@@ -4,48 +4,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-Addinedu 4기 최종 프로젝트 — **로봇 호텔**. 사람 손님이 묵는 호텔에 OpenArm(체크인 응대), Pinky(룸서비스 배달), OMX 3대(객실 비치)로 구성된 로봇 직원이 서비스를 제공한다.
+Addinedu 4기 최종 프로젝트 — **pingdergarten**. 유치원에서 아이와 놀아주고 교사를 보조하는 교육보조로봇 서비스. OpenArm(놀이·정리정돈), Pinky(등하원·교사 추종·운반·놀이), OMX 3대(교실 비치·Pinky 양팔)로 구성된 로봇이 등원부터 하원까지 하루 일과를 함께한다.
 
+- 팀명: 사랑의 에듀핑
+- 프로젝트명: pingdergarten
 - 팀: 6명
-- 기간: 2026-04-28 ~ 2026-06-04 (약 5주)
+- 기간: 2026-04-23 ~ 2026-06-04 (약 7주)
 - 진행 단계: 시뮬레이션 검증 → 실물 이전
 - 현재 상태: 요구사항 정의 단계 (코드 미작성)
 
-## 기술 스택
+## 구현 완료 항목 관리
 
-- **로봇/제어**: ROS2 Jazzy
-- **언어**: Python
-- **데이터베이스**: PostgreSQL 17
-- **손님 앱**: 휴대폰 웹앱
-- **직원 앱**: PyQt5 데스크톱 앱
-- **음성 입력**: 브라우저 STT (Web Speech API)
+[docs/implementation-plan.md](docs/implementation-plan.md) 의 SR 이 **완전히** 구현되면 다음을 같은 commit 으로 처리한다:
 
-## 객실 구성
+1. 해당 SR 행을 [docs/implemented.md](docs/implemented.md) 의 동일 섹션 헤딩 아래로 옮긴다.
+2. 옮긴 행에 `구현 위치` (코드 경로) 와 `완료일` (YYYY-MM-DD) 컬럼을 추가한다.
+3. `implementation-plan.md` 에서 해당 행을 삭제한다. 섹션의 모든 SR 이 옮겨졌다면 섹션 본문에 `> 구현 완료 — [implemented.md](implemented.md) 참조` 한 줄만 남긴다.
 
-- 스위트룸 (8인실) × 1
-- 일반 객실 (2인실) × 1
+부분 구현은 옮기지 않는다. UI 만 완료, ROS2 publish 가 남은 식이라면 plan 에 그대로 두고, 모든 부분이 끝났을 때 한 번에 이동한다.
 
-## 시스템 구성
+## ROS 환경
 
-| 영역 | 구성 |
-|---|---|
-| 체크인 데스크 | OpenArm 1대 + 노트북(키오스크 역할) |
-| 룸서비스 | Pinky 1대 (자율주행 배달) |
-| 객실 내 | OMX 3대 — 신발 정리 / 조명 스위치 조작 / 책상 정리 / 모닝콜 (4종 작업, 3대 매핑은 미정) |
-| 손님 인터페이스 | 휴대폰 웹앱 — 예약 확인, 음성 객실 제어, 룸서비스 주문, 모닝콜 설정, 알림 수신 |
-| 직원 인터페이스 | PyQt5 데스크톱 앱 — 예약 관리, 객실 상태 보드, 로봇 모니터링, 작업 큐, 수동 제어 |
+- 사용 가능한 ROS_DOMAIN_ID: **201 ~ 219**
+- 팀원 간 충돌을 피하기 위해 각자 할당된 ID를 사용한다.
 
-## 레포 레이아웃
+## Python 환경
 
-## 개발 명령어
+의존성은 **루트 [pyproject.toml](pyproject.toml) 하나**로 통합 관리한다.
 
-(코드 작성 후 채워 넣을 예정)
+- 설치: `conda run -n jazzy pip install -e .` (프로젝트 루트에서 실행)
+- 새 의존성 추가 시 `pyproject.toml` 의 `[project.dependencies]` 에 추가한다.
+- `venv`, `uv` 등 별도 가상환경을 생성하지 않는다. `.venv/`, `uv.lock` 파일을 만들지 않는다.
+- 서비스별 `requirements.txt` 나 `pyproject.toml` 을 새로 만들지 않는다.
 
-## 컨벤션
+## 테스트
 
-- 커밋 메시지는 한국어 사용 가능. **`Claude`, `claude`, `Co-Authored-By: Claude` 등 AI 관련 표현은 절대 포함하지 않는다.**
-- 응답·문서는 한국어로 작성하되, 영어 직역체를 피하고 자연스러운 한국어를 쓴다. (코드 주석·식별자는 영어)
+유닛테스트를 새로 만들 때마다 [scripts/test.sh](scripts/test.sh) 에 해당 테스트 실행 명령을 추가한다. `test.sh` 는 프로젝트 전체 테스트를 한 번에 돌릴 수 있는 단일 진입점이다.
 
 ## 참조 문서
 
-- 사용자 요구사항: [docs/user-requirements.md](docs/user-requirements.md)
+상세 문서 목록은 [docs/CLAUDE.md](docs/CLAUDE.md). Confluence 동기화는 [scripts/CLAUDE.md](scripts/CLAUDE.md).

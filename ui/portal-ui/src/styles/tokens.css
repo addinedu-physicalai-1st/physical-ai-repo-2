@@ -1,0 +1,94 @@
+:root {
+  /* ─── Color · Surface ───────────────────────────── */
+  --color-surface-base: #FAF8F4;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F4F1EA;
+  --color-surface-inverse: #1F2A37;
+
+  /* ─── Color · Text ──────────────────────────────── */
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-text-on-inverse: #F8F4EC;
+  --color-text-on-inverse-muted: #B6AE9F;
+
+  /* ─── Color · Border ────────────────────────────── */
+  --color-border-subtle: #ECE7DD;
+  --color-border-strong: #D9D2C3;
+  --color-border-on-inverse: #2E3A48;
+
+  /* ─── Color · Brand ─────────────────────────────── */
+  --color-brand-primary: #E07856;
+  --color-brand-primary-hover: #CB6A4A;
+  --color-brand-primary-soft: #FBE9DF;
+  --color-brand-primary-soft-inverse: rgba(224, 120, 86, 0.18);
+  --color-brand-secondary: #5B8DEF;
+  --color-brand-secondary-soft: #E4ECFB;
+
+  /* ─── Color · Accent ────────────────────────────── */
+  --color-accent-warm: #F4C28A;
+  --color-accent-warm-soft: #FBEFD9;
+
+  /* ─── Color · Status ────────────────────────────── */
+  --color-status-success: #5BA978;
+  --color-status-success-soft: #E2F1E8;
+  --color-status-warning: #E0A03A;
+  --color-status-warning-soft: #FBEED4;
+  --color-status-danger: #D9534F;
+  --color-status-danger-soft: #F8E2E1;
+  --color-status-info: #5B8DEF;
+  --color-status-info-soft: #E4ECFB;
+
+  /* ─── Typography ────────────────────────────────── */
+  --font-family-base: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', sans-serif;
+  --font-family-numeric: 'Inter Tight', 'Pretendard Variable', sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 28px;
+  --font-size-3xl: 36px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.65;
+
+  /* ─── Spacing ───────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+  --space-11: 80px;
+  --space-12: 96px;
+
+  /* ─── Radius ────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ─── Shadow ────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(28, 20, 8, 0.04);
+  --shadow-sm: 0 1px 2px rgba(28, 20, 8, 0.04), 0 2px 8px rgba(120, 90, 60, 0.05);
+  --shadow-md: 0 1px 2px rgba(28, 20, 8, 0.04), 0 4px 16px rgba(120, 90, 60, 0.07);
+  --shadow-lg: 0 4px 12px rgba(28, 20, 8, 0.06), 0 12px 32px rgba(120, 90, 60, 0.10);
+
+  /* ─── Motion ────────────────────────────────────── */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 280ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ─── Focus ─────────────────────────────────────── */
+  --focus-ring: 0 0 0 3px rgba(224, 120, 86, 0.30);
+}

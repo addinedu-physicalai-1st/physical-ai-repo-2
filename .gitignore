@@ -1,2 +1,9 @@
 .env
 __pycache__
+.superpowers
+*.egg-info
+node_modules/
+*.tsbuildinfo
+dist/
+server/storage/
+.playwright-mcp

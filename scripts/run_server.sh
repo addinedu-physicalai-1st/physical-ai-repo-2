@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# scripts/run_server.sh — postgres + pgweb + AI Hub + Control 을 한 번에 실행.
+#
+# 동작:
+#   - postgres + pgweb docker 컨테이너 자동 기동 (없으면 띄우고, healthy 까지 대기)
+#   - tmux 세션 'pingdergarten' 안에 window 4개 (postgres / pgweb / ai-hub / control)
+#   - 한 화면엔 1개 window 만 표시. 하단 status bar 의 window 이름을 마우스 클릭으로 전환
+#   - pgweb DB 뷰어: http://localhost:8081
+#
+# 사용:
+#   scripts/run_server.sh           # 세션 시작·attach (이미 떠있으면 attach)
+#   scripts/run_server.sh down      # tmux 세션 + postgres/pgweb 컨테이너 종료
+#   scripts/run_server.sh status    # 세션 상태 + window 목록
+#
+# 의존:
+#   - tmux, docker, conda env 'jazzy'
+#   - host 에 ollama 가 떠있어야 한다 (`ollama serve` 또는 macOS 앱)
+#
+# 단축키 (tmux):
+#   - 마우스로 하단 status bar 의 window 이름 클릭 → 전환
+#   - Ctrl+B 다음 0/1/2 → window 번호로 전환
+#   - Ctrl+B 다음 D → detach (백그라운드 유지)
+set -euo pipefail
+
+SESSION="pingdergarten"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ACTION="${1:-up}"
+
+if ! command -v tmux &>/dev/null; then
+  echo "[run_server] tmux 가 설치되어 있지 않습니다 (brew install tmux)" >&2
+  exit 1
+fi
+
+case "$ACTION" in
+  up|"")
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+      echo "[run_server] 세션 '$SESSION' 이미 떠있음 — attach"
+      exec tmux attach -t "$SESSION"
+    fi
+
+    # postgres + pgweb 기동 (이미 떠있으면 no-op) + healthy 대기
+    cd "$REPO_ROOT"
+    echo "[run_server] postgres + pgweb 컨테이너 시작..."
+    docker compose up -d postgres pgweb
+
+    echo "[run_server] postgres healthy 대기..."
+    healthy=0
+    for _ in {1..30}; do
+      if docker compose ps postgres --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
+        healthy=1
+        break
+      fi
+      sleep 1
+    done
+    if [[ $healthy -ne 1 ]]; then
+      echo "[run_server] postgres healthy 안 됨 — 'docker compose logs postgres' 로 확인" >&2
+      exit 1
+    fi
+    echo "[run_server] postgres ready (localhost:5432) / pgweb ready (http://localhost:8081)"
+
+    # 포트 충돌 사전 경고 (치명적이진 않음 — 사용자가 알아서 처리)
+    for port in 8000 8001 8081; do
+      if lsof -i ":$port" -P -sTCP:LISTEN &>/dev/null; then
+        echo "[run_server] ⚠ 포트 $port 가 이미 사용 중 — 해당 서비스가 바인드 실패하면 window 에 에러가 표시됩니다." >&2
+      fi
+    done
+
+    # remain-on-exit on: 프로세스 종료해도 window 유지 (에러 메시지 보고 디버깅 가능)
+    tmux new-session -d -s "$SESSION" -x 200 -y 50 -n postgres -c "$REPO_ROOT" \
+      'docker compose logs -f postgres'
+    tmux set-option -t "$SESSION" -g remain-on-exit on
+
+    # window 1: pgweb :8081 (DB 뷰어)
+    tmux new-window -t "$SESSION" -n pgweb -c "$REPO_ROOT" \
+      'docker compose logs -f pgweb'
+
+    # window 2: ai-hub :8001
+    tmux new-window -t "$SESSION" -n ai-hub -c "$REPO_ROOT" \
+      'conda run --no-capture-output -n jazzy uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload'
+
+    # window 3: control :8000
+    tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
+      'conda run --no-capture-output -n jazzy uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload'
+
+    # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
+    tmux set-option -t "$SESSION" -g mouse on
+    tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
+    tmux set-option -t "$SESSION" -g window-status-current-style 'bg=colour33,fg=white,bold'
+    tmux set-option -t "$SESSION" -g window-status-format ' #I:#W '
+    tmux set-option -t "$SESSION" -g window-status-current-format ' #I:#W '
+
+    # control window 로 attach (가장 자주 보는 화면)
+    tmux select-window -t "$SESSION:control"
+
+    echo "[run_server] 세션 '$SESSION' 시작 — attach"
+    echo "[run_server] 하단 status bar 의 'postgres / pgweb / ai-hub / control' 클릭으로 전환"
+    exec tmux attach -t "$SESSION"
+    ;;
+  down)
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+      tmux kill-session -t "$SESSION"
+      echo "[run_server] 세션 '$SESSION' 종료"
+    else
+      echo "[run_server] 세션 '$SESSION' 없음"
+    fi
+
+    echo "[run_server] 컨테이너 종료..."
+    cd "$REPO_ROOT"
+    docker compose down
+    echo "[run_server] 완료 — 볼륨(pg_data)은 유지됨. 완전 삭제는 'docker compose down -v'"
+    ;;
+  status)
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+      echo "[run_server] '$SESSION' 실행 중"
+      tmux list-windows -t "$SESSION"
+    else
+      echo "[run_server] '$SESSION' 없음"
+    fi
+    ;;
+  *)
+    echo "usage: $0 [up|down|status]" >&2
+    exit 2
+    ;;
+esac

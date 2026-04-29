@@ -1,0 +1,59 @@
+{
+  "$schema_note": "백엔드(server/ai/emotions.py) ↔ 프론트(ui/robot-ui/src/config/emotions.ts) 가 공유하는 감정 정의. id 는 EmotionId 와 1:1 매칭.",
+  "emotions": [
+    {
+      "id": "basic",
+      "label": "기본",
+      "description": "특별한 감정 색이 없는 평온한 응답. 정보 전달이나 짧은 안내.",
+      "chat_eligible": true
+    },
+    {
+      "id": "hello",
+      "label": "반가움",
+      "description": "인사·환영. 처음 만났거나 호명에 반응할 때.",
+      "chat_eligible": true
+    },
+    {
+      "id": "happy",
+      "label": "기쁨",
+      "description": "긍정적이고 즐거운 응답. 칭찬·축하·좋은 소식.",
+      "chat_eligible": true
+    },
+    {
+      "id": "fun",
+      "label": "신남",
+      "description": "장난스럽고 활기찬 응답. 놀이·농담 분위기.",
+      "chat_eligible": true
+    },
+    {
+      "id": "interest",
+      "label": "호기심",
+      "description": "관심·궁금함. 되묻거나 같이 알아보자고 제안할 때.",
+      "chat_eligible": true
+    },
+    {
+      "id": "bored",
+      "label": "지루함",
+      "description": "심심하거나 시들한 감정. 반복적이거나 흥미가 떨어지는 화제.",
+      "chat_eligible": true
+    },
+    {
+      "id": "sad",
+      "label": "슬픔",
+      "description": "위로·공감이 필요한 응답. 아이가 속상해하거나 부정적 화제.",
+      "chat_eligible": true
+    },
+    {
+      "id": "angry",
+      "label": "화남",
+      "description": "단호함·불만. 위험한 상황을 말리거나 잘못을 지적할 때.",
+      "chat_eligible": true
+    },
+    {
+      "id": "sleep",
+      "label": "졸림",
+      "description": "자장가 모드 등 휴식·취침 분위기 전용. 자연발화 chat 응답에는 사용 금지.",
+      "chat_eligible": false
+    }
+  ]
+}

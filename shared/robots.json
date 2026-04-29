@@ -1,0 +1,91 @@
+{
+  "$schema_note": "백엔드(server/ai/robots.py) ↔ 프론트(ui/robot-ui/src/config/robots.ts) 가 공유하는 로봇/모드 정의. 양쪽 다 이 파일을 읽음.",
+  "robots": [
+    {
+      "id": "eduping",
+      "displayName": "EduPing",
+      "wakeWord": "에듀핑",
+      "wakeWordAliases": ["에듀핀", "애듀핑", "애듀핀", "에듀팽", "에듀빙"],
+      "modes": ["대기", "등원", "하원", "율동", "아기상어", "곰 세마리", "놀이", "가게놀이", "무궁화꽃이 피었습니다"],
+      "modeTree": [
+        "대기",
+        "등원",
+        "하원",
+        { "id": "율동", "children": ["아기상어", "곰 세마리"], "selfSelectable": false },
+        {
+          "id": "놀이", "selfSelectable": false,
+          "children": ["가게놀이", "무궁화꽃이 피었습니다"]
+        }
+      ],
+      "defaultEmotionByMode": {
+        "대기": "basic",
+        "등원": "basic",
+        "하원": "basic",
+        "놀이": "fun",
+        "율동": "fun",
+        "아기상어": "fun",
+        "곰 세마리": "fun",
+        "가게놀이": "fun",
+        "무궁화꽃이 피었습니다": "fun"
+      },
+      "restrictedVoiceMode": null
+    },
+    {
+      "id": "gogoping",
+      "displayName": "GogoPing",
+      "wakeWord": "고고핑",
+      "wakeWordAliases": ["고고핀", "꼬꼬핑", "꼬꼬핀", "고고팽", "고고빙"],
+      "modes": ["대기", "보조", "놀이", "숨바꼭질", "자장가"],
+      "modeTree": [
+        "대기",
+        "보조",
+        {
+          "id": "놀이", "selfSelectable": false,
+          "children": ["숨바꼭질"]
+        },
+        "자장가"
+      ],
+      "defaultEmotionByMode": {
+        "대기": "basic",
+        "보조": "basic",
+        "놀이": "fun",
+        "숨바꼭질": "fun",
+        "자장가": "sleep"
+      },
+      "restrictedVoiceMode": "보조"
+    },
+    {
+      "id": "noriarm",
+      "displayName": "NoriArm",
+      "wakeWord": "노리암",
+      "wakeWordAliases": ["놀이암", "노리아", "노라암", "노리야"],
+      "modes": ["대기", "놀이", "블럭쌓기"],
+      "modeTree": [
+        "대기",
+        {
+          "id": "놀이", "selfSelectable": false,
+          "children": ["블럭쌓기"]
+        }
+      ],
+      "defaultEmotionByMode": {
+        "대기": "basic",
+        "놀이": "interest",
+        "블럭쌓기": "interest"
+      },
+      "restrictedVoiceMode": null
+    }
+  ],
+  "modeDescriptions": {
+    "등원": "아침 등원할 때 얼굴 인식으로 출석 체크하고 반갑게 인사하기",
+    "하원": "하원할 때 출석 체크하고 인사하기",
+    "놀이": "아이들과 함께 놀이 활동 진행하기",
+    "율동": "음악에 맞춰 율동·춤 보여주기",
+    "가게놀이": "아이들과 가게 역할 놀이 함께 하기",
+    "무궁화꽃이 피었습니다": "무궁화꽃이 피었습니다 놀이 진행",
+    "보조": "선생님 곁에서 따라다니며 짐 운반하고 보조하기",
+    "숨바꼭질": "아이들과 숨바꼭질 놀이",
+    "자장가": "자장가 불러주기",
+    "블럭쌓기": "블럭으로 모양 만들고 같이 쌓기"
+  },
+  "stopTokens": ["정지", "멈춰", "그만", "스톱"]
+}

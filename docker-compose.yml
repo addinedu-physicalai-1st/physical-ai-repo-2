@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: pingdergarten-postgres
+    environment:
+      POSTGRES_USER: pingder
+      POSTGRES_PASSWORD: pingder
+      POSTGRES_DB: pingdergarten
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pingder -d pingdergarten"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pgweb:
+    image: sosedoff/pgweb:latest
+    container_name: pingdergarten-pgweb
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://pingder:pingder@postgres:5432/pingdergarten?sslmode=disable
+    ports:
+      - "8081:8081"
+
+volumes:
+  pg_data:
