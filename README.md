@@ -2,9 +2,9 @@
 
 유치원 교육보조로봇 서비스. 아이와 놀아주고 교사를 보조한다.
 
-- **OpenArm** — 놀이·정리정돈
-- **Pinky** — 등하원·교사 추종·운반·놀이
-- **OMX ×3** — 교실 비치·Pinky 양팔
+- **EduPing** — 율동 안내·가게놀이·정리정돈·무궁화꽃이 피었습니다
+- **GogoPing** — 등하원·교사 보조 (추종·운반)·숨바꼭질·자장가
+- **NoriArm** — 블럭쌓기·정리
 
 Addinedu 4기 최종 프로젝트 | 팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-06-04
 
@@ -22,7 +22,7 @@ Addinedu 4기 최종 프로젝트 | 팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-
 
 ### 사전 준비
 
-- conda 환경 (`jazzy`, Python 3.11+)
+- Python 3.12 가상환경
 - [Ollama](https://ollama.com) 설치 및 실행 (`ollama serve`)
 - tmux
 
@@ -30,7 +30,7 @@ Addinedu 4기 최종 프로젝트 | 팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-
 
 ```bash
 # 1. 저장소 클론 (submodule 포함)
-git clone --recurse-submodules <repo-url>
+git clone --recurse-submodules <repo-url> pingdergarten
 cd pingdergarten
 
 # 또는 이미 클론했다면 submodule 초기화
