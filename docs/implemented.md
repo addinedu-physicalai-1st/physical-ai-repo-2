@@ -34,7 +34,7 @@
 
 | S ID | Name | Description | Priority | 구현 위치 | 완료일 |
 | --- | --- | --- | --- | --- | --- |
-| SR-UI-001 | 표정 상시 표시 | 각 로봇 UI 가 표정 자원 (basic·hello·happy·fun·interest·bored·sad·angry — pinky_pro WebP 변환본 + sleep — 별도 자원) 을 현재 모드·이벤트에 따라 디스플레이에 상시 재생한다. | High | `ui/robot-ui/src/common/EmotionDisplay.vue`, `ui/robot-ui/public/emotions/*.webp` | 2026-05-04 |
+| SR-UI-001 | 표정 상시 표시 | 각 로봇 UI 가 표정 (basic·hello·happy·fun·interest·bored·sad·angry·sleep) 을 현재 모드·이벤트에 따라 디스플레이에 상시 표시한다. three.js 셰이더로 눈·눈썹·입 파라미터를 합성. | High | `ui/robot-ui/src/common/EmotionDisplay.vue`, `ui/robot-ui/src/common/ShaderFace.vue` | 2026-05-04 |
 
 ## 5. Portal Web (학부모·교사 공용 웹앱)
 

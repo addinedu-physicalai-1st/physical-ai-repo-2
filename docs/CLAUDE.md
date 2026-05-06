@@ -16,7 +16,7 @@ Confluence 와 양방향 동기화되는 설계 문서.
 | [tech-stack.md](tech-stack.md) | 추상 동사 → 라이브러리·모델 매핑 |
 | [robots/openarm.md](robots/openarm.md) | OpenArm — EduPing 하드웨어 사양 |
 | [robots/vic-pinky.md](robots/vic-pinky.md) | Vic Pinky — GogoPing 하드웨어 사양 |
-| [robots/omx-ai.md](robots/omx-ai.md) | OMX-AI — GogoArm·NoriArm 하드웨어 사양 |
+| [robots/omx-ai.md](robots/omx-ai.md) | OMX-AI — NoriArm 하드웨어 사양 |
 
 ## 동기화 규칙
 

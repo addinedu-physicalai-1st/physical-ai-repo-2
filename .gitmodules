@@ -1,9 +1,6 @@
 [submodule "device/gogoping_ws/src/vic_pinky"]
 	path = device/gogoping_ws/src/vic_pinky
 	url = https://github.com/pinklab-art/vic_pinky.git
-[submodule "device/gogoping_ws/src/open_manipulator"]
-	path = device/gogoping_ws/src/open_manipulator
-	url = https://github.com/robotis-git/open_manipulator.git
 [submodule "device/noriarm_ws/src/open_manipulator"]
 	path = device/noriarm_ws/src/open_manipulator
 	url = https://github.com/robotis-git/open_manipulator.git

@@ -20,22 +20,22 @@ last_synced: "2026-05-04T13:33:23"
 
 | 로봇 UI | 모드 |
 | --- | --- |
-| EduPing UI | 대기, 율동, 가게놀이, 정리정돈, 무궁화꽃이 피었습니다 |
-| GogoPing UI | 대기, 등원, 하원, 보조, 숨바꼭질, 자장가 |
+| EduPing UI | 대기, 등원, 하원, 율동, 가게놀이, 정리정돈, 무궁화꽃이 피었습니다 |
+| GogoPing UI | 대기, 보조, 숨바꼭질, 자장가 |
 | NoriArm UI | 대기, 블럭쌓기, 정리 |
 
 ## 0.2 모드별 동작 매트릭스
 
-| 로봇 UI | 모드 | 호출어 | 표정 GIF | 자연 촬영 | 인접 정지 | default 표정 |
+| 로봇 UI | 모드 | 호출어 | 표정 | 자연 촬영 | 인접 정지 | default 표정 |
 | --- | --- | :---: | :---: | :---: | :---: | --- |
 | EduPing UI | 대기 | ✓ | ✓ | ✗ | ✗ | basic |
+| EduPing UI | 등원 | ✓ | ✓ | ✗ | ✓ | hello |
+| EduPing UI | 하원 | ✓ | ✓ | ✗ | ✓ | hello |
 | EduPing UI | 율동 | ✓ | ✓ | ✓ | ✓ | fun |
 | EduPing UI | 가게놀이 | ✓ | ✓ | ✓ | ✗ | fun |
 | EduPing UI | 정리정돈 | ✓ | ✓ | ✗ | ✓ | interest |
 | EduPing UI | 무궁화꽃이 피었습니다 | ✓ | ✓ | ✓ | ✓ | fun |
 | GogoPing UI | 대기 | ✓ | ✓ | ✗ | ✗ | basic |
-| GogoPing UI | 등원 | ✓ | ✓ | ✗ | ✓ | hello |
-| GogoPing UI | 하원 | ✓ | ✓ | ✗ | ✓ | hello |
 | GogoPing UI | 보조 | ✓ | ✓ | ✗ | ✓ | basic |
 | GogoPing UI | 숨바꼭질 | ✓ | ✓ | ✓ | ✓ | fun |
 | GogoPing UI | 자장가 | ✓ | ✓ | ✗ | ✗ | sleep |
@@ -47,8 +47,7 @@ last_synced: "2026-05-04T13:33:23"
 
 | 자원 | 종류 |
 | --- | --- |
-| pinky_pro 의 emotion gif (WebP 변환) | basic / hello / happy / fun / interest / bored / sad / angry — 출처: pinklab-art/pinky_pro, Apache-2.0, 600×450 resize + WebP lossy q=80 으로 변환 |
-| 추가 표정 | sleep — 별도 자원 (`ui/robot-ui/public/emotions/sleep.webp`), GogoPing 자장가 모드 default. pinky_pro 에 sleeping 이 없어 외부에서 별도 추가 |
+| three.js 셰이더 표정 (`ui/robot-ui/src/common/ShaderFace.vue`) | basic / hello / happy / fun / interest / bored / sad / angry / sleep — 눈·눈썹·입 파라미터 (closure / smileBow / smileThickness 등) 로 표정을 코드로 합성. 외부 이미지 자원 없음 |
 
 ## 0.4 디바이스 점유
 
@@ -99,27 +98,27 @@ last_synced: "2026-05-04T13:33:23"
 | 탈락 대기 | 탈락자 결정 | 탈락자가 시야 밖으로 나갈 때까지 대기 | sad | 노래 |
 | 종료 (전역 트리거) | 어느 단계에서든 EduPing UI 터치 버튼 클릭 또는 호출어 + 자연어 모드 전환 명령 (mp3 재생 중이면 즉시 정지) | 게임 종료 음성 재생, 대기 모드로 전환 | happy | 대기 |
 
-## 2. GogoPing UI (Robot UI 코드베이스의 `VITE_ROBOT=gogoping` 인스턴스, VicPinky + OMX 양팔 + Laptop)
-
-### 2.1 등원
+### 1.5 등원
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-IN-001 | 정문 위치 선점·얼굴 캡처 | GogoPing 이 등원 모드 진입 시 자율 주행 으로 정문 위치 (`gate`) 에 도착한 후, 노트북 웹캠 시야에 등록된 얼굴 등장 시 단일 프레임을 캡처한다. 미등록 얼굴은 무시한다. | High |
-| SR-IN-002 | 얼굴 식별 | GogoPing 이 얼굴 인식 으로 등록 임베딩과 매칭해 등원하는 아이의 child_id 를 확정한다. 당일 이미 등원 기록이 있는 child_id 는 무시한다. | High |
-| SR-IN-003 | 환영 인사 출력 | GogoPing 이 음성 합성 으로 이름을 포함한 환영 멘트를 합성해 노트북 스피커로 재생한다. 멘트 재생 중 다른 아이가 등장하면 큐에 적재해 순차 처리한다. | High |
-| SR-IN-004 | 환영 모션 | GogoPing 의 GogoArm(OMX 양팔) 이 사전 녹화 환영 trajectory 를 재생하고, 완료 후 출결 시각 기록 (SR-IN-006) 을 트리거한다. | High |
+| SR-IN-001 | 얼굴 캡처 | EduPing 이 정문에 상주한 상태에서 등원 모드 진입 시, 노트북 웹캠 시야에 등록된 얼굴 등장 시 단일 프레임을 캡처한다. 미등록 얼굴은 무시한다. | High |
+| SR-IN-002 | 얼굴 식별 | EduPing 이 얼굴 인식 으로 등록 임베딩과 매칭해 등원하는 아이의 child_id 를 확정한다. 당일 이미 등원 기록이 있는 child_id 는 무시한다. | High |
+| SR-IN-003 | 환영 인사 출력 | EduPing 이 음성 합성 으로 이름을 포함한 환영 멘트를 합성해 노트북 스피커로 재생한다. 멘트 재생 중 다른 아이가 등장하면 큐에 적재해 순차 처리한다. | High |
+| SR-IN-004 | 환영 모션 | EduPing 의 OpenArm 이 사전 녹화 환영 trajectory 를 재생하고, 완료 후 출결 시각 기록 (SR-IN-006) 을 트리거한다. | High |
 
-### 2.2 하원
+### 1.6 하원
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-OUT-001 | 정문 위치 선점·얼굴 캡처 | GogoPing 이 하원 모드 진입 시 자율 주행 으로 정문 위치 (`gate`) 에 도착한 후, 노트북 웹캠 시야에 등록된 얼굴 등장 시 단일 프레임을 캡처한다. 미등록 얼굴(학부모 포함)은 무시한다. | High |
-| SR-OUT-002 | 얼굴 식별 | GogoPing 이 얼굴 인식 으로 등록 임베딩과 매칭해 하원하는 아이의 child_id 를 확정한다. 당일 이미 하원 기록이 있는 child_id 는 무시한다. | High |
-| SR-OUT-003 | 작별 인사 출력 | GogoPing 이 음성 합성 으로 이름을 포함한 작별 멘트를 합성해 노트북 스피커로 재생한다. 멘트 재생 중 다른 아이가 등장하면 큐에 적재해 순차 처리한다. | High |
-| SR-OUT-004 | 작별 모션 | GogoPing 의 GogoArm(OMX 양팔) 이 사전 녹화 작별 trajectory 를 재생하고, 완료 후 출결 시각 기록 (SR-OUT-006) 을 트리거한다. | High |
+| SR-OUT-001 | 얼굴 캡처 | EduPing 이 정문에 상주한 상태에서 하원 모드 진입 시, 노트북 웹캠 시야에 등록된 얼굴 등장 시 단일 프레임을 캡처한다. 미등록 얼굴(학부모 포함)은 무시한다. | High |
+| SR-OUT-002 | 얼굴 식별 | EduPing 이 얼굴 인식 으로 등록 임베딩과 매칭해 하원하는 아이의 child_id 를 확정한다. 당일 이미 하원 기록이 있는 child_id 는 무시한다. | High |
+| SR-OUT-003 | 작별 인사 출력 | EduPing 이 음성 합성 으로 이름을 포함한 작별 멘트를 합성해 노트북 스피커로 재생한다. 멘트 재생 중 다른 아이가 등장하면 큐에 적재해 순차 처리한다. | High |
+| SR-OUT-004 | 작별 모션 | EduPing 의 OpenArm 이 사전 녹화 작별 trajectory 를 재생하고, 완료 후 출결 시각 기록 (SR-OUT-006) 을 트리거한다. | High |
 
-### 2.3 보조
+## 2. GogoPing UI (Robot UI 코드베이스의 `VITE_ROBOT=gogoping` 인스턴스, VicPinky + Laptop)
+
+### 2.1 보조
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
@@ -144,7 +143,7 @@ last_synced: "2026-05-04T13:33:23"
 | 도착 | 자율 주행 액션 완료 | 대기 상태로 전이 후 교사앱 토스트·사운드 + GogoPing 노트북 스피커 음성 알림 | happy | 대기 |
 | 정지 (전역 트리거) | 어느 단계에서든 UI "정지" 버튼 클릭 또는 호출어 + 정지 의도 발화 (호출어만 부르면 일시 정지 + 대답 후 직전 단계 재개) | 진행 동작 종료 → 대기 | basic | 대기 |
 
-### 2.4 숨바꼭질
+### 2.2 숨바꼭질
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
@@ -157,22 +156,22 @@ last_synced: "2026-05-04T13:33:23"
 | 진입 | §8.2 명령 인터페이스의 모드 전환 | 모드 진입 | hello | 위치 이동 |
 | 위치 이동 | 진입 직후 | 자율 주행 으로 놀이 위치 (`play_area`) 로 이동 | basic | 참가자 확정 |
 | 참가자 확정 | 놀이 위치 도착 | GogoPing 노트북 웹캠 + 얼굴 인식 으로 등록 임베딩과 매칭해 참가 아이 (최대 5명, 시야 내 등록된 아이) 를 확정 | hello | 카운트다운 |
-| 카운트다운 | 참가자 확정 | GogoPing 노트북 디스플레이 로봇 눈 GIF + GogoArm 양팔이 디스플레이 앞에서 눈 가리기 모션 + 음성 합성 으로 30초 카운트다운 | fun | 순찰 |
+| 카운트다운 | 참가자 확정 | GogoPing 노트북 디스플레이의 셰이더 로봇 눈 (눈 가리기 표정) + 음성 합성 으로 30초 카운트다운 | fun | 순찰 |
 | 순찰 | 카운트다운 종료 | 자율 주행 으로 무작위 `patrol_*` named pose 순찰 | interest | 호명 (참가 아이 발견 시) |
 | 호명 | 시야 내 등록 참가 아이 발견 (얼굴 인식) | 음성 합성 으로 이름 호명, 해당 아이를 "잡힘" 으로 게임에서 제외 | happy | (남은 아이) 순찰 / (모두 잡힘) 종료 |
 | 종료 (전역 트리거) | 모든 참가 아이 발견 / 타임아웃 / 교사 종료 명령 (호출어 + 자연어 / UI) | 종료 음성 재생, 대기 모드로 전환 | (모두 발견) happy / (타임아웃) sad / (교사 종료) basic | 대기 |
 
-### 2.5 자장가
+### 2.3 자장가
 
 > 구현 완료 — [implemented.md](implemented.md) 참조
 
-### 2.6 낮잠 시각 기록
+### 2.4 낮잠 시각 기록
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
 | SR-NAP-002 | 낮잠 시각 기록 | GogoPing 이 낮잠 모드(자장가) 진입·종료 시각을 Control Server REST 로 전달하고, Control Server 가 DB `mode_history` 에 기록한다. AI Server 보고서 생성(SR-RPT-001) 시 해당 당일 낮잠 시작·종료 시각을 조회해 요약에 포함한다. | High |
 
-### 2.7 주행 안전 / 자가관리
+### 2.5 주행 안전 / 자가관리
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
@@ -181,11 +180,10 @@ last_synced: "2026-05-04T13:33:23"
 | SR-SAF-005 | 사람 근접 시 감속 | GogoPing 이 자율 주행 의 속도 제한 으로 사람 인접 거리에 따라 최대 속도를 스케일 다운한다. 모든 모드에서 항상 활성. | Low |
 | SR-REL-004 | 배터리 저하 복귀 | GogoPing 이 배터리 임계치 도달 시 비긴급 작업(추종 제외 모든 상태)을 cancel 하고 자율 주행 으로 충전소 (`charger`) 로 복귀한다. | Low |
 
-### 2.8 nav graph named pose 카탈로그
+### 2.6 nav graph named pose 카탈로그
 
 | key | 위치 | 사용 SR |
 | --- | --- | --- |
-| gate | 정문 (등·하원 위치) | SR-IN-001, SR-OUT-001 |
 | play_area | 숨바꼭질 놀이 위치 | SR-PLAY-007 |
 | patrol_1 .. patrol_N | 순찰용 무작위 위치 (N ≥ 3 권장) | SR-PLAY-007 |
 | charger | 충전소 | SR-REL-004 |
@@ -354,7 +352,7 @@ last_synced: "2026-05-04T13:33:23"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-SAF-003 | 인접 정지 | EduPing(OpenArm)·GogoArm·NoriArm이 작업영역 워치독 + 카메라 사람 검출로 진입 시 trajectory 를 일시 정지한다. | High |
+| SR-SAF-003 | 인접 정지 | EduPing(OpenArm)·NoriArm이 작업영역 워치독 + 카메라 사람 검출로 진입 시 trajectory 를 일시 정지한다. | High |
 
 ### 8.2 명령 인터페이스 (모든 UI — 자연어 + 클릭)
 

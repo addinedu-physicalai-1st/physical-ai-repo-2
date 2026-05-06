@@ -2,8 +2,8 @@
 confluence_page_id: "40763394"
 confluence_url: "https://woolimi.atlassian.net/wiki/spaces/FN/pages/40763394/Folder+Structure"
 title: "Folder Structure"
-confluence_version: 5
-last_synced: "2026-05-04T09:35:56"
+confluence_version: 6
+last_synced: "2026-05-06T14:29:29"
 ---
 
 # 폴더 구조
@@ -25,9 +25,9 @@ pingdergarten/
 │   └── robots/
 │       ├── openarm.md                # EduPing 듀얼 암
 │       ├── vic-pinky.md              # GogoPing 모바일 베이스
-│       └── omx-ai.md                 # GogoArm · NoriArm 매니퓰레이터
+│       └── omx-ai.md                 # NoriArm 매니퓰레이터
 │
-├── .gitmodules                       # vendor 패키지 (vic_pinky, open_manipulator) submodule 정의
+├── .gitmodules                       # vendor 패키지 (vic_pinky, NoriArm open_manipulator) submodule 정의
 ├── scripts/                          # 평면 구조, 접두어로 분류
 │   ├── pull_docs.sh                  # Confluence → docs/ pull
 │   ├── push_docs.sh                  # docs/ → Confluence push
@@ -39,23 +39,22 @@ pingdergarten/
 │   ├── ui-portal.sh                  # portal-ui vite dev
 │   ├── ui-admin.sh                   # python -m admin_app
 │   ├── device-gogoping-pi.sh         # GogoPing 라즈베리파이 — vicpinky_bringup (모터·LiDAR)
-│   ├── device-gogoping-laptop.sh     # GogoPing 노트북 — Nav2/SLAM + OMX + gogoping_* 응용 + 비전
+│   ├── device-gogoping-laptop.sh     # GogoPing 노트북 — Nav2/SLAM + gogoping_* 응용 + 비전
 │   ├── device-eduping.sh             # EduPing 노트북 (단일) — OpenArm + 비전 + eduping_* 응용
 │   └── device-noriarm.sh             # NoriArm 노트북 (단일) — OMX + 비전 + noriarm_* 응용
 │
 ├── ui/
 │   ├── robot-ui/                     # Vue 3 + Vite 단일 코드베이스 (eduping/gogoping/noriarm 분기)
 │   │   ├── src/
-│   │   │   ├── common/               # 호출어·STT·TTS·표정·모드 셀렉터·자연어 디스패처·인접 정지 표시기
+│   │   │   ├── common/               # 호출어·STT·TTS·표정 (three.js 셰이더 ShaderFace.vue)·모드 셀렉터·자연어 디스패처·인접 정지 표시기
 │   │   │   ├── composables/          # useSTT·useTTS·useVoiceController·useIntentDispatch
 │   │   │   ├── stores/               # voice·mode (Pinia)
 │   │   │   ├── config/               # robots.ts (VITE_ROBOT 분기)
-│   │   │   ├── eduping/              # 율동·가게놀이·정리정돈·무궁화꽃 (defineAsyncComponent)
-│   │   │   ├── gogoping/             # 등원·하원·보조·숨바꼭질·자장가 + 지도 위젯
+│   │   │   ├── eduping/              # 등원·하원·율동·가게놀이·정리정돈·무궁화꽃 (defineAsyncComponent)
+│   │   │   ├── gogoping/             # 보조·숨바꼭질·자장가 + 지도 위젯
 │   │   │   └── noriarm/              # 블럭쌓기·정리
 │   │   ├── public/
-│   │   │   ├── audio/                # mp3 (율동·자장가·무궁화꽃 노래)
-│   │   │   └── emotions/             # pinky_pro WebP (Apache-2.0, NOTICE.md 동봉)
+│   │   │   └── audio/                # mp3 (율동·자장가·무궁화꽃 노래)
 │   │   ├── mock/                     # vite plugin: /api/* mock (Control Service 붙기 전 임시)
 │   │   ├── package.json
 │   │   └── vite.config.ts
@@ -109,17 +108,16 @@ pingdergarten/
 │   ├── eduping_ws/src/               # EduPing 노트북에서 빌드
 │   │   ├── (OpenArm SDK)             # vendor — git submodule 위치/URL 미정 (정보 보완 후 추가)
 │   │   ├── eduping_bringup/          # launch / config
-│   │   ├── eduping_modes/            # 율동·가게놀이·정리정돈·무궁화꽃
+│   │   ├── eduping_modes/            # 등원·하원·율동·가게놀이·정리정돈·무궁화꽃
 │   │   ├── eduping_vision/           # 얼굴·객체·감정 인식 + 자연 촬영
 │   │   └── eduping_msgs/
 │   ├── gogoping_ws/src/              # GogoPing 라즈베리파이 + 노트북에서 빌드 (launch 분리)
 │   │   ├── vic_pinky/                # vendor (git submodule, pinklab-art/vic_pinky v1.0.0)
-│   │   ├── open_manipulator/         # vendor (git submodule, robotis-git/open_manipulator) — OMX 양팔
 │   │   ├── gogoping_bringup/
 │   │   │   └── launch/
 │   │   │       ├── pi.launch.py      # 라즈베리파이용 (vicpinky_bringup wrapping)
-│   │   │       └── laptop.launch.py  # 노트북용 (Nav2 + OMX + 응용 + 비전)
-│   │   ├── gogoping_modes/           # 등원·하원·보조·숨바꼭질·자장가
+│   │   │       └── laptop.launch.py  # 노트북용 (Nav2 + 응용 + 비전)
+│   │   ├── gogoping_modes/           # 보조·숨바꼭질·자장가
 │   │   ├── gogoping_vision/
 │   │   ├── gogoping_carry/           # 운반 액션
 │   │   └── gogoping_msgs/
@@ -143,7 +141,7 @@ pingdergarten/
 | 로봇 | 컴퓨터 | 책임 |
 |---|---|---|
 | GogoPing | 라즈베리파이 | `vicpinky_bringup` — 모터 드라이버 + RPLiDAR (USB 시리얼 직결) |
-| GogoPing | 노트북 | Nav2/SLAM + `open_manipulator_x_*` (OMX 양팔) + `gogoping_*` 응용 + 비전 |
+| GogoPing | 노트북 | Nav2/SLAM + `gogoping_*` 응용 + 비전 |
 | EduPing | 노트북 단독 | OpenArm USB 직결 + 비전 + `eduping_*` 응용 |
 | NoriArm | 노트북 단독 | OMX USB 직결 + 비전 + `noriarm_*` 응용 |
 | Control / AI Server | 별도 호스트 (docker-compose) | control + ai + postgres + minio |
