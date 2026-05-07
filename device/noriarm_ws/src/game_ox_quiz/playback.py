@@ -1,3 +1,5 @@
+# 실행: python device/noriarm_ws/src/game_ox_quiz/playback.py device/noriarm_ws/src/game_ox_quiz/episode_0_trajectory.json
+
 import time
 import json
 import argparse
@@ -5,7 +7,6 @@ import torch
 import numpy as np
 from lerobot.robots.omx_follower import OmxFollowerConfig
 from lerobot.robots.utils import make_robot_from_config
-from lerobot.utils.control_utils import predict_action
 from lerobot.utils.robot_utils import precise_sleep
 
 def run_playback(json_path):
