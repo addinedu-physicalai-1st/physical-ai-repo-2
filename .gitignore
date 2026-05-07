@@ -8,3 +8,9 @@ dist/
 server/storage/
 .playwright-mcp
 .claude
+device/gogoping_ws/build/
+device/gogoping_ws/install/
+device/gogoping_ws/log/
+device/noriarm_ws/build/
+device/noriarm_ws/install/
+device/noriarm_ws/log/
