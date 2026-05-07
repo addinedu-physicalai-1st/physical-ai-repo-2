@@ -31,6 +31,8 @@ Addinedu 4기 최종 프로젝트 | 팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-
 - **lsof** — `run_server.sh` 의 포트 충돌 사전 경고 (없으면 경고만 생략)
 - **[Ollama](https://ollama.com)** — AI Hub 가 호출하는 LLM 런타임
 
+**Robot UI TTS:** Control 이 AI Hub 의 `/voice/tts` 로 **Edge neural MP3** 를 받아 재생합니다 (인터넷 필요). 화자·피치·속도는 루트 `.env` 의 `EDGE_TTS_VOICE`, `EDGE_TTS_PITCH_PCT`, `EDGE_TTS_RATE` 로 조정합니다.
+
 ### 설치
 
 ```bash
