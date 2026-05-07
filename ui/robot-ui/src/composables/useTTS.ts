@@ -2,14 +2,6 @@ import { onBeforeUnmount, ref } from 'vue';
 import { useVoiceStore } from '@/stores/voice';
 
 export interface UseTTSOptions {
-  /** @deprecated Server-side TTS uses fixed language */
-  lang?: string;
-  /** @deprecated Server-side TTS uses fixed pitch */
-  pitch?: number;
-  /** @deprecated Server-side TTS uses fixed rate */
-  rate?: number;
-  /** @deprecated Server-side TTS uses fixed voice */
-  preferredVoiceTokens?: string[];
   onStart?: () => void;
   onEnd?: () => void;
 }
@@ -34,7 +26,6 @@ export function useTTS(options: UseTTSOptions = {}): {
     // 기존 재생 중인 것이 있으면 정지
     cancel();
 
-    console.log(`[TTS] Speaking via Server-Side (Edge-TTS): ${text.slice(0, 20)}...`);
     
     return new Promise((resolve) => {
       // 텍스트가 너무 길면 URL 파라미터 제한에 걸릴 수 있으나, 일반적인 대화형 응답(200자 내외)에서는 문제 없음
