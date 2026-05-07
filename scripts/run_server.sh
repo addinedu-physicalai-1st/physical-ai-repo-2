@@ -26,6 +26,25 @@ SESSION="pingdergarten"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ACTION="${1:-up}"
 
+# 활성 환경 감지: VIRTUAL_ENV (venv) → CONDA_ENV → CONDA_DEFAULT_ENV(base 제외)
+# wrap_cmd <cmd> <args...> → 환경 안에서 실행할 명령 문자열을 stdout 으로 출력
+ENV_DESC=""
+if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  ENV_DESC="venv:$VIRTUAL_ENV"
+  wrap_cmd() { echo "$VIRTUAL_ENV/bin/$*"; }
+else
+  ENV_NAME="${CONDA_ENV:-}"
+  if [[ -z "$ENV_NAME" && -n "${CONDA_DEFAULT_ENV:-}" && "${CONDA_DEFAULT_ENV}" != "base" ]]; then
+    ENV_NAME="$CONDA_DEFAULT_ENV"
+  fi
+  if [[ -z "$ENV_NAME" ]]; then
+    echo "[run_server] 활성화된 conda/venv 환경이 없습니다. 'conda activate <env>' 또는 venv 활성화 후 실행하세요." >&2
+    exit 1
+  fi
+  ENV_DESC="conda:$ENV_NAME"
+  wrap_cmd() { echo "conda run --no-capture-output -n $ENV_NAME $*"; }
+fi
+
 if ! command -v tmux &>/dev/null; then
   echo "[run_server] tmux 가 설치되어 있지 않습니다 (brew install tmux)" >&2
   exit 1
@@ -58,6 +77,13 @@ case "$ACTION" in
     fi
     echo "[run_server] postgres ready (localhost:5432) / pgweb ready (http://localhost:8081)"
 
+    # alembic upgrade head — 첫 실행 시 스키마 생성, 이미 최신이면 no-op
+    echo "[run_server] alembic upgrade head ($ENV_DESC)"
+    if ! eval "$(wrap_cmd alembic -c server/db/alembic.ini upgrade head)"; then
+      echo "[run_server] ⚠ alembic 마이그레이션 실패 — 'scripts/db-seed.sh' 로 수동 확인" >&2
+      exit 1
+    fi
+
     # 포트 충돌 사전 경고 (치명적이진 않음 — 사용자가 알아서 처리)
     for port in 8000 8001 8081; do
       if lsof -i ":$port" -P -sTCP:LISTEN &>/dev/null; then
@@ -76,11 +102,11 @@ case "$ACTION" in
 
     # window 2: ai-hub :8001
     tmux new-window -t "$SESSION" -n ai-hub -c "$REPO_ROOT" \
-      'conda run --no-capture-output -n jazzy uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload'
+      "$(wrap_cmd uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload)"
 
     # window 3: control :8000
     tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
-      'conda run --no-capture-output -n jazzy uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload'
+      "$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload)"
 
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
     tmux set-option -t "$SESSION" -g mouse on

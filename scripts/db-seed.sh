@@ -1,9 +1,29 @@
 #!/usr/bin/env bash
 # scripts/db-seed.sh — alembic upgrade head + seed 데이터 INSERT (인터랙티브 메뉴)
+#
+# 활성 환경 감지: VIRTUAL_ENV (venv) → CONDA_ENV → CONDA_DEFAULT_ENV(base 제외)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+
+# 활성 환경에서 실행하는 헬퍼
+ENV_DESC=""
+if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  ENV_DESC="venv:$VIRTUAL_ENV"
+  run_in_env() { "$VIRTUAL_ENV/bin/$1" "${@:2}"; }
+else
+  ENV_NAME="${CONDA_ENV:-}"
+  if [[ -z "$ENV_NAME" && -n "${CONDA_DEFAULT_ENV:-}" && "${CONDA_DEFAULT_ENV}" != "base" ]]; then
+    ENV_NAME="$CONDA_DEFAULT_ENV"
+  fi
+  if [[ -z "$ENV_NAME" ]]; then
+    echo "[db-seed] 활성화된 conda/venv 환경이 없습니다. 'conda activate <env>' 또는 venv 활성화 후 실행하세요." >&2
+    exit 1
+  fi
+  ENV_DESC="conda:$ENV_NAME"
+  run_in_env() { conda run --no-capture-output -n "$ENV_NAME" "$@"; }
+fi
 
 # postgres 떠있는지 확인 (docker compose health status 체크)
 if ! docker compose ps postgres --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
@@ -24,8 +44,8 @@ case "$MODE" in
     ;;
   2)
     echo "[db-seed] 모드: 전체 초기화"
-    echo "[db-seed] alembic downgrade base"
-    conda run -n jazzy alembic -c server/db/alembic.ini downgrade base
+    echo "[db-seed] alembic downgrade base ($ENV_DESC)"
+    run_in_env alembic -c server/db/alembic.ini downgrade base
     ;;
   *)
     echo "[db-seed] 잘못된 입력입니다. 1 또는 2를 입력하세요." >&2
@@ -33,10 +53,10 @@ case "$MODE" in
     ;;
 esac
 
-echo "[db-seed] alembic upgrade head"
-conda run -n jazzy alembic -c server/db/alembic.ini upgrade head
+echo "[db-seed] alembic upgrade head ($ENV_DESC)"
+run_in_env alembic -c server/db/alembic.ini upgrade head
 
 echo "[db-seed] seed 데이터 INSERT"
-conda run -n jazzy python -m server.db.seed
+run_in_env python -m server.db.seed
 
 echo "[db-seed] 완료"
