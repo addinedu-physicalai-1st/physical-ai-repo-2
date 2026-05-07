@@ -3,20 +3,6 @@ import json
 import re
 from typing import Any
 
-_KIND_RE = re.compile(r'"kind"\s*:\s*"(\w+)"')
-_HANGUL_RE = re.compile(r"[가-힣]")
-_REPLY_RE = re.compile(r'"reply"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"')
-
-# 모르는 사실을 합리화하려는 hallucination 패턴 — 잡히면 "모르겠어요" 로 fallback.
-# 점심 메뉴 미주입 시에도 "아직 정해지지 않았어요" 같이 답하는 모델 버릇을 잡는다.
-_HALLUCINATION_PATTERNS = [
-    re.compile(r"아직\s*정해지지\s*않"),
-    re.compile(r"아직\s*정해지지\s*않았"),
-    re.compile(r"정해지지\s*않았어요"),
-    re.compile(r"무엇인지\s*잘\s*모르겠"),
-    re.compile(r"메뉴가\s*나오지\s*않았"),
-]
-
 import httpx
 
 from server.ai import prompts
@@ -54,25 +40,15 @@ async def classify_intent(text: str, robot: str) -> dict[str, Any]:
 
     raw = await _ollama_chat(
         messages=messages,
-        json_format=True,
         num_predict=60,
         num_ctx=2048,
         temperature=0.1,
     )
 
     try:
-        parsed: dict[str, Any] = json.loads(raw)
+        return json.loads(raw)
     except json.JSONDecodeError:
-        # 모델이 reason 같은 추가 필드를 달아 JSON 이 잘린 경우 kind 만 추출
-        m = _KIND_RE.search(raw)
-        if not m:
-            raise LLMError(f"JSON 파싱 실패: {raw[:200]}")
-        kind = m.group(1)
-        if kind not in {"mode_change", "sub_command", "ignored"}:
-            raise LLMError(f"알 수 없는 kind: {kind}")
-        parsed = {"kind": kind}
-
-    return parsed
+        raise LLMError(f"JSON 파싱 실패: {raw[:200]}")
 
 
 async def generate_chat(
@@ -106,47 +82,26 @@ async def generate_chat(
 
     raw = await _ollama_chat(
         messages=messages,
-        json_format=True,
         num_predict=200,
         num_ctx=3072,
         temperature=0.6,
         model=settings.ollama_chat_model,
     )
 
-    # JSON 파싱 시도
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        # JSON이 아니면 텍스트만이라도 추출 시도
-        m = _REPLY_RE.search(raw)
-        if m:
-            data = {"reply": m.group(1), "emotion": "basic"}
-        else:
-            data = {"reply": raw.strip(), "emotion": "basic"}
+        data = {"reply": raw.strip(), "emotion": "basic"}
 
-    reply = data.get("reply", "").strip()
-    emotion = data.get("emotion", "basic")
-
-    # Hallucination Shield: 모르는 사실을 지어내는 패턴 감지
-    if any(p.search(reply) for p in _HALLUCINATION_PATTERNS):
-        reply = "그건 저도 잘 모르겠어요. 선생님께 여쭤볼까요?"
-        emotion = "basic"
-
-    # 최종 검증: 응답이 비어있거나 한글이 없으면 fallback
-    if not reply or not _HANGUL_RE.search(reply):
-        reply = f"{robot}은 잘 모르겠어요. 다시 말씀해주실래요?"
-        emotion = "basic"
-
-    if emotion not in CHAT_EMOTION_IDS:
-        emotion = "basic"
-
-    return {"reply": reply, "emotion": emotion}
+    return {
+        "reply": data.get("reply", "").strip(),
+        "emotion": data.get("emotion", "basic")
+    }
 
 
 async def _ollama_chat(
     *,
     messages: list[dict[str, str]],
-    json_format: bool,
     num_predict: int,
     num_ctx: int,
     temperature: float,
@@ -163,8 +118,7 @@ async def _ollama_chat(
             "num_ctx": num_ctx,
         },
     }
-    if json_format:
-        payload["format"] = "json"
+    payload["format"] = "json"
 
     try:
         response = await _get_client().post(
