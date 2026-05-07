@@ -5,12 +5,13 @@ Vite proxy 가 `/api/voice/intent` 를 이쪽으로 forward.
 """
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import BaseModel, Field
 
 from server.ai.context import build_chat_context
 from server.ai.llm import LLMError, classify_intent, generate_chat
 from server.ai.robots import STOP_TOKENS, is_known_robot, modes_for
+from server.ai.tts import generate_tts
 
 app = FastAPI(title="Pingdergarten AI Hub", version="0.1.0")
 
@@ -107,5 +108,18 @@ async def voice_intent(req: IntentRequest) -> dict:
         ctx = await build_chat_context(text, req.robot)
         chat = await generate_chat(text, req.robot, ctx)
     except LLMError:
-        return {"kind": "ignored"}
+        return {
+            "kind": "chat",
+            "reply": f"{req.robot}은 잘 모르겠어요. 다시 한번 말씀해주실래요?",
+            "emotion": "basic"
+        }
     return {"kind": "chat", "reply": chat["reply"], "emotion": chat["emotion"]}
+
+
+@app.get("/voice/tts")
+async def get_tts(text: str) -> Response:
+    """텍스트를 음성 스트림으로 반환."""
+    audio = await generate_tts(text)
+    if not audio:
+        return Response(status_code=500)
+    return Response(content=audio, media_type="audio/mpeg")

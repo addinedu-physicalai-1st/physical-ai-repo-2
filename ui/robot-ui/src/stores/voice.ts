@@ -13,6 +13,8 @@ export const useVoiceStore = defineStore('voice', () => {
   // 사용자가 입력창을 직접 편집 중인 동안에는 STT 결과로 덮어쓰지 않는다
   const inputLocked = ref<boolean>(false);
   const voiceMode = ref<VoiceMode>('voice');
+  const robotReply = ref<string>('');
+  const currentChar = ref<string>('');
 
   function setState(next: VoiceState): void {
     state.value = next;
@@ -20,10 +22,17 @@ export const useVoiceStore = defineStore('voice', () => {
 
   function setSttText(text: string): void {
     sttText.value = text;
+    if (text && state.value !== 'dispatching') {
+      robotReply.value = '';
+    }
   }
 
   function setLastSpokenText(text: string): void {
     lastSpokenText.value = text;
+  }
+
+  function setRobotReply(text: string): void {
+    robotReply.value = text;
   }
 
   function setSpeaking(value: boolean): void {
@@ -41,18 +50,26 @@ export const useVoiceStore = defineStore('voice', () => {
   function setVoiceMode(mode: VoiceMode): void {
     voiceMode.value = mode;
   }
+  
+  function setCurrentChar(char: string): void {
+    currentChar.value = char;
+  }
 
   return {
     state,
     sttText,
     lastSpokenText,
+    robotReply,
     isSpeaking,
     lastError,
     inputLocked,
     voiceMode,
+    currentChar,
     setState,
     setSttText,
     setLastSpokenText,
+    setRobotReply,
+    setCurrentChar,
     setSpeaking,
     setError,
     setInputLocked,

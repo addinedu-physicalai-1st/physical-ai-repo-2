@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as THREE from 'three';
+import { useVoiceStore } from '@/stores/voice';
 import type { EmotionId } from '@/config/robots';
 
-const props = defineProps<{ emotion: EmotionId; accent: string }>();
+const props = defineProps<{ 
+  emotion: EmotionId; 
+  accent: string;
+  thinking?: boolean;
+  speaking?: boolean;
+}>();
 
 interface EyeP {
   cx: number;
@@ -65,20 +71,15 @@ const PRESETS: Record<EmotionId, FacePreset> = {
     M: { cx: 0, cy: -0.40, halfWidth: 0.16, bow: 0.04, thickness: 0.05, openness: 0 },
   },
   hello: {
-    L: { cx: -0.42, cy: 0.08, sx: 0.16, sy: 0.22, radius: 0.10, closure: 0, ...NO_SMILE },
-    R: { cx: 0.42, cy: 0.08, sx: 0.16, sy: 0.22, radius: 0.10, closure: 0, ...NO_SMILE },
-    // ^^ 모양 — tilt 없이 peak 만 사용
+    L: { cx: -0.42, cy: 0.06, sx: 0.16, sy: 0.22, radius: 0.10, closure: 0, ...NO_SMILE },
+    R: { cx: 0.42, cy: 0.06, sx: 0.16, sy: 0.22, radius: 0.10, closure: 0, ...NO_SMILE },
     BL: { cx: -0.42, cy: 0.44, halfLen: 0.18, thickness: 0.04, tilt: 0, visible: 1, peak: 1 },
     BR: { cx: 0.42, cy: 0.44, halfLen: 0.18, thickness: 0.04, tilt: 0, visible: 1, peak: 1 },
-    // 입은 tick 에서 작은 o ↔ 큰 O 로 천천히 oscillate
     M: { cx: 0, cy: -0.40, halfWidth: 0.16, bow: 0, thickness: 0.05, openness: 0 },
   },
   happy: {
-    // 눈웃음 ⌒⌒ — 박스 대신 위로 굽은 활 형태. closure 는 0 (활이 sy 만으로 그려짐)
-    L: { cx: -0.42, cy: 0.06, sx: 0.20, sy: 0.10, radius: 0.05, closure: 0,
-         smile: 1, smileBow: 0.18, smileThickness: 0.07 },
-    R: { cx: 0.42, cy: 0.06, sx: 0.20, sy: 0.10, radius: 0.05, closure: 0,
-         smile: 1, smileBow: 0.18, smileThickness: 0.07 },
+    L: { cx: -0.42, cy: 0.06, sx: 0.20, sy: 0.10, radius: 0.05, closure: 0, smile: 1, smileBow: 0.18, smileThickness: 0.07 },
+    R: { cx: 0.42, cy: 0.06, sx: 0.20, sy: 0.10, radius: 0.05, closure: 0, smile: 1, smileBow: 0.18, smileThickness: 0.07 },
     BL: { cx: -0.42, cy: 0.42, halfLen: 0.18, thickness: 0.04, tilt: -0.10, visible: 1, peak: 0 },
     BR: { cx: 0.42, cy: 0.42, halfLen: 0.18, thickness: 0.04, tilt: 0.10, visible: 1, peak: 0 },
     M: { cx: 0, cy: -0.38, halfWidth: 0.26, bow: 0.16, thickness: 0.07, openness: 0 },
@@ -91,8 +92,8 @@ const PRESETS: Record<EmotionId, FacePreset> = {
     M: { cx: 0, cy: -0.38, halfWidth: 0.16, bow: 0.10, thickness: 0.06, openness: 0.7 },
   },
   interest: {
-    L: { cx: -0.34, cy: 0.08, sx: 0.14, sy: 0.22, radius: 0.08, closure: 0, ...NO_SMILE },
-    R: { cx: 0.34, cy: 0.08, sx: 0.14, sy: 0.22, radius: 0.08, closure: 0, ...NO_SMILE },
+    L: { cx: -0.42, cy: 0.06, sx: 0.14, sy: 0.22, radius: 0.08, closure: 0, ...NO_SMILE },
+    R: { cx: 0.42, cy: 0.06, sx: 0.14, sy: 0.22, radius: 0.08, closure: 0, ...NO_SMILE },
     BL: { cx: -0.34, cy: 0.44, halfLen: 0.16, thickness: 0.04, tilt: -0.06, visible: 1, peak: 0 },
     BR: { cx: 0.34, cy: 0.44, halfLen: 0.16, thickness: 0.04, tilt: 0.06, visible: 1, peak: 0 },
     M: { cx: 0, cy: -0.40, halfWidth: 0.10, bow: 0.02, thickness: 0.05, openness: 0 },
@@ -105,9 +106,8 @@ const PRESETS: Record<EmotionId, FacePreset> = {
     M: { cx: 0, cy: -0.40, halfWidth: 0.16, bow: 0, thickness: 0.05, openness: 0 },
   },
   sad: {
-    L: { cx: -0.42, cy: 0.04, sx: 0.16, sy: 0.20, radius: 0.10, closure: 0, ...NO_SMILE },
-    R: { cx: 0.42, cy: 0.04, sx: 0.16, sy: 0.20, radius: 0.10, closure: 0, ...NO_SMILE },
-    // 슬픔: 안쪽 눈썹이 위로 올라가 ⌒ 모양 (걱정·간청).
+    L: { cx: -0.42, cy: 0.06, sx: 0.16, sy: 0.20, radius: 0.10, closure: 0, ...NO_SMILE },
+    R: { cx: 0.42, cy: 0.06, sx: 0.16, sy: 0.20, radius: 0.10, closure: 0, ...NO_SMILE },
     BL: { cx: -0.42, cy: 0.38, halfLen: 0.18, thickness: 0.04, tilt: 0.24, visible: 1, peak: 0 },
     BR: { cx: 0.42, cy: 0.38, halfLen: 0.18, thickness: 0.04, tilt: -0.24, visible: 1, peak: 0 },
     M: { cx: 0, cy: -0.38, halfWidth: 0.20, bow: -0.10, thickness: 0.06, openness: 0 },
@@ -115,7 +115,6 @@ const PRESETS: Record<EmotionId, FacePreset> = {
   angry: {
     L: { cx: -0.42, cy: 0.06, sx: 0.16, sy: 0.18, radius: 0.10, closure: 0, ...NO_SMILE },
     R: { cx: 0.42, cy: 0.06, sx: 0.16, sy: 0.18, radius: 0.10, closure: 0, ...NO_SMILE },
-    // 분노: 안쪽 눈썹이 아래로 내려와 ╲╱ 모양 (찌푸린 미간).
     BL: { cx: -0.42, cy: 0.36, halfLen: 0.20, thickness: 0.05, tilt: -0.30, visible: 1, peak: 0 },
     BR: { cx: 0.42, cy: 0.36, halfLen: 0.20, thickness: 0.05, tilt: 0.30, visible: 1, peak: 0 },
     M: { cx: 0, cy: -0.38, halfWidth: 0.18, bow: -0.06, thickness: 0.06, openness: 0 },
@@ -162,6 +161,12 @@ uniform vec2 uHand2Center;
 uniform float uHand1Tilt;
 uniform float uHand2Tilt;
 uniform float uHandsActive;
+uniform float uCheeks;
+uniform vec3 uCheeksColor;
+
+float sdCircle(vec2 p, float r) {
+  return length(p) - r;
+}
 
 float sdRoundBox(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
@@ -241,14 +246,34 @@ float mouthEllipseSDF(vec2 q, float halfWidth, float thickness, float openness) 
   vec2 ellSize = vec2(halfWidth * 0.55, thickness + halfWidth * 0.55 * openness);
   float k = length(q / ellSize) - 1.0;
   return k * min(ellSize.x, ellSize.y);
-}
+}  
 
 float mouthSDF(vec2 p, vec2 center, float halfWidth, float bow, float thickness, float openness) {
   vec2 q = p - center;
-  float dCurve = mouthCurveSDF(q, halfWidth, bow, thickness);
-  float dEllipse = mouthEllipseSDF(q, halfWidth, thickness, openness);
-  // openness 0 → 곡선, 1 → 타원 으로 부드럽게 보간
-  return mix(dCurve, dEllipse, clamp(openness, 0.0, 1.0));
+  // Clamp x to avoid parabola extending to infinity and causing spooky glow streaks
+  float px = clamp(q.x, -halfWidth, halfWidth);
+  
+  // Parabola bend to match the smile/frown curve
+  // when x = 0, shift = -bow. when x = halfWidth, shift = 0
+  float parabola = -bow + (bow / max(halfWidth * halfWidth, 0.0001)) * (px * px);
+  
+  float openY = max(openness, 0.0);
+  
+  // Simulate lower jaw dropping when mouth opens widely
+  float jawDrop = halfWidth * 0.2 * openY; 
+  
+  // Apply bend and drop to local space
+  vec2 qBend = vec2(q.x, q.y - parabola + jawDrop);
+  
+  // The open mouth uses a mathematically exact rounded box in bent space
+  float r = thickness * 0.5 + openY * halfWidth * 0.3; 
+  float totalWidth = halfWidth * 0.95;
+  float bx = max(totalWidth - r, 0.0);
+  float totalHeight = thickness * 0.5 + openY * halfWidth * 0.4;
+  float by = max(totalHeight - r, 0.0);
+  
+  vec2 d_box = abs(qBend) - vec2(bx, by);
+  return length(max(d_box, 0.0)) + min(max(d_box.x, d_box.y), 0.0) - r;
 }
 
 void main() {
@@ -258,7 +283,7 @@ void main() {
   // Idle micro-saccade
   vec2 saccade = vec2(sin(uTime * 0.31) * 0.008, sin(uTime * 0.23) * 0.005);
   uv -= saccade;
-
+  
   // 모든 형상의 거리장을 union (min)
   float dEye = min(
     eyeSDF(uv, uLEyeCenter, uLEyeSize, uLEyeRadius, uLEyeClosure,
@@ -299,12 +324,28 @@ void main() {
   // 안쪽 살짝 밝게 — OLED 발광 느낌
   float innerGlow = smoothstep(0.04, -0.04, d);
   vec3 col = uAccent * (0.92 + 0.42 * innerGlow);
+  vec3 color = uAccent * (0.92 + 0.42 * innerGlow);
 
   // 바깥 헤일로
   float halo = exp(-max(d, 0.0) * 16.0);
   float outA = mask + (1.0 - mask) * halo * 0.30;
 
-  gl_FragColor = vec4(col, outA);
+  // --- CHEEKS (Blush) ---
+  // Position them significantly below and slightly outward from the eyes
+  float cheekL = sdCircle(uv - (uLEyeCenter + vec2(-0.30, -0.42)), 0.18);
+  float cheekR = sdCircle(uv - (uREyeCenter + vec2(0.30, -0.42)), 0.18);
+  float cheekD = min(cheekL, cheekR);
+  
+  // Stronger exponential glow for cheeks (softer falloff = bigger appearance)
+  float cheekGlow = exp(-max(cheekD, 0.0) * 8.0) * uCheeks;
+  
+  // High-visibility alpha punch-through for black backgrounds
+  outA = max(outA, cheekGlow * 0.85);
+  
+  // Vibrant blush color blending
+  color = mix(color, uCheeksColor, cheekGlow * 1.0);
+
+  gl_FragColor = vec4(color, outA);
 }
 `;
 
@@ -314,15 +355,98 @@ let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
 let camera: THREE.OrthographicCamera | null = null;
 let material: THREE.ShaderMaterial | null = null;
+const voiceStore = useVoiceStore();
+
+// Korean Sub-syllable Phonetic Decomposition for Realistic Lip Sync
+function getVisemeForSyllable(char: string, t_ms: number) {
+  if (!char) return null;
+  const code = char.charCodeAt(0);
+  
+  // Hangul Syllables: AC00–D7A3
+  if (code < 0xAC00 || code > 0xD7A3) {
+    if (char.trim() === '') return null;
+    // Generic bounce for non-Korean chars
+    const bounce = t_ms < 75 ? 0.8 : 0.4;
+    return { openness: bounce, width: 0.9, bowOffset: 0.0 };
+  }
+  
+  const index = code - 0xAC00;
+  const onsetIdx = Math.floor(index / 588);
+  const vowelIdx = Math.floor((index % 588) / 28);
+  const codaIdx = index % 28;
+  
+  // Identify bilabials (ㅁ, ㅂ, ㅃ, ㅍ) which require lips to completely close
+  const isBilabialOnset = [6, 7, 8, 17].includes(onsetIdx); 
+  const isBilabialCoda = [16, 17, 10, 11, 14, 26, 18].includes(codaIdx);
+
+  // Base Vowel Viseme
+  let vOpenness = 0.6;
+  let vWidth = 1.0;
+  let vBow = 0.0;
+  
+  if ([0, 1, 2, 3].includes(vowelIdx)) { vOpenness = 1.1; vWidth = 1.05; vBow = -0.05; } // ㅏ (Ah)
+  else if ([4, 5, 6, 7].includes(vowelIdx)) { vOpenness = 0.8; vWidth = 0.95; vBow = 0.0; } // ㅓ (Eo)
+  else if ([8, 9, 10, 11, 12].includes(vowelIdx)) { vOpenness = 0.65; vWidth = 0.5; vBow = 0.1; } // ㅗ (Oh)
+  else if ([13, 14, 15, 16, 17].includes(vowelIdx)) { vOpenness = 0.4; vWidth = 0.35; vBow = 0.15; } // ㅜ (U)
+  else if ([18, 19].includes(vowelIdx)) { vOpenness = 0.2; vWidth = 1.25; vBow = 0.0; } // ㅡ (Eu)
+  else if (vowelIdx === 20) { vOpenness = 0.3; vWidth = 1.4; vBow = 0.05; } // ㅣ (E/I)
+
+  let openness = vOpenness;
+  let width = vWidth;
+  let bow = vBow;
+
+  // Syllable Timing (assuming ~220ms per syllable block from TTS)
+  if (t_ms < 50) {
+    // 1. Onset Phase
+    if (isBilabialOnset) {
+      openness = 0.0; // Lips closed
+      width = 0.8;
+    } else {
+      openness = vOpenness * 0.3; // Slight prep opening
+      width = vWidth * 0.9;
+    }
+  } else if (t_ms < 150) {
+    // 2. Nucleus (Vowel) Phase
+    openness = vOpenness;
+    width = vWidth;
+  } else {
+    // 3. Coda Phase
+    if (isBilabialCoda) {
+      openness = 0.0; // Lips closed
+      width = 0.8;
+    } else if (codaIdx === 0) {
+      openness = vOpenness * 0.7; // Fade out slightly
+    } else {
+      openness = vOpenness * 0.4; // Tongue moves, jaw partially closes
+    }
+  }
+  
+  return { openness, width, bowOffset: bow };
+}
+
+const visemeTarget = ref({ openness: 0, width: 1, bowOffset: 0 });
+let currentViseme = { openness: 0, width: 1, bowOffset: 0 };
+let speechWeight = 0;
+let lastSpokenChar = '';
+let charStartTime = 0;
+let speakingStartTime = 0;
+let wasSpeaking = false;
+
 let geometry: THREE.PlaneGeometry | null = null;
 let mesh: THREE.Mesh | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let raf = 0;
+const isThinkingActive = ref(!!props.thinking);
+watch(() => props.thinking, (val) => {
+  isThinkingActive.value = !!val;
+});
 
 let displayed: FacePreset = clonePreset(PRESETS[props.emotion]);
 let source: FacePreset = clonePreset(displayed);
 let target: FacePreset = clonePreset(displayed);
 let tweenStart = 0;
+let displayedCheeks = 0;
+let targetCheeks = 0;
 const TWEEN_DURATION = 320;
 
 let nextBlinkAt = performance.now() + 2400 + Math.random() * 2400;
@@ -439,6 +563,20 @@ function setupRenderer(canvas: HTMLCanvasElement): void {
       uAspect: { value: 1 },
       uBlink: { value: 0 },
       uAccent: { value: new THREE.Vector3(r, g, b) },
+      uMouthCenter: { value: new THREE.Vector2() },
+      uMouthHalfWidth: { value: 0 },
+      uMouthBow: { value: 0 },
+      uMouthThickness: { value: 0 },
+      uMouthOpenness: { value: 0 },
+
+      uHandSize: { value: new THREE.Vector2(0.06, 0.35) },
+      uHand1Center: { value: new THREE.Vector2() },
+      uHand2Center: { value: new THREE.Vector2() },
+      uHand1Tilt: { value: 0.0 },
+      uHand2Tilt: { value: 0.0 },
+      uHandsActive: { value: 0.0 },
+      uCheeks: { value: 0.0 },
+      uCheeksColor: { value: new THREE.Vector3(1, 0.4, 0.5) },
 
       uLEyeCenter: { value: new THREE.Vector2() },
       uLEyeSize: { value: new THREE.Vector2() },
@@ -506,6 +644,18 @@ function tick(): void {
   // Emotion 트윈
   const tRaw = Math.min(1, (now - tweenStart) / TWEEN_DURATION);
   const t = easeInOut(tRaw);
+  
+  // Thinking scanning motion: kill if speaking
+  let thinkingX = 0;
+  let thinkingY = 0;
+  if (isThinkingActive.value && !props.speaking) {
+    const time = now / 1000;
+    // Look top-left and top-right while thinking (Micro-range, ultra-subtle)
+    const scan = Math.sin(time * 2.5); 
+    thinkingX = scan * 0.06; // Micro sweep
+    thinkingY = 0.08 + Math.abs(scan) * 0.02; // Very low upward drift
+  }
+
   displayed = {
     L: lerpEye(source.L, target.L, t),
     R: lerpEye(source.R, target.R, t),
@@ -513,6 +663,7 @@ function tick(): void {
     BR: lerpBrow(source.BR, target.BR, t),
     M: lerpMouth(source.M, target.M, t),
   };
+
 
   // Blink — sleep 일 때는 항상 닫힘으로 처리하므로 별도 깜빡임 없음
   let blink = 0;
@@ -560,11 +711,119 @@ function tick(): void {
   material.uniforms.uTime.value = now / 1000;
   material.uniforms.uBlink.value = blink;
 
-  applyEyeUniforms('L', displayed.L);
-  applyEyeUniforms('R', displayed.R);
-  applyBrowUniforms('L', displayed.BL);
-  applyBrowUniforms('R', displayed.BR);
-  applyMouthUniforms(displayed.M);
+  // Render-time offset for thinking (does not affect 'displayed' state used for next transition)
+  let renderL = { ...displayed.L };
+  let renderR = { ...displayed.R };
+  
+  if (isThinkingActive.value && !props.speaking) {
+    // Focused thinking shape: perfect circles (aspect-corrected)
+    const thinkingSize = 0.10;
+    const sx = thinkingSize * material.uniforms.uAspect.value;
+    const sy = thinkingSize;
+    const radius = thinkingSize * material.uniforms.uAspect.value; // Large enough to force circle
+    
+    renderL = { 
+      ...renderL, 
+      cx: renderL.cx + thinkingX, 
+      cy: renderL.cy + thinkingY,
+      sx, sy, radius
+    };
+    renderR = { 
+      ...renderR, 
+      cx: renderR.cx + thinkingX, 
+      cy: renderR.cy + thinkingY,
+      sx, sy, radius
+    };
+  }
+
+  let renderBL = { ...displayed.BL };
+  let renderBR = { ...displayed.BR };
+  let renderM = { ...displayed.M };
+  
+  // Speech Chatter & Viseme Sync
+  const time = now / 1000;
+  
+  if (voiceStore.currentChar !== lastSpokenChar) {
+    lastSpokenChar = voiceStore.currentChar;
+    charStartTime = now;
+  }
+
+  let speechWeightTarget = 0.0;
+  
+  if (props.speaking) {
+    let charToUse = voiceStore.currentChar;
+    let t_ms = now - charStartTime;
+
+    // Fallback: If TTS events fail to fire (Server-Side TTS or browser bugs), autonomously simulate phonetic timing
+    if (!charToUse && voiceStore.robotReply) {
+      if (!wasSpeaking) {
+        speakingStartTime = now;
+      }
+      const t_speaking = now - speakingStartTime;
+      const charIdx = Math.floor(t_speaking / 220);
+      
+      if (charIdx < voiceStore.robotReply.length) {
+        charToUse = voiceStore.robotReply.charAt(charIdx);
+        t_ms = t_speaking % 220;
+      } else {
+        // Fallback pulse if audio outlasts the text
+        charToUse = '아';
+        t_ms = t_speaking % 400;
+      }
+    }
+
+    wasSpeaking = true;
+
+    if (charToUse) {
+      const viseme = getVisemeForSyllable(charToUse, t_ms);
+      if (viseme) {
+        speechWeightTarget = 1.0;
+        let openness = viseme.openness;
+        // 웃는 표정일 때는 입을 조금 더 크게 벌려 자연스럽게
+        if (props.emotion === 'happy') {
+          openness *= 1.2;
+        }
+        visemeTarget.value = { 
+          openness: openness, 
+          width: viseme.width,
+          bowOffset: viseme.bowOffset
+        };
+      }
+    }
+  } else {
+    wasSpeaking = false;
+    speechWeightTarget = 0.0;
+  }
+
+  // Decay/Smooth toward target - Much softer alpha for organic, less spazzy movement
+  const alpha = 0.18; 
+  currentViseme.openness = currentViseme.openness * (1 - alpha) + visemeTarget.value.openness * alpha;
+  currentViseme.width = currentViseme.width * (1 - alpha) + visemeTarget.value.width * alpha;
+  currentViseme.bowOffset = currentViseme.bowOffset * (1 - alpha) + visemeTarget.value.bowOffset * alpha;
+  
+  // Independent speech weight allows explicit width/bow changes even for closed phonemes
+  const weightAlpha = 0.15;
+  speechWeight = speechWeight * (1 - weightAlpha) + speechWeightTarget * weightAlpha;
+
+  // Apply viseme overrides using the independent speech weight
+  renderM.openness = lerp(displayed.M.openness, currentViseme.openness, speechWeight);
+  renderM.halfWidth = lerp(displayed.M.halfWidth, displayed.M.halfWidth * currentViseme.width, speechWeight);
+  renderM.bow = displayed.M.bow + currentViseme.bowOffset * speechWeight;
+
+
+
+  // Eyebrow shake when happy/smiling
+  if (props.emotion === 'happy') {
+    const shake = Math.sin(now / 40) * 0.015;
+    renderBL.cy += shake;
+    renderBR.cy += shake;
+  }
+
+  applyEyeUniforms('L', renderL);
+  applyEyeUniforms('R', renderR);
+  applyBrowUniforms('L', renderBL);
+  applyBrowUniforms('R', renderBR);
+  applyMouthUniforms(renderM);
 
   material.uniforms.uHandsActive.value = handsActive;
   (material.uniforms.uHand1Center.value as THREE.Vector2).set(-1.05, -0.55);
@@ -575,6 +834,17 @@ function tick(): void {
   const [r, g, b] = hexToRgb(props.accent);
   (material.uniforms.uAccent.value as THREE.Vector3).set(r, g, b);
 
+  // Cheeks logic: Happy/Fun/Interest/Hello get blush
+  const blushingEmotions: EmotionId[] = ['happy', 'fun', 'interest', 'hello'];
+  targetCheeks = blushingEmotions.includes(props.emotion) ? 1.0 : 0.0;
+  displayedCheeks = lerp(displayedCheeks, targetCheeks, 0.08); // Smooth fade
+  // Blush Color: Mix accent color with a soft red/pink for a natural glow
+  const accentColor = new THREE.Color(props.accent);
+  const blushColor = new THREE.Color(1.0, 0.2, 0.5); // Vibrant Magenta/Pink
+  blushColor.lerp(accentColor, 0.1); // Keep 90% pink, 10% accent
+  material.uniforms.uCheeksColor.value.set(blushColor.r, blushColor.g, blushColor.b);
+  material.uniforms.uCheeks.value = displayedCheeks;
+
   renderer.render(scene, camera);
   raf = requestAnimationFrame(tick);
 }
@@ -583,7 +853,7 @@ watch(
   () => props.emotion,
   (next) => {
     source = clonePreset(displayed);
-    target = clonePreset(PRESETS[next]);
+    target = clonePreset(PRESETS[next] || PRESETS.basic);
     tweenStart = performance.now();
   }
 );

@@ -5,8 +5,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# postgres 떠있는지 확인
-if ! pg_isready -h localhost -p 5432 -U pingder &>/dev/null; then
+# postgres 떠있는지 확인 (docker compose health status 체크)
+if ! docker compose ps postgres --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
   echo "[db-seed] postgres 가 떠있지 않습니다. 먼저 'scripts/run_server.sh' 실행" >&2
   exit 1
 fi

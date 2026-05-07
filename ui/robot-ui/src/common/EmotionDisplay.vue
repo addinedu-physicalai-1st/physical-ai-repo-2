@@ -16,8 +16,8 @@ const { robot } = storeToRefs(mode);
 
 // 표정 색은 emotion 별이 아닌 로봇 브랜드 primary 로 통일
 const PRIMARY_BY_ROBOT: Record<RobotId, string> = {
-  eduping: '#e08a14',
-  gogoping: '#d8567a',
+  eduping: '#db2777',
+  gogoping: '#bef32c',
   noriarm: '#3a8fc2',
 };
 
@@ -47,42 +47,68 @@ const showWakePrompt = computed(
 const wakePromptText = computed(
   () => `"${robot.value.wakeWord}" 을 부르고 명령해주세요`
 );
+const isThinking = computed(() => state.value === 'dispatching');
 </script>
 
 <template>
   <div class="stage">
-    <div
-      class="face"
-      :class="{ listening: isListening }"
-      :style="{ '--accent': accent }"
-    >
-      <Transition name="bubble-pop">
-        <div v-if="showWakePrompt" class="wake-bubble" role="status">
-          {{ wakePromptText }}
-        </div>
-      </Transition>
-      <span class="notch">
-        <span class="notch-dot"></span>
-      </span>
-      <Transition name="forehead-fade">
-        <div
-          v-if="showStatus"
-          class="forehead-status"
-          :style="{ '--dot-color': activeColor }"
-        >
-          <span class="status-dot"></span>
-          <span class="status-label">{{ activeLabel }}</span>
-        </div>
-      </Transition>
-      <div class="screen">
-        <ShaderFace :emotion="emotion" :accent="accent" />
-        <Transition name="sleep-fx">
-          <div v-if="emotion === 'sleep'" class="sleep-fx" aria-hidden="true">
-            <div class="zzz">
-              <span>z</span>
-              <span>z</span>
-              <span>z</span>
+    <div class="actor-wrapper">
+      <div
+        class="face"
+        :class="{ listening: isListening }"
+        :style="{ '--accent': accent }"
+      >
+        <Transition name="bubble-pop">
+          <div v-if="showWakePrompt" class="wake-bubble" role="status">
+            {{ wakePromptText }}
+          </div>
+        </Transition>
+        <span class="notch">
+          <span class="notch-dot"></span>
+        </span>
+        <Transition name="forehead-fade">
+          <div
+            v-if="showStatus"
+            class="forehead-status"
+            :style="{ '--dot-color': activeColor }"
+          >
+            <span class="status-dot"></span>
+            <span class="status-label">{{ activeLabel }}</span>
+          </div>
+        </Transition>
+        <div class="screen">
+          <ShaderFace 
+            :emotion="emotion" 
+            :accent="accent" 
+            :thinking="isThinking"
+            :speaking="state === 'speaking'"
+          />
+          
+          <Transition name="sleep-fx">
+            <div v-if="emotion === 'sleep'" class="sleep-fx" aria-hidden="true">
+              <div class="zzz">
+                <span>z</span>
+                <span>z</span>
+                <span>z</span>
+              </div>
             </div>
+          </Transition>
+        </div>
+      </div>
+
+      <!-- Premium Subtitle Overlay (Moved Outside for Clarity) -->
+      <div class="subtitle-container" v-if="state !== 'idle' && state !== 'cooldown'">
+        <Transition name="fade" mode="out-in">
+          <div :key="state" class="subtitle-text">
+            <span v-if="state === 'listening'" class="listening-text">
+              {{ voice.sttText || '듣고 있어요...' }}
+            </span>
+            <span v-else-if="state === 'dispatching'" class="thinking-text">
+              {{ voice.lastSpokenText }}
+            </span>
+            <span v-else-if="state === 'speaking'" class="speaking-text">
+              {{ voice.robotReply }}
+            </span>
           </div>
         </Transition>
       </div>
@@ -334,6 +360,70 @@ const wakePromptText = computed(
 .sleep-fx-enter-from,
 .sleep-fx-leave-to {
   opacity: 0;
+}
+
+
+.actor-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+}
+
+/* --- PREMIUM SUBTITLES --- */
+.subtitle-container {
+  width: min(75vw, 600px);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.subtitle-text {
+  background: rgba(10, 13, 20, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 16px 32px;
+  color: white;
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.45;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.listening-text {
+  color: #a3e635; /* Neon lime */
+  opacity: 0.9;
+}
+
+.thinking-text {
+  color: #60a5fa; /* Soft blue */
+}
+
+.speaking-text {
+  color: white;
+  font-size: 1.3rem;
+}
+
+/* Animations */
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
 }
 
 @keyframes bob {

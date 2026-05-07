@@ -60,10 +60,10 @@ function handleStart(): void {
   font-family: -apple-system, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
 }
 .app.bg-eduping {
-  background: linear-gradient(135deg, #fff8e1 0%, #ffe1a8 100%);
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
 }
 .app.bg-gogoping {
-  background: linear-gradient(135deg, #fff5f7 0%, #ffe8ec 100%);
+  background: linear-gradient(135deg, #e6ff00 0%, #ccff00 100%);
 }
 .app.bg-noriarm {
   background: linear-gradient(135deg, #e8f5fb 0%, #c5e4f3 100%);
@@ -79,10 +79,10 @@ function handleStart(): void {
   pointer-events: none;
 }
 .bg-eduping .brand {
-  color: rgba(180, 110, 20, 0.7);
+  color: rgba(219, 39, 119, 0.7);
 }
 .bg-gogoping .brand {
-  color: rgba(196, 84, 111, 0.7);
+  color: rgba(0, 0, 0, 0.6);
 }
 .bg-noriarm .brand {
   color: rgba(40, 110, 160, 0.7);
