@@ -5,7 +5,7 @@ import { useTTS } from './useTTS';
 import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
 
-const LISTENING_WINDOW_MS = 5000;
+const LISTENING_WINDOW_MS = 8000;
 // 명령 처리 후 UI 가 잠시 쉬는 상태 cooldown.
 const COOLDOWN_MS = 1500;
 // TTS 가 끝난 뒤 echo (스피커 → 마이크) 가 STT 결과로 새는 걸 막기 위한 짧은 그레이스.
@@ -14,7 +14,7 @@ const COOLDOWN_MS = 1500;
 const ECHO_SUPPRESS_MS = 700;
 // 호출어가 들어왔을 때 추가 발화를 기다리는 settle 시간.
 // 이 시간 내에 새 interim 이 안 오면 그 시점 텍스트로 처리한다.
-const WAKE_SETTLE_MS = 500;
+const WAKE_SETTLE_MS = 1000;
 const STOP_TOKENS = ['정지', '멈춰', '그만', '스톱'];
 
 // STT 가 띄어쓰며 인식하는 케이스도 잡기 위해 wake word 음절 사이 \s* 허용
@@ -130,7 +130,8 @@ export function useVoiceController(robot: RobotConfig): {
 
   function shouldDropResult(): boolean {
     if (voice.isSpeaking) return true;
-    if (Date.now() < suppressUntil) return true;
+    // Increased tolerance for echo to prevent dropping the start of a command
+    if (Date.now() < suppressUntil - 200) return true; 
     return false;
   }
 
@@ -244,6 +245,7 @@ export function useVoiceController(robot: RobotConfig): {
   async function enterDispatching(text: string): Promise<void> {
     voice.setState('dispatching');
     voice.setLastSpokenText(text);
+    voice.setRobotReply('');
 
     const restricted = robot.restrictedVoiceMode === mode.currentMode;
     if (restricted && !isStopIntent(text)) {
@@ -256,14 +258,31 @@ export function useVoiceController(robot: RobotConfig): {
     const controller = new AbortController();
     dispatchAbort = controller;
     try {
+      const startTime = Date.now();
       const response = await dispatchIntent(text, robot.id, controller.signal);
       if (controller.signal.aborted) return;
+
+      // Ensure we stay in thinking state for at least 300ms to show a quick flicker of animation
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 300) {
+        await new Promise(resolve => window.setTimeout(resolve, 300 - elapsed));
+      }
+
       mode.applyIntent(response);
       if (response.kind === 'chat') {
-        // 발화 감정에 맞춰 표정 변경 → 발화 끝나면 이전(모드 default) 으로 복귀
-        await mode.holdEmotionDuring(response.emotion, () => tts.speak(response.reply));
+        voice.setState('speaking'); // CRITICAL: Stop thinking movement
+        voice.setRobotReply(response.reply);
+        
+        const minDuration = Math.max(3000, response.reply.length * 200);
+        await mode.holdEmotionDuring(response.emotion, async () => {
+          await tts.speak(response.reply);
+        });
+        enterCooldown();
+      } else {
+        voice.setRobotReply('');
       }
     } catch (err) {
+      voice.setRobotReply('');
       // barge-in 으로 abort 된 경우는 정상 — error 로 표시 안 함
       if ((err as Error).name === 'AbortError') return;
       voice.setError((err as Error).message);

@@ -9,8 +9,8 @@ defineEmits<{ start: [] }>();
 const { robot } = storeToRefs(useModeStore());
 
 const PRIMARY: Record<RobotId, string> = {
-  eduping:  '#e08a14',
-  gogoping: '#d8567a',
+  eduping:  '#db2777',
+  gogoping: '#000000',
   noriarm:  '#3a8fc2',
 };
 const primary = computed(() => PRIMARY[robot.value.id]);

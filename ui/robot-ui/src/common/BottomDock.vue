@@ -12,12 +12,12 @@ import DispatchingLoader from './DispatchingLoader.vue';
 import VoiceCaption from './VoiceCaption.vue';
 
 const voice = useVoiceStore();
-const { voiceMode, state, sttText, lastSpokenText } = storeToRefs(voice);
+const { voiceMode, state, sttText, lastSpokenText, robotReply } = storeToRefs(voice);
 
 const { robot } = storeToRefs(useModeStore());
 const PRIMARY: Record<RobotId, string> = {
-  eduping:  '#e08a14',
-  gogoping: '#d8567a',
+  eduping:  '#db2777',
+  gogoping: '#bef32c',
   noriarm:  '#3a8fc2',
 };
 const primary = computed(() => PRIMARY[robot.value.id]);
@@ -40,8 +40,8 @@ watch([voiceMode, state], async ([vm, st]) => {
   if (wantAudio) {
     try {
       await audio.start();
-    } catch {
-      // mic 접근 거부 등 — 무음 상태로 진행
+    } catch (e) {
+      console.warn('[Mic] Failed to start audio visualization:', e);
     }
   } else {
     audio.stop();
@@ -52,9 +52,13 @@ const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'
 );
 const captionText = computed(() => {
-  if (voiceMode.value !== 'voice') return '';
-  if (state.value === 'dispatching') return lastSpokenText.value;
-  if (state.value === 'listening' || state.value === 'wake_detected') return sttText.value;
+  if (robotReply.value) {
+    return robotReply.value;
+  }
+  if (voiceMode.value === 'voice') {
+    if (state.value === 'dispatching') return lastSpokenText.value;
+    if (state.value === 'listening' || state.value === 'wake_detected') return sttText.value;
+  }
   return '';
 });
 
@@ -65,6 +69,10 @@ function switchToText(): void {
 
 <template>
   <div class="dock" :style="{ '--primary': primary }">
+    <!-- Legacy caption hidden in favor of Premium Subtitles in EmotionDisplay -->
+    <!-- <div class="caption-container">
+      <VoiceCaption :text="captionText" />
+    </div> -->
     <Transition name="dock-swap" mode="out-in">
       <CommandBar v-if="voiceMode === 'text'" key="text" />
       <div v-else key="voice" class="voice-area">
@@ -78,7 +86,6 @@ function switchToText(): void {
             </svg>
           </button>
         </div>
-        <VoiceCaption :text="captionText" />
       </div>
     </Transition>
   </div>
@@ -91,11 +98,18 @@ function switchToText(): void {
   bottom: 60px;
   transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  gap: 16px;
   z-index: 15;
   width: min(560px, calc(100vw - 200px));
   min-height: 200px;
+}
+.caption-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 .dock-swap-enter-active {
   transition: opacity 0.32s ease, transform 0.36s cubic-bezier(0.34, 1.5, 0.5, 1);
@@ -109,12 +123,10 @@ function switchToText(): void {
   transform: scale(0.7);
 }
 .voice-area {
-  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-height: 200px;
   justify-content: center;
 }
 .anim-slot {

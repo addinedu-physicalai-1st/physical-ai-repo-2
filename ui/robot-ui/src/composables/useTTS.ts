@@ -1,137 +1,95 @@
 import { onBeforeUnmount, ref } from 'vue';
+import { useVoiceStore } from '@/stores/voice';
 
 export interface UseTTSOptions {
-  lang?: string;
-  pitch?: number;
-  rate?: number;
-  /** 우선순위 높은 음성 이름 토큰. 첫 매칭 음성을 사용한다 */
-  preferredVoiceTokens?: string[];
   onStart?: () => void;
   onEnd?: () => void;
 }
 
-// 한국어 여성 음성 후보 (OS·브라우저별 이름 차이)
-//   macOS: Yuna, Sora — 기본 시스템 음성
-//   Windows: Heami — Microsoft Heami
-//   Chrome (Google 음성): "Google 한국의" / "Google Korean"
-//   Android: Korean female 표기
-const DEFAULT_KO_FEMALE_TOKENS = [
-  'Yuna',
-  'Sora',
-  'Heami',
-  'Seoyeon',
-  'Google 한국의',
-  'Google Korean',
-  'Korean Female',
-  '여성',
-];
-
-let voicesCache: SpeechSynthesisVoice[] = [];
-
-function loadVoices(): SpeechSynthesisVoice[] {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) voicesCache = voices;
-  return voicesCache;
-}
-
-function pickVoice(lang: string, tokens: string[]): SpeechSynthesisVoice | null {
-  const all = loadVoices();
-  if (all.length === 0) return null;
-  const langPrefix = lang.split('-')[0];
-  const matchingLang = all.filter((v) => v.lang.startsWith(langPrefix));
-  if (matchingLang.length === 0) return null;
-
-  for (const token of tokens) {
-    const lower = token.toLowerCase();
-    const found = matchingLang.find((v) => v.name.toLowerCase().includes(lower));
-    if (found) return found;
-  }
-  return matchingLang[0] ?? null;
-}
-
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  // 음성 목록은 비동기 로딩 — 이벤트로 캐시 업데이트
-  loadVoices();
-  window.speechSynthesis.addEventListener('voiceschanged', () => {
-    loadVoices();
-  });
-
-  // Chrome autoplay policy — 첫 user gesture 전에 speak 하면 'not-allowed' 에러.
-  // 첫 pointerdown 에 silent utterance 로 engine 을 unlock.
-  const unlock = (): void => {
-    try {
-      const u = new SpeechSynthesisUtterance(' ');
-      u.volume = 0;
-      window.speechSynthesis.speak(u);
-    } catch {
-      // ignore
-    }
-    window.removeEventListener('pointerdown', unlock);
-    window.removeEventListener('keydown', unlock);
-  };
-  window.addEventListener('pointerdown', unlock, { once: true });
-  window.addEventListener('keydown', unlock, { once: true });
-}
-
+/**
+ * 전용 서버 사이드 TTS (Edge-TTS)를 사용하는 컴포저블.
+ * 브라우저 네이티브 speechSynthesis는 OS/브라우저별 음성 품질 및 지원 편차가 심해(특히 Linux) 제외함.
+ */
 export function useTTS(options: UseTTSOptions = {}): {
   speak: (text: string) => Promise<void>;
   cancel: () => void;
   isSpeaking: ReturnType<typeof ref<boolean>>;
 } {
+  const voiceStore = useVoiceStore();
   const isSpeaking = ref(false);
-  const lang = options.lang ?? 'ko-KR';
-  const tokens = options.preferredVoiceTokens ?? DEFAULT_KO_FEMALE_TOKENS;
+  let currentAudio: HTMLAudioElement | null = null;
+  let charInterval: number | null = null;
 
-  function speak(text: string): Promise<void> {
+  async function speak(text: string): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    // 기존 재생 중인 것이 있으면 정지
+    cancel();
+
+    
     return new Promise((resolve) => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-        resolve();
-        return;
-      }
+      // 텍스트가 너무 길면 URL 파라미터 제한에 걸릴 수 있으나, 일반적인 대화형 응답(200자 내외)에서는 문제 없음
+      const audio = new Audio(`/api/voice/tts?text=${encodeURIComponent(text)}`);
+      currentAudio = audio;
 
-      const synth = window.speechSynthesis;
-
-      // Chrome known issue — paused/stuck 상태에서 회복
-      if (synth.paused) synth.resume();
-      // 이전 stale utterance 큐 비우기
-      if (synth.speaking || synth.pending) synth.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang;
-      utterance.pitch = options.pitch ?? 1.1;
-      utterance.rate = options.rate ?? 1.0;
-      utterance.volume = 1.0;
-      const voice = pickVoice(lang, tokens);
-      if (voice) utterance.voice = voice;
-
-      let resolved = false;
-      const finish = (): void => {
-        if (resolved) return;
-        resolved = true;
-        isSpeaking.value = false;
-        options.onEnd?.();
-        resolve();
-      };
-
-      utterance.onstart = () => {
+      audio.onplay = () => {
         isSpeaking.value = true;
         options.onStart?.();
+        
+        // 입모양 애니메이션 시뮬레이션
+        // 서버 사이드 오디오는 단어 경계(onboundary) 이벤트가 없으므로,
+        // 텍스트의 글자들을 순차적으로 순환하며 립싱크를 흉내낸다.
+        let charIdx = 0;
+        const cleanText = text.replace(/[^가-힣a-zA-Z]/g, '').trim(); 
+        if (cleanText.length > 0) {
+            charInterval = window.setInterval(() => {
+                voiceStore.setCurrentChar(cleanText[charIdx % cleanText.length]);
+                charIdx++;
+            }, 180); // 약 0.18초 간격으로 입모양 변경
+        }
       };
-      utterance.onend = finish;
-      utterance.onerror = finish;
 
-      // 안전 타임아웃 — 10초 안에 onend/onerror 안 오면 강제 resolve (state machine 멈춤 방지)
-      window.setTimeout(finish, 10000);
+      audio.onended = () => {
+        finish();
+        resolve();
+      };
 
-      synth.speak(utterance);
+      audio.onerror = (e) => {
+        console.error('[TTS] Server-side audio error:', e);
+        finish();
+        resolve();
+      };
+
+      const finish = () => {
+        isSpeaking.value = false;
+        voiceStore.setCurrentChar('');
+        if (charInterval) {
+            window.clearInterval(charInterval);
+            charInterval = null;
+        }
+        currentAudio = null;
+        options.onEnd?.();
+      };
+
+      audio.play().catch((err) => {
+        // Autoplay policy 등에 의해 실패할 수 있음
+        console.error('[TTS] Audio play failed:', err);
+        finish();
+        resolve();
+      });
     });
   }
 
   function cancel(): void {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
     }
+    if (charInterval) {
+      window.clearInterval(charInterval);
+      charInterval = null;
+    }
+    voiceStore.setCurrentChar('');
     isSpeaking.value = false;
   }
 

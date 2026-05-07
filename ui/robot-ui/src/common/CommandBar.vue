@@ -84,7 +84,7 @@ async function submit(): Promise<void> {
 
 <style scoped>
 .bar {
-  flex: 1;
+  width: 100%;
   background: white;
   border-radius: 18px;
   padding: 10px 12px;

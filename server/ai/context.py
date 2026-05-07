@@ -3,7 +3,10 @@
 점심 메뉴는 pgvector 기반 의미 검색 (Menu.embedding, bge-m3 1024d).
 쿼리에 "오늘/내일/어제" 같은 상대 날짜 토큰이 있으면 day 숫자로 치환한 뒤 임베딩.
 """
+import json
+import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -61,7 +64,8 @@ async def _vector_search_menu(
     """
     try:
         qvec = await embed_text(query)
-    except EmbedError:
+    except EmbedError as exc:
+        logging.error(f"[context] menu 검색 실패 (임베딩 에러): {exc}")
         return []
 
     async with async_session_maker() as session:
@@ -87,9 +91,20 @@ async def build_chat_context(
     `user_text` 가 있으면 vector 검색을 시도. 거리 임계값 안의 메뉴만 inject.
     `robot` 이 주어지면 해당 로봇의 capability 목록도 inject — "뭐 할 수 있어?" 류 질문에 사용.
     """
-    now = datetime.now()
+    # Load shared school schedule
+    shared_path = Path(__file__).parent.parent.parent / "shared" / "school_schedule.json"
+    try:
+        with open(shared_path, "r", encoding="utf-8") as f:
+            schedule_data = json.load(f)
+        schedule_str = ", ".join(f"{k}: {v}" for k, v in schedule_data.items())
+    except Exception as e:
+        logging.error(f"[context] schedule 로드 실패: {e}")
+        schedule_str = "정보 없음"
+
+    now = datetime.utcnow() + timedelta(hours=9)
     ctx: dict[str, str] = {
         "current_time": _format_now_ko(now),
+        "school_schedule": schedule_str
     }
 
     if user_text:
@@ -115,6 +130,8 @@ def format_context_block(ctx: dict[str, str]) -> str:
     lines = ["[지금 알고 있는 사실 — 질문이 이 사실에 해당하면 정확히 답할 것]"]
     if "current_time" in ctx:
         lines.append(f"- 현재 시각: {ctx['current_time']}")
+    if "school_schedule" in ctx:
+        lines.append(f"- 일과표(일정): {ctx['school_schedule']}")
     if "lunch_menu" in ctx:
         lines.append(f"- 점심 메뉴 (vector 검색 결과): {ctx['lunch_menu']}")
     else:

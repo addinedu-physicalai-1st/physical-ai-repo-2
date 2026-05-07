@@ -72,22 +72,33 @@ export function useSTT(options: UseSTTOptions): {
     };
     r.onerror = (event) => {
       const message = (event as unknown as { error?: string }).error ?? 'unknown';
+      console.warn('[STT] Error event:', message);
+      
+      // If we get a network error, it's usually a browser/API key issue on Linux.
+      // Stop the loop to prevent flickering.
+      if (message === 'network') {
+        console.error('[STT] Fatal network error. Stopping auto-restart. Are you using Chromium? Try Google Chrome.');
+        shouldRestart = false;
+      }
+
       if (message === 'no-speech' || message === 'aborted') return;
       options.onError?.(`STT 오류: ${message}`);
     };
     r.onend = () => {
+      console.log('[STT] Session ended. shouldRestart:', shouldRestart);
       isRunning.value = false;
       if (shouldRestart) {
         window.setTimeout(() => {
           if (shouldRestart) {
+            console.log('[STT] Attempting restart...');
             try {
               r.start();
               isRunning.value = true;
-            } catch {
-              // already started or other transient — ignore
+            } catch (e) {
+              console.warn('[STT] Restart failed:', e);
             }
           }
-        }, 200);
+        }, 50); // Reduced to 50ms to prevent flickering while clearing buffer
       }
     };
     return r;
