@@ -21,6 +21,8 @@ from server.control.routers import menu as menu_router
 from server.control.routers import parents as parents_router
 from server.control.routers import photos as photos_router
 from server.control.routers import reports as reports_router
+from server.control.teleop.ros_bridge import RosBridge
+from server.control.teleop.router import install as install_teleop
 
 app = FastAPI(title="Pingdergarten Control", version="0.1.0")
 
@@ -41,6 +43,22 @@ app.include_router(attendance_router.router)
 app.include_router(menu_router.router)
 app.include_router(photos_router.router)
 app.include_router(reports_router.router)
+
+# teleop (GogoPing keyboard control) — POST /teleop/cmd_vel, WS /teleop/state, GET /teleop/health
+_teleop_bridge = RosBridge()
+install_teleop(app, _teleop_bridge)
+
+
+@app.on_event("startup")
+async def _start_teleop_bridge() -> None:
+    # ROS_DOMAIN_ID (201~219) 가 설정되어 있어야 한다.
+    _teleop_bridge.start()
+
+
+@app.on_event("shutdown")
+async def _stop_teleop_bridge() -> None:
+    _teleop_bridge.shutdown()
+
 
 # 얼굴 이미지 정적 노출 — DB 의 photo_url 은 /api/face-images/{child_id}/{idx}.jpg 형태로 저장된다.
 os.makedirs(settings.face_image_dir, exist_ok=True)

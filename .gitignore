@@ -15,3 +15,7 @@ device/noriarm_ws/build/
 device/noriarm_ws/install/
 device/noriarm_ws/log/
 shared/machine_ips.json
+COLCON_IGNORE
+build
+install
+log
