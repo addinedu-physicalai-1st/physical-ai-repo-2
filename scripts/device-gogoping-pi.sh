@@ -30,7 +30,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ACTION="${1:-up}"
 
 ROS_SETUP="/opt/ros/jazzy/setup.zsh"
-WS_SETUP="$REPO_ROOT/install/setup.zsh"
+WS_SETUP="$REPO_ROOT/install/local_setup.zsh"
 
 if ! command -v tmux &>/dev/null; then
   echo "[device-gogoping-pi] tmux 가 설치되어 있지 않습니다 (sudo apt install tmux)" >&2
