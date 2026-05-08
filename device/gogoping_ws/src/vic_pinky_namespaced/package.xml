@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>vic_pinky_namespaced</name>
+  <version>0.1.0</version>
+  <description>
+    GogoPing (vic pinky) bringup wrapper that pushes the 'gogoping' ROS namespace.
+    The upstream vicpinky_bringup launch is included unmodified.
+  </description>
+  <maintainer email="dev@pingdergarten.local">Pingdergarten</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>vicpinky_bringup</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
