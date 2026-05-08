@@ -1,36 +1,56 @@
-"""Wrapper launch — vicpinky_bringup 의 bringup.launch.xml 을 'gogoping' namespace 아래로.
+"""Wrapper launch — vicpinky_bringup 노드 구성을 'gogoping' namespace 아래로.
 
 upstream submodule 코드는 수정하지 않는다 (AC #19).
-변경 가능성이 있는 launch 인자는 BRINGUP_ARGS dict 한 곳에 모은다.
+sllidar driver 의 frame_id 를 URDF 의 laser_link 와 맞추기 위해
+bringup.launch.xml 을 통째 include 하지 않고 동등한 노드 구성을 여기서 기술한다.
 """
 
 from launch import LaunchDescription
 from launch.actions import GroupAction, IncludeLaunchDescription
 from launch.launch_description_sources import AnyLaunchDescriptionSource
-from launch_ros.actions import PushRosNamespace
+from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 
 
-# 변경 가능성이 높은 launch 인자는 여기서만 수정 (위험 #6 완화)
-BRINGUP_ARGS = {
-    "use_sim_time": "False",
-}
-
-
 def generate_launch_description() -> LaunchDescription:
-    bringup_xml = (
-        get_package_share_directory("vicpinky_bringup")
-        + "/launch/bringup.launch.xml"
+    pkg_description = get_package_share_directory("vicpinky_description")
+    pkg_bringup = get_package_share_directory("vicpinky_bringup")
+    pkg_sllidar = get_package_share_directory("sllidar_ros2")
+
+    upload = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(pkg_description + "/launch/upload.launch.xml"),
+        launch_arguments={"use_sim_time": "False"}.items(),
     )
 
-    bringup = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(bringup_xml),
-        launch_arguments=list(BRINGUP_ARGS.items()),
+    # sllidar 의 scan frame_id 를 URDF 의 laser_link 와 일치시킨다
+    sllidar = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(pkg_sllidar + "/launch/sllidar_c1_launch.py"),
+        launch_arguments={"frame_id": "laser_link"}.items(),
+    )
+
+    bringup_node = Node(
+        package="vicpinky_bringup",
+        executable="bringup",
+        parameters=[{
+            "accel_limit": 0.4,
+            "decel_limit": 1.0,
+            "ang_accel_limit": 1.0,
+            "ang_decel_limit": 1.5,
+        }],
+    )
+
+    laser_filter = Node(
+        package="laser_filters",
+        executable="scan_to_scan_filter_chain",
+        parameters=[pkg_bringup + "/config/laser_filter.yaml"],
     )
 
     return LaunchDescription([
         GroupAction([
             PushRosNamespace("gogoping"),
-            bringup,
+            upload,
+            sllidar,
+            bringup_node,
+            laser_filter,
         ]),
     ])
