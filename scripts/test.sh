@@ -28,6 +28,23 @@ else
 fi
 
 echo
+echo "[tests] Teleop (admin-ui ↔ control-server) 단위 테스트"
+cd "$REPO_ROOT"
+TELEOP_RC=0
+conda run -n jazzy pytest \
+  tests/test_teleop_router.py \
+  tests/test_teleop_card.py \
+  tests/test_ros_bridge_threadsafe.py \
+  tests/test_teleop_arch_guards.py \
+  -v "$@" || TELEOP_RC=$?
+if [[ $TELEOP_RC -eq 0 ]]; then
+  echo "[tests] Teleop 섹션 PASS"
+else
+  echo "[tests] Teleop 섹션 FAIL (exit=$TELEOP_RC)"
+  exit $TELEOP_RC
+fi
+
+echo
 echo "[ui/portal-ui] Vitest 단위 테스트"
 PORTAL_DIR="$REPO_ROOT/ui/portal-ui"
 if [[ -d "$PORTAL_DIR/node_modules" ]]; then

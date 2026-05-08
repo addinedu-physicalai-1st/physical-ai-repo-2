@@ -30,6 +30,8 @@ dependencies = [
   "PyQt5>=5.15",
   # Arduino serial bridge (gogoping_camera_pan)
   "pyserial>=3.5",
+  # Admin UI ↔ Control Server teleop (HTTP/WS)
+  "websockets>=13",
 ]
 
 [dependency-groups]
@@ -38,6 +40,7 @@ dev = [
   "anyio[trio]>=4",
   "pytest-anyio>=0.0.0",
   "pytest-asyncio>=0.24",
+  "pytest-qt>=4.4",
 ]
 
 [tool.pytest.ini_options]

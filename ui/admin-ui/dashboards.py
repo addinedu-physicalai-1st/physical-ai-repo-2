@@ -217,8 +217,6 @@ class GogoPingDashboard(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        meta = ROBOTS[self.NAME]
-        accent = meta["color"]
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(28, 24, 28, 24)
@@ -239,43 +237,15 @@ class GogoPingDashboard(QWidget):
         self.camera = CameraView()
         self.camera_card.body.addWidget(self.camera)
 
-        # 주행
-        drive_card = Card("주행 상태")
-        drive_row = QHBoxLayout()
-        drive_row.setSpacing(10)
-        self.compass = CompassDial(accent)
-        drive_row.addWidget(self.compass)
-        drive_metrics = QVBoxLayout()
-        drive_metrics.setSpacing(6)
-        self.speed_row = MetricRow("속도", "0.32 m/s")
-        self.heading_row = MetricRow("방향", "045°")
-
-        # 모드 / 목적지 — 아이콘 강조 행
-        self.mode_row = _kv_row("주행 모드", IconText("robot", "자율주행",
-                                                       size=14, color=accent,
-                                                       bold=True, font_pt=12))
-        self.target_row = _kv_row("목적지", IconText("music", "2반 교실",
-                                                       size=14, color=accent,
-                                                       bold=True, font_pt=12))
-        self.eta_row = MetricRow("도착 예정", "1분 24초")
-        for w in (self.speed_row, self.heading_row, self.mode_row,
-                  self.target_row, self.eta_row):
-            drive_metrics.addWidget(w)
-        drive_metrics.addStretch(1)
-        drive_row.addLayout(drive_metrics, 1)
-        drive_card.body.addLayout(drive_row)
-
-        # 경유지
-        path_card = Card("경유지")
-        self.path_queue = TaskQueue(accent)
-        self.path_queue.set_tasks([
-            ("door",       "출입구 — 김민준 등원 픽업"),
-            ("palette",    "1반 교실 — 미술도구 운반"),
-            ("music",      "2반 교실 — 악기 회수"),
-            ("tree",       "운동장 — 점심 후 정렬 보조"),
-            ("bookshelf",  "도서실 — 그림책 반납"),
-        ])
-        path_card.body.addWidget(self.path_queue)
+        # Teleop 카드로 교체. admin-ui 는 Control Server 와 HTTP/WS 만 통신.
+        from services.teleop_client import TeleopClient
+        from widgets.teleop_card import TeleopCard
+        self.teleop_client = TeleopClient()
+        self.teleop_card = TeleopCard(
+            send_cmd_vel=self.teleop_client.post_cmd_vel,
+            get_health=self.teleop_client.get_health,
+        )
+        self.teleop_client.connect_state_ws(self.teleop_card.on_state)
 
         # 시스템
         system_card = Card("시스템 상태")
@@ -288,18 +258,18 @@ class GogoPingDashboard(QWidget):
                   self.distance_row):
             system_card.body.addWidget(w)
 
-        grid.addWidget(self.map_card,    0, 0, 2, 2)
-        grid.addWidget(self.camera_card, 0, 2, 1, 2)
-        grid.addWidget(drive_card,       1, 2, 1, 2)
-        grid.addWidget(path_card,        2, 0, 1, 2)
-        grid.addWidget(system_card,      2, 2, 1, 2)
+        # 레이아웃: 위쪽 절반에 모니터링 (map · camera · system),
+        # 아래쪽 전체 폭에 Teleop 카드 (D-pad + cockpit + telemetry).
+        grid.addWidget(self.map_card,    0, 0, 1, 2)
+        grid.addWidget(self.camera_card, 0, 2, 1, 1)
+        grid.addWidget(system_card,      0, 3, 1, 1)
+        grid.addWidget(self.teleop_card, 1, 0, 1, 4)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
         grid.setColumnStretch(3, 1)
         grid.setRowStretch(0, 3)
-        grid.setRowStretch(1, 2)
-        grid.setRowStretch(2, 2)
+        grid.setRowStretch(1, 4)
 
         self._tick = 0
         self._timer = QTimer(self)
@@ -311,18 +281,8 @@ class GogoPingDashboard(QWidget):
         self.map_view.step(0.010)
         self.camera.step()
 
-        speed = 0.4 + math.sin(self._tick * 0.03) * 0.25
-        heading = (self._tick * 1.2) % 360
-        self.compass.set_state(heading, speed)
-        self.speed_row.set_value(f"{speed * 0.6:.2f} m/s")
-        self.heading_row.set_value(f"{heading:03.0f}°")
-
         if self._tick % 30 == 0:
             self.cpu_row.set_value(f"{random.randint(28, 38)}%")
-            eta = max(5, 84 - (self._tick // 30) % 80)
-            self.eta_row.set_value(
-                f"{eta // 60}분 {eta % 60:02d}초" if eta >= 60 else f"{eta}초"
-            )
             self.distance_row.set_value(
                 f"{1.42 + (self._tick // 30) * 0.003:.2f} km"
             )
