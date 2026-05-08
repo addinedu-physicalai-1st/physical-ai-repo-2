@@ -45,6 +45,14 @@ HEALTH_TICK_MS = 5000
 # D-pad 버튼 글리프 — 안정적인 유니코드 삼각형
 _GLYPH = {"up": "▲", "down": "▼", "left": "◀", "right": "▶"}
 
+# 화살표 키 → 방향 kind 매핑 (키보드 입력 시 버튼 setDown 으로 시각 피드백)
+_KEY_TO_KIND = {
+    Qt.Key_Up: "up",
+    Qt.Key_Down: "down",
+    Qt.Key_Left: "left",
+    Qt.Key_Right: "right",
+}
+
 
 def _load_vic_ip(json_path: pathlib.Path) -> str:
     try:
@@ -756,6 +764,10 @@ class TeleopCard(QWidget):
 
     # ---------------------------------------------------- 입력 처리
 
+    def _btn_for_kind(self, kind: str) -> QPushButton:
+        return {"up": self.btn_up, "down": self.btn_down,
+                "left": self.btn_left, "right": self.btn_right}[kind]
+
     def _on_btn_pressed(self, kind: str) -> None:
         self._buttons_down.add(kind)
         self._sync_active_indicators()
@@ -772,18 +784,16 @@ class TeleopCard(QWidget):
         self._publishing = False
         self._cmd_timer.stop()
         self._send_zero_once()
+        # 키 입력으로 setDown 시켰던 버튼들 모두 시각 해제
+        for kind in ("up", "down", "left", "right"):
+            self._btn_for_kind(kind).setDown(False)
         self._sync_active_indicators()
 
     def _active_directions(self) -> set[str]:
         active = set(self._buttons_down)
-        if Qt.Key_Up in self._keys_down:
-            active.add("up")
-        if Qt.Key_Down in self._keys_down:
-            active.add("down")
-        if Qt.Key_Left in self._keys_down:
-            active.add("left")
-        if Qt.Key_Right in self._keys_down:
-            active.add("right")
+        for key, kind in _KEY_TO_KIND.items():
+            if key in self._keys_down:
+                active.add(kind)
         return active
 
     def _sync_active_indicators(self) -> None:
@@ -798,8 +808,11 @@ class TeleopCard(QWidget):
         if k == Qt.Key_Space:
             self._on_stop_clicked()
             return
-        if k in (Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right):
+        kind = _KEY_TO_KIND.get(k)
+        if kind is not None:
             self._keys_down.add(k)
+            # QSS :pressed 트리거하여 마우스 클릭과 동일한 시각 피드백
+            self._btn_for_kind(kind).setDown(True)
             self._sync_active_indicators()
             self._ensure_publishing()
             return
@@ -811,6 +824,9 @@ class TeleopCard(QWidget):
         k = e.key()
         if k in self._keys_down:
             self._keys_down.discard(k)
+            kind = _KEY_TO_KIND.get(k)
+            if kind is not None:
+                self._btn_for_kind(kind).setDown(False)
             self._sync_active_indicators()
             self._maybe_stop()
             return
@@ -901,6 +917,6 @@ class TeleopCard(QWidget):
             return
         info = self._get_health()
         if info is None:
-            self._set_comm_badge(False, label="health X")
+            self._set_comm_badge(False, label="통신 끊김")
             return
         self._set_comm_badge(bool(info.get("ros_ok", False)))
