@@ -19,3 +19,4 @@ COLCON_IGNORE
 build
 install
 log
+.vscode
