@@ -34,17 +34,17 @@ class Observation:
     """한 timestep 의 관측값.
 
     필드는 모두 optional — 정책이 필요한 것만 사용한다.
-        images           — 카메라 id → BGR ndarray (H, W, 3)
-        joint_states     — arm id → joint position ndarray (radian)
-        marker_position  — rule-based 에서 검출한 마커 좌표 (x, y) 또는 라벨
-        lang_prompt      — smolVLA 같은 언어조건 정책의 텍스트 프롬프트
-        timestamp        — 관측 시각 (s, monotonic 또는 ROS 시각)
-        extra            — 게임 고유 신호용 자유 dict
+        images        — 카메라 id → BGR ndarray (H, W, 3)
+        joint_states  — arm id → joint position ndarray (radian)
+        hand_position — vision 노드가 검출한 손 위치/선택 (예: 'O' / 'X' / (x, y))
+        lang_prompt   — smolVLA 같은 언어조건 정책의 텍스트 프롬프트
+        timestamp     — 관측 시각 (s, monotonic 또는 ROS 시각)
+        extra         — 게임 고유 신호용 자유 dict
     """
 
     images: dict[str, np.ndarray] | None = None
     joint_states: dict[str, np.ndarray] | None = None
-    marker_position: tuple[float, float] | str | None = None
+    hand_position: tuple[float, float] | str | None = None
     lang_prompt: str | None = None
     timestamp: float | None = None
     extra: dict[str, Any] = field(default_factory=dict)

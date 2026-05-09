@@ -11,12 +11,33 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import threading
 import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 logger = logging.getLogger(__name__)
+
+
+def _norm_to_rad(mode: str) -> Callable[[float], float]:
+    """lerobot 정규화 값 → URDF 라디안 변환 함수.
+
+    OMX 의 모터 calibration 디폴트 (range_min=0 ticks, range_max=4095 ticks, mid=2047.5)
+    에서 mid 가 URDF 의 home (joint=0 rad) 라고 가정한다. 정규화의 양 끝은 모터 풀 회전
+    (±π rad) 으로 매핑.
+        m100_100   : -100..+100  → -π..+π     (val × π/100)
+        range_0_100: 0..100      → -π..+π    ((val−50) × π/50)
+        degrees    : -180..+180  → -π..+π     (val × π/180)
+    """
+    if mode == "m100_100":
+        return lambda v: v * math.pi / 100
+    if mode == "range_0_100":
+        return lambda v: (v - 50) * math.pi / 50
+    if mode == "degrees":
+        return lambda v: v * math.pi / 180
+    logger.warning(f"unknown joint_norm_mode={mode!r} — 'degrees' 로 fallback")
+    return lambda v: v * math.pi / 180
 
 
 class BridgeUnavailable(RuntimeError):
@@ -196,12 +217,13 @@ class NoriarmRosBridge:
     async def play_answer(self, answer: str) -> dict:
         """정책 → action → trajectory 재생을 비동기 background task 로 시작.
 
-        HTTP 응답은 trajectory 가 끝날 때까지 안 기다리고 즉시 반환 — UI 가 다른 일 (다음
-        문제, SSE 시청 등) 을 진행할 수 있도록.
+        Trajectory 를 먼저 load 해서 duration_s 를 응답에 포함 — UI 가 그 시간만큼 기다린
+        뒤 다음 문제로 넘어갈 수 있게.
         """
         Observation = self._fw["Observation"]
         ReplayTrajectoryAction = self._fw["ReplayTrajectoryAction"]
         IdleAction = self._fw["IdleAction"]
+        load_trajectory = self._fw["load_trajectory"]
 
         obs = Observation(extra={"answer": answer})
         action = self._policy.step(obs)
@@ -209,32 +231,47 @@ class NoriarmRosBridge:
         if isinstance(action, IdleAction):
             return {"ok": True, "action": "idle", "answer": answer}
         if isinstance(action, ReplayTrajectoryAction):
-            asyncio.create_task(self._play_trajectory(action.name))
-            return {"ok": True, "action": "replay_trajectory", "name": action.name}
+            path = self._manifest_path.parent / action.name
+            traj = load_trajectory(path)
+            asyncio.create_task(self._play_trajectory(traj, action.name))
+            return {
+                "ok": True,
+                "action": "replay_trajectory",
+                "name": action.name,
+                "duration_s": traj.duration_s,
+            }
         return {"ok": False, "reason": f"unknown action {action!r}"}
 
-    async def _play_trajectory(self, name: str) -> None:
-        load_trajectory = self._fw["load_trajectory"]
-        deg_to_rad = self._fw["deg_to_rad"]
-
-        path = self._manifest_path.parent / name
-        traj = load_trajectory(path)
+    async def _play_trajectory(self, traj: Any, name: str) -> None:
         names = list(self._arm.sim.get("joint_state_names") or [])
         if not names:
             logger.error("joint_state_names 가 매니페스트에 없음 — 재생 취소")
             return
+        # 컬럼별 정규화 모드 → URDF 라디안 변환 함수 리스트. 매니페스트 누락 시 'degrees'.
+        modes = list(self._arm.sim.get("joint_norm_modes") or ["degrees"] * len(names))
+        if len(modes) != len(names):
+            logger.warning(
+                f"joint_norm_modes 길이가 joint_state_names 와 다름 — 'degrees' 로 fallback"
+            )
+            modes = ["degrees"] * len(names)
+        converters = [_norm_to_rad(m) for m in modes]
+
+        # URDF mimic joint (예: gripper_joint_2 = -1 * gripper_joint_1) 는 urdf-loader 가
+        # 자동 처리 — bridge 는 source joint 만 publish 한다.
         sliced = traj.slice_columns(len(names))
         period = 1.0 / sliced.hz
         logger.info(
-            f"trajectory 재생 시작: {name} frames={sliced.num_frames} duration={sliced.duration_s:.2f}s"
+            f"trajectory 재생 시작: {name} frames={sliced.num_frames} duration={sliced.duration_s:.2f}s "
+            f"modes={modes}"
         )
         for frame in sliced.frames_deg:
             if self._stopping.is_set() or self._node is None:
                 break
+            positions = [converters[i](frame[i]) for i in range(len(names))]
             msg = JointState()
             msg.header.stamp = self._node.get_clock().now().to_msg()
             msg.name = names
-            msg.position = deg_to_rad(frame)
+            msg.position = positions
             self._js_pub.publish(msg)
             await asyncio.sleep(period)
         # 정책을 다시 reset 해서 다음 답을 받을 수 있게.

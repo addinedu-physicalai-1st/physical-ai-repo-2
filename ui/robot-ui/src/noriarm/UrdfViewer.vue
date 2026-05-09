@@ -10,6 +10,7 @@
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
 
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -19,10 +20,15 @@ const errorMsg = ref('');
 let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
 let camera: THREE.PerspectiveCamera | null = null;
+let controls: OrbitControls | null = null;
 let robot: any = null;
 let animationId = 0;
 let eventSource: EventSource | null = null;
 let resizeObserver: ResizeObserver | null = null;
+
+// 디폴트 뷰 — 위에서 거의 수직 내려다봄 (사용자가 OrbitControls 로 미세조정 가능).
+const VIEW_TARGET = new THREE.Vector3(0.135, 0.199, -0.015);
+const CAMERA_POSITION = new THREE.Vector3(0.12, 0.933, -0.015);
 
 interface JointStateMessage {
   name: string[];
@@ -35,8 +41,8 @@ function setupScene(width: number, height: number): void {
   scene.background = new THREE.Color(0xeaf3fa);
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 100);
-  camera.position.set(0.55, 0.45, 0.55);
-  camera.lookAt(0, 0.12, 0);
+  camera.position.copy(CAMERA_POSITION);
+  camera.lookAt(VIEW_TARGET);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -52,6 +58,75 @@ function setupScene(width: number, height: number): void {
   const grid = new THREE.GridHelper(1.2, 24, 0x99b8c9, 0xcbd9e2);
   grid.position.y = -0.001; // z-fight 방지
   scene.add(grid);
+
+  // 마우스로 회전·줌·팬. damping 으로 부드럽게.
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.copy(VIEW_TARGET);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.12;
+  controls.minDistance = 0.2;
+  controls.maxDistance = 2.0;
+  controls.update();
+}
+
+/**
+ * 로봇 앞 바닥에 O/X 안내판(가로 25 cm × 세로 15 cm × 높이 1 cm)을 배치한다. 윗면을 절반으로
+ * 나누어 왼쪽 O / 오른쪽 X 표시 — 시뮬에서 trajectory 가 어느 답을 가리키는지 시각적으로
+ * 식별하기 위함. URDF 와 무관한 정적 데코라 scene 에 직접 추가한다.
+ */
+function addAnswerBoard(): void {
+  if (!scene) return;
+  // 축 매핑 (URDF 가 rotation.x = -π/2 로 회전된 후 기준):
+  //   월드 +X = 로봇 정면, 월드 -Z = 로봇 왼쪽 (ROS +Y), 월드 +Z = 로봇 오른쪽.
+  // → 보드 장축(25 cm) 을 월드 Z(좌우) 로, 단축(15 cm) 을 월드 X(앞뒤) 로.
+  const FORWARD = 0.15; // X 방향 (로봇 앞뒤)
+  const SIDE = 0.25;    // Z 방향 (로봇 좌우)
+  const H = 0.01;       // Y (높이)
+
+  // BoxGeometry +Y face UV 규칙:
+  //   캔버스 top(cy=0)    → 월드 -Z = 로봇 왼쪽  ⇒ 여기에 O 그림.
+  //   캔버스 bottom(cy=H) → 월드 +Z = 로봇 오른쪽 ⇒ 여기에 X 그림.
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = Math.round(canvas.width * (SIDE / FORWARD)); // 640
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#1f3a4d';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height / 2);
+  ctx.lineTo(canvas.width, canvas.height / 2);
+  ctx.stroke();
+  ctx.font = 'bold 260px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // 글씨를 90° 회전 — 카메라(위에서 내려다 본) 시점에서 정자체로 보이게 하기 위함.
+  const drawRotated = (text: string, cx: number, cy: number, color: string) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillStyle = color;
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  };
+  drawRotated('O', canvas.width / 2, canvas.height * 0.25, '#2d8b57');
+  drawRotated('X', canvas.width / 2, canvas.height * 0.75, '#c14545');
+
+  const topTex = new THREE.CanvasTexture(canvas);
+  topTex.colorSpace = THREE.SRGBColorSpace;
+  topTex.anisotropy = 4;
+
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2 });
+  const topMat = new THREE.MeshStandardMaterial({ map: topTex });
+  // BoxGeometry face 순서: +X, -X, +Y(top), -Y, +Z, -Z
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(FORWARD, H, SIDE),
+    [sideMat, sideMat, topMat, sideMat, sideMat, sideMat],
+  );
+  // 발판 바로 앞: OMX-F base footprint 절반(~0.035 m) 보다 살짝 떨어진 곳에 보드 후면이 닿게.
+  board.position.set(0.115, H / 2, 0);
+  scene.add(board);
 }
 
 function loadUrdf(): void {
@@ -109,6 +184,7 @@ function openEventSource(): void {
 function startAnimation(): void {
   const tick = () => {
     animationId = requestAnimationFrame(tick);
+    controls?.update(); // damping 활성 시 매 프레임 업데이트 필요
     if (renderer && scene && camera) {
       renderer.render(scene, camera);
     }
@@ -135,6 +211,7 @@ onMounted(() => {
   const w = containerRef.value.clientWidth || 480;
   const h = containerRef.value.clientHeight || 360;
   setupScene(w, h);
+  addAnswerBoard();
   loadUrdf();
   startAnimation();
   setupResize();
@@ -147,6 +224,8 @@ onBeforeUnmount(() => {
   eventSource = null;
   resizeObserver?.disconnect();
   resizeObserver = null;
+  controls?.dispose();
+  controls = null;
 
   if (renderer) {
     renderer.domElement.remove();

@@ -33,8 +33,13 @@ hardware:
         # OX 퀴즈처럼 녹화 trajectory 재생만 필요한 게임에 적합.
         backend: joint_state_only
         joint_state_topic: /joint_states
-        # OMX-F URDF 의 7 joint 중 lerobot 녹화 6 컬럼과 1:1 매핑 (gripper_joint_2 는 mimic).
+        # OMX-F URDF 의 6 joint 중 lerobot 녹화 6 컬럼과 1:1 매핑. URDF 의 mimic joint
+        # (gripper_joint_2 = -1 * gripper_joint_1) 는 urdf-loader 가 자동 처리.
         joint_state_names: [joint1, joint2, joint3, joint4, joint5, gripper_joint_1]
+        # 각 컬럼의 lerobot 정규화 모드 → URDF 라디안 변환 규칙.
+        # lerobot/robots/omx_follower 의 디폴트는 arm = RANGE_M100_100, gripper = RANGE_0_100.
+        # 녹화 시 use_degrees=True 였다면 모든 컬럼을 'degrees' 로 바꾸면 됨.
+        joint_norm_modes: [m100_100, m100_100, m100_100, m100_100, m100_100, range_0_100]
       real:
         backend: dynamixel
         port: /dev/omx_follower
