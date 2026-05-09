@@ -1,0 +1,249 @@
+"""카메라 스트림 위젯 — JPEG 표시 + 상태 오버레이.
+
+PLAN §8 단계 6, SR-CAM-004.
+
+대시보드 카드 내부에 배치. showEvent 에서 자동 subscribe, hideEvent 에서 unsubscribe
+(패턴 A — 배타적 전환). 받은 binary frame 의 (robot_id, stream_id) 가 자기 target
+과 매칭되는 것만 표시.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QImage,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QRadialGradient,
+)
+from PyQt5.QtWidgets import QSizePolicy, QWidget
+
+from theme import COLORS
+
+if TYPE_CHECKING:
+    from services.stream_client import StreamClient
+
+
+# 표시 상태
+_STATE_DISCONNECTED = 0   # WS 끊김
+_STATE_WAITING = 1        # 연결됨, 첫 frame 미수신
+_STATE_LIVE = 2           # frame 수신 중
+_STATE_STALL = 3          # 5초 이상 frame 미수신 (subscriber 0 또는 Pi 정지)
+
+
+class CameraStreamView(QWidget):
+    """단일 (robot, stream) 영상 표시.
+
+    - showEvent: stream_client.subscribe(robot, stream)
+    - hideEvent: stream_client.unsubscribe(robot, stream)
+    - frame_received signal 에서 자기 (robot, stream) 만 필터링
+    - 5초 frame 없으면 STALL 상태로 표시 (운영자에게 시각적 피드백)
+    """
+
+    STALL_THRESHOLD_S = 5.0
+
+    def __init__(
+        self,
+        robot: str,
+        stream_client: "StreamClient",
+        stream_id: int = 0,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self._robot = robot
+        self._stream_id = stream_id
+        self._client = stream_client
+        self._pixmap: QPixmap | None = None
+        self._last_frame_at: datetime | None = None
+        self._frame_count = 0
+        self._state = _STATE_DISCONNECTED
+        self._target = (self._robot_id(), stream_id)
+
+        self.setMinimumHeight(220)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        # signal 연결
+        self._client.frame_received.connect(self._on_frame)
+        self._client.connection_state_changed.connect(self._on_conn_state)
+
+        # 1초 주기 stall/타임스탬프 갱신
+        self._tick = QTimer(self)
+        self._tick.timeout.connect(self._on_tick)
+        self._tick.start(1000)
+
+    def _robot_id(self) -> int:
+        from services.stream_client import ROBOT_IDS
+        return ROBOT_IDS.get(self._robot, 0)
+
+    # ---------------------------------------------------------- lifecycle
+
+    def showEvent(self, ev) -> None:   # noqa: N802
+        super().showEvent(ev)
+        self._client.subscribe(self._robot, self._stream_id)
+
+    def hideEvent(self, ev) -> None:   # noqa: N802
+        super().hideEvent(ev)
+        self._client.unsubscribe(self._robot, self._stream_id)
+        # 가려지면 마지막 프레임은 유지하지만 LIVE 표시는 끔
+        if self._state == _STATE_LIVE:
+            self._state = _STATE_WAITING
+
+    # ---------------------------------------------------------- slots
+
+    def _on_frame(self, robot_id: int, stream_id: int, jpeg: bytes) -> None:
+        if (robot_id, stream_id) != self._target:
+            return   # 다른 영상 frame — 무시
+        img = QImage.fromData(jpeg, "JPG")
+        if img.isNull():
+            return
+        self._pixmap = QPixmap.fromImage(img)
+        self._last_frame_at = datetime.now()
+        self._frame_count += 1
+        self._state = _STATE_LIVE
+        self.update()
+
+    def _on_conn_state(self, connected: bool) -> None:
+        if not connected:
+            self._state = _STATE_DISCONNECTED
+        elif self._pixmap is None:
+            self._state = _STATE_WAITING
+        self.update()
+
+    def _on_tick(self) -> None:
+        # stall 검출
+        if (
+            self._state == _STATE_LIVE
+            and self._last_frame_at is not None
+            and (datetime.now() - self._last_frame_at).total_seconds()
+                > self.STALL_THRESHOLD_S
+        ):
+            self._state = _STATE_STALL
+        self.update()   # 타임스탬프 라이브 갱신
+
+    # ---------------------------------------------------------- paint
+
+    def paintEvent(self, _ev) -> None:   # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        rect = self.rect()
+
+        # 둥근 모서리 클립
+        clip = QPainterPath()
+        clip.addRoundedRect(float(rect.x()), float(rect.y()),
+                            float(rect.width()), float(rect.height()), 14, 14)
+        p.setClipPath(clip)
+
+        # 배경
+        bg = QLinearGradient(0, 0, 0, rect.height())
+        bg.setColorAt(0, QColor("#1f2330"))
+        bg.setColorAt(1, QColor("#11141d"))
+        p.fillRect(rect, QBrush(bg))
+
+        # frame 표시
+        if self._pixmap is not None and self._state in (_STATE_LIVE, _STATE_WAITING, _STATE_STALL):
+            scaled = self._pixmap.scaled(
+                rect.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            offset_x = (rect.width() - scaled.width()) // 2
+            offset_y = (rect.height() - scaled.height()) // 2
+            p.drawPixmap(offset_x, offset_y, scaled)
+
+            # STALL 시 살짝 어둡게
+            if self._state == _STATE_STALL:
+                p.fillRect(rect, QColor(0, 0, 0, 120))
+        else:
+            self._draw_placeholder(p, rect)
+
+        # 비네트
+        vg = QRadialGradient(
+            float(rect.center().x()), float(rect.center().y()),
+            max(rect.width(), rect.height()) * 0.7,
+        )
+        vg.setColorAt(0.6, QColor(0, 0, 0, 0))
+        vg.setColorAt(1.0, QColor(0, 0, 0, 70))
+        p.setBrush(QBrush(vg))
+        p.setPen(Qt.NoPen)
+        p.drawRect(rect)
+
+        # 상태 뱃지
+        self._draw_state_badge(p, rect)
+
+        # 타임스탬프 (LIVE 일 때만)
+        if self._state == _STATE_LIVE and self._last_frame_at is not None:
+            self._draw_timestamp(p, rect, self._last_frame_at.strftime("%H:%M:%S"))
+
+    def _draw_placeholder(self, p: QPainter, rect) -> None:
+        p.setPen(QColor(255, 255, 255, 80))
+        f = QFont(self.font())
+        f.setPointSize(13)
+        f.setBold(True)
+        p.setFont(f)
+        if self._state == _STATE_DISCONNECTED:
+            text = "스트리밍 서버 연결 대기"
+        elif self._state == _STATE_WAITING:
+            text = f"{self._robot} 영상 대기 중"
+        else:
+            text = "영상 없음"
+        p.drawText(rect, Qt.AlignCenter, text)
+
+    def _draw_state_badge(self, p: QPainter, rect) -> None:
+        if self._state == _STATE_LIVE:
+            text = "LIVE"
+            color = QColor(COLORS["danger"])
+        elif self._state == _STATE_STALL:
+            text = "신호 약함"
+            color = QColor(COLORS.get("warning", "#E0A23A"))
+        elif self._state == _STATE_WAITING:
+            text = "대기 중"
+            color = QColor("#88a4b0")
+        else:
+            text = "끊김"
+            color = QColor("#888888")
+
+        from PyQt5.QtCore import QRectF
+        badge = QRectF(12, 12, 90, 26)
+        p.setBrush(QColor(0, 0, 0, 150))
+        p.setPen(Qt.NoPen)
+        p.drawRoundedRect(badge, 13, 13)
+
+        # 점 (LIVE 만 깜박임)
+        dot_color = color
+        if self._state == _STATE_LIVE and (datetime.now().microsecond // 500_000) % 2 == 0:
+            dot_color = QColor("#FFFFFF")
+        p.setBrush(dot_color)
+        # QRectF 좌표는 float — QPointF overload 사용 (PyQt5 는 (x,y,w,h) overload 가 int 만 받음)
+        from PyQt5.QtCore import QPointF
+        p.drawEllipse(QPointF(badge.left() + 18, badge.center().y()), 4, 4)
+
+        # 텍스트
+        p.setPen(QColor("#FFFFFF"))
+        f = QFont(self.font())
+        f.setPointSize(10)
+        f.setBold(True)
+        p.setFont(f)
+        p.drawText(
+            badge.adjusted(30, 0, 0, 0), Qt.AlignVCenter | Qt.AlignLeft, text,
+        )
+
+    def _draw_timestamp(self, p: QPainter, rect, text: str) -> None:
+        from PyQt5.QtCore import QRectF
+        ts = QRectF(rect.width() - 110, 12, 96, 26)
+        p.setBrush(QColor(0, 0, 0, 130))
+        p.setPen(Qt.NoPen)
+        p.drawRoundedRect(ts, 13, 13)
+        p.setPen(QColor("#FFFFFF"))
+        f = QFont(self.font())
+        f.setPointSize(10)
+        p.setFont(f)
+        p.drawText(ts, Qt.AlignCenter, text)

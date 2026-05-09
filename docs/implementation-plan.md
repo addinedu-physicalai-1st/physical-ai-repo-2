@@ -190,6 +190,20 @@ last_synced: "2026-05-04T13:33:23"
 
 > 위 카탈로그는 시스템이 사전 의존하는 named pose 키 집합이다. SR-CAR-004 운반 목적지는 교사가 맵에서 동적으로 선택하므로 카탈로그 외이며, 사전 키가 아니라도 nav_graph 에 등록된 임의 named pose 또는 좌표면 된다.
 
+### 2.7 카메라 영상 스트리밍
+
+> 설계 상세 — [device/gogoping_stream_ws/PLAN.md](../device/gogoping_stream_ws/PLAN.md). 방식 D (커스텀 UDP + WebSocket fan-out).
+
+**포트 매핑 컨벤션**: 같은 로봇 패밀리 (901X / 902X / 903X) 안에서 9_DD_R 포맷 (DD=robot_id 01~99, R=role 0~9) — role 0=예약 (websocket, 추후 SR), role 1=Pi→Server 제어 (추후 SR), role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6 (총 7 streams/로봇, 최대 99대 지원). WebSocket 은 8100/TCP `/ws/video-stream` 단일 endpoint 에서 robot_id+stream_id 헤더로 멀티플렉싱. IP 해석은 [shared/machine_ips.json](../shared/machine_ips.json) 활용 (Control Server=`tonyno`, GogoPing=`vic`).
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
+| SR-CAM-001 | 카메라 송출 (Pi, default ON) | Vic Pinky 가 `camera_streamer.py` 실행 직후 자동으로 USB 웹캠을 MJPEG 640×480 q70 @ 25fps 으로 캡처해 Control Server (port 9013/UDP, primary stream = role 3) 로 28B 헤더 (magic "PING" + version + robot_id + stream_id + frame_seq + ts_ms + jpeg_size + CRC32) + JPEG payload 의 단일 패킷 = 단일 frame 형식으로 항상 송신한다. Control Server 의 수동 STOP 신호 (Pi 측 listener port 9012/UDP = role 2, intent_seq 포함) 수신 시 송출을 중지하고, START 신호 수신 시 재개한다. 자동 트리거 (subscriber 카운트 기반) 는 없음. EduPing/NoriArm 도 동일 프로토콜 (영상 9023/9033, 제어 9022/9032). 이번 SR 은 수동 실행 (SSH 후 `scripts/run_camera.sh`), 부팅 자동 시작은 별도 SR. | High |
+| SR-CAM-002 | Control Server 스트리밍 게이트웨이 | Control Server 가 별도 uvicorn 프로세스 (port 8100/TCP) 로 `/ws/video-stream` WebSocket 엔드포인트를 노출한다 (SR-ADM-001 의 `/ws/<channel>` 컨벤션). 로봇별 UDP 수신 스레드가 frame 을 받아 magic/길이/CRC32/frame_seq 4단계 검증 후 asyncio 측 frame hub 에 전달, **subscriber 가 있는 영상만 client 큐(maxsize=1)에 push, 0 명이면 즉시 drop**. fastapi-users 세션 쿠키 핸드셰이크 인증, 30초 heartbeat, drop-oldest 정책. Server 부팅 시 5초간 Pi frame 수신 모니터, 미수신 시 START 1회 송신해 Pi sanity check. | High |
+| SR-CAM-003 | 다중 클라이언트 / 다중 로봇 | Client 가 uuid client_id 로 hello 후 robot 별 subscribe/unsubscribe 메시지로 영상 fan-out 을 토글할 수 있다. 한 client 가 여러 로봇 동시 구독 가능 (multi-subscribe), stream 필드(기본 0=primary)로 로봇당 여러 카메라 선택 가능. subscribe/unsubscribe 는 server 측 fan-out 정책만 변경, Pi 송출에는 영향 없음 (실시간 전환 ~30–50ms). | High |
+| SR-CAM-004 | Admin UI 카메라 위젯 | Admin UI 가 `websockets.sync.client` 기반 WS 클라이언트를 1개 유지하고, GogoPing/NoriArm/EduPing 대시보드 카드 표시·은닉 이벤트에 맞춰 subscribe/unsubscribe 를 송신한다. 받은 바이너리 frame 을 robot_id/stream_id 로 라우팅해 `QLabel` 에 표시. 끊기면 1초 후 자동 재연결 후 활성 구독 자동 복원 ([teleop_client.py](../ui/admin-ui/services/teleop_client.py) 패턴 일치). | High |
+| SR-CAM-005 | 수동 admin 제어 (정비/절전) | Admin UI 또는 Control Server 의 admin 라우터가 명시적 액션으로 특정 Pi 의 송출을 STOP/START 시킬 수 있다 (정비 모드, 야간 절전 등). REST `POST /api/streaming/robots/{robot}/stop` 및 `POST /api/streaming/robots/{robot}/start` (`/api/` prefix 컨벤션). 이 액션은 subscriber 카운트와 무관하게 Pi 의 streaming_enabled 플래그만 토글한다 (intent_seq 단조 증가, 1초 간격 3회 재전송). | Low |
+
 ## 3. NoriArm UI (Robot UI 코드베이스의 `VITE_ROBOT=noriarm` 인스턴스, 교실 OMX)
 
 ### 3.1 블럭쌓기

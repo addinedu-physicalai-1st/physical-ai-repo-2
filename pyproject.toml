@@ -32,6 +32,8 @@ dependencies = [
   "pyserial>=3.5",
   # Admin UI ↔ Control Server teleop (HTTP/WS)
   "websockets>=13",
+  # Pi 측 v4l2 직접 캡처 (camera_streamer_v4l2.py — Linux 전용)
+  "linuxpy>=0.24; sys_platform == 'linux'",
 ]
 
 [dependency-groups]
