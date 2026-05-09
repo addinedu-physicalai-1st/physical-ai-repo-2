@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import oxQuizData from '../../../../shared/ox_quiz.json';
+import UrdfViewer from '@/noriarm/UrdfViewer.vue';
 
 interface OXQuestion {
   id: string;
@@ -55,14 +56,16 @@ function pickQuestions(): OXQuestion[] {
 }
 
 async function dispatchTrajectory(answer: 'O' | 'X'): Promise<void> {
+  // Control Server 가 노리암 정책을 호출해 trajectory 재생을 background 로 시작.
+  // joint state 들은 별도로 UrdfViewer 가 SSE 로 받아 three.js 에 반영한다.
   try {
-    await fetch('/api/noriarm/trajectory', {
+    await fetch('/api/noriarm/games/ox-quiz/answer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answer }),
     });
   } catch (err) {
-    console.warn('[OXQuiz] trajectory dispatch failed', err);
+    console.warn('[OXQuiz] answer dispatch failed', err);
   }
 }
 
@@ -160,10 +163,17 @@ const progressLabel = computed(
         >
           <div class="progress">{{ progressLabel }}</div>
           <h2 class="q-text small">{{ currentQuestion.question }}</h2>
-          <div class="answer-box" :class="currentQuestion.answer === 'O' ? 'is-o' : 'is-x'">
-            <span class="big-answer">{{ currentQuestion.answer }}</span>
+          <div class="reveal-body">
+            <div class="answer-side">
+              <div class="answer-box" :class="currentQuestion.answer === 'O' ? 'is-o' : 'is-x'">
+                <span class="big-answer">{{ currentQuestion.answer }}</span>
+              </div>
+              <p class="explanation">{{ currentQuestion.explanation }}</p>
+            </div>
+            <div class="viewer-side">
+              <UrdfViewer />
+            </div>
           </div>
-          <p class="explanation">{{ currentQuestion.explanation }}</p>
           <p class="status">
             <span v-if="phase === 'reveal'">노리암이 답을 가리키러 갑니다…</span>
             <span v-else>로봇팔 재생 중…</span>
@@ -202,6 +212,10 @@ const progressLabel = computed(
   text-align: center;
   min-width: 480px;
   max-width: 720px;
+}
+.card.reveal {
+  /* 답 카드 + URDF 뷰어 2단 레이아웃을 담을 폭 */
+  max-width: 920px;
 }
 .card h1 {
   margin: 0 0 16px;
@@ -298,6 +312,22 @@ const progressLabel = computed(
   margin: 0;
   color: #8aa6b8;
   font-size: 16px;
+}
+.reveal-body {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.answer-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.viewer-side {
+  width: 360px;
+  height: 320px;
 }
 .answer-box {
   width: 220px;
