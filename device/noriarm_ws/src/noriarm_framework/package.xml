@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>noriarm_framework</name>
+  <version>0.1.0</version>
+  <description>NoriArm 게임 프레임워크 — 매니페스트 기반 동적 구성 + 정책 인터페이스 (rule_based / smolVLA)</description>
+  <maintainer email="wooliwooli91@gmail.com">Pingdergarten</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>trajectory_msgs</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
