@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# scripts/run_server.sh — postgres + pgweb + AI Hub + Control 을 한 번에 실행.
+# scripts/run_server.sh — postgres + pgweb + AI Hub + Control + Streaming 을 한 번에 실행.
 #
 # 동작:
 #   - postgres + pgweb docker 컨테이너 자동 기동 (없으면 띄우고, healthy 까지 대기)
-#   - tmux 세션 'pingdergarten' 안에 window 4개 (postgres / pgweb / ai-hub / control)
+#   - tmux 세션 'pingdergarten' 안에 window 5개 (postgres / pgweb / ai-hub / control / streaming)
 #   - 한 화면엔 1개 window 만 표시. 하단 status bar 의 window 이름을 마우스 클릭으로 전환
 #   - pgweb DB 뷰어: http://localhost:8081
+#   - streaming WS: ws://localhost:8100/ws/video-stream (SR-CAM-002, 영상 fan-out)
 #
 # 사용:
 #   scripts/run_server.sh           # 세션 시작·attach (이미 떠있으면 attach)
@@ -86,11 +87,18 @@ case "$ACTION" in
     fi
 
     # 포트 충돌 사전 경고 (치명적이진 않음 — 사용자가 알아서 처리)
-    for port in 8000 8001 8081; do
+    # 8000=control, 8001=ai-hub, 8081=pgweb, 8100=streaming(WS)
+    for port in 8000 8001 8081 8100; do
       if lsof -i ":$port" -P -sTCP:LISTEN &>/dev/null; then
         echo "[run_server] ⚠ 포트 $port 가 이미 사용 중 — 해당 서비스가 바인드 실패하면 window 에 에러가 표시됩니다." >&2
       fi
     done
+    # streaming UDP 영상 수신 포트 (이번 SR: gogoping primary 9013 만 활성)
+    if command -v lsof &>/dev/null; then
+      if lsof -i ":9013" -P -sUDP:LISTEN &>/dev/null; then
+        echo "[run_server] ⚠ UDP 9013 가 이미 사용 중 — streaming 의 gogoping 영상 수신이 실패할 수 있습니다." >&2
+      fi
+    fi
 
     # remain-on-exit on: 프로세스 종료해도 window 유지 (에러 메시지 보고 디버깅 가능)
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n postgres -c "$REPO_ROOT" \
@@ -109,6 +117,10 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
       "$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload)"
 
+    # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
+    tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
+      "$(wrap_cmd uvicorn server.control.streaming.app:app --host 0.0.0.0 --port 8100 --reload)"
+
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
     tmux set-option -t "$SESSION" -g mouse on
     tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
@@ -120,7 +132,7 @@ case "$ACTION" in
     tmux select-window -t "$SESSION:control"
 
     echo "[run_server] 세션 '$SESSION' 시작 — attach"
-    echo "[run_server] 하단 status bar 의 'postgres / pgweb / ai-hub / control' 클릭으로 전환"
+    echo "[run_server] 하단 status bar 의 'postgres / pgweb / ai-hub / control / streaming' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 
@@ -25,7 +26,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from config.client_id import get_or_create_client_id
 from dashboards import EduPingDashboard, GogoPingDashboard, NoriArmDashboard
+from services.stream_client import StreamClient
 from theme import COLORS, ROBOTS, apply_theme
 from widgets import Icon, StatusBadge
 
@@ -234,6 +237,15 @@ class AdminWindow(QMainWindow):
         self.resize(1400, 880)
         self.setMinimumSize(1180, 760)
 
+        # SR-CAM-004 — 단일 StreamClient 인스턴스 (앱 라이프타임).
+        # base_url 은 STREAMING_BASE_URL env 로 override 가능.
+        client_id = get_or_create_client_id()
+        base_url = os.environ.get("STREAMING_BASE_URL", "ws://localhost:8100")
+        self.stream_client = StreamClient(
+            client_id=client_id, base_url=base_url, client_kind="admin",
+        )
+        self.stream_client.start()
+
         root = QWidget()
         root.setObjectName("mainBg")
         self.setCentralWidget(root)
@@ -255,7 +267,7 @@ class AdminWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.pages: dict[str, QWidget] = {
             "noriarm":  NoriArmDashboard(),
-            "gogoping": GogoPingDashboard(),
+            "gogoping": GogoPingDashboard(stream_client=self.stream_client),
             "eduping":  EduPingDashboard(),
         }
         for w in self.pages.values():
@@ -270,6 +282,13 @@ class AdminWindow(QMainWindow):
         self.sidebar.select(key)
         self.stack.setCurrentWidget(self.pages[key])
         self.topbar.set_page(key)
+
+    def closeEvent(self, ev) -> None:   # noqa: N802
+        try:
+            self.stream_client.stop()
+        except Exception:
+            pass
+        super().closeEvent(ev)
 
 
 def main() -> int:

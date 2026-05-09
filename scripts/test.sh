@@ -47,6 +47,24 @@ else
 fi
 
 echo
+echo "[tests] Streaming (UDP camera → WS fan-out, SR-CAM-001~005) 단위 테스트"
+cd "$REPO_ROOT"
+STREAMING_RC=0
+conda run -n jazzy pytest \
+  tests/test_streaming_protocol.py \
+  tests/test_streaming_frame_hub.py \
+  tests/test_streaming_frame_drop.py \
+  tests/test_streaming_robot_controller.py \
+  tests/test_streaming_ws_router.py \
+  -v "$@" || STREAMING_RC=$?
+if [[ $STREAMING_RC -eq 0 ]]; then
+  echo "[tests] Streaming 섹션 PASS"
+else
+  echo "[tests] Streaming 섹션 FAIL (exit=$STREAMING_RC)"
+  exit $STREAMING_RC
+fi
+
+echo
 echo "[ui/portal-ui] Vitest 단위 테스트"
 PORTAL_DIR="$REPO_ROOT/ui/portal-ui"
 if [[ -d "$PORTAL_DIR/node_modules" ]]; then

@@ -35,6 +35,7 @@ from widgets import (
     TaskQueue,
     soften,
 )
+from widgets.camera_widget import CameraStreamView
 
 
 # --------------------------------------------------------------------------
@@ -215,8 +216,9 @@ class NoriArmDashboard(QWidget):
 class GogoPingDashboard(QWidget):
     NAME = "gogoping"
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, stream_client=None):
         super().__init__(parent)
+        self._stream_client = stream_client
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(28, 24, 28, 24)
@@ -234,7 +236,14 @@ class GogoPingDashboard(QWidget):
         self.map_card.body.addWidget(self.map_view)
 
         self.camera_card = Card("전방 카메라")
-        self.camera = CameraView()
+        if stream_client is not None:
+            # 실 영상 스트림 (SR-CAM-004) — Pi UDP → Server WS → 이 위젯
+            self.camera = CameraStreamView(
+                robot=self.NAME, stream_client=stream_client, stream_id=0,
+            )
+        else:
+            # stream_client 미주입 시 fallback (mock)
+            self.camera = CameraView()
         self.camera_card.body.addWidget(self.camera)
 
         # Teleop 카드로 교체. admin-ui 는 Control Server 와 HTTP/WS 만 통신.
@@ -279,7 +288,9 @@ class GogoPingDashboard(QWidget):
     def _on_tick(self) -> None:
         self._tick += 1
         self.map_view.step(0.010)
-        self.camera.step()
+        # 실 stream 위젯은 frame_received signal 로 자동 업데이트, mock CameraView 만 step 필요
+        if isinstance(self.camera, CameraView):
+            self.camera.step()
 
         if self._tick % 30 == 0:
             self.cpu_row.set_value(f"{random.randint(28, 38)}%")
