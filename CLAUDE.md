@@ -32,9 +32,9 @@ Addinedu 4기 최종 프로젝트 — **pingdergarten**. 유치원에서 아이�
 
 의존성은 **루트 [pyproject.toml](pyproject.toml) 하나**로 통합 관리한다.
 
-- 설치: `conda run -n jazzy pip install -e .` (프로젝트 루트에서 실행)
+- 설치: 본인 Python 환경 (conda env 등) 을 활성화한 뒤 프로젝트 루트에서 `pip install -e .` 실행. 환경 이름은 팀원마다 다를 수 있으므로 스크립트·문서에 특정 env 이름을 박지 않는다.
 - 새 의존성 추가 시 `pyproject.toml` 의 `[project.dependencies]` 에 추가한다.
-- `venv`, `uv` 등 별도 가상환경을 생성하지 않는다. `.venv/`, `uv.lock` 파일을 만들지 않는다.
+- `venv`, `uv` 등 별도 가상환경을 새로 생성하지 않는다. `.venv/`, `uv.lock` 파일을 만들지 않는다.
 - 서비스별 `requirements.txt` 나 `pyproject.toml` 을 새로 만들지 않는다.
 
 ## 테스트

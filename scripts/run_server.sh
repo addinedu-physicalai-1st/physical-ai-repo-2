@@ -13,7 +13,8 @@
 #   scripts/run_server.sh status    # 세션 상태 + window 목록
 #
 # 의존:
-#   - tmux, docker, conda env 'jazzy'
+#   - tmux, docker
+#   - 활성화된 Python 환경 (conda env 또는 venv) — 환경 이름은 팀원마다 다르며 스크립트가 자동 감지한다 (CONDA_DEFAULT_ENV / VIRTUAL_ENV)
 #   - host 에 ollama 가 떠있어야 한다 (`ollama serve` 또는 macOS 앱)
 #
 # 단축키 (tmux):

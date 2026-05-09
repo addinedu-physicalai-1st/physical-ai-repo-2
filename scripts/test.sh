@@ -5,6 +5,8 @@
 # 사용법:
 #   bash scripts/test.sh               # 전체
 #   bash scripts/test.sh -k gogoping   # 특정 케이스만
+#
+# 본인 Python 환경 (conda env 등) 을 먼저 활성화하고 실행. 환경 이름은 팀원마다 다를 수 있으므로 이 스크립트에 박지 않는다.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,13 +18,13 @@ if ! curl -sf http://localhost:11434/api/tags > /dev/null; then
 fi
 
 echo "Ollama OK. 테스트 시작..."
-conda run -n jazzy pytest "$AI_DIR/tests/" -v "$@" || true
+pytest "$AI_DIR/tests/" -v "$@" || true
 
 echo
 echo "[server/control] FastAPI + DB 테스트"
 if pg_isready -h localhost -p 5432 -U pingder &>/dev/null; then
   cd "$REPO_ROOT"
-  conda run -n jazzy pytest server/control/tests/ -v
+  pytest server/control/tests/ -v
 else
   echo "  postgres 안 떠있음 — 'scripts/run_server.sh' 실행 후 다시 시도하세요. (skip)"
 fi
@@ -31,7 +33,7 @@ echo
 echo "[tests] Teleop (admin-ui ↔ control-server) 단위 테스트"
 cd "$REPO_ROOT"
 TELEOP_RC=0
-conda run -n jazzy pytest \
+pytest \
   tests/test_teleop_router.py \
   tests/test_teleop_card.py \
   tests/test_ros_bridge_threadsafe.py \
