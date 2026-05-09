@@ -42,6 +42,8 @@ class ArmSpec:
     ros_namespace: str  # ROS2 namespace, 예: /noriarm/pointer
     sim: dict[str, Any]
     real: dict[str, Any]
+    controller_topic: str  # JointTrajectory publish 대상 — 예: /arm_controller/joint_trajectory
+    controller_joint_names: tuple[str, ...]  # arm_controller 가 소유한 joint 이름 (순서 유의)
     role: str = ""
 
     def backend(self, target: str) -> dict[str, Any]:
@@ -184,12 +186,18 @@ def _build_arm(a: dict[str, Any], source: Path) -> ArmSpec:
     real = _require(a, "real", where)
     if not isinstance(sim, dict) or not isinstance(real, dict):
         raise ManifestError(f"{where}: sim / real 은 매핑이어야 함")
+    controller_topic = _require(a, "controller_topic", where)
+    joint_names_raw = _require(a, "controller_joint_names", where)
+    if not isinstance(joint_names_raw, list) or not joint_names_raw:
+        raise ManifestError(f"{where}: controller_joint_names 는 비어있지 않은 리스트")
     return ArmSpec(
         id=arm_id,
         model=model,
         ros_namespace=ns,
         sim=sim,
         real=real,
+        controller_topic=str(controller_topic),
+        controller_joint_names=tuple(str(j) for j in joint_names_raw),
         role=a.get("role", ""),
     )
 

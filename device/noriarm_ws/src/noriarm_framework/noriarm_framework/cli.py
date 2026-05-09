@@ -65,7 +65,20 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     cfg = load_manifest(_resolve_manifest(args.game))
-    run(RunnerConfig(config=cfg, target=args.target, max_steps=args.max_steps))
+    inputs: dict[str, str] = {}
+    for raw in args.input or []:
+        if "=" not in raw:
+            raise SystemExit(f"--input 은 KEY=VAL 형식: {raw!r}")
+        k, v = raw.split("=", 1)
+        inputs[k.strip()] = v.strip()
+    run(
+        RunnerConfig(
+            config=cfg,
+            target=args.target,
+            inputs=inputs,
+            max_steps=args.max_steps,
+        )
+    )
     return 0
 
 
@@ -84,6 +97,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="게임 실행")
     p_run.add_argument("--game", required=True)
     p_run.add_argument("--target", choices=["sim", "real"], default="sim")
+    p_run.add_argument(
+        "--input",
+        action="append",
+        metavar="KEY=VAL",
+        help="정책 obs.extra 에 주입할 값 (여러 번 지정 가능). 예: --input answer=O",
+    )
     p_run.add_argument("--max-steps", type=int, default=None, help="디버깅용 — n 스텝 후 종료")
     p_run.set_defaults(func=cmd_run)
 
