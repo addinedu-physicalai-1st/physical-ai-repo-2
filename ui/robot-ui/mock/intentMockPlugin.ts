@@ -77,7 +77,7 @@ export function intentMockPlugin(): Plugin {
         if (
           !originalUrl.startsWith('/api/voice/intent') &&
           !originalUrl.startsWith('/api/mode') &&
-          !originalUrl.startsWith('/api/noriarm/trajectory')
+          !originalUrl.startsWith('/api/noriarm/games/ox-quiz/answer')
         ) {
           next();
           return;
@@ -112,16 +112,13 @@ export function intentMockPlugin(): Plugin {
             return;
           }
 
-          if (originalUrl.startsWith('/api/noriarm/trajectory')) {
-            // 시뮬: 실제 OMX/Gazebo 에 publish 하는 대신 콘솔 로그.
-            // 운영 환경에서는 Control Service 가 ROS2 노드로 forward.
+          if (originalUrl.startsWith('/api/noriarm/games/ox-quiz/answer')) {
+            // mock 모드 fallback — 실제 OX 트랙 재생은 Control Server (ROS bridge) 가 담당.
+            // mock 에서는 UI 흐름만 확인할 수 있도록 OK 만 반환. UrdfViewer 의 SSE 는 연결 실패 후
+            // static URDF 표시.
             const answer = body.answer === 'X' ? 'X' : 'O';
-            const trajectory =
-              answer === 'O'
-                ? 'episode_0_trajectory.json'
-                : 'episode_1_trajectory.json';
-            console.log(`[mock] /api/noriarm/trajectory answer=${answer} → ${trajectory}`);
-            sendJson(res, 200, { ok: true, answer, trajectory });
+            console.log(`[mock] /api/noriarm/games/ox-quiz/answer answer=${answer} (no ROS publish)`);
+            sendJson(res, 200, { ok: true, action: 'mock', answer });
             return;
           }
         } catch (err) {
