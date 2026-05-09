@@ -11,6 +11,7 @@ import ModeSelectorFab from '@/common/ModeSelectorFab.vue';
 import BottomDock from '@/common/BottomDock.vue';
 import StartOverlay from '@/common/StartOverlay.vue';
 import AttendanceCamera from '@/eduping/AttendanceCamera.vue';
+import OXQuiz from '@/noriarm/OXQuiz.vue';
 
 const mode = useModeStore();
 const voice = useVoiceStore();
@@ -22,6 +23,8 @@ const attendanceMode = computed<'IN' | 'OUT' | null>(() => {
   if (currentMode.value === '하원') return 'OUT';
   return null;
 });
+
+const showOXQuiz = computed(() => robot.value.id === 'noriarm');
 
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
@@ -48,6 +51,7 @@ function handleStart(): void {
     <ModeSelectorFab />
     <div class="brand">{{ robot.displayName }}</div>
     <AttendanceCamera :mode="attendanceMode" />
+    <OXQuiz v-if="showOXQuiz" />
     <StartOverlay v-if="!started" @start="handleStart" />
   </div>
 </template>

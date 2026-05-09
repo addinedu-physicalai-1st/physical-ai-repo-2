@@ -1,0 +1,65 @@
+{
+  "$schema_note": "NoriArm OX 퀴즈 문제 풀. UI(ui/robot-ui/src/noriarm/OXQuiz.vue) 가 매 라운드 3문제를 랜덤으로 뽑아 출제한다. 유아 (만 5세) 수준 상식.",
+  "questions": [
+    {
+      "id": "ox-001",
+      "question": "사과는 빨간색이에요.",
+      "answer": "O",
+      "explanation": "사과는 보통 빨갛게 익어요!"
+    },
+    {
+      "id": "ox-002",
+      "question": "호랑이는 풀만 먹어요.",
+      "answer": "X",
+      "explanation": "호랑이는 고기를 먹는 동물이에요."
+    },
+    {
+      "id": "ox-003",
+      "question": "물고기는 물에서 살아요.",
+      "answer": "O",
+      "explanation": "물고기는 아가미로 물 속에서 숨을 쉬어요."
+    },
+    {
+      "id": "ox-004",
+      "question": "펭귄은 하늘을 날 수 있어요.",
+      "answer": "X",
+      "explanation": "펭귄은 날개가 있지만 헤엄을 쳐요."
+    },
+    {
+      "id": "ox-005",
+      "question": "사람의 손가락은 한 손에 다섯 개예요.",
+      "answer": "O",
+      "explanation": "엄지·검지·중지·약지·새끼 모두 다섯 개!"
+    },
+    {
+      "id": "ox-006",
+      "question": "거북이는 토끼보다 빨리 달려요.",
+      "answer": "X",
+      "explanation": "거북이는 천천히 걸어요."
+    },
+    {
+      "id": "ox-007",
+      "question": "봄이 오면 꽃이 피어요.",
+      "answer": "O",
+      "explanation": "따뜻해지면 꽃들이 피어나요."
+    },
+    {
+      "id": "ox-008",
+      "question": "자동차는 다리로 걸어다녀요.",
+      "answer": "X",
+      "explanation": "자동차는 바퀴로 굴러가요."
+    },
+    {
+      "id": "ox-009",
+      "question": "해는 동쪽에서 떠요.",
+      "answer": "O",
+      "explanation": "아침에는 동쪽 하늘에서 해가 떠요."
+    },
+    {
+      "id": "ox-010",
+      "question": "얼음은 뜨거워요.",
+      "answer": "X",
+      "explanation": "얼음은 차가워요!"
+    }
+  ]
+}
