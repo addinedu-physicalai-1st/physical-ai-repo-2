@@ -1,5 +1,9 @@
 """Control Service — REST gateway."""
+import asyncio
+import logging
 import os
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal
 
 import httpx
@@ -25,7 +29,58 @@ from server.control.routers import schedule as schedule_router
 from server.control.teleop.ros_bridge import RosBridge
 from server.control.teleop.router import install as install_teleop
 
-app = FastAPI(title="Pingdergarten Control", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+# noriarm_framework 의 매니페스트 경로 — Control Server 가 같은 게임 정의를 공유한다.
+_NORIARM_OX_MANIFEST = (
+    Path(__file__).resolve().parents[2]
+    / "device"
+    / "noriarm_ws"
+    / "src"
+    / "noriarm_framework"
+    / "noriarm_framework"
+    / "games"
+    / "ox_quiz"
+    / "game.yaml"
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """ROS bridge lifecycle. ROS 환경 미source 시 graceful skip — noriarm 엔드포인트만 503."""
+    bridge = None
+    try:
+        from server.control.noriarm.ros_bridge import (
+            BridgeUnavailable,
+            NoriarmRosBridge,
+            ros_available,
+        )
+
+        if not ros_available():
+            logger.warning(
+                "ROS (rclpy / sensor_msgs) import 실패 — /api/noriarm/* 엔드포인트는 503 으로 응답합니다. "
+                "활성화하려면 `source /opt/ros/jazzy/setup.bash` 후 서버 재시작."
+            )
+        elif not _NORIARM_OX_MANIFEST.is_file():
+            logger.warning(f"OX 매니페스트 없음: {_NORIARM_OX_MANIFEST}")
+        else:
+            try:
+                bridge = NoriarmRosBridge(_NORIARM_OX_MANIFEST)
+                bridge.start(asyncio.get_running_loop())
+                app.state.noriarm_bridge = bridge
+                logger.info("NoriArm ROS bridge 활성화됨")
+            except BridgeUnavailable as e:
+                logger.warning(f"NoriArm bridge 초기화 실패: {e}")
+    except ImportError as e:
+        logger.warning(f"noriarm 모듈 import 실패: {e}")
+
+    yield
+
+    if bridge is not None:
+        bridge.stop()
+
+
+app = FastAPI(title="Pingdergarten Control", version="0.1.0", lifespan=lifespan)
 
 # fastapi-users 라우터
 app.include_router(
@@ -61,6 +116,14 @@ async def _start_teleop_bridge() -> None:
 async def _stop_teleop_bridge() -> None:
     _teleop_bridge.shutdown()
 
+
+# NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.
+try:
+    from server.control.noriarm.router import router as noriarm_router
+
+    app.include_router(noriarm_router)
+except ImportError as e:
+    logger.warning(f"noriarm router 등록 실패 — endpoint 비활성: {e}")
 
 # 얼굴 이미지 정적 노출 — DB 의 photo_url 은 /api/face-images/{child_id}/{idx}.jpg 형태로 저장된다.
 os.makedirs(settings.face_image_dir, exist_ok=True)

@@ -139,9 +139,12 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n ai-hub -c "$REPO_ROOT" \
       "$(wrap_cmd uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload)"
 
-    # window 3: control :8000
+    # window 3: control :8000 — NoriArm 통합용 ROS 환경 + noriarm_framework PYTHONPATH 함께 source.
+    NORIARM_FRAMEWORK_PATH="$REPO_ROOT/device/noriarm_ws/src/noriarm_framework"
+    ROS_SETUP="/opt/ros/jazzy/setup.bash"
+    CONTROL_CMD="$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload)"
     tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
-      "$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload)"
+      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
 
     # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
