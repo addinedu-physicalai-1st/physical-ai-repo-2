@@ -229,6 +229,25 @@ last_synced: "2026-05-04T13:33:23"
 | SR-CLEAN-003 | NoriArm 정리 | NoriArm 이 정리 모드에 진입해 Top 카메라 + 객체 인식 으로 쌓인 블럭과 5개 출발 위치 ROI 를 모니터링하고, 모방학습 정책 (정리 ACT) 으로 검출된 블럭을 색별 매칭 (사람 색 → 사람 ROI 빈 곳 / 로봇 색 → 로봇 ROI 빈 곳, SR-PLAY-003 과 동일 매핑) 으로 다시 옮긴다 (그리퍼 카메라로 픽업 직전 정밀 검증). | High |
 | SR-CLEAN-004 | NoriArm 정리 자동 종료 | 5개 출발 위치 ROI 가 모두 채워지면 정리 모드를 자동 종료한다. | High |
 
+### 3.3 게임 프레임워크 (NoriArm 공통)
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
+| SR-NORI-001 | 게임 매니페스트 | NoriArm 의 각 게임이 하드웨어 요구 (카메라 id·역할·해상도·sim/real 디바이스 매핑 / OMX 팔 id·model·ROS namespace·sim 백엔드(gazebo)·real 백엔드(dynamixel 포트)) 와 정책 종류 (`rule_based` / `smolvla`) 를 YAML 매니페스트 (`device/noriarm_ws/src/noriarm_framework/games/<name>/game.yaml`) 로 선언한다. 런타임은 매니페스트 기반으로 게임을 동적으로 구성하며, 한 게임에 필요한 카메라·팔의 종류와 갯수가 게임마다 다를 수 있다. | High |
+| SR-NORI-002 | 정책 인터페이스 | 게임 진행 로직을 `Policy` Protocol (`reset(ctx)`, `step(observation) -> action`) 로 추상화해 rule-based 와 smolVLA 모방학습 추론을 같은 게임 루프 코드 위에서 교체 가능하게 한다. `Observation` 은 카메라 이미지·검출된 마커·로봇 관절 상태·언어 프롬프트 등 optional 필드를 갖는 dataclass, `Action` 은 idle / replay_trajectory(name) / joint_targets(values) 의 union 으로 표현한다. | High |
+| SR-NORI-003 | 런처 CLI | `python -m noriarm_framework run --game <name> --target sim\|real` 진입점이 매니페스트를 읽어 ROS2 launch description 을 합성하고, 정책 인스턴스를 동적 import 한 뒤 게임 루프를 시작한다. `validate` (매니페스트 + 하드웨어 가용성 검증) / `list` (등록된 게임 목록) 서브커맨드를 함께 제공한다. | High |
+| SR-NORI-004 | 하드웨어 가용성 검증 | 게임 시작 전 매니페스트가 요구하는 카메라(`v4l2-ctl --list-devices`) 와 OMX 팔(`ros2 node list` + 매니페스트의 namespace) 가용성을 점검해 부재 시 명시적으로 실패한다. sim 타깃에서는 sim 디바이스 (Gazebo · 가상 카메라) 기준으로 검증한다. | Medium |
+| SR-NORI-005 | 동적 launch 생성 | 매니페스트의 `cameras` / `arms` / `target` 조합으로 ROS2 launch description 을 동적 합성한다 (real → ros2_control + USB 카메라 노드 / sim → Gazebo + 가상 카메라). 네트워크 토픽 이름은 sim/real 동일하게 유지해 정책·UI 코드는 어느 쪽에서 도는지 모르도록 한다. | Medium |
+
+### 3.4 OX 퀴즈
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
+| SR-PLAY-010 | OX 퀴즈 진행 | NoriArm UI 가 OX 퀴즈 모드에 진입해 `shared/ox_quiz.json` 에서 3문제를 무작위 추출, 각 문제마다 5초 카운트다운 후 정답을 공개하고, NoriArm 게임 프레임워크 (§3.3) 의 OX 퀴즈 게임 (overhead 카메라 1대 + OMX 팔 1대 매니페스트 + rule_based 정책) 으로 정답 trajectory 를 재생한다. 3문제가 끝나면 종료 화면을 표시한다. | High |
+| SR-PLAY-011 | OX 퀴즈 — 손 터치 검출 | overhead 카메라 + 손 검출 (mediapipe 등) 으로 아이가 O 또는 X 마커 위에 손을 올린 시점을 검출해 정답 여부를 판정하고 점수를 누적한다. 검출 이벤트는 게임 세션 WebSocket 으로 NoriArm UI 에 실시간 push 한다. | Medium |
+| SR-PLAY-012 | OX 퀴즈 — smolVLA 정책 | rule_based 대신 smolVLA 모방학습 추론으로 답을 가리키는 trajectory 를 생성하는 대안 정책을 추가한다. 매니페스트의 `policy.kind` 만 `smolvla` 로 바꾸면 동일 게임 루프 / UI 가 ML 정책으로 동작. | Low |
+| SR-PLAY-013 | OX 퀴즈 세션 API | Control Server REST 가 `POST /api/noriarm/games/ox-quiz/sessions` 로 게임 세션을 시작하고 `WebSocket /api/noriarm/games/ox-quiz/sessions/{id}/events` 로 실시간 이벤트(다음 문제·손 검출·정답·점수·종료)를 NoriArm UI 에 push 한다. 내부적으로는 §3.3 게임 프레임워크의 런처를 호출. | Medium |
+
 ## 4. Admin UI (PyQt5 데스크톱 앱, 로봇 관제)
 
 ### 4.1 로봇 상태 모니터링

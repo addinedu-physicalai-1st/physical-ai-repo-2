@@ -33,6 +33,8 @@ dependencies = [
   "websockets>=13",
   # Pi 측 v4l2 직접 캡처 (camera_streamer_v4l2.py — Linux 전용)
   "linuxpy>=0.24; sys_platform == 'linux'",
+  # NoriArm 게임 프레임워크 매니페스트 (YAML)
+  "pyyaml>=6.0",
 ]
 
 [dependency-groups]

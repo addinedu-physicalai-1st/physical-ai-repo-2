@@ -1,0 +1,46 @@
+name: ox_quiz
+display: "OX 퀴즈"
+
+hardware:
+  cameras:
+    - id: overhead
+      role: marker_detection
+      resolution: [1280, 720]
+      fps: 30
+      sim:
+        source: webcam
+        index: 0
+      real:
+        source: usb
+        # `ls /dev/v4l/by-id` 로 실제 카메라 id 채우기.
+        by_id: "PLACEHOLDER-overhead-cam"
+
+  arms:
+    - id: pointer
+      model: omx_f
+      ros_namespace: /noriarm/pointer
+      role: answer_pointer
+      sim:
+        backend: gazebo
+        launch: open_manipulator_bringup/omx_f_gazebo.launch.py
+      real:
+        backend: dynamixel
+        port: /dev/omx_follower
+        baudrate: 1000000
+
+policy:
+  kind: rule_based
+  module: noriarm_framework.games.ox_quiz.policy_rule
+  # rule_based 정책 옵션 — answer ∈ {O, X} → trajectory 파일.
+  trajectory_map:
+    O: episode_0_trajectory.json
+    X: episode_1_trajectory.json
+  # smolVLA 로 전환할 때:
+  # kind: smolvla
+  # module: noriarm_framework.games.ox_quiz.policy_smolvla
+  # checkpoint: checkpoints/ox_v1
+  # device: cuda:0
+
+runtime:
+  rate_hz: 30
+  episode_timeout_s: 30
