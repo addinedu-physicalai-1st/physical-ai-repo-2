@@ -238,15 +238,18 @@ last_synced: "2026-05-04T13:33:23"
 | SR-NORI-003 | 런처 CLI | `python -m noriarm_framework run --game <name> --target sim\|real` 진입점이 매니페스트를 읽어 ROS2 launch description 을 합성하고, 정책 인스턴스를 동적 import 한 뒤 게임 루프를 시작한다. `validate` (매니페스트 + 하드웨어 가용성 검증) / `list` (등록된 게임 목록) 서브커맨드를 함께 제공한다. | High |
 | SR-NORI-004 | 하드웨어 가용성 검증 | 게임 시작 전 매니페스트가 요구하는 카메라(`v4l2-ctl --list-devices`) 와 OMX 팔(`ros2 node list` + 매니페스트의 namespace) 가용성을 점검해 부재 시 명시적으로 실패한다. sim 타깃에서는 sim 디바이스 (Gazebo · 가상 카메라) 기준으로 검증한다. | Medium |
 | SR-NORI-005 | 동적 launch 생성 | 매니페스트의 `cameras` / `arms` / `target` 조합으로 ROS2 launch description 을 동적 합성한다 (real → ros2_control + USB 카메라 노드 / sim → Gazebo + 가상 카메라). 네트워크 토픽 이름은 sim/real 동일하게 유지해 정책·UI 코드는 어느 쪽에서 도는지 모르도록 한다. | Medium |
+| SR-NORI-006 | 타깃 자동 감지 | Control Server `GET /api/noriarm/health` 가 `/dev/omx_follower` 존재 여부 + Dynamixel SDK ping + `ros2 node list` 의 실물 드라이버 노드 상태로 실물 가용성을 판정해 `{real_arm_present, active_target, gazebo_running, controller_active}` 를 반환한다. NoriArm UI 가 마운트 시 호출해 상단 배지 (실물/시뮬) 와 디폴트 target 을 결정한다. 디폴트 규칙: real_arm_present=true 면 real, 아니면 sim. | Medium |
+| SR-NORI-007 | 세션 라이프사이클 | Control Server `POST /api/noriarm/session { target }` / `DELETE /api/noriarm/session` 가 매니페스트의 `arm.sim.backend` 에 따라 분기한다. `joint_state_only` 면 `/joint_states` 를 SSE 로 forward 만 하고 ROS 자식 프로세스 spawn 은 없음 (OX 퀴즈 등 경량 시각화 게임용). `gazebo` 면 `omx_f_gazebo.launch.py` 등 launch 파일을 spawn (블럭쌓기 등 물리 시뮬 필요 게임용). 진행 상태는 SSE `/api/noriarm/session/events` 로 `{phase: "launching" → "ready" → "running" → "terminating"}` push. real 타깃은 launch 생략. 개발 환경에서 Control Server 가 노트북 셸에서 직접 실행되므로 DISPLAY 등은 자연 상속. | Medium |
+| SR-NORI-008 | 수동 target override | NoriArm UI 의 토글 (자동 감지 결과 옆) 이 강제로 target=sim 또는 target=real 을 지정해 SR-NORI-007 세션 시작 페이로드에 반영. 실물 미연결 상태에서 real 선택 시 명확한 에러 (실물 연결 안내) 를 반환하고 세션을 시작하지 않는다. | Low |
 
 ### 3.4 OX 퀴즈
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
 | SR-PLAY-010 | OX 퀴즈 진행 | NoriArm UI 가 OX 퀴즈 모드에 진입해 `shared/ox_quiz.json` 에서 3문제를 무작위 추출, 각 문제마다 5초 카운트다운 후 정답을 공개하고, NoriArm 게임 프레임워크 (§3.3) 의 OX 퀴즈 게임 (overhead 카메라 1대 + OMX 팔 1대 매니페스트 + rule_based 정책) 으로 정답 trajectory 를 재생한다. 3문제가 끝나면 종료 화면을 표시한다. | High |
-| SR-PLAY-011 | OX 퀴즈 — 손 터치 검출 | overhead 카메라 + 손 검출 (mediapipe 등) 으로 아이가 O 또는 X 마커 위에 손을 올린 시점을 검출해 정답 여부를 판정하고 점수를 누적한다. 검출 이벤트는 게임 세션 WebSocket 으로 NoriArm UI 에 실시간 push 한다. | Medium |
+| SR-PLAY-011 | OX 퀴즈 — 손 터치 검출 | overhead 카메라 + 손 검출 (mediapipe Hands) 으로 아이가 O 또는 X 마커 위에 손을 올린 시점을 검출해 정답 여부를 판정하고 점수를 누적한다. 검출 이벤트는 게임 세션 WebSocket 으로 NoriArm UI 에 실시간 push 한다. **sim/real 모두 동일한 vision 파이프라인을 노트북 웹캠에 돌리고, sim/real 차이는 OMX 팔 레이어 (Gazebo vs Dynamixel) 에만 국한** — 팀장 노트북 한 대로 책상에 종이 마커 두 개 붙여두고 회귀 테스트한다. 마커 ROI 보정은 캘리브레이션 단계로 분리. | Medium |
 | SR-PLAY-012 | OX 퀴즈 — smolVLA 정책 | rule_based 대신 smolVLA 모방학습 추론으로 답을 가리키는 trajectory 를 생성하는 대안 정책을 추가한다. 매니페스트의 `policy.kind` 만 `smolvla` 로 바꾸면 동일 게임 루프 / UI 가 ML 정책으로 동작. | Low |
-| SR-PLAY-013 | OX 퀴즈 세션 API | Control Server REST 가 `POST /api/noriarm/games/ox-quiz/sessions` 로 게임 세션을 시작하고 `WebSocket /api/noriarm/games/ox-quiz/sessions/{id}/events` 로 실시간 이벤트(다음 문제·손 검출·정답·점수·종료)를 NoriArm UI 에 push 한다. 내부적으로는 §3.3 게임 프레임워크의 런처를 호출. | Medium |
+| SR-PLAY-013 | OX 퀴즈 세션 API | Control Server REST 가 `POST /api/noriarm/games/ox-quiz/sessions` 로 게임 세션을 시작하고, `POST /api/noriarm/games/ox-quiz/sessions/{id}/answer` 로 정답을 받으면 §3.3 게임 프레임워크의 룰 정책을 호출해 trajectory publish 를 트리거한다. 게임 이벤트(다음 문제·손 검출·정답·점수·종료)는 SSE `/api/noriarm/games/ox-quiz/sessions/{id}/events` 로 NoriArm UI 에 push, 로봇팔 관절값은 SSE `/api/noriarm/joint-states/stream` 으로 별도 push (three.js URDF 뷰어용). rosbridge_websocket / roslibjs 는 사용하지 않는다 — Control Server 가 직접 다리. | Medium |
 
 ## 4. Admin UI (PyQt5 데스크톱 앱, 로봇 관제)
 

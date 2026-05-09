@@ -36,6 +36,8 @@ hardware:
     - id: arm0
       model: omx_f
       ros_namespace: /noriarm/arm0
+      controller_topic: /arm_controller/joint_trajectory
+      controller_joint_names: [joint1, joint2, joint3, joint4, joint5]
       sim:  { backend: gazebo }
       real: { backend: dynamixel, port: /dev/ttyUSB0 }
 policy:
