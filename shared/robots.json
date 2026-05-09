@@ -59,18 +59,19 @@
       "displayName": "NoriArm",
       "wakeWord": "노리암",
       "wakeWordAliases": ["놀이암", "노리아", "노라암", "노리야"],
-      "modes": ["대기", "놀이", "블럭쌓기"],
+      "modes": ["대기", "놀이", "블럭쌓기", "OX 퀴즈"],
       "modeTree": [
         "대기",
         {
           "id": "놀이", "selfSelectable": false,
-          "children": ["블럭쌓기"]
+          "children": ["블럭쌓기", "OX 퀴즈"]
         }
       ],
       "defaultEmotionByMode": {
         "대기": "basic",
         "놀이": "interest",
-        "블럭쌓기": "interest"
+        "블럭쌓기": "interest",
+        "OX 퀴즈": "fun"
       },
       "restrictedVoiceMode": null
     }
@@ -85,7 +86,8 @@
     "보조": "선생님 곁에서 따라다니며 짐 운반하고 보조하기",
     "숨바꼭질": "아이들과 숨바꼭질 놀이",
     "자장가": "자장가 불러주기",
-    "블럭쌓기": "블럭으로 모양 만들고 같이 쌓기"
+    "블럭쌓기": "블럭으로 모양 만들고 같이 쌓기",
+    "OX 퀴즈": "아이들에게 OX 퀴즈를 내고 정답에 따라 팔로 O·X를 가리킴"
   },
   "stopTokens": ["정지", "멈춰", "그만", "스톱"]
 }

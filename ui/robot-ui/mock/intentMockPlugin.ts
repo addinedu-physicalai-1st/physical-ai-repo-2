@@ -74,7 +74,11 @@ export function intentMockPlugin(): Plugin {
       const handler: Connect.NextHandleFunction = async (req, res, next) => {
         const originalUrl = req.originalUrl ?? req.url ?? '';
 
-        if (!originalUrl.startsWith('/api/voice/intent') && !originalUrl.startsWith('/api/mode')) {
+        if (
+          !originalUrl.startsWith('/api/voice/intent') &&
+          !originalUrl.startsWith('/api/mode') &&
+          !originalUrl.startsWith('/api/noriarm/trajectory')
+        ) {
           next();
           return;
         }
@@ -85,7 +89,14 @@ export function intentMockPlugin(): Plugin {
 
         try {
           const raw = await readBody(req);
-          const body = raw ? (JSON.parse(raw) as { text?: string; robot?: RobotId; mode?: string }) : {};
+          const body = raw
+            ? (JSON.parse(raw) as {
+                text?: string;
+                robot?: RobotId;
+                mode?: string;
+                answer?: 'O' | 'X';
+              })
+            : {};
 
           if (originalUrl.startsWith('/api/voice/intent')) {
             const text = (body.text ?? '').trim();
@@ -98,6 +109,19 @@ export function intentMockPlugin(): Plugin {
             const robot = body.robot ?? 'gogoping';
             const mode = body.mode ?? '대기';
             sendJson(res, 200, { ok: true, robot, mode });
+            return;
+          }
+
+          if (originalUrl.startsWith('/api/noriarm/trajectory')) {
+            // 시뮬: 실제 OMX/Gazebo 에 publish 하는 대신 콘솔 로그.
+            // 운영 환경에서는 Control Service 가 ROS2 노드로 forward.
+            const answer = body.answer === 'X' ? 'X' : 'O';
+            const trajectory =
+              answer === 'O'
+                ? 'episode_0_trajectory.json'
+                : 'episode_1_trajectory.json';
+            console.log(`[mock] /api/noriarm/trajectory answer=${answer} → ${trajectory}`);
+            sendJson(res, 200, { ok: true, answer, trajectory });
             return;
           }
         } catch (err) {
