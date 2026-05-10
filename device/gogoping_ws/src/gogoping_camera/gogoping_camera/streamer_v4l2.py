@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """GogoPing/EduPing/NoriArm 카메라 UDP 송출 — v4l2 직접 캡처 (저지연 모드).
 
-[camera_streamer.py](camera_streamer.py) 와 동일한 와이어 프로토콜 (28B 헤더 + MJPEG)
+[streamer.py](streamer.py) 와 동일한 와이어 프로토콜 (28B 헤더 + MJPEG)
 이지만 cv2 의 BGR decode → JPEG re-encode 우회. linuxpy 로 v4l2 buffer 의 raw
 MJPEG 바이트를 그대로 송신해서 ~15-35ms 지연 단축 + 이중 인코드 손실 제거.
 
@@ -9,10 +9,11 @@ MJPEG 바이트를 그대로 송신해서 ~15-35ms 지연 단축 + 이중 인코
   pip install linuxpy
 
 실행:
-  CAMERA_ROBOT=gogoping device/gogoping_stream_ws/scripts/run_camera_v4l2.sh
+  ros2 run gogoping_camera camera_streamer_v4l2 --robot gogoping
+  ros2 launch gogoping_camera camera_stream.launch.py robot:=gogoping
 
-기존 [camera_streamer.py](camera_streamer.py) 와 비교 테스트 가능.
-공통 부분 (Config, StateController, machine_ips.json lookup, 헤더 포맷) 재사용.
+공통 부분 (Config, StateController, machine_ips.json lookup, 헤더 포맷) 은
+[streamer.py](streamer.py) 에서 import.
 """
 
 from __future__ import annotations
@@ -27,13 +28,10 @@ import sys
 import threading
 import time
 import zlib
-from pathlib import Path
 from typing import Optional
 
-# 공통 로직 재사용 (camera_streamer.py 와 동일 디렉토리)
-SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR))
-from camera_streamer import (   # noqa: E402
+# 공통 로직 재사용 — 같은 패키지 내 streamer 모듈
+from gogoping_camera.streamer import (
     CONTROL_SERVER_HOST_ENV,
     DEFAULT_CONTROL_SERVER_HOST,
     MAGIC_PING,
@@ -285,7 +283,8 @@ def parse_args() -> Config:
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
-    args = p.parse_args()
+    # parse_known_args — ROS2 launch 가 주입하는 `--ros-args` 등을 무시.
+    args, _unknown = p.parse_known_args()
 
     if not args.server_ip:
         args.server_ip = resolve_server_ip_from_machine_ips(args.control_server)

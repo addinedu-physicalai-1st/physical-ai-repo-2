@@ -16,6 +16,7 @@ def generate_launch_description() -> LaunchDescription:
     pkg_description = get_package_share_directory("vicpinky_description")
     pkg_bringup = get_package_share_directory("vicpinky_bringup")
     pkg_sllidar = get_package_share_directory("sllidar_ros2")
+    pkg_camera = get_package_share_directory("gogoping_camera")
 
     upload = IncludeLaunchDescription(
         AnyLaunchDescriptionSource(pkg_description + "/launch/upload.launch.xml"),
@@ -45,6 +46,14 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[pkg_bringup + "/config/laser_filter.yaml"],
     )
 
+    # 카메라 UDP MJPEG 송출 (SR-CAM-001) — Pi → Control Server.
+    # robot=gogoping 고정. backend / control_server 는 default 또는 호출 셸 env 상속.
+    camera_stream = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(
+            pkg_camera + "/launch/camera_stream.launch.py"),
+        launch_arguments={"robot": "gogoping"}.items(),
+    )
+
     return LaunchDescription([
         GroupAction([
             PushRosNamespace("gogoping"),
@@ -52,5 +61,6 @@ def generate_launch_description() -> LaunchDescription:
             sllidar,
             bringup_node,
             laser_filter,
+            camera_stream,
         ]),
     ])

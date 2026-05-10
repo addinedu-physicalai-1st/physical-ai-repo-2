@@ -2,8 +2,8 @@
 
 UDP 영상 수신 + WebSocket fan-out 게이트웨이. **별도 uvicorn 프로세스 (port 8100)** 로 실행.
 
-설계 / 프로토콜 명세: [device/gogoping_stream_ws/PLAN.md](../../../device/gogoping_stream_ws/PLAN.md)
 관련 SR: SR-CAM-002 / SR-CAM-003 / SR-CAM-005 ([docs/implementation-plan.md §2.7](../../../docs/implementation-plan.md))
+프로토콜 명세는 [protocol.py](protocol.py) 의 헤더 상수와 `parse_video_packet`/`encode_*` 함수 참조.
 
 ## 데이터 흐름
 
@@ -63,22 +63,30 @@ conda run -n jazzy pytest tests/test_streaming_*.py -v
 
 신규 테스트 추가 시 [scripts/test.sh](../../../scripts/test.sh) 의 `Streaming 섹션` 에 기록.
 
-## Loopback 검증 (Pi 없이)
+## 통합 검증 (실 카메라 사용)
 
 ```bash
 # 1. server
-scripts/run_server.sh   # tmux 'streaming' window
-# 2. fake sender
-python device/gogoping_stream_ws/scripts/fake_streamer.py --robot gogoping
-# 3. probe
-python device/gogoping_stream_ws/scripts/ws_probe.py --robot gogoping --duration 5
+scripts/run_server.sh   # tmux 'streaming' window — port 8100/TCP 시작
+
+# 2. Pi 측 — gogoping_camera 패키지 launch (실 카메라 직접 송출)
+#    Vic Pinky 에서:
+#      cd ~/pingdergarten/device/gogoping_ws
+#      source /opt/ros/jazzy/setup.zsh && source install/local_setup.zsh
+#      ros2 launch gogoping_camera camera_stream.launch.py
+#    또는 bringup 한꺼번에:
+#      scripts/device-gogoping-pi.sh
+
+# 3. Server 측 frame 수신 확인
+curl -sf http://localhost:8100/health | python3 -m json.tool
+#    udp_receivers[0].frames_received 가 25/초로 증가
 ```
 
-자세한 절차: [device/gogoping_stream_ws/INTEGRATION.md](../../../device/gogoping_stream_ws/INTEGRATION.md).
+Admin UI 의 GogoPing 대시보드 → 실 영상 표시. 첫 frame ≤100ms.
 
 ## 변경 시 주의
 
 - **UDP 수신 thread 안에서는 asyncio 호출 금지** — 반드시 `loop.call_soon_threadsafe`.
 - **`FrameHub` / `ClientRegistry` 메서드는 asyncio 단일 thread 에서만 호출** — lock 없음.
 - **WS auth 강화 시** `require_auth=true` 로 전환 — 단, Admin UI 가 로그인 흐름 추가 필요 (별도 SR).
-- **포트 컨벤션** (9_DD_R 포맷: role 0=예약 ws, role 1=Pi→Server 제어, role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6) 변경 시 [config.py](config.py) + Pi 측 [device/gogoping_stream_ws/scripts/camera_streamer.py](../../../device/gogoping_stream_ws/scripts/camera_streamer.py) 동시 갱신.
+- **포트 컨벤션** (9_DD_R 포맷: role 0=예약 ws, role 1=Pi→Server 제어, role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6) 변경 시 [config.py](config.py) + Pi 측 [device/gogoping_ws/src/gogoping_camera/gogoping_camera/streamer.py](../../../device/gogoping_ws/src/gogoping_camera/gogoping_camera/streamer.py) 동시 갱신.
