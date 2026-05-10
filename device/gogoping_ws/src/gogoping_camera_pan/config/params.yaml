@@ -1,6 +1,6 @@
 servo_bridge:
   ros__parameters:
-    serial_port: /dev/ttyACM0
+    serial_port: /dev/ttyACM1
     baud: 115200
     min_deg: 0.0
     max_deg: 180.0
@@ -16,3 +16,16 @@ pan_scanner:
     period_s: 4.0
     update_hz: 20.0
     cmd_topic: /servo_bridge/cmd_angle
+
+coord_trigger:
+  ros__parameters:
+    threshold_m: 0.5
+    odom_topic: /gogoping/odom
+    cmd_topic: /servo_bridge/cmd_angle
+    left_deg: 0.0
+    right_deg: 180.0
+    center_deg: 90.0
+    left_duration_s: 2.0     # center(90) → left(0)   부드러운 회전 시간
+    right_duration_s: 4.0    # left(0)    → right(180) 부드러운 회전 시간
+    center_duration_s: 2.0   # right(180) → center(90) 부드러운 회전 시간 (제자리 복귀)
+    tick_hz: 20.0            # 보간 발행 주기 (20Hz = 50ms 간격으로 중간 각도 publish)

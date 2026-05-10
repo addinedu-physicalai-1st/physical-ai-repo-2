@@ -24,4 +24,11 @@ def generate_launch_description() -> LaunchDescription:
             parameters=[params],
             output='screen',
         ),
+        Node(
+            package='gogoping_camera_pan',
+            executable='coord_trigger',
+            name='coord_trigger',
+            parameters=[params],
+            output='screen',
+        ),
     ])
