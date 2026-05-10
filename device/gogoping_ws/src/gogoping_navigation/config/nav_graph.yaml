@@ -1,0 +1,37 @@
+# GogoPing nav graph — 단일 로봇 waypoint 그래프
+#
+# 좌표 입력 방법: RViz 에서 Publish Point 클릭 → /clicked_point 좌표를 여기에 기록
+#   ros2 topic echo /clicked_point
+#
+# 포맷:
+#   vertex: {idx, name, x, y, theta, type}
+#     type: dock / junction / goal / charger
+#     theta: 도착 시 로봇이 향할 yaw (rad). junction 은 생략 가능.
+#   lane: {from, to, bidirectional}
+#     bidirectional: false 면 단방향. 좁은 통로 일방통행 등에 사용.
+#
+# 변경 시:
+#   - graph_visualizer 가 /nav_graph_markers 로 즉시 RViz 에 반영
+#   - server/control 의 nav_router 는 reload 필요 (파일 watch 또는 재시작)
+
+metadata:
+  frame_id: "map"
+  origin: [0.0, 0.0]
+  description: "유치원 실내 1층 — 예시 (실제 좌표는 SLAM 후 RViz 클릭으로 갱신)"
+
+vertices:
+  - {idx: 0, name: "도크",        x:  0.000, y:  0.000, theta:  0.0,    type: "dock"}
+  - {idx: 1, name: "로비",        x:  2.000, y:  0.000, theta:  0.0,    type: "junction"}
+  - {idx: 2, name: "교실A_입구",  x:  4.000, y:  0.000, theta: -1.5708, type: "junction"}
+  - {idx: 3, name: "교실A",       x:  4.000, y:  2.000, theta: -1.5708, type: "goal"}
+  - {idx: 4, name: "교실B_입구",  x:  4.000, y: -2.000, theta:  1.5708, type: "junction"}
+  - {idx: 5, name: "교실B",       x:  4.000, y: -4.000, theta:  1.5708, type: "goal"}
+  - {idx: 6, name: "급식실",      x:  6.000, y:  0.000, theta:  0.0,    type: "goal"}
+
+lanes:
+  - {from: 0, to: 1, bidirectional: true}
+  - {from: 1, to: 2, bidirectional: true}
+  - {from: 2, to: 3, bidirectional: true}
+  - {from: 1, to: 4, bidirectional: true}
+  - {from: 4, to: 5, bidirectional: true}
+  - {from: 1, to: 6, bidirectional: true}

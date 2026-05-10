@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gogoping_bringup</name>
+  <version>0.1.0</version>
+  <description>
+    GogoPing hardware bringup — Raspberry Pi 진입점.
+    vic_pinky_namespaced (모터/LiDAR ns wrap) + gogoping_camera_pan (서보) 통합 launch.
+  </description>
+  <maintainer email="dlrkdxor0821@gmail.com">Pingdergarten</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>vic_pinky_namespaced</exec_depend>
+  <exec_depend>gogoping_camera_pan</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,10 @@
+# Goal — 도착할 vertex 이름 (nav_graph.yaml 의 vertex name)
+string vertex_name
+---
+# Result
+bool arrived
+string error              # 실패 시 사유 (성공 시 빈 문자열)
+---
+# Feedback
+string current_vertex     # 현재 가장 가까운 vertex 이름
+float32 distance_remaining_m
