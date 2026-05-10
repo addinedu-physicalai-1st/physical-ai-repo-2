@@ -32,6 +32,11 @@ dependencies = [
   "pyserial>=3.5",
   # Admin UI ↔ Control Server teleop (HTTP/WS)
   "websockets>=13",
+  # ROS2 colcon build tooling (conda env 의 python 으로 colcon 돌릴 때 필요)
+  "catkin_pkg",
+  "empy==3.3.4",
+  "lark",
+  "numpy",
 ]
 
 [dependency-groups]
