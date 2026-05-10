@@ -1,6 +1,7 @@
 """Streaming module 설정 — 포트 매핑, 로봇 호스트 lookup, 타임아웃.
 
-설계: device/gogoping_stream_ws/PLAN.md §0, §5, §8 단계 3
+관련 SR: SR-CAM-001/002 (docs/implementation-plan.md §2.7).
+포트 컨벤션: 9_DD_R (DD=robot_id 01~99, R=role 0~9. 본 파일 함수 참조).
 """
 from __future__ import annotations
 

@@ -8,7 +8,6 @@ START/STOP 제어 신호를 listen 한다.
 기본 동작 (default ON): 실행 직후 즉시 송출 시작. 자동 종료 트리거 없음.
 admin 의 수동 STOP 신호 수신 시에만 송출 일시 중지.
 
-설계: device/gogoping_stream_ws/PLAN.md
 관련 SR: SR-CAM-001 (docs/implementation-plan.md §2.7)
 """
 
@@ -402,7 +401,8 @@ def parse_args() -> Config:
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
-    args = p.parse_args()
+    # parse_known_args — ROS2 launch 가 주입하는 `--ros-args` 등을 무시.
+    args, _unknown = p.parse_known_args()
 
     if not args.server_ip:
         args.server_ip = resolve_server_ip_from_machine_ips(args.control_server)

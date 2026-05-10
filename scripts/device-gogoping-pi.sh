@@ -2,12 +2,11 @@
 # scripts/device-gogoping-pi.sh — GogoPing 라즈베리파이에서 실행하는 ROS 노드 묶음.
 #
 # 동작:
-#   - tmux 세션 'gogoping-pi' 안에 window 3개 (bringup / camera-pan / camera-stream)
-#   - bringup       : vic_pinky_namespaced gogoping_bringup.launch.py
-#                     (모터 + sllidar_c1 + URDF + laser_filter, '/gogoping' namespace)
-#   - camera-pan    : gogoping_camera_pan camera_pan.launch.py (Arduino 시리얼 카메라 팬)
-#   - camera-stream : device/gogoping_stream_ws/scripts/run_camera.sh
-#                     (USB 웹캠 UDP MJPEG 송출 → Control Server, SR-CAM-001)
+#   - tmux 세션 'gogoping-pi' 안에 window 2개 (bringup / camera-pan)
+#   - bringup    : vic_pinky_namespaced gogoping_bringup.launch.py
+#                  (모터 + sllidar_c1 + URDF + laser_filter + 카메라 UDP 송출 SR-CAM-001,
+#                   모두 '/gogoping' namespace 안)
+#   - camera-pan : gogoping_camera_pan camera_pan.launch.py (Arduino 시리얼 카메라 팬)
 #   - 한 화면엔 1개 window 만 표시. 하단 status bar 의 window 이름 클릭으로 전환
 #
 # 사용:
@@ -21,14 +20,14 @@
 #   - repo root 에서 colcon build 완료 (./install/setup.bash 존재)
 #   - ROS_DOMAIN_ID 는 호출 셸 환경 그대로 사용 (export 안 함)
 #
-# 환경변수 (camera-stream window 에 영향):
+# 환경변수 (bringup 안 카메라 송출 노드에 전파):
 #   CONTROL_SERVER_NAME  shared/machine_ips.json 의 hostname (기본 'tonyno')
-#   CAMERA_BACKEND       v4l2 (기본) | cv2
-#   기타 CAMERA_* 환경변수는 device/gogoping_stream_ws/scripts/run_camera.sh 참조
+#   기타 인자 — gogoping_bringup.launch.py 가 gogoping_camera launch 를 include 함.
+#   상세: device/gogoping_ws/src/gogoping_camera/CLAUDE.md
 #
 # 단축키 (tmux):
 #   - 마우스로 하단 status bar 의 window 이름 클릭 → 전환
-#   - Ctrl+B 다음 0/1/2 → window 번호로 전환
+#   - Ctrl+B 다음 0/1 → window 번호로 전환
 #   - Ctrl+B 다음 D → detach (백그라운드 유지)
 set -euo pipefail
 
@@ -75,10 +74,9 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
-    # window 2: camera-stream — USB 웹캠 UDP MJPEG 송출 (Control Server 로)
-    # ROS 의존 없음 (UDP 직접 송신). conda env / CAMERA_*/CONTROL_SERVER_NAME 은 호출 셸에서 상속.
-    tmux new-window -t "$SESSION" -n camera-stream -c "$REPO_ROOT" \
-      "exec env CAMERA_ROBOT=gogoping device/gogoping_stream_ws/scripts/run_camera.sh"
+    # 카메라 UDP MJPEG 송출 (SR-CAM-001) 은 bringup 안에 IncludeLaunchDescription 으로 통합됨.
+    # → gogoping_bringup.launch.py 가 gogoping_camera/launch/camera_stream.launch.py 호출.
+    # → 별도 window 불필요. CONTROL_SERVER_NAME env 는 bringup window 에 전파.
 
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
     tmux set-option -t "$SESSION" -g mouse on
@@ -92,7 +90,7 @@ case "$ACTION" in
     echo "[device-gogoping-pi] 세션 '$SESSION' 시작 — attach"
     echo "[device-gogoping-pi] ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-<unset>}"
     echo "[device-gogoping-pi] CONTROL_SERVER_NAME=${CONTROL_SERVER_NAME:-tonyno (default)}"
-    echo "[device-gogoping-pi] 하단 status bar 의 'bringup / camera-pan / camera-stream' 클릭으로 전환"
+    echo "[device-gogoping-pi] 하단 status bar 의 'bringup / camera-pan' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)
