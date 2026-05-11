@@ -114,12 +114,12 @@ pingdergarten/
 │   ├── gogoping_ws/src/              # GogoPing 라즈베리파이 + 노트북에서 빌드 (launch 분리)
 │   │   ├── vic_pinky/                # vendor (git submodule, pinklab-art/vic_pinky) — 모바일 베이스
 │   │   ├── sllidar_ros2/             # vendor (git submodule, Slamtec) — RPLiDAR C1 드라이버
-│   │   ├── open_manipulator/         # vendor (git submodule, ROBOTIS) — Pinky 양팔용 (GogoPing 본체 미사용)
+│   │   ├── open_manipulator/         # vendor (git submodule, ROBOTIS) — Pinky 로봇팔
 │   │   ├── py_trees_ros/             # vendor (git submodule, splintered-reality) — Behavior Tree
 │   │   ├── py_trees_ros_interfaces/  # vendor (git submodule) — BT 메시지/서비스 정의
 │   │   ├── py_trees_ros_viewer/      # vendor (git submodule) — BT 실시간 시각화
 │   │   └── gogoping/                 # 우리 app 코드 그룹 (vendor 와 분리)
-│   │       ├── gogoping_bringup/     # launch 통합 진입점 (vic_pinky_namespaced 흡수)
+│   │       ├── gogoping_bringup/     # launch 통합 진입점 (namespaced)
 │   │       │   └── launch/
 │   │       │       ├── pi.launch.py       # 라즈베리파이용 (vicpinky_bringup + sllidar + camera)
 │   │       │       └── laptop.launch.py   # 노트북용 (Nav2 + modes + vision)
