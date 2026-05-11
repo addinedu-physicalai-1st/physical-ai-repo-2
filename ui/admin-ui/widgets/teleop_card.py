@@ -360,7 +360,7 @@ class OdomMini(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("teleopOdomMini")
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(110)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
         self._x = 0.0
         self._y = 0.0
@@ -470,7 +470,7 @@ class ScanMini(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("teleopScanMini")
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(110)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
         self._ranges: list[float] = []
         self._angle_min = 0.0
@@ -611,10 +611,12 @@ class TeleopCard(QWidget):
         head_row.addWidget(self.ip_label)
         body.addLayout(head_row)
 
-        # ---------- 메인 row: D-pad (왼쪽) + Cockpit (오른쪽) ----------
+        # ---------- 단일 가로 행: D-pad | Cockpit | Telemetry stack ----------
+        # 세로 공간을 아끼고, 가로 빈 공간을 ODOM/LIDAR 가 흡수한다.
         main_row = QHBoxLayout()
-        main_row.setSpacing(16)
+        main_row.setSpacing(14)
 
+        # ── D-pad (왼쪽 컬럼) ──
         self._pad = DirectionalPad(self)
         # 호환: 외부에서 self.btn_up 등 직접 접근 가능하도록 재노출
         self.btn_up = self._pad.btn_up
@@ -636,7 +638,8 @@ class TeleopCard(QWidget):
         pad_wrap = QVBoxLayout()
         pad_wrap.setContentsMargins(0, 0, 0, 0)
         pad_wrap.setSpacing(8)
-        pad_wrap.addWidget(self._pad, 0, Qt.AlignTop | Qt.AlignHCenter)
+        pad_wrap.addStretch(1)
+        pad_wrap.addWidget(self._pad, 0, Qt.AlignHCenter)
         hint = QLabel("화살표 키 또는 버튼")
         hint.setAlignment(Qt.AlignHCenter)
         hint.setStyleSheet(
@@ -646,25 +649,25 @@ class TeleopCard(QWidget):
         pad_wrap.addStretch(1)
         main_row.addLayout(pad_wrap, 0)
 
-        # Cockpit: live readout + sliders
+        # ── Cockpit: live readout + 슬라이더 (가운데 컬럼) ──
         cockpit = QVBoxLayout()
-        cockpit.setSpacing(12)
+        cockpit.setSpacing(10)
         self.cmd_row = LiveReadout(self)
-        cockpit.addWidget(self.cmd_row)
+        cockpit.addWidget(self.cmd_row, 0)
         cockpit.addWidget(self._build_sliders(), 0)
         cockpit.addStretch(1)
-        main_row.addLayout(cockpit, 1)
+        main_row.addLayout(cockpit, 3)
 
-        body.addLayout(main_row)
-
-        # ---------- 하단: Telemetry pair ----------
-        tele_row = QHBoxLayout()
-        tele_row.setSpacing(12)
+        # ── Telemetry: ODOM 위 / LIDAR 아래 (오른쪽 컬럼) ──
         self.odom_view = OdomMini(self)
         self.scan_view = ScanMini(self)
-        tele_row.addWidget(self.odom_view, 1)
-        tele_row.addWidget(self.scan_view, 1)
-        body.addLayout(tele_row)
+        tele_stack = QVBoxLayout()
+        tele_stack.setSpacing(10)
+        tele_stack.addWidget(self.odom_view, 1)
+        tele_stack.addWidget(self.scan_view, 1)
+        main_row.addLayout(tele_stack, 2)
+
+        body.addLayout(main_row)
 
         # 송신 / health 타이머
         self._cmd_timer = QTimer(self)

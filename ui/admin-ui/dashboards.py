@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -31,6 +32,7 @@ from widgets import (
     JointPanel,
     MapView,
     MetricRow,
+    StatChip,
     StatusBadge,
     TaskQueue,
     soften,
@@ -220,21 +222,86 @@ class GogoPingDashboard(QWidget):
         super().__init__(parent)
         self._stream_client = stream_client
 
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(28, 24, 28, 24)
-        outer.setSpacing(18)
+        # 창이 짧을 때 teleop 영역이 잘리지 않도록 전체를 스크롤 영역으로 감싼다.
+        # 폭은 늘 채우고, 세로 컨텐츠가 창 높이를 초과하면 스크롤바가 등장한다.
+        scroll = QScrollArea(self)
+        scroll.setObjectName("dashScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # 배경이 비치도록 viewport 투명 처리
+        scroll.setStyleSheet(
+            "QScrollArea#dashScroll, QScrollArea#dashScroll > QWidget > QWidget {"
+            "  background: transparent;"
+            "}"
+        )
 
-        self.header = RobotHeader(self.NAME)
-        outer.addWidget(self.header)
+        host_lay = QVBoxLayout(self)
+        host_lay.setContentsMargins(0, 0, 0, 0)
+        host_lay.setSpacing(0)
+        host_lay.addWidget(scroll)
 
-        grid = QGridLayout()
-        grid.setSpacing(14)
-        outer.addLayout(grid, 1)
+        content = QWidget()
+        content.setObjectName("dashContent")
+        scroll.setWidget(content)
 
-        self.map_card = Card("실내 맵 · 위치")
-        self.map_view = MapView()
-        self.map_card.body.addWidget(self.map_view)
+        outer = QVBoxLayout(content)
+        outer.setContentsMargins(28, 20, 28, 24)
+        outer.setSpacing(14)
 
+        # ── 헤더 행: 로고 + 이름 | 시스템 stat 칩들 | 상태 뱃지 ───
+        # 칩을 헤더 빈 공간으로 흡수해 세로 공간을 카메라/맵에 양보.
+        meta = ROBOTS[self.NAME]
+        accent = meta["color"]
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(14)
+
+        avatar = QWidget()
+        avatar.setFixedSize(56, 56)
+        avatar.setStyleSheet(
+            f"background: {meta['color_soft']}; border-radius: 28px;"
+        )
+        a_lay = QVBoxLayout(avatar)
+        a_lay.setContentsMargins(0, 0, 0, 0)
+        a_lay.addWidget(Icon(meta["icon"], size=30, color=accent),
+                        0, Qt.AlignCenter)
+        header_row.addWidget(avatar)
+
+        name_lbl = QLabel(meta["name"])
+        name_lbl.setStyleSheet(
+            f"font-size: 22px; font-weight: 800; color: {COLORS['text']};"
+        )
+        header_row.addWidget(name_lbl, 0, Qt.AlignVCenter)
+
+        # 칩들 — 헤더 옆 빈 공간을 채운다
+        self.battery_chip = StatChip(
+            "battery", "배터리", "74%", COLORS["mint"],
+            with_bar=True, battery=True,
+        )
+        self.battery_chip.set_pct(74)
+        self.cpu_chip = StatChip("cpu", "CPU", "31%", COLORS["warning"])
+        self.lidar_chip = StatChip("radar", "LiDAR", "12 Hz", COLORS["lavender"])
+        self.localizer_chip = StatChip(
+            "pin", "위치 신뢰도", "98%", COLORS["sky"],
+        )
+        self.distance_chip = StatChip(
+            "vehicle", "오늘 주행", "1.42 km", COLORS["sun"],
+        )
+        for chip in (self.battery_chip, self.cpu_chip, self.lidar_chip,
+                     self.localizer_chip, self.distance_chip):
+            chip.setMinimumHeight(60)
+            header_row.addWidget(chip, 1)
+
+        self.header_badge = StatusBadge("정상 작동", COLORS["success"])
+        header_row.addWidget(self.header_badge, 0, Qt.AlignVCenter)
+
+        outer.addLayout(header_row)
+
+        # ── 카메라 + 맵 가로 1:1 ─────────────────────────
+        # 두 카드 모두 Card 기본 padding (18/16/18/18, spacing 12) 사용 →
+        # 카메라와 맵의 흰 여백이 좌우 대칭으로 깔끔하게 정렬된다.
         self.camera_card = Card("전방 카메라")
         if stream_client is not None:
             # 실 영상 스트림 (SR-CAM-004) — Pi UDP → Server WS → 이 위젯
@@ -244,9 +311,21 @@ class GogoPingDashboard(QWidget):
         else:
             # stream_client 미주입 시 fallback (mock)
             self.camera = CameraView()
-        self.camera_card.body.addWidget(self.camera)
+        self.camera_card.body.addWidget(self.camera, 1)
 
-        # Teleop 카드로 교체. admin-ui 는 Control Server 와 HTTP/WS 만 통신.
+        self.map_card = Card("실내 맵 · 위치")
+        self.map_view = MapView()
+        # 맵 — 카메라와 같은 너비/높이로 자라난다 (Expanding).
+        self.map_view.setMinimumHeight(220)
+        self.map_card.body.addWidget(self.map_view, 1)
+
+        monitor_row = QHBoxLayout()
+        monitor_row.setSpacing(14)
+        monitor_row.addWidget(self.camera_card, 1)
+        monitor_row.addWidget(self.map_card, 1)
+        outer.addLayout(monitor_row, 6)
+
+        # ── Teleop 카드로 교체. admin-ui 는 Control Server 와 HTTP/WS 만 통신.
         from services.teleop_client import TeleopClient
         from widgets.teleop_card import TeleopCard
         self.teleop_client = TeleopClient()
@@ -256,29 +335,7 @@ class GogoPingDashboard(QWidget):
         )
         self.teleop_client.connect_state_ws(self.teleop_card.on_state)
 
-        # 시스템
-        system_card = Card("시스템 상태")
-        system_card.body.addWidget(_battery_row(self, init=74))
-        self.cpu_row = MetricRow("CPU", "31%")
-        self.lidar_row = MetricRow("LiDAR", "정상 · 12 Hz")
-        self.localizer_row = MetricRow("위치 신뢰도", "98%")
-        self.distance_row = MetricRow("오늘 주행", "1.42 km")
-        for w in (self.cpu_row, self.lidar_row, self.localizer_row,
-                  self.distance_row):
-            system_card.body.addWidget(w)
-
-        # 레이아웃: 위쪽 절반에 모니터링 (map · camera · system),
-        # 아래쪽 전체 폭에 Teleop 카드 (D-pad + cockpit + telemetry).
-        grid.addWidget(self.map_card,    0, 0, 1, 2)
-        grid.addWidget(self.camera_card, 0, 2, 1, 1)
-        grid.addWidget(system_card,      0, 3, 1, 1)
-        grid.addWidget(self.teleop_card, 1, 0, 1, 4)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(2, 1)
-        grid.setColumnStretch(3, 1)
-        grid.setRowStretch(0, 3)
-        grid.setRowStretch(1, 4)
+        outer.addWidget(self.teleop_card, 5)
 
         self._tick = 0
         self._timer = QTimer(self)
@@ -293,8 +350,8 @@ class GogoPingDashboard(QWidget):
             self.camera.step()
 
         if self._tick % 30 == 0:
-            self.cpu_row.set_value(f"{random.randint(28, 38)}%")
-            self.distance_row.set_value(
+            self.cpu_chip.set_value(f"{random.randint(28, 38)}%")
+            self.distance_chip.set_value(
                 f"{1.42 + (self._tick // 30) * 0.003:.2f} km"
             )
 
