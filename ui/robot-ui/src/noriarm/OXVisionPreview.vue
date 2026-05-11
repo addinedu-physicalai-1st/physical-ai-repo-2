@@ -48,9 +48,14 @@ interface InferResponse {
   frame_size: [number, number];
 }
 
-const JPEG_QUALITY = 0.7;
-const SEND_W = 640; // 추론 보내기 전 다운스케일
+const JPEG_QUALITY = 0.6;
+const SEND_W = 480; // 추론 보내기 전 다운스케일 (보드는 작으니 480 으로 충분)
 const VISION_WS_PATH = '/api/noriarm/vision/ox-board/infer';
+// mediapipe Hands 호출 최소 간격 — 매 RAF (60Hz) 돌리면 메인 스레드 잠식해서 WS round-trip 이 느려짐.
+// 손 추적은 ~15 FPS 면 충분 (사람 손 움직임 속도).
+const HANDS_MIN_INTERVAL_MS = 66;
+// YOLO 추론 최소 간격 — 보드는 자주 안 움직이므로 5 FPS 면 충분. 서버/네트워크 부하 감소.
+const INFER_MIN_INTERVAL_MS = 200;
 
 const cameras = ref<MediaDeviceInfo[]>([]);
 const selectedDeviceId = ref<string>('');
@@ -69,6 +74,8 @@ let ws: WebSocket | null = null;
 let stopRequested = false;
 let frameCount = 0;
 let lastFpsT = 0;
+let lastInferSentAt = 0;
+let pendingSendTimer: number | null = null;
 
 // MediaPipe Hands 상태 — 한 번만 setup, 매 프레임 send
 let hands: Hands | null = null;
@@ -227,20 +234,36 @@ function regionForFingertip(nx: number, ny: number): 'O' | 'X' | null {
   return null;
 }
 
+/** 검지 tip 이 현재 보드 bbox 안에 있으면 박스를 freeze. */
+function isBboxFrozen(): boolean {
+  if (!fingertip || !lastInfer || lastInfer.boxes.length === 0) return false;
+  const [fw, fh] = lastInfer.frame_size;
+  const px = fingertip.x * fw;
+  const py = fingertip.y * fh;
+  return insideBbox(px, py, lastInfer.boxes[0].bbox);
+}
+
 function insideBbox(x: number, y: number, b: [number, number, number, number]): boolean {
   return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
 }
 
 function startHandsLoop(): void {
   if (handsRafId != null) return;
+  let lastSentAt = 0;
   const tick = (): void => {
     if (stopRequested) {
       handsRafId = null;
       return;
     }
     const v = videoRef.value;
-    if (v && v.readyState >= 2 && v.videoWidth && hands && !handsBusy) {
+    const now = performance.now();
+    // 인터벌 + busy 가드 — mediapipe 가 메인 스레드 점유해 WS round-trip 을 막지 않게.
+    if (
+      v && v.readyState >= 2 && v.videoWidth && hands && !handsBusy
+      && now - lastSentAt >= HANDS_MIN_INTERVAL_MS
+    ) {
       handsBusy = true;
+      lastSentAt = now;
       hands.send({ image: v }).finally(() => {
         handsBusy = false;
       });
@@ -275,6 +298,10 @@ function stopHandsLoop(): void {
 
 async function stopStream(): Promise<void> {
   stopRequested = true;
+  if (pendingSendTimer != null) {
+    window.clearTimeout(pendingSendTimer);
+    pendingSendTimer = null;
+  }
   closeWs();
   stopHandsLoop();
   if (stream) {
@@ -318,8 +345,13 @@ function startInferLoop(): void {
       const data = JSON.parse(ev.data as string) as InferResponse | { error: string };
       if ('error' in data) return;
       inferenceMs.value = Math.round(data.inference_ms);
-      lastInfer = data;
-      // hand 가 이미 잡혀있으면 새 bbox 로 region 다시 계산
+      // Freeze: 손가락이 현재 bbox 안에 있으면 새 검출로 박스를 갱신하지 않음.
+      // 아이가 손을 가져다 댄 순간 박스가 흔들리는 걸 방지 — 손이 영역 밖으로 나가면
+      // 다시 라이브 업데이트 재개.
+      if (!isBboxFrozen()) {
+        lastInfer = data;
+      }
+      // hand 가 이미 잡혀있으면 (frozen 또는 새) bbox 로 region 다시 계산
       if (fingertip) {
         currentRegion.value = regionForFingertip(fingertip.x, fingertip.y);
       }
@@ -352,14 +384,24 @@ async function sendNextFrame(): Promise<void> {
   if (stopRequested || !ws || ws.readyState !== WebSocket.OPEN) return;
   const v = videoRef.value;
   if (!v || v.readyState < 2 || !v.videoWidth) {
-    // 비디오 아직 안 준비됨 — 잠시 후 다시
     window.setTimeout(() => void sendNextFrame(), 50);
+    return;
+  }
+  // INFER_MIN_INTERVAL_MS 보다 빨리 보내려 하면 남은 시간만큼 지연
+  const elapsed = performance.now() - lastInferSentAt;
+  if (elapsed < INFER_MIN_INTERVAL_MS) {
+    if (pendingSendTimer != null) return; // 이미 예약된 송신 있음 — 중복 방지
+    pendingSendTimer = window.setTimeout(() => {
+      pendingSendTimer = null;
+      void sendNextFrame();
+    }, INFER_MIN_INTERVAL_MS - elapsed);
     return;
   }
   const blob = await captureFrame(v);
   if (!blob) return;
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(blob);
+    lastInferSentAt = performance.now();
   }
 }
 
