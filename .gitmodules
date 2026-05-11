@@ -4,3 +4,15 @@
 [submodule "device/noriarm_ws/src/open_manipulator"]
 	path = device/noriarm_ws/src/open_manipulator
 	url = https://github.com/robotis-git/open_manipulator.git
+[submodule "device/gogoping_ws/src/py_trees_ros"]
+	path = device/gogoping_ws/src/py_trees_ros
+	url = https://github.com/splintered-reality/py_trees_ros.git
+	branch = devel
+[submodule "device/gogoping_ws/src/py_trees_ros_interfaces"]
+	path = device/gogoping_ws/src/py_trees_ros_interfaces
+	url = https://github.com/splintered-reality/py_trees_ros_interfaces.git
+	branch = devel
+[submodule "device/gogoping_ws/src/py_trees_ros_viewer"]
+	path = device/gogoping_ws/src/py_trees_ros_viewer
+	url = https://github.com/splintered-reality/py_trees_ros_viewer.git
+	branch = devel
