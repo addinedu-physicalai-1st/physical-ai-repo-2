@@ -3,17 +3,21 @@
 Vite proxy 가 `/api/voice/intent` 를 이쪽으로 forward.
 나중에 Control Service 가 들어오면 Control 이 중간에서 받아 forward.
 """
-import asyncio
+import logging
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 
 from pydantic import BaseModel, Field, field_validator
+
+from server.ai.vision import default_registry
+
+logger = logging.getLogger(__name__)
 
 from server.ai.context import (
     build_chat_context,
@@ -45,6 +49,14 @@ app = FastAPI(
     version="0.1.0",
     lifespan=_hub_lifespan,
 )
+
+
+@app.on_event("startup")
+async def _register_vision_tasks() -> None:
+    """등록된 vision task 들. 새 task 추가 시 여기에 한 줄."""
+    if not default_registry.names():
+        default_registry.register(OXBoardTask())
+        logger.info(f"AI Hub vision tasks: {default_registry.names()}")
 
 
 class IntentRequest(BaseModel):
@@ -362,3 +374,59 @@ async def get_tts(text: str):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Edge TTS failed: {exc}") from exc
 
+
+# ---------- Vision (task-based YOLO 추론) ----------
+
+@app.get("/vision/tasks")
+async def vision_tasks() -> dict:
+    """등록된 vision task 목록."""
+    return {"tasks": default_registry.list_tasks()}
+
+
+@app.post("/vision/{task}/infer")
+async def vision_infer(task: str, req: Request) -> dict:
+    """1회성 추론 (디버깅·curl 용). 스트리밍은 WebSocket 권장.
+
+    body=image/jpeg → 해당 task YOLO → bbox JSON.
+    """
+    t = default_registry.get(task)
+    if t is None:
+        raise HTTPException(status_code=404, detail=f"unknown vision task: {task!r}")
+    body = await req.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="empty body")
+    try:
+        return await asyncio.to_thread(t.infer, body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.websocket("/vision/{task}/infer")
+async def vision_infer_ws(ws: WebSocket, task: str) -> None:
+    """스트리밍 추론 — 브라우저가 frame binary 보내면 추론 결과 JSON 으로 응답.
+
+    프로토콜:
+      client → server : binary (image/jpeg)
+      server → client : text (JSON 결과 = vision_infer 와 동일 schema)
+    """
+    t = default_registry.get(task)
+    if t is None:
+        await ws.accept()
+        await ws.close(code=1008, reason=f"unknown vision task: {task}")
+        return
+
+    await ws.accept()
+    logger.info("vision ws 접속 — task=%s", task)
+    try:
+        while True:
+            jpeg = await ws.receive_bytes()
+            if not jpeg:
+                continue
+            try:
+                result = await asyncio.to_thread(t.infer, jpeg)
+            except ValueError as e:
+                await ws.send_json({"error": str(e)})
+                continue
+            await ws.send_json(result)
+    except WebSocketDisconnect:
+        logger.info("vision ws 퇴장 — task=%s", task)

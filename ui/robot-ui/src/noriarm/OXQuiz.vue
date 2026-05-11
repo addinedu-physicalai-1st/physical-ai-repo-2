@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import oxQuizData from '../../../../shared/ox_quiz.json';
 import UrdfViewer from '@/noriarm/UrdfViewer.vue';
+import OXVisionPreview from '@/noriarm/OXVisionPreview.vue';
 
 interface OXQuestion {
   id: string;
@@ -249,6 +250,15 @@ const progressLabel = computed(
           </div>
         </div>
 
+        <!-- 좌하단 floating: 카메라 라이브 뷰 + 카메라 셀렉트 -->
+        <div class="vision-float">
+          <OXVisionPreview />
+          <p class="vision-caption">
+            <span class="status-dot status-vision" />
+            보드 인식 카메라
+          </p>
+        </div>
+
         <!-- 우하단 floating: sim 일 때 URDF 뷰어, real 일 때 연결 배지 -->
         <div v-if="showSimViewer" class="viewer-float sim">
           <div class="viewer-float-canvas">
@@ -344,6 +354,32 @@ const progressLabel = computed(
 .status-dot.status-real {
   background: #2d8b57;
   box-shadow: 0 0 0 3px rgba(45, 139, 87, 0.18);
+}
+.status-dot.status-vision {
+  background: #3a8fc2;
+  box-shadow: 0 0 0 3px rgba(58, 143, 194, 0.18);
+}
+.vision-float {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.vision-caption {
+  margin: 0;
+  color: #5b7a8c;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .card h1 {
   margin: 0 0 16px;

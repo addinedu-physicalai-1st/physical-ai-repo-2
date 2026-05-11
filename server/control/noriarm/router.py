@@ -19,6 +19,12 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+import httpx
+import websockets
+from fastapi import WebSocket, WebSocketDisconnect
+from urllib.parse import urlparse, urlunparse
+
+from server.control.config import settings
 from server.control.noriarm.ros_bridge import NoriarmRosBridge, ros_available
 
 # 실물 OMX-F follower 가 udev 룰로 만든 심볼릭 링크. 존재 여부로 연결 판정.
@@ -104,6 +110,95 @@ async def joint_states_stream(req: Request) -> StreamingResponse:
             "Connection": "keep-alive",
         },
     )
+
+
+# ---------- Vision (AI Hub proxy) ----------
+# 실제 YOLO 추론은 AI Hub (server/ai/hub.py) 가 담당. 여기는 brower → AI Hub 의
+# 인증 게이트 + URL 매핑만. voice/intent / voice/tts 와 동일 패턴.
+
+_VISION_TIMEOUT_S = 10.0
+
+
+@router.get("/vision/tasks")
+async def vision_tasks() -> dict:
+    """AI Hub 의 등록된 vision task 목록을 그대로 forward."""
+    try:
+        async with httpx.AsyncClient(timeout=_VISION_TIMEOUT_S) as client:
+            r = await client.get(f"{settings.ai_hub_url}/vision/tasks")
+            r.raise_for_status()
+            return r.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"AI Hub unavailable: {exc}") from exc
+
+
+@router.post("/vision/{task}/infer")
+async def vision_infer(task: str, req: Request) -> dict:
+    """1회성 추론 — AI Hub 의 동일 task endpoint 로 binary forward (디버깅용)."""
+    body = await req.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="empty body")
+    try:
+        async with httpx.AsyncClient(timeout=_VISION_TIMEOUT_S) as client:
+            r = await client.post(
+                f"{settings.ai_hub_url}/vision/{task}/infer",
+                content=body,
+                headers={"Content-Type": "image/jpeg"},
+            )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        return r.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"AI Hub unavailable: {exc}") from exc
+
+
+def _ai_hub_ws_url(path: str) -> str:
+    """settings.ai_hub_url (http://...) 를 ws:// 로 변환해 path 붙임."""
+    parsed = urlparse(settings.ai_hub_url)
+    scheme = "wss" if parsed.scheme == "https" else "ws"
+    return urlunparse((scheme, parsed.netloc, path, "", "", ""))
+
+
+@router.websocket("/vision/{task}/infer")
+async def vision_infer_ws(ws: WebSocket, task: str) -> None:
+    """브라우저 ↔ AI Hub WebSocket 프록시 (vision 스트리밍 추론).
+
+    프로토콜:
+      client → server : binary (image/jpeg)
+      server → client : text (JSON)
+    """
+    await ws.accept()
+    upstream_url = _ai_hub_ws_url(f"/vision/{task}/infer")
+    try:
+        async with websockets.connect(upstream_url, max_size=None) as upstream:
+            async def to_upstream() -> None:
+                while True:
+                    data = await ws.receive_bytes()
+                    await upstream.send(data)
+
+            async def to_client() -> None:
+                async for msg in upstream:
+                    if isinstance(msg, bytes):
+                        await ws.send_bytes(msg)
+                    else:
+                        await ws.send_text(msg)
+
+            done, pending = await asyncio.wait(
+                [asyncio.create_task(to_upstream()), asyncio.create_task(to_client())],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t in pending:
+                t.cancel()
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning("vision ws proxy 종료: %s", e)
+        try:
+            await ws.close(code=1011, reason=str(e)[:120])
+        except Exception:
+            pass
+
+
+# ---------- /Vision ----------
 
 
 async def _joint_state_event_stream(

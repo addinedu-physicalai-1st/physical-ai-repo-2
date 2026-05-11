@@ -47,7 +47,10 @@ _NORIARM_OX_MANIFEST = (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """ROS bridge lifecycle. ROS 환경 미source 시 graceful skip — noriarm 엔드포인트만 503."""
+    """ROS bridge lifecycle. ROS 환경 미source 시 graceful skip — noriarm 엔드포인트만 503.
+
+    Vision (YOLO) 추론은 AI Hub (server/ai/hub.py) 가 담당 — Control Server 는 proxy.
+    """
     bridge = None
     try:
         from server.control.noriarm.ros_bridge import (
