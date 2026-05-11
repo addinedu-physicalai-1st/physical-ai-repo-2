@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gogoping_bringup</name>
+  <version>0.1.0</version>
+  <description>GogoPing launch 통합 진입점 (Pi: pi.launch.py / Laptop: laptop.launch.py).</description>
+  <maintainer email="dev@pingdergarten.local">pingdergarten</maintainer>
+  <license>Proprietary</license>
+
+  <exec_depend>launch_ros</exec_depend>
+  <!-- vicpinky_bringup, sllidar_ros2, gogoping_camera 등 실제 의존은 -->
+  <!-- pi.launch.py / laptop.launch.py 구현 시 추가 -->
+
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

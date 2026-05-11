@@ -89,4 +89,4 @@ Admin UI 의 GogoPing 대시보드 → 실 영상 표시. 첫 frame ≤100ms.
 - **UDP 수신 thread 안에서는 asyncio 호출 금지** — 반드시 `loop.call_soon_threadsafe`.
 - **`FrameHub` / `ClientRegistry` 메서드는 asyncio 단일 thread 에서만 호출** — lock 없음.
 - **WS auth 강화 시** `require_auth=true` 로 전환 — 단, Admin UI 가 로그인 흐름 추가 필요 (별도 SR).
-- **포트 컨벤션** (9_DD_R 포맷: role 0=예약 ws, role 1=Pi→Server 제어, role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6) 변경 시 [config.py](config.py) + Pi 측 [device/gogoping_ws/src/gogoping_camera/gogoping_camera/streamer.py](../../../device/gogoping_ws/src/gogoping_camera/gogoping_camera/streamer.py) 동시 갱신.
+- **포트 컨벤션** (9_DD_R 포맷: role 0=예약 ws, role 1=Pi→Server 제어, role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6) 변경 시 [config.py](config.py) + Pi 측 [device/gogoping_ws/src/gogoping/gogoping_camera/gogoping_camera/streamer.py](../../../device/gogoping_ws/src/gogoping/gogoping_camera/gogoping_camera/streamer.py) 동시 갱신.
