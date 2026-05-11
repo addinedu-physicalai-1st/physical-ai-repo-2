@@ -3,7 +3,7 @@
 #
 # 동작:
 #   - tmux 세션 'gogoping-pi' 안에 window 2개 (bringup / camera-pan)
-#   - bringup    : vic_pinky_namespaced gogoping_bringup.launch.py
+#   - bringup    : gogoping_bringup pi.launch.py
 #                  (모터 + sllidar_c1 + URDF + laser_filter + 카메라 UDP 송출 SR-CAM-001,
 #                   모두 '/gogoping' namespace 안)
 #   - camera-pan : gogoping_camera_pan camera_pan.launch.py (Arduino 시리얼 카메라 팬)
@@ -22,8 +22,8 @@
 #
 # 환경변수 (bringup 안 카메라 송출 노드에 전파):
 #   CONTROL_SERVER_NAME  shared/machine_ips.json 의 hostname (기본 'tonyno')
-#   기타 인자 — gogoping_bringup.launch.py 가 gogoping_camera launch 를 include 함.
-#   상세: device/gogoping_ws/src/gogoping_camera/CLAUDE.md
+#   기타 인자 — pi.launch.py 가 gogoping_camera launch 를 include 함.
+#   상세: device/gogoping_ws/src/gogoping/gogoping_camera/CLAUDE.md
 #
 # 단축키 (tmux):
 #   - 마우스로 하단 status bar 의 window 이름 클릭 → 전환
@@ -68,14 +68,14 @@ case "$ACTION" in
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n bringup -c "$REPO_ROOT" "sleep infinity"
     tmux set-option -t "$SESSION" -g remain-on-exit on
     tmux respawn-pane -k -t "$SESSION:bringup" -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch vic_pinky_namespaced gogoping_bringup.launch.py"
+      "$SOURCE_ENV && exec ros2 launch gogoping_bringup pi.launch.py"
 
     # window 1: camera-pan
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
     # 카메라 UDP MJPEG 송출 (SR-CAM-001) 은 bringup 안에 IncludeLaunchDescription 으로 통합됨.
-    # → gogoping_bringup.launch.py 가 gogoping_camera/launch/camera_stream.launch.py 호출.
+    # → pi.launch.py 가 gogoping_camera/launch/camera_stream.launch.py 호출.
     # → 별도 window 불필요. CONTROL_SERVER_NAME env 는 bringup window 에 전파.
 
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
