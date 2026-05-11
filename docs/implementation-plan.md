@@ -192,7 +192,7 @@ last_synced: "2026-05-04T13:33:23"
 
 ### 2.7 카메라 영상 스트리밍
 
-> 방식 D — Vic Pinky / EduPing / NoriArm 의 카메라 영상을 커스텀 UDP 로 Control Server 에 송신하고, Control Server 가 WebSocket 으로 fan-out. 코드: [device/gogoping_ws/src/gogoping_camera/](../device/gogoping_ws/src/gogoping_camera/) (Pi 측 ROS2 패키지), [server/control/streaming/](../server/control/streaming/) (Server 측), [ui/admin-ui/widgets/camera_widget.py](../ui/admin-ui/widgets/camera_widget.py) (Admin UI).
+> 방식 D — Vic Pinky / EduPing / NoriArm 의 카메라 영상을 커스텀 UDP 로 Control Server 에 송신하고, Control Server 가 WebSocket 으로 fan-out. 코드: [device/gogoping_ws/src/gogoping/gogoping_camera/](../device/gogoping_ws/src/gogoping/gogoping_camera/) (Pi 측 ROS2 패키지), [server/control/streaming/](../server/control/streaming/) (Server 측), [ui/admin-ui/widgets/camera_widget.py](../ui/admin-ui/widgets/camera_widget.py) (Admin UI).
 
 **포트 매핑 컨벤션**: 같은 로봇 패밀리 (901X / 902X / 903X) 안에서 9_DD_R 포맷 (DD=robot_id 01~99, R=role 0~9) — role 0=예약 (websocket, 추후 SR), role 1=Pi→Server 제어 (추후 SR), role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6 (총 7 streams/로봇, 최대 99대 지원). WebSocket 은 8100/TCP `/ws/video-stream` 단일 endpoint 에서 robot_id+stream_id 헤더로 멀티플렉싱. IP 해석은 [shared/machine_ips.json](../shared/machine_ips.json) 활용 (Control Server=`tonyno`, GogoPing=`vic`).
 

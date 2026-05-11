@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>gogoping_modes</name>
+  <version>0.1.0</version>
+  <description>GogoPing 로봇 매니저 — FSM + Behavior Tree (보조·숨바꼭질·자장가).</description>
+  <maintainer email="dev@pingdergarten.local">pingdergarten</maintainer>
+  <license>Proprietary</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <!-- py_trees / py_trees_ros / transitions / nav2_msgs / gogoping_msgs 등은 -->
+  <!-- submodule + 패키지가 도입된 후 추가 -->
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

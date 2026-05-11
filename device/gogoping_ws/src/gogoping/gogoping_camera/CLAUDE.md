@@ -2,8 +2,8 @@
 
 GogoPing/EduPing/NoriArm 의 USB 웹캠 영상을 MJPEG 으로 캡처해 Control Server (UDP) 로 송출하는 ROS2 ament_python 패키지.
 
-관련 SR: SR-CAM-001 ([docs/implementation-plan.md §2.7](../../../../docs/implementation-plan.md)).
-Server 측: [server/control/streaming/](../../../../server/control/streaming/) (port 8100/TCP, `/ws/video-stream`).
+관련 SR: SR-CAM-001 ([docs/implementation-plan.md §2.7](../../../../../docs/implementation-plan.md)).
+Server 측: [server/control/streaming/](../../../../../server/control/streaming/) (port 8100/TCP, `/ws/video-stream`).
 
 ## 모듈 구성
 
@@ -102,6 +102,6 @@ curl -sf http://<control_server>:8100/health | python3 -m json.tool
 
 ## 변경 시 주의
 
-- 와이어 프로토콜은 server 측 [server/control/streaming/protocol.py](../../../../server/control/streaming/protocol.py) 와 **반드시 일치** 시킬 것 (헤더 포맷, 포트 매핑)
+- 와이어 프로토콜은 server 측 [server/control/streaming/protocol.py](../../../../../server/control/streaming/protocol.py) 와 **반드시 일치** 시킬 것 (헤더 포맷, 포트 매핑)
 - `parse_known_args()` 사용 — ROS2 launch 가 주입하는 `--ros-args` 를 무시해야 정상 동작
 - `streamer_v4l2.py` 는 `streamer.py` 에서 공통 코드 import — `streamer.py` 의 클래스/상수 변경 시 v4l2 도 같이 검증
