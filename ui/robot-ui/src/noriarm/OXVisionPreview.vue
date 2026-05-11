@@ -1,21 +1,36 @@
 <script setup lang="ts">
 /**
- * OX 보드 인식 미리보기 — 브라우저가 카메라 잡고, AI Hub 가 YOLO 추론.
+ * OX 보드 인식 미리보기 — 브라우저 카메라 + AI Hub YOLO + 브라우저 mediapipe Hands.
  *
- * 흐름:
- *   1. enumerateDevices() 로 카메라 목록, getUserMedia({ deviceId }) → <video>
- *   2. WebSocket 으로 /api/noriarm/vision/ox-board/infer 연결 (Control Server → AI Hub 프록시)
- *   3. 새 응답 받으면 다음 프레임을 즉시 캡처해 binary 로 send (back-pressure 자연스러움)
- *   4. 응답 JSON bbox 를 overlay <canvas> 에 그림
+ * 두 추론 파이프라인이 같은 <video> 공유:
+ *   1. AI Hub YOLO (서버) — 200ms 마다 WebSocket → bbox (O/X 영역)
+ *   2. mediapipe Hands (브라우저) — 매 프레임 → 검지 tip 좌표
  *
- * back-pressure:
- *   "응답 받으면 다음 send" 패턴이라 추론 속도 ≈ 전송 속도. 서버 폭주 방지.
+ * armed=true 일 때 손가락이 한 영역에 LOCK_DURATION_MS 머물면 `select` emit.
+ * 영역에서 한 번 떠나야 같은 영역에서 재발사 가능 (오발사 방지).
  *
- * 좌표 매핑:
- *   서버 응답 bbox 는 받은 frame 픽셀 좌표 (frame_size 기준).
- *   overlay canvas 는 video 표시 크기에 맞추고 sx/sy 로 스케일.
+ * 좌표:
+ *   - YOLO bbox: frame_size 픽셀 (640×480 다운스케일)
+ *   - mediapipe: normalized 0-1
+ *   - overlay canvas: video 표시 픽셀
+ *   - contains 검사는 frame_size 공간 (mp.x × frame_w, mp.y × frame_h)
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { Hands, type Results as HandResults } from '@mediapipe/hands';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+
+const props = withDefaults(
+  defineProps<{
+    /** true 일 때만 락인 카운트다운이 진행됨. 질문 phase 동안 true 유지. */
+    armed?: boolean;
+  }>(),
+  { armed: true },
+);
+
+const emit = defineEmits<{
+  select: [region: 'O' | 'X'];
+}>();
+
+const LOCK_DURATION_MS = 1500;
 
 interface Detection {
   score: number;
@@ -42,6 +57,8 @@ const selectedDeviceId = ref<string>('');
 const error = ref<string | null>(null);
 const fps = ref<number>(0);
 const inferenceMs = ref<number>(0);
+const currentRegion = ref<'O' | 'X' | null>(null);
+const handDetected = ref<boolean>(false);
 
 const videoRef = ref<HTMLVideoElement | null>(null);
 const overlayRef = ref<HTMLCanvasElement | null>(null);
@@ -50,9 +67,24 @@ let stream: MediaStream | null = null;
 let captureCanvas: HTMLCanvasElement | null = null;
 let ws: WebSocket | null = null;
 let stopRequested = false;
-let lastSentAt = 0;
 let frameCount = 0;
 let lastFpsT = 0;
+
+// MediaPipe Hands 상태 — 한 번만 setup, 매 프레임 send
+let hands: Hands | null = null;
+let handsBusy = false;
+let handsRafId: number | null = null;
+// 검지 tip 좌표 (normalized 0-1, video 기준)
+let fingertip: { x: number; y: number } | null = null;
+// 가장 최근 YOLO 응답 — hands 결과와 매칭하기 위해 캐시
+let lastInfer: InferResponse | null = null;
+
+// 락인 상태 — armed=true 일 때만 진행
+let lockedRegion: 'O' | 'X' | null = null;
+let lockStartT = 0;
+// 한 영역에서 emit 한 후엔 lockedFiredFor 로 마킹 — 손가락이 영역에서 한 번 떠나야 해제
+let lockedFiredFor: 'O' | 'X' | null = null;
+const lockProgress = ref<number>(0);
 
 const hasCameras = computed(() => cameras.value.length > 0);
 
@@ -99,14 +131,152 @@ async function startStream(): Promise<void> {
       await videoRef.value.play();
     }
     startInferLoop();
+    setupHands();
+    startHandsLoop();
   } catch (e) {
     error.value = `카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
   }
 }
 
+function setupHands(): void {
+  if (hands) return;
+  hands = new Hands({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`,
+  });
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 0,           // 0=lite (빠름), 1=full
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+  hands.onResults(handleHandResults);
+}
+
+function handleHandResults(results: HandResults): void {
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    fingertip = null;
+    handDetected.value = false;
+    currentRegion.value = null;
+  } else {
+    const landmarks = results.multiHandLandmarks[0];
+    const tip = landmarks[8]; // 검지 fingertip
+    fingertip = { x: tip.x, y: tip.y };
+    handDetected.value = true;
+    currentRegion.value = regionForFingertip(tip.x, tip.y);
+  }
+  updateLock();
+  redraw();
+}
+
+function updateLock(): void {
+  const region = currentRegion.value;
+
+  if (!props.armed || region === null) {
+    // 손이 보드 밖 또는 disarm → 다음 진입 시 다시 발사 가능하도록 모두 리셋
+    lockedRegion = null;
+    lockedFiredFor = null;
+    lockProgress.value = 0;
+    return;
+  }
+
+  // 같은 region 에서 이미 emit 된 상태 — 진행 100% 로 표시만 하고 재발사 X
+  if (lockedFiredFor === region) {
+    lockProgress.value = 1;
+    return;
+  }
+
+  if (lockedRegion !== region) {
+    // 새 region 진입 — 카운트다운 시작
+    lockedRegion = region;
+    lockStartT = performance.now();
+  }
+
+  const elapsed = performance.now() - lockStartT;
+  lockProgress.value = Math.min(1, elapsed / LOCK_DURATION_MS);
+
+  if (elapsed >= LOCK_DURATION_MS) {
+    lockedFiredFor = region;
+    emit('select', region);
+  }
+}
+
+// armed 가 true 로 켜질 때 (예: 새 질문 시작) lock 상태 리셋 — 같은 답을 다시
+// 선택할 수 있어야 함 (예: 연속 두 문제 답이 모두 'O')
+watch(
+  () => props.armed,
+  (isArmed) => {
+    if (isArmed) {
+      lockedRegion = null;
+      lockedFiredFor = null;
+      lockStartT = 0;
+      lockProgress.value = 0;
+    }
+  },
+);
+
+function regionForFingertip(nx: number, ny: number): 'O' | 'X' | null {
+  if (!lastInfer || lastInfer.boxes.length === 0) return null;
+  const [fw, fh] = lastInfer.frame_size;
+  const px = nx * fw;
+  const py = ny * fh;
+  const box = lastInfer.boxes[0];
+  if (!box.parts) return null;
+  if (insideBbox(px, py, box.parts.O)) return 'O';
+  if (insideBbox(px, py, box.parts.X)) return 'X';
+  return null;
+}
+
+function insideBbox(x: number, y: number, b: [number, number, number, number]): boolean {
+  return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
+}
+
+function startHandsLoop(): void {
+  if (handsRafId != null) return;
+  const tick = (): void => {
+    if (stopRequested) {
+      handsRafId = null;
+      return;
+    }
+    const v = videoRef.value;
+    if (v && v.readyState >= 2 && v.videoWidth && hands && !handsBusy) {
+      handsBusy = true;
+      hands.send({ image: v }).finally(() => {
+        handsBusy = false;
+      });
+    }
+    handsRafId = window.requestAnimationFrame(tick);
+  };
+  handsRafId = window.requestAnimationFrame(tick);
+}
+
+function stopHandsLoop(): void {
+  if (handsRafId != null) {
+    window.cancelAnimationFrame(handsRafId);
+    handsRafId = null;
+  }
+  // mediapipe WASM 리소스 명시적 해제 — GC 기다리지 않고 즉시 메모리 반환
+  if (hands) {
+    try {
+      hands.close();
+    } catch {
+      /* close 두 번 호출 등 무시 */
+    }
+    hands = null;
+  }
+  handsBusy = false;
+  fingertip = null;
+  handDetected.value = false;
+  currentRegion.value = null;
+  lockProgress.value = 0;
+  lockedRegion = null;
+  lockedFiredFor = null;
+}
+
 async function stopStream(): Promise<void> {
   stopRequested = true;
   closeWs();
+  stopHandsLoop();
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -114,6 +284,7 @@ async function stopStream(): Promise<void> {
   if (videoRef.value) videoRef.value.srcObject = null;
   fps.value = 0;
   inferenceMs.value = 0;
+  lastInfer = null;
   clearOverlay();
 }
 
@@ -147,7 +318,12 @@ function startInferLoop(): void {
       const data = JSON.parse(ev.data as string) as InferResponse | { error: string };
       if ('error' in data) return;
       inferenceMs.value = Math.round(data.inference_ms);
-      drawOverlay(data);
+      lastInfer = data;
+      // hand 가 이미 잡혀있으면 새 bbox 로 region 다시 계산
+      if (fingertip) {
+        currentRegion.value = regionForFingertip(fingertip.x, fingertip.y);
+      }
+      redraw();
       frameCount += 1;
       const now = performance.now();
       if (now - lastFpsT > 1000) {
@@ -156,7 +332,6 @@ function startInferLoop(): void {
         frameCount = 0;
       }
     } finally {
-      // back-pressure: 응답 받은 후에 다음 프레임 송신 → 추론 속도 ≈ 전송 속도
       void sendNextFrame();
     }
   };
@@ -185,7 +360,6 @@ async function sendNextFrame(): Promise<void> {
   if (!blob) return;
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(blob);
-    lastSentAt = performance.now();
   }
 }
 
@@ -211,12 +385,11 @@ function clearOverlay(): void {
   ctx.clearRect(0, 0, c.width, c.height);
 }
 
-function drawOverlay(data: InferResponse): void {
+function redraw(): void {
   const c = overlayRef.value;
   const v = videoRef.value;
   if (!c || !v) return;
   const rect = v.getBoundingClientRect();
-  // canvas 픽셀 = video 표시 픽셀 (devicePixelRatio 무시 — 화질보다 정렬 우선)
   if (c.width !== rect.width || c.height !== rect.height) {
     c.width = rect.width;
     c.height = rect.height;
@@ -225,16 +398,57 @@ function drawOverlay(data: InferResponse): void {
   if (!ctx) return;
   ctx.clearRect(0, 0, c.width, c.height);
 
-  const [fw, fh] = data.frame_size;
-  const sx = c.width / fw;
-  const sy = c.height / fh;
-  for (const b of data.boxes) {
-    if (b.parts) {
-      drawBox(ctx, b.parts.O, sx, sy, '#22dd55', `O ${b.score.toFixed(2)}`);
-      drawBox(ctx, b.parts.X, sx, sy, '#ff5544', `X ${b.score.toFixed(2)}`);
-    } else {
-      drawBox(ctx, b.bbox, sx, sy, '#3a8fc2', `${b.label ?? ''} ${b.score.toFixed(2)}`);
+  // 1) YOLO bbox
+  if (lastInfer) {
+    const [fw, fh] = lastInfer.frame_size;
+    const sx = c.width / fw;
+    const sy = c.height / fh;
+    for (const b of lastInfer.boxes) {
+      if (b.parts) {
+        // 현재 손가락이 있는 영역은 두껍게 강조
+        const oW = currentRegion.value === 'O' ? 5 : 2;
+        const xW = currentRegion.value === 'X' ? 5 : 2;
+        drawBox(ctx, b.parts.O, sx, sy, '#22dd55', `O ${b.score.toFixed(2)}`, oW);
+        drawBox(ctx, b.parts.X, sx, sy, '#ff5544', `X ${b.score.toFixed(2)}`, xW);
+      } else {
+        drawBox(ctx, b.bbox, sx, sy, '#3a8fc2', `${b.label ?? ''} ${b.score.toFixed(2)}`);
+      }
     }
+  }
+
+  // 2) 손가락 tip (mediapipe normalized → canvas px) + 락인 진행 호
+  if (fingertip) {
+    const fx = fingertip.x * c.width;
+    const fy = fingertip.y * c.height;
+
+    // 락인 진행 호 (검지 둘레)
+    if (lockProgress.value > 0 && currentRegion.value) {
+      const ringR = 22;
+      const lockColor = currentRegion.value === 'O' ? '#22dd55' : '#ff5544';
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(fx, fy, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = lockColor;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(
+        fx, fy, ringR,
+        -Math.PI / 2,
+        -Math.PI / 2 + lockProgress.value * Math.PI * 2,
+      );
+      ctx.stroke();
+    }
+
+    // 검지 dot
+    ctx.beginPath();
+    ctx.arc(fx, fy, 9, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffeb3b';
+    ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 }
 
@@ -245,12 +459,12 @@ function drawBox(
   sy: number,
   color: string,
   label: string,
+  lineWidth = 2,
 ): void {
   const [x1, y1, x2, y2] = b;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = lineWidth;
   ctx.strokeRect(x1 * sx, y1 * sy, (x2 - x1) * sx, (y2 - y1) * sy);
-  // 라벨 배경
   ctx.font = 'bold 12px system-ui, sans-serif';
   const text = label.trim();
   const tw = ctx.measureText(text).width + 8;
@@ -293,6 +507,20 @@ onUnmounted(stopStream);
       <canvas ref="overlayRef" class="overlay" />
       <div v-if="fps > 0" class="hud">
         {{ fps.toFixed(1) }} fps · infer {{ inferenceMs }} ms
+      </div>
+      <div
+        class="region-badge"
+        :class="{
+          'region-o': currentRegion === 'O',
+          'region-x': currentRegion === 'X',
+          'region-out': handDetected && !currentRegion,
+          'region-none': !handDetected,
+        }"
+      >
+        <template v-if="!handDetected">손 대기</template>
+        <template v-else-if="currentRegion === 'O'">O 위</template>
+        <template v-else-if="currentRegion === 'X'">X 위</template>
+        <template v-else>영역 밖</template>
       </div>
     </div>
     <p v-if="error" class="vision-error">{{ error }}</p>
@@ -370,6 +598,33 @@ onUnmounted(stopStream);
   padding: 3px 8px;
   border-radius: 4px;
   pointer-events: none;
+}
+.vision-canvas .region-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+  letter-spacing: 0.3px;
+}
+.region-badge.region-none {
+  background: rgba(0, 0, 0, 0.55);
+  color: #aaa;
+}
+.region-badge.region-out {
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffe082;
+}
+.region-badge.region-o {
+  background: #22dd55;
+  color: black;
+}
+.region-badge.region-x {
+  background: #ff5544;
+  color: white;
 }
 .vision-error {
   margin: 0;
