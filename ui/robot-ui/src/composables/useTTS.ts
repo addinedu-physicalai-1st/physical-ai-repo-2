@@ -7,7 +7,6 @@ export interface UseTTSOptions {
 }
 
 // Robot UI 는 서버 TTS 만 사용한다 (Edge MP3, 브라우저 speechSynthesis 비활성).
-const USE_SERVER_TTS = true;
 /** 1.0 = 원속. Edge rate 와 별도로 살짝만 올려 체감 속도 보정 (립싱크는 currentTime 기준이라 동기 유지). */
 const TTS_PLAYBACK_RATE = 1.1;
 const WAKE_ACK_LIPSYNC_TEXT = '네!';
@@ -342,9 +341,6 @@ export function useTTS(options: UseTTSOptions = {}): {
     if (typeof window === 'undefined') return;
 
     cancel();
-    if (!USE_SERVER_TTS) {
-      throw new Error('Server TTS is required.');
-    }
     await speakFromHub(text);
   }
 

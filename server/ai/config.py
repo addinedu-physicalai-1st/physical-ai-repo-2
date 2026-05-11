@@ -31,7 +31,6 @@ class Settings(BaseSettings):
     roster_labels_cache_ttl_s: float = 120.0
     request_timeout_s: float = 30.0
     ai_port: int = 8001
-    sd_url: str = "http://localhost:7860/sdapi/v1/txt2img"
 
     # Edge neural — 한국어 남성: InJoon / Hyunsu(Multilingual). 아동 전용 화자는 없음.
     edge_tts_voice: str = "ko-KR-InJoonNeural"
