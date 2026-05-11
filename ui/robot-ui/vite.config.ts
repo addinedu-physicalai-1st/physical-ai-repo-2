@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
@@ -32,6 +33,11 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
             },
           },
+    },
+    // Pure 유틸 (wakeMatcher 등) 만 테스트하므로 jsdom 불필요. globals 도 import 로 명시.
+    test: {
+      environment: 'node',
+      include: ['tests/**/*.test.ts'],
     },
   };
 });

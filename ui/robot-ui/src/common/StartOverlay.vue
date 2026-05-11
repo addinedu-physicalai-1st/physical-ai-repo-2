@@ -2,18 +2,13 @@
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
-import type { RobotId } from '@/config/robots';
+import { chromeAccent } from '@/config/colors';
 
 defineEmits<{ start: [] }>();
 
 const { robot } = storeToRefs(useModeStore());
 
-const PRIMARY: Record<RobotId, string> = {
-  eduping:  '#db2777',
-  gogoping: '#000000',
-  noriarm:  '#3a8fc2',
-};
-const primary = computed(() => PRIMARY[robot.value.id]);
+const primary = computed(() => chromeAccent(robot.value.id));
 </script>
 
 <template>

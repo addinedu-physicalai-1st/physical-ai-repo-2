@@ -3,17 +3,13 @@ import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { postModeClick } from '@/composables/useIntentDispatch';
-import type { ModeTreeNode, ModeTreeGroup, RobotId } from '@/config/robots';
+import type { ModeTreeNode, ModeTreeGroup } from '@/config/robots';
+import { chromeAccent } from '@/config/colors';
 
 const mode = useModeStore();
 const { robot, currentMode } = storeToRefs(mode);
 
-const PRIMARY: Record<RobotId, string> = {
-  eduping:  '#db2777',
-  gogoping: '#000000',
-  noriarm:  '#3a8fc2',
-};
-const primary = computed(() => PRIMARY[robot.value.id]);
+const primary = computed(() => chromeAccent(robot.value.id));
 
 const expanded = ref(new Set<string>());
 

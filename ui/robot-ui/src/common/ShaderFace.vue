@@ -401,8 +401,11 @@ function getVisemeForSyllable(char: string, t_ms: number) {
   const vowelIdx = Math.floor((index % 588) / 28);
   const codaIdx = index % 28;
 
-  const isBilabialOnset = [6, 7, 8, 17].includes(onsetIdx);
-  const isBilabialCoda = [16, 17, 10, 11, 14, 26, 18].includes(codaIdx);
+  // 한글 자모 표 기준 양순음 (입 다물기) 인덱스.
+  // 초성 19자: 6=ㅁ, 7=ㅂ, 8=ㅃ, 18=ㅍ.  (17=ㅌ 는 치경음이라 제외)
+  // 종성 28자: 11=ㄻ, 14=ㄿ, 16=ㅁ, 17=ㅂ, 18=ㅄ, 26=ㅍ.  (10=ㄺ 는 연구개음이라 제외)
+  const isBilabialOnset = [6, 7, 8, 18].includes(onsetIdx);
+  const isBilabialCoda = [11, 14, 16, 17, 18, 26].includes(codaIdx);
 
   const base = pickAhOrOhForHangul(vowelIdx, code);
   const vOpenness = base.openness;

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import type { EmotionId, RobotId } from '@/config/robots';
+import type { EmotionId } from '@/config/robots';
+import { faceAccent } from '@/config/colors';
 import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
 import ShaderFace from '@/common/ShaderFace.vue';
@@ -14,14 +15,7 @@ const { state, voiceMode, robotReply, sttText } = storeToRefs(voice);
 const mode = useModeStore();
 const { robot } = storeToRefs(mode);
 
-// 표정 색은 emotion 별이 아닌 로봇 브랜드 primary 로 통일
-const PRIMARY_BY_ROBOT: Record<RobotId, string> = {
-  eduping: '#db2777',
-  gogoping: '#bef32c',
-  noriarm: '#3a8fc2',
-};
-
-const accent = computed(() => PRIMARY_BY_ROBOT[robot.value.id]);
+const accent = computed(() => faceAccent(robot.value.id));
 const isListening = computed(
   () => state.value === 'listening' || state.value === 'wake_detected'
 );

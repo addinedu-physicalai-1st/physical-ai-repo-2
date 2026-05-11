@@ -5,7 +5,7 @@ import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useAudioLevel } from '@/composables/useAudioLevel';
-import type { RobotId } from '@/config/robots';
+import { faceAccent } from '@/config/colors';
 import CommandBar from './CommandBar.vue';
 import SiriBlob from './SiriBlob.vue';
 import DispatchingLoader from './DispatchingLoader.vue';
@@ -14,12 +14,7 @@ const voice = useVoiceStore();
 const { voiceMode, state } = storeToRefs(voice);
 
 const { robot } = storeToRefs(useModeStore());
-const PRIMARY: Record<RobotId, string> = {
-  eduping:  '#db2777',
-  gogoping: '#bef32c',
-  noriarm:  '#3a8fc2',
-};
-const primary = computed(() => PRIMARY[robot.value.id]);
+const primary = computed(() => faceAccent(robot.value.id));
 
 const controller = inject(VOICE_CONTROLLER_KEY);
 if (!controller) throw new Error('VOICE_CONTROLLER_KEY not provided');
