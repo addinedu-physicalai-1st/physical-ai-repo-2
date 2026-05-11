@@ -43,6 +43,11 @@ def modes_for(robot: str) -> list[str]:
     return list(entry["modes"]) if entry else []
 
 
+def robot_display_name(robot: str) -> str:
+    entry = _ROBOTS_BY_ID.get(robot)
+    return str(entry["displayName"]) if entry else robot
+
+
 def capabilities_for(robot: str) -> list[tuple[str, str]]:
     """로봇의 (모드명, 설명) 쌍 — '대기' 제외, capability 만."""
     return [

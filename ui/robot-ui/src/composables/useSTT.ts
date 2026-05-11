@@ -49,6 +49,8 @@ export function useSTT(options: UseSTTOptions): {
   const isRunning = ref(false);
   let recognition: SpeechRecognitionLike | null = null;
   let shouldRestart = false;
+  /** Chrome ends the session on silence (`no-speech`); short restarts spin and flood the console. */
+  let nextRestartDelayMs = 200;
 
   function build(): SpeechRecognitionLike | null {
     const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -61,6 +63,7 @@ export function useSTT(options: UseSTTOptions): {
     r.interimResults = true;
     r.lang = options.lang ?? 'ko-KR';
     r.onresult = (event) => {
+      nextRestartDelayMs = 200;
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (!result) continue;
@@ -72,8 +75,7 @@ export function useSTT(options: UseSTTOptions): {
     };
     r.onerror = (event) => {
       const message = (event as unknown as { error?: string }).error ?? 'unknown';
-      console.warn('[STT] Error event:', message);
-      
+
       // If we get a network error, it's usually a browser/API key issue on Linux.
       // Stop the loop to prevent flickering.
       if (message === 'network') {
@@ -81,25 +83,34 @@ export function useSTT(options: UseSTTOptions): {
         shouldRestart = false;
       }
 
-      if (message === 'no-speech' || message === 'aborted') return;
+      // Silence / user stop — session will end; avoid warn spam and tight restart loops.
+      if (message === 'no-speech') {
+        nextRestartDelayMs = 750;
+        return;
+      }
+      if (message === 'aborted') {
+        return;
+      }
+
+      console.warn('[STT] Error event:', message);
       options.onError?.(`STT 오류: ${message}`);
     };
     r.onend = () => {
-      console.log('[STT] Session ended. shouldRestart:', shouldRestart);
       isRunning.value = false;
-      if (shouldRestart) {
-        window.setTimeout(() => {
-          if (shouldRestart) {
-            console.log('[STT] Attempting restart...');
-            try {
-              r.start();
-              isRunning.value = true;
-            } catch (e) {
-              console.warn('[STT] Restart failed:', e);
-            }
-          }
-        }, 50); // Reduced to 50ms to prevent flickering while clearing buffer
-      }
+      if (!shouldRestart) return;
+
+      const delay = nextRestartDelayMs;
+      nextRestartDelayMs = 200;
+
+      window.setTimeout(() => {
+        if (!shouldRestart) return;
+        try {
+          r.start();
+          isRunning.value = true;
+        } catch (e) {
+          console.warn('[STT] Restart failed:', e);
+        }
+      }, delay);
     };
     return r;
   }

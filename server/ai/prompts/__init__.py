@@ -7,6 +7,10 @@
 from types import ModuleType
 
 from server.ai.prompts import eduping, gogoping, noriarm
+from server.ai.prompts.shared_chat_guardrails import (
+    CHILD_SAFE_CURRENT_EVENTS_BLOCK,
+    honesty_nonsense_block,
+)
 from server.ai.robots import modes_for
 
 _REGISTRY: dict[str, ModuleType] = {
@@ -32,8 +36,11 @@ def classify_system(robot: str) -> str:
 
 
 def chat_system(robot: str, *, context_block: str, emotions_block: str) -> str:
+    name = display_name(robot)
     return _module(robot).CHAT_SYSTEM.format(
-        robot_name=display_name(robot),
+        robot_name=name,
+        child_safe_current_events_block=CHILD_SAFE_CURRENT_EVENTS_BLOCK,
+        honesty_nonsense_block=honesty_nonsense_block(name),
         context_block=context_block,
         emotions_block=emotions_block,
     )

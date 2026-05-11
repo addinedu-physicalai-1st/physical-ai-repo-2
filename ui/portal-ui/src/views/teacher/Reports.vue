@@ -89,7 +89,7 @@ function onSaved(updated: Report) {
     />
 
     <div v-else class="grid">
-      <BaseCard v-for="c in filtered" :key="c.id" class="card" :padded="true">
+      <BaseCard v-for="c in filtered" :key="c.id" class="card grid-card--reports" :padded="true">
         <template #header>
           <div class="card-head">
             <BaseAvatar :name="c.name" :size="32" />
@@ -127,4 +127,18 @@ function onSaved(updated: Report) {
 .card-head__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .card-head__text strong { font-size: var(--font-size-sm); }
 .card-head__text span { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.grid-card--reports {
+  position: relative;
+  overflow: hidden;
+}
+.grid-card--reports::after {
+  content: '📝';
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  font-size: 140px;
+  opacity: 0.12;
+  transform: rotate(-15deg);
+  pointer-events: none;
+}
 </style>

@@ -1,4 +1,5 @@
-import { WAKE_WORD_VARIANT_MAP, type RobotConfig } from '@/config/robots';
+import { WAKE_WORD_VARIANT_MAP, type RobotConfig, type EmotionId } from '@/config/robots';
+import { isEmotionId } from '@/config/emotions';
 import { dispatchIntent } from './useIntentDispatch';
 import { useSTT, type STTResult } from './useSTT';
 import { useTTS } from './useTTS';
@@ -11,10 +12,12 @@ const COOLDOWN_MS = 1500;
 // TTS 가 끝난 뒤 echo (스피커 → 마이크) 가 STT 결과로 새는 걸 막기 위한 짧은 그레이스.
 // COOLDOWN_MS 와 분리 — 너무 길면 사용자가 응답 직후 호출어 다시 부를 때 인식이 버려진다.
 // TTS 끝과 동시에 stt.refresh() 로 인식 버퍼도 비우므로 이 그레이스는 짧아도 충분.
-const ECHO_SUPPRESS_MS = 700;
+const ECHO_SUPPRESS_MS = 350;
+// wake ack("네") 직후 아주 짧은 interim 잡음으로 즉시 끊기는 것을 방지.
+const WAKE_ACK_BARGE_IN_GRACE_MS = 220;
 // 호출어가 들어왔을 때 추가 발화를 기다리는 settle 시간.
 // 이 시간 내에 새 interim 이 안 오면 그 시점 텍스트로 처리한다.
-const WAKE_SETTLE_MS = 1000;
+const WAKE_SETTLE_MS = 650;
 const STOP_TOKENS = ['정지', '멈춰', '그만', '스톱'];
 
 // STT 가 띄어쓰며 인식하는 케이스도 잡기 위해 wake word 음절 사이 \s* 허용
@@ -25,14 +28,48 @@ const WAKE_WORD_PATTERNS = WAKE_WORD_VARIANT_MAP.map(({ variant }) =>
 );
 const WAKE_WORD_REGEX = new RegExp(`(${WAKE_WORD_PATTERNS.join('|')})[\\s,.!?]*(.*)$`);
 
+function normalizeWakeText(text: string): string {
+  return text.replace(/\s+/g, '').replace(/[^\p{Script=Hangul}a-zA-Z0-9]/gu, '').toLowerCase();
+}
+
+function wakeHeuristicMatch(compact: string, wakeWord: string): boolean {
+  if (!compact) return false;
+  if (wakeWord === '고고핑') {
+    return /(고고|꼬꼬)(핑|핀|팽|빙)/.test(compact);
+  }
+  if (wakeWord === '에듀핑') {
+    return /(에듀|애듀)(핑|핀|팽|빙)/.test(compact);
+  }
+  if (wakeWord === '노리암') {
+    return /(노리|놀이|노라)(암|아)/.test(compact);
+  }
+  return false;
+}
+
 function canonicalizeWakeWord(matched: string): string | null {
-  const compact = matched.replace(/\s+/g, '');
+  const compact = normalizeWakeText(matched);
   const hit = WAKE_WORD_VARIANT_MAP.find((v) => v.variant === compact);
   return hit?.canonical ?? null;
 }
 
 function isStopIntent(text: string): boolean {
   return STOP_TOKENS.some((token) => text.includes(token));
+}
+
+function normalizeSpeechText(text: string): string {
+  return text.replace(/\s+/g, '').replace(/[^\p{Script=Hangul}a-zA-Z0-9]/gu, '').toLowerCase();
+}
+
+/** 쉼표 구분 — LLM 에 원아 명단으로 전달 (이름 질문 환각 완화). 비우면 전송 안 함. */
+function classRosterFromEnv(): string[] | undefined {
+  const raw = (import.meta.env.VITE_CLASS_ROSTER as string | undefined)?.trim();
+  if (!raw) return undefined;
+  const names = raw
+    .split(/[,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 40);
+  return names.length ? names : undefined;
 }
 
 export function useVoiceController(robot: RobotConfig): {
@@ -50,19 +87,51 @@ export function useVoiceController(robot: RobotConfig): {
   // listening 상태에서 마지막으로 본 interim 텍스트. 갱신되면 사용자가 말하는 중으로 보고
   // listeningTimer 를 리셋한다.
   let lastListeningInterim = '';
+  // 브라우저 STT final 이 짧게 잘리는 경우 보정용 (최근/가장 긴 interim).
+  let bestListeningText = '';
   let suppressUntil = 0;
   // dispatching 중 호출어로 가로채기 위한 abort controller
   let dispatchAbort: AbortController | null = null;
 
+  let pendingEmotion: EmotionId | null = null;
+  let skipTtsEndCleanupOnce = false;
+  let wakeAckInProgress = false;
+  let wakeAckStartedAt = 0;
+  // wake 직후 첫 발화는 restricted mode 제한을 1회 우회 (사용자는 호출 후 즉시 명령한다고 기대)
+  let allowRestrictedBypassOnce = false;
+
+  function baseEmotionForCurrentMode(): EmotionId {
+    return mode.robot.defaultEmotionByMode[mode.currentMode] ?? 'basic';
+  }
+
   const tts = useTTS({
-    onStart: () => voice.setSpeaking(true),
+    onStart: (text) => {
+      voice.setSpeaking(true);
+      voice.setRobotReply(text);
+      if (text === '네!') wakeAckStartedAt = Date.now();
+      // 웨이크 응답("네") 재생 중엔 listening barge-in 을 위해 wake_detected 유지
+      if (!wakeAckInProgress) {
+        voice.setState('speaking'); // Maintain thinking until audio starts
+      }
+      if (pendingEmotion) {
+        mode.currentEmotion = pendingEmotion;
+      }
+    },
     onEnd: () => {
       voice.setSpeaking(false);
+      if (skipTtsEndCleanupOnce) {
+        // barge-in 으로 의도적으로 끊은 경우: echo suppress/refresh 를 걸면
+        // 사용자가 이어서 말한 명령까지 버퍼에서 날아간다.
+        skipTtsEndCleanupOnce = false;
+        voice.setRobotReply('');
+        return;
+      }
       // 짧은 echo 그레이스 + STT 세션 refresh 로 누적 버퍼 비우기.
       // 이전엔 1500ms 동안 모든 STT 결과를 버려, 응답 직후 사용자가 호출어를 다시
       // 불러도 인식이 누락되는 문제가 있었음.
       suppressUntil = Date.now() + ECHO_SUPPRESS_MS;
       stt.refresh();
+      voice.setRobotReply('');
     },
   });
 
@@ -104,10 +173,32 @@ export function useVoiceController(robot: RobotConfig): {
 
   function tryWakeFromText(text: string): { wakeWord: string; remainder: string } | null {
     const match = text.match(WAKE_WORD_REGEX);
-    if (!match) return null;
-    const canonical = canonicalizeWakeWord(match[1] ?? '');
-    if (canonical !== robot.wakeWord) return null;
-    return { wakeWord: canonical, remainder: (match[2] ?? '').trim() };
+    if (match) {
+      const canonical = canonicalizeWakeWord(match[1] ?? '');
+      if (canonical === robot.wakeWord) {
+        return { wakeWord: canonical, remainder: (match[2] ?? '').trim() };
+      }
+    }
+
+    // Fallback: 공백/기호가 섞인 STT 결과에서도 호출어를 안정적으로 탐지
+    const compact = normalizeWakeText(text);
+    if (!compact) return null;
+    for (const v of WAKE_WORD_VARIANT_MAP) {
+      if (v.canonical !== robot.wakeWord) continue;
+      const vv = normalizeWakeText(v.variant);
+      if (vv && compact.includes(vv)) {
+        return { wakeWord: robot.wakeWord, remainder: '' };
+      }
+    }
+    if (wakeHeuristicMatch(compact, robot.wakeWord)) {
+      return { wakeWord: robot.wakeWord, remainder: '' };
+    }
+    return null;
+  }
+
+  function isWakeOnlyUtterance(text: string): boolean {
+    const wake = tryWakeFromText(text);
+    return !!wake && wake.remainder.trim().length === 0;
   }
 
   async function fireSettle(): Promise<void> {
@@ -129,9 +220,11 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   function shouldDropResult(): boolean {
-    if (voice.isSpeaking) return true;
-    // Increased tolerance for echo to prevent dropping the start of a command
-    if (Date.now() < suppressUntil - 200) return true; 
+    // wake ack("네") 중에는 suppressUntil/echo 게이트를 우회해서 즉시 barge-in 허용
+    if (wakeAckInProgress) return false;
+    // 일반 발화(TTS) 중엔 STT 결과를 버리되, wake ack("네") 중엔 barge-in 허용.
+    if (voice.isSpeaking && !wakeAckInProgress && voice.state !== 'speaking') return true;
+    if (Date.now() < suppressUntil) return true;
     return false;
   }
 
@@ -140,6 +233,9 @@ export function useVoiceController(robot: RobotConfig): {
    * 진행 중 작업 (fetch / TTS / 타이머) 을 모두 취소하고 새 흐름 시작.
    */
   async function bargeIn(remainder: string): Promise<void> {
+    const duringRobotSpeech =
+      voice.state === 'speaking' || wakeAckInProgress || voice.isSpeaking;
+
     if (dispatchAbort) {
       dispatchAbort.abort();
       dispatchAbort = null;
@@ -149,8 +245,34 @@ export function useVoiceController(robot: RobotConfig): {
     clearCooldownTimer();
     clearSettleTimer();
     lastListeningInterim = '';
+    bestListeningText = '';
     voice.setSpeaking(false);
     suppressUntil = 0;
+    // 어떤 모드에서든 로봇이 말하는 중 호출되면 즉시 listening 으로 전이해
+    // 사용자의 후속 명령을 놓치지 않도록 한다 (자장가 포함).
+    if (duringRobotSpeech) {
+      voice.setRobotReply('');
+      // 호출어 인식 시에는 항상 "네" 응답 (중단 상황 포함)
+      voice.setState('wake_detected');
+      mode.setEmotionTransient('hello', 800);
+      wakeAckInProgress = true;
+      try {
+        await tts.playWakeAck();
+      } finally {
+        wakeAckInProgress = false;
+      }
+      if (voice.state !== 'wake_detected') return;
+      voice.setState('listening');
+      allowRestrictedBypassOnce = true;
+      bestListeningText = '';
+      lastListeningInterim = '';
+      armListeningTimer();
+      if (remainder.trim().length > 0) {
+        clearListeningTimer();
+        await enterDispatching(remainder);
+      }
+      return;
+    }
     await enterWakeDetected(remainder);
   }
 
@@ -166,6 +288,70 @@ export function useVoiceController(robot: RobotConfig): {
     }
 
     const trimmed = result.text.trim();
+
+    // wake ack("네!") 도중 사용자가 이어서 말하면 즉시 TTS 중단 후 listening 으로 전이.
+    if (wakeAckInProgress && voice.isSpeaking && trimmed) {
+      const elapsed = Date.now() - wakeAckStartedAt;
+      const significantSpeech =
+        result.isFinal || (elapsed >= WAKE_ACK_BARGE_IN_GRACE_MS && trimmed.length >= 2);
+      // "네"/호출어 재인식 같은 잔향은 wake ack barge-in 조건에서 제외
+      const likelyWakeEcho = isWakeOnlyUtterance(trimmed) || trimmed === '네' || trimmed === '네요';
+      if (!significantSpeech || likelyWakeEcho) {
+        return;
+      }
+      skipTtsEndCleanupOnce = true;
+      tts.cancel();
+      wakeAckInProgress = false;
+      voice.setSpeaking(false);
+      voice.setRobotReply('');
+      voice.setState('listening');
+      allowRestrictedBypassOnce = true;
+      lastListeningInterim = '';
+      bestListeningText = trimmed;
+      armListeningTimer();
+      // final 이 이미 온 경우 바로 dispatch.
+      if (result.isFinal) {
+        // "고고핑" 만 다시 final 로 떨어진 경우는 명령이 아님 — 계속 listening 유지
+        if (isWakeOnlyUtterance(trimmed)) {
+          return;
+        }
+        clearListeningTimer();
+        await enterDispatching(trimmed);
+      }
+      return;
+    }
+
+    // speaking 중 wake barge-in은 final 만 — interim 은 스피커→마이크 echo 가
+    // 호출어로 자주 뜨며 재생이 끊기고 "네!" 가 다시 나가는 현상을 만든다.
+    if (voice.state === 'speaking' && trimmed && result.isFinal) {
+      const wake = tryWakeFromText(trimmed);
+      if (wake) {
+        await bargeIn(wake.remainder);
+        return;
+      }
+    }
+
+    // 일반 speaking 중에도 사용자가 최종 발화를 하면 즉시 끊고 명령 처리.
+    // 단, 로봇이 방금 말한 문장 echo 인식은 제외.
+    if (voice.state === 'speaking' && result.isFinal) {
+      const heard = normalizeSpeechText(trimmed);
+      const spoken = normalizeSpeechText(voice.robotReply ?? '');
+      const likelyEcho =
+        !heard ||
+        heard === spoken ||
+        (heard.length >= 2 && spoken.includes(heard)) ||
+        heard === '네' ||
+        heard === '네요';
+
+      if (!likelyEcho) {
+        skipTtsEndCleanupOnce = true;
+        tts.cancel();
+        voice.setSpeaking(false);
+        voice.setRobotReply('');
+        await enterDispatching(trimmed);
+      }
+      return;
+    }
 
     // barge-in — idle / listening 외 상태에서도 호출어 들어오면 가로챈다.
     // (idle 은 아래 settle 로직, listening 은 일반 후속 발화 처리)
@@ -212,34 +398,81 @@ export function useVoiceController(robot: RobotConfig): {
 
     if (voice.state === 'listening') {
       if (result.isFinal) {
+        // wake-word만 final 로 떨어진 경우는 명령이 아님 — 계속 listening 유지
+        if (isWakeOnlyUtterance(trimmed)) {
+          bestListeningText = '';
+          lastListeningInterim = '';
+          armListeningTimer();
+          return;
+        }
+
         clearListeningTimer();
         lastListeningInterim = '';
-        await enterDispatching(trimmed);
+        // final 이 짧게 끊긴 경우(예: "틀어") 최근 interim(예: "자장가 틀어줘")로 보정
+        const candidate = bestListeningText.trim();
+        const finalText = trimmed;
+        const useCandidate =
+          candidate.length > finalText.length &&
+          (candidate.includes(finalText) || finalText.length <= 2);
+        // candidate/final 이 서로 부분문자열이 아니면 접합해 의미 손실을 줄임
+        const mergedText =
+          candidate &&
+          finalText &&
+          !candidate.includes(finalText) &&
+          !finalText.includes(candidate)
+            ? `${candidate} ${finalText}`.trim()
+            : '';
+        const dispatchText = useCandidate
+          ? candidate
+          : mergedText.length > finalText.length
+            ? mergedText
+            : finalText;
+        bestListeningText = '';
+        await enterDispatching(dispatchText);
         return;
       }
       // 사용자가 실제로 말을 시작/계속하는 중이면 listening 윈도우를 갱신.
       // 같은 interim 이 반복 (STT chatter) 되는 경우는 무시 — 무한 갱신 방지.
       if (trimmed && trimmed !== lastListeningInterim) {
         lastListeningInterim = trimmed;
+        if (trimmed.length >= bestListeningText.length) {
+          bestListeningText = trimmed;
+        }
         armListeningTimer();
       }
     }
   }
 
   async function enterWakeDetected(remainder: string): Promise<void> {
+    voice.setRobotReply('');
     voice.setState('wake_detected');
-    mode.setEmotionTransient('hello', 1500);
+    // 직전 TTS suppress window 때문에 wake 직후 첫 음절이 버려지는 현상 방지
+    suppressUntil = 0;
 
-    if (remainder.length > 0) {
-      // 호출어 + 명령이 같이 온 경우 — TTS 응답 생략, 바로 명령 처리
-      await enterDispatching(remainder);
+    mode.setEmotionTransient('hello', 1500);
+    
+    // 호출어 인식 시에는 항상 "네" 응답 후 listening/dispatch
+    wakeAckInProgress = true;
+    try {
+      await tts.playWakeAck();
+    } finally {
+      wakeAckInProgress = false;
+    }
+
+    // wake ack 재생 중 사용자 발화가 이미 listening/dispatching 으로 전이시켰다면 덮어쓰지 않음
+    if (voice.state !== 'wake_detected') {
       return;
     }
-    // 호출어 단독 — 응답하고 listening 윈도우 열어 후속 발화 대기
-    await tts.speak('네!');
+    
     voice.setState('listening');
+    allowRestrictedBypassOnce = true;
     lastListeningInterim = '';
+    bestListeningText = '';
     armListeningTimer();
+    if (remainder.trim().length > 0) {
+      clearListeningTimer();
+      await enterDispatching(remainder);
+    }
   }
 
   async function enterDispatching(text: string): Promise<void> {
@@ -247,8 +480,11 @@ export function useVoiceController(robot: RobotConfig): {
     voice.setLastSpokenText(text);
     voice.setRobotReply('');
 
+    const bypassRestricted = allowRestrictedBypassOnce;
+    allowRestrictedBypassOnce = false;
     const restricted = robot.restrictedVoiceMode === mode.currentMode;
-    if (restricted && !isStopIntent(text)) {
+    const hasModeKeyword = robot.modes.some((m) => m && text.includes(m));
+    if (restricted && !bypassRestricted && !isStopIntent(text) && !hasModeKeyword) {
       // 보조 모드: 정지 의도 외 발화는 의도 분류 건너뛰고 직전 동작 재개 신호
       mode.setProximityHalt(false);
       enterCooldown();
@@ -258,25 +494,25 @@ export function useVoiceController(robot: RobotConfig): {
     const controller = new AbortController();
     dispatchAbort = controller;
     try {
-      const startTime = Date.now();
-      const response = await dispatchIntent(text, robot.id, controller.signal);
+      const response = await dispatchIntent(
+        text,
+        robot.id,
+        controller.signal,
+        classRosterFromEnv(),
+      );
       if (controller.signal.aborted) return;
-
-      // Ensure we stay in thinking state for at least 300ms to show a quick flicker of animation
-      const elapsed = Date.now() - startTime;
-      if (elapsed < 300) {
-        await new Promise(resolve => window.setTimeout(resolve, 300 - elapsed));
-      }
 
       mode.applyIntent(response);
       if (response.kind === 'chat') {
-        voice.setState('speaking'); // CRITICAL: Stop thinking movement
-        voice.setRobotReply(response.reply);
-        
-        const minDuration = Math.max(3000, response.reply.length * 200);
-        await mode.holdEmotionDuring(response.emotion, async () => {
-          await tts.speak(response.reply);
-        });
+        // voice.setState('speaking') moved to onStart of TTS to maintain thinking status
+        const idleEmotion = baseEmotionForCurrentMode();
+        pendingEmotion = isEmotionId(response.emotion) ? response.emotion : 'basic';
+
+        await tts.speak(response.reply);
+
+        pendingEmotion = null;
+        mode.currentEmotion = idleEmotion;
+
         enterCooldown();
       } else {
         voice.setRobotReply('');
@@ -308,6 +544,17 @@ export function useVoiceController(robot: RobotConfig): {
     clearCooldownTimer();
     clearSettleTimer();
     lastListeningInterim = '';
+    bestListeningText = '';
+    wakeAckInProgress = false;
+    skipTtsEndCleanupOnce = false;
+    suppressUntil = 0;
+    pendingEmotion = null;
+    allowRestrictedBypassOnce = false;
+    // 타이핑 모드로 전환 시: 마이크에 잡힌 주변 발화·누적 STT 가 입력창에 남지 않도록 비움 (모든 로봇/모드 공통).
+    voice.setSttText('');
+    voice.setRobotReply('');
+    voice.setInputLocked(false);
+    voice.setSpeaking(false);
     voice.setState('idle');
   }
 
@@ -327,13 +574,17 @@ export function useVoiceController(robot: RobotConfig): {
     if (wake) {
       if (wake.remainder) {
         // 호출어 + 명령 — TTS 응답 생략, 바로 dispatch
-        mode.setEmotionTransient('hello', 800);
         await enterDispatching(wake.remainder);
       } else {
         // 호출어 단독 — 응답만 (타이핑은 follow-up 의미 없으므로 listening 안 함)
         voice.setState('wake_detected');
         mode.setEmotionTransient('hello', 1500);
-        await tts.speak('네!');
+        wakeAckInProgress = true;
+        try {
+          await tts.playWakeAck();
+        } finally {
+          wakeAckInProgress = false;
+        }
         enterCooldown();
       }
       return;

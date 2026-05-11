@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
-export type VoiceState = 'idle' | 'wake_detected' | 'listening' | 'dispatching' | 'cooldown';
+export type VoiceState =
+  | 'idle'
+  | 'wake_detected'
+  | 'listening'
+  | 'dispatching'
+  | 'speaking'
+  | 'cooldown';
 export type VoiceMode = 'voice' | 'text';
 
 export const useVoiceStore = defineStore('voice', () => {
@@ -15,6 +21,8 @@ export const useVoiceStore = defineStore('voice', () => {
   const voiceMode = ref<VoiceMode>('voice');
   const robotReply = ref<string>('');
   const currentChar = ref<string>('');
+  /** 0~1 Web Audio RMS — 말할 때 입 벌림에 섞어 대화감(오·아 리듬) 보강 */
+  const speechEnvelope = ref(0);
 
   function setState(next: VoiceState): void {
     state.value = next;
@@ -55,6 +63,10 @@ export const useVoiceStore = defineStore('voice', () => {
     currentChar.value = char;
   }
 
+  function setSpeechEnvelope(value: number): void {
+    speechEnvelope.value = Math.min(1, Math.max(0, value));
+  }
+
   return {
     state,
     sttText,
@@ -65,11 +77,13 @@ export const useVoiceStore = defineStore('voice', () => {
     inputLocked,
     voiceMode,
     currentChar,
+    speechEnvelope,
     setState,
     setSttText,
     setLastSpokenText,
     setRobotReply,
     setCurrentChar,
+    setSpeechEnvelope,
     setSpeaking,
     setError,
     setInputLocked,

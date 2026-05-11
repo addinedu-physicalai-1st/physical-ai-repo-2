@@ -9,10 +9,9 @@ import type { RobotId } from '@/config/robots';
 import CommandBar from './CommandBar.vue';
 import SiriBlob from './SiriBlob.vue';
 import DispatchingLoader from './DispatchingLoader.vue';
-import VoiceCaption from './VoiceCaption.vue';
 
 const voice = useVoiceStore();
-const { voiceMode, state, sttText, lastSpokenText, robotReply } = storeToRefs(voice);
+const { voiceMode, state } = storeToRefs(voice);
 
 const { robot } = storeToRefs(useModeStore());
 const PRIMARY: Record<RobotId, string> = {
@@ -51,16 +50,6 @@ watch([voiceMode, state], async ([vm, st]) => {
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'
 );
-const captionText = computed(() => {
-  if (robotReply.value) {
-    return robotReply.value;
-  }
-  if (voiceMode.value === 'voice') {
-    if (state.value === 'dispatching') return lastSpokenText.value;
-    if (state.value === 'listening' || state.value === 'wake_detected') return sttText.value;
-  }
-  return '';
-});
 
 function switchToText(): void {
   voice.setVoiceMode('text');

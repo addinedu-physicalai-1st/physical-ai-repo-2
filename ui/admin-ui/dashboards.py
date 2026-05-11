@@ -32,6 +32,8 @@ from widgets import (
     JointPanel,
     MapView,
     MetricRow,
+    LunchCard,
+    ScheduleCard,
     StatChip,
     StatusBadge,
     TaskQueue,
@@ -109,12 +111,20 @@ class NoriArmDashboard(QWidget):
         self.header = RobotHeader(self.NAME)
         outer.addWidget(self.header)
 
+        main_lay = QHBoxLayout()
+        outer.addLayout(main_lay, 1)
+
         grid = QGridLayout()
         grid.setSpacing(14)
-        outer.addLayout(grid, 1)
+        main_lay.addLayout(grid, 2)
+
+        right_lay = QVBoxLayout()
+        right_lay.setSpacing(14)
+        main_lay.addLayout(right_lay, 1)
 
         # 현재 작업
         self.task_card = Card("지금 하는 일")
+        self.task_card.set_watermark("📦")
         task_title_row = QHBoxLayout()
         task_title_row.setSpacing(10)
         task_title_row.addWidget(Icon("block", size=28, color=accent))
@@ -138,11 +148,13 @@ class NoriArmDashboard(QWidget):
 
         # 그리퍼
         gripper_card = Card("그리퍼")
+        gripper_card.set_watermark("🦾")
         self.gripper = GripperIndicator(accent)
         gripper_card.body.addWidget(self.gripper, 0, Qt.AlignCenter)
 
         # 시스템
         system_card = Card("시스템 상태")
+        system_card.set_watermark("⚙️")
         system_card.body.addWidget(_battery_row(self))
         self.cpu_row = MetricRow("CPU", "23%")
         self.temp_row = MetricRow("관절 온도", "42 °C")
@@ -165,6 +177,7 @@ class NoriArmDashboard(QWidget):
 
         # 작업 큐
         queue_card = Card("오늘의 일정")
+        queue_card.set_watermark("📋")
         self.queue = TaskQueue(accent)
         self.queue.set_tasks([
             ("block",     "블록 정리하기"),
@@ -175,11 +188,19 @@ class NoriArmDashboard(QWidget):
         ])
         queue_card.body.addWidget(self.queue)
 
+        # 학교 전체 일과 (추가)
+        self.school_schedule = ScheduleCard()
+        self.lunch_card = LunchCard()
+
         grid.addWidget(self.task_card,  0, 0, 1, 2)
         grid.addWidget(gripper_card,    0, 2, 1, 1)
         grid.addWidget(joint_card,      1, 0, 1, 2)
         grid.addWidget(system_card,     1, 2, 1, 1)
-        grid.addWidget(queue_card,      2, 0, 1, 3)
+        grid.addWidget(queue_card,      2, 0, 1, 2)
+        
+        right_lay.addWidget(self.school_schedule)
+        right_lay.addWidget(self.lunch_card)
+        
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
@@ -300,22 +321,18 @@ class GogoPingDashboard(QWidget):
         outer.addLayout(header_row)
 
         # ── 카메라 + 맵 가로 1:1 ─────────────────────────
-        # 두 카드 모두 Card 기본 padding (18/16/18/18, spacing 12) 사용 →
-        # 카메라와 맵의 흰 여백이 좌우 대칭으로 깔끔하게 정렬된다.
         self.camera_card = Card("전방 카메라")
         if stream_client is not None:
-            # 실 영상 스트림 (SR-CAM-004) — Pi UDP → Server WS → 이 위젯
             self.camera = CameraStreamView(
                 robot=self.NAME, stream_client=stream_client, stream_id=0,
             )
         else:
-            # stream_client 미주입 시 fallback (mock)
             self.camera = CameraView()
         self.camera_card.body.addWidget(self.camera, 1)
 
         self.map_card = Card("실내 맵 · 위치")
+        self.map_card.set_watermark("🗺️")
         self.map_view = MapView()
-        # 맵 — 카메라와 같은 너비/높이로 자라난다 (Expanding).
         self.map_view.setMinimumHeight(220)
         self.map_card.body.addWidget(self.map_view, 1)
 
@@ -325,7 +342,6 @@ class GogoPingDashboard(QWidget):
         monitor_row.addWidget(self.map_card, 1)
         outer.addLayout(monitor_row, 6)
 
-        # ── Teleop 카드로 교체. admin-ui 는 Control Server 와 HTTP/WS 만 통신.
         from services.teleop_client import TeleopClient
         from widgets.teleop_card import TeleopCard
         self.teleop_client = TeleopClient()
@@ -336,6 +352,14 @@ class GogoPingDashboard(QWidget):
         self.teleop_client.connect_state_ws(self.teleop_card.on_state)
 
         outer.addWidget(self.teleop_card, 5)
+
+        schedule_lunch_row = QHBoxLayout()
+        schedule_lunch_row.setSpacing(14)
+        self.school_schedule = ScheduleCard()
+        self.lunch_card = LunchCard()
+        schedule_lunch_row.addWidget(self.school_schedule, 1)
+        schedule_lunch_row.addWidget(self.lunch_card, 1)
+        outer.addLayout(schedule_lunch_row, 2)
 
         self._tick = 0
         self._timer = QTimer(self)
@@ -382,12 +406,20 @@ class EduPingDashboard(QWidget):
         self.header = RobotHeader(self.NAME)
         outer.addWidget(self.header)
 
+        main_lay = QHBoxLayout()
+        outer.addLayout(main_lay, 1)
+
         grid = QGridLayout()
         grid.setSpacing(14)
-        outer.addLayout(grid, 1)
+        main_lay.addLayout(grid, 2)
+
+        right_lay = QVBoxLayout()
+        right_lay.setSpacing(14)
+        main_lay.addLayout(right_lay, 1)
 
         # 현재 활동
         activity_card = Card("지금 함께하는 활동")
+        activity_card.set_watermark("🎨")
         title_row = QHBoxLayout()
         title_row.setSpacing(10)
         title_row.addWidget(Icon("music", size=28, color=accent))
@@ -410,6 +442,7 @@ class EduPingDashboard(QWidget):
 
         # 위치
         location_card = Card("교실 위치")
+        location_card.set_watermark("🏫")
         location_card.body.addWidget(self._make_pill("pin", "1반 교실 · 창가 자리",
                                                      accent))
         self.teacher_row = MetricRow("담당 선생님", "김지영 선생님")
@@ -425,6 +458,7 @@ class EduPingDashboard(QWidget):
 
         # 상호작용
         interact_card = Card("오늘의 상호작용")
+        interact_card.set_watermark("💬")
         big_row = QHBoxLayout()
         big_row.setSpacing(10)
         big_row.addStretch(1)
@@ -456,6 +490,7 @@ class EduPingDashboard(QWidget):
 
         # 일정
         schedule_card = Card("오늘 남은 활동")
+        schedule_card.set_watermark("🗓️")
         self.schedule = TaskQueue(accent)
         self.schedule.set_tasks([
             ("music",      "음악 시간 보조 (진행 중)"),
@@ -466,12 +501,19 @@ class EduPingDashboard(QWidget):
         ])
         schedule_card.body.addWidget(self.schedule)
 
+        # 학교 전체 일과 (추가)
+        self.school_schedule = ScheduleCard()
+        self.lunch_card = LunchCard()
+
         grid.addWidget(activity_card,  0, 0, 1, 2)
         grid.addWidget(location_card,  0, 2, 1, 1)
         grid.addWidget(joint_card,     1, 0, 1, 1)
         grid.addWidget(interact_card,  1, 1, 1, 1)
         grid.addWidget(system_card,    1, 2, 1, 1)
-        grid.addWidget(schedule_card,  2, 0, 1, 3)
+        grid.addWidget(schedule_card,  2, 0, 1, 2)
+        
+        right_lay.addWidget(self.school_schedule)
+        right_lay.addWidget(self.lunch_card)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
@@ -493,7 +535,7 @@ class EduPingDashboard(QWidget):
         lay.addWidget(Icon(kind, size=18, color=color))
         lbl = QLabel(text)
         lbl.setStyleSheet(
-            f"color: {COLORS['text']}; font-weight: 700; font-size: 13px; "
+            f"color: {COLORS['text']}; font-weight: 700; font-size: 10pt; "
             f"background: transparent;"
         )
         lay.addWidget(lbl)

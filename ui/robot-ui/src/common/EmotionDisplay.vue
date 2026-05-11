@@ -9,7 +9,7 @@ import ShaderFace from '@/common/ShaderFace.vue';
 defineProps<{ emotion: EmotionId }>();
 
 const voice = useVoiceStore();
-const { state, voiceMode } = storeToRefs(voice);
+const { state, voiceMode, robotReply, sttText } = storeToRefs(voice);
 
 const mode = useModeStore();
 const { robot } = storeToRefs(mode);
@@ -48,6 +48,42 @@ const wakePromptText = computed(
   () => `"${robot.value.wakeWord}" 을 부르고 명령해주세요`
 );
 const isThinking = computed(() => state.value === 'dispatching');
+
+/** 마이크 인식 중 사용자 발화를 실시간 자막으로 표시. */
+const liveUserText = computed(() => {
+  if (state.value !== 'listening' && state.value !== 'wake_detected') {
+    return '';
+  }
+  return sttText.value.trim();
+});
+
+/** 큰 자막 버블: 사용자 음성 인식 글자(stt)는 넣지 않고 로봇 말만 보여 준다. */
+const visibleText = computed(() => {
+  const reply = robotReply.value.trim();
+  if (state.value === 'listening' || state.value === 'wake_detected') {
+    if (reply) {
+      return robotReply.value;
+    }
+    return '듣고 있어요…';
+  }
+  if (state.value === 'dispatching') {
+    return '';
+  }
+  if (state.value === 'speaking' || state.value === 'cooldown') {
+    return robotReply.value;
+  }
+  return '';
+});
+
+/** `state` 를 Transition key 로 쓰면 speaking→cooldown→idle 마다 자막이 다시 팝업한다 — 문장 단위로만 전환. */
+const subtitleTransitionKey = computed(() => {
+  const r = robotReply.value.trim();
+  if (r) return r;
+  if (state.value === 'listening' || state.value === 'wake_detected') {
+    return '__listening_hint__';
+  }
+  return visibleText.value || '__empty__';
+});
 </script>
 
 <template>
@@ -97,18 +133,19 @@ const isThinking = computed(() => state.value === 'dispatching');
       </div>
 
       <!-- Premium Subtitle Overlay (Moved Outside for Clarity) -->
-      <div class="subtitle-container" v-if="state !== 'idle' && state !== 'cooldown'">
-        <Transition name="fade" mode="out-in">
-          <div :key="state" class="subtitle-text">
-            <span v-if="state === 'listening'" class="listening-text">
-              {{ voice.sttText || '듣고 있어요...' }}
+      <div class="subtitle-container" v-if="visibleText">
+        <Transition name="subtitle-fade">
+          <div :key="subtitleTransitionKey" class="subtitle-text">
+            <span :class="`${state}-text`">
+              {{ visibleText }}
             </span>
-            <span v-else-if="state === 'dispatching'" class="thinking-text">
-              {{ voice.lastSpokenText }}
-            </span>
-            <span v-else-if="state === 'speaking'" class="speaking-text">
-              {{ voice.robotReply }}
-            </span>
+          </div>
+        </Transition>
+      </div>
+      <div class="user-subtitle-container" v-if="liveUserText">
+        <Transition name="subtitle-fade">
+          <div :key="`user-${liveUserText}`" class="user-subtitle-text">
+            <span class="user-listening-text">{{ liveUserText }}</span>
           </div>
         </Transition>
       </div>
@@ -378,6 +415,13 @@ const isThinking = computed(() => state.value === 'dispatching');
   pointer-events: none;
 }
 
+.user-subtitle-container {
+  width: min(68vw, 520px);
+  margin-top: -18px;
+  z-index: 9;
+  pointer-events: none;
+}
+
 .subtitle-text {
   background: rgba(10, 13, 20, 0.82);
   backdrop-filter: blur(20px);
@@ -394,6 +438,26 @@ const isThinking = computed(() => state.value === 'dispatching');
     0 12px 40px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(0, 0, 0, 0.1);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.user-subtitle-text {
+  background: rgba(10, 13, 20, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px dashed rgba(190, 243, 44, 0.42);
+  border-radius: 18px;
+  padding: 10px 18px;
+  color: #d9f99d;
+  text-align: center;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.user-listening-text {
+  color: #d9f99d;
+  opacity: 0.95;
 }
 
 .listening-text {
@@ -424,6 +488,17 @@ const isThinking = computed(() => state.value === 'dispatching');
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-10px) scale(0.98);
+}
+
+/* 자막만 짧게 — 같은 응답 동안 state 전환으로 연속 팝 느낌 완화 */
+.subtitle-fade-enter-active,
+.subtitle-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.subtitle-fade-enter-from,
+.subtitle-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 @keyframes bob {

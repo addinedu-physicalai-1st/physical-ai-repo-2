@@ -6,11 +6,13 @@
 
 from __future__ import annotations
 
+import json
 import math
+import pathlib
 import random
 from dataclasses import dataclass
 
-from PyQt5.QtCore import QPointF, QRectF, QSize, Qt
+from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PyQt5.QtGui import (
     QBrush,
     QColor,
@@ -28,12 +30,18 @@ from PyQt5.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from theme import COLORS
+
+CUTE_COLORS = [
+    "#FF6B6B", "#FF922B", "#FCC419", "#51CF66", "#339AF0", "#5C7CFA", "#BE4BDB"
+]
 
 
 # --------------------------------------------------------------------------
@@ -346,9 +354,15 @@ def draw_icon(p: QPainter, kind: str, rect: QRectF, color: str,
         path.closeSubpath()
         p.drawPath(path)
 
-    elif kind == "dot":
-        p.setBrush(qcol); p.setPen(Qt.NoPen)
-        p.drawEllipse(PT(0.50, 0.50), s * 0.12, s * 0.12)
+    elif kind == "utensils":
+        # Spoon
+        p.drawEllipse(PT(0.3, 0.35), s * 0.1, s * 0.15)
+        p.drawLine(PT(0.3, 0.50), PT(0.3, 0.85))
+        # Fork
+        p.drawLine(PT(0.7, 0.25), PT(0.7, 0.85))
+        p.drawLine(PT(0.6, 0.25), PT(0.6, 0.50))
+        p.drawLine(PT(0.8, 0.25), PT(0.8, 0.50))
+        p.drawLine(PT(0.6, 0.50), PT(0.8, 0.50))
 
     elif kind == "cpu":
         # 칩 본체 + 네 변의 핀 + 내부 점 4개
@@ -380,6 +394,136 @@ def draw_icon(p: QPainter, kind: str, rect: QRectF, color: str,
         p.drawRoundedRect(sub, sub.width() * 0.12, sub.width() * 0.12)
 
     p.restore()
+
+
+class CuteScheduleItem(QWidget):
+    """일과표의 한 줄을 예쁘게 표시하는 위젯."""
+    def __init__(self, index: int, time: str, text: str, parent=None):
+        super().__init__(parent)
+        color = CUTE_COLORS[index % len(CUTE_COLORS)]
+        soft_bg = soften(color, 0.12)
+
+        # Vertical layout so text wraps inside the box, not just horizontal
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(12, 10, 12, 10)
+        lay.setSpacing(4)
+
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: {soft_bg};
+                border-left: 4px solid {color};
+                border-radius: 8px;
+            }}
+        """)
+        # Allow the item to grow vertically as needed
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        # Top row: index badge + time
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(8)
+
+        # 원형 인덱스
+        self.idx_lbl = QLabel(str(index + 1))
+        self.idx_lbl.setFixedSize(22, 22)
+        self.idx_lbl.setAlignment(Qt.AlignCenter)
+        self.idx_lbl.setStyleSheet(f"""
+            background: {color};
+            color: white;
+            border-radius: 11px;
+            font-weight: 700;
+            font-size: 8pt;
+            border: none;
+        """)
+
+        self.time_lbl = QLabel(time)
+        self.time_lbl.setStyleSheet(
+            f"color: {COLORS['text_soft']}; font-size: 8pt; font-weight: 500; background: transparent;"
+        )
+
+        top_row.addWidget(self.idx_lbl)
+        top_row.addWidget(self.time_lbl)
+        top_row.addStretch(1)
+
+        # Activity text — word wrap so it flows vertically inside the box
+        self.text_lbl = QLabel(text)
+        self.text_lbl.setWordWrap(True)
+        self.text_lbl.setStyleSheet(
+            f"color: {COLORS['text']}; font-size: 10pt; font-weight: 700; background: transparent;"
+        )
+        self.text_lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+        lay.addLayout(top_row)
+        lay.addWidget(self.text_lbl)
+
+
+class FlowLayout(QLayout):
+    """아이템이 가로로 쌓이다가 공간이 부족하면 다음 줄로 넘어가게 하는 레이아웃."""
+    def __init__(self, parent=None, spacing=8):
+        super().__init__(parent)
+        self.setSpacing(spacing)
+        self.items = []
+
+    def addItem(self, item):
+        self.items.append(item)
+
+    def count(self):
+        return len(self.items)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self.items):
+            return self.items[index]
+        return None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self.items):
+            return self.items.pop(index)
+        return None
+
+    def expandingDirections(self):
+        return Qt.Orientations(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self._do_layout(QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._do_layout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QSize()
+        for item in self.items:
+            size = size.expandedTo(item.minimumSize())
+        m = self.contentsMargins()
+        return size + QSize(m.left() + m.right(), m.top() + m.bottom())
+
+    def _do_layout(self, rect, test_only):
+        x, y = rect.x(), rect.y()
+        line_height = 0
+        spacing = self.spacing()
+
+        for item in self.items:
+            next_x = x + item.sizeHint().width() + spacing
+            if next_x - spacing > rect.right() and line_height > 0:
+                x = rect.x()
+                y += line_height + spacing
+                next_x = x + item.sizeHint().width() + spacing
+                line_height = 0
+            
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+            
+            x = next_x
+            line_height = max(line_height, item.sizeHint().height())
+        return y + line_height - rect.y()
+
+
 
 
 class Icon(QWidget):
@@ -420,7 +564,7 @@ class IconText(QWidget):
         self.label = QLabel(text)
         self.label.setStyleSheet(
             f"color: {text_color or COLORS['text']}; "
-            f"font-size: {font_pt}px; "
+            f"font-size: {font_pt}pt; "
             f"font-weight: {'700' if bold else '500'}; "
             f"background: transparent;"
         )
@@ -474,10 +618,99 @@ class Card(QFrame):
         self.body = QVBoxLayout()
         self.body.setSpacing(10)
         self._outer.addLayout(self.body)
+        
+        self.watermark = None
+
+    def set_watermark(self, emoji: str):
+        self.watermark = emoji
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        
+        # Background pattern
+        p.setPen(QPen(QColor(255, 255, 255, 6), 1))
+        spacing = 30
+        for x in range(0, self.width(), spacing):
+            for y in range(0, self.height(), spacing):
+                p.drawPoint(x, y)
+
+        if self.watermark:
+            p.setOpacity(0.10)
+            font = p.font()
+            font.setPointSize(120)
+            p.setFont(font)
+            
+            # Position at bottom right
+            p.save()
+            p.translate(self.width() - 20, self.height() - 20)
+            p.rotate(-15)
+            p.drawText(-140, 0, self.watermark)
+            p.restore()
 
     def add_title_widget(self, w: QWidget) -> None:
         if self._title_row is not None:
             self._title_row.addWidget(w)
+
+
+class LunchCard(Card):
+    """오늘 점심 — Control `Menu` DB(`/api/menu`)가 정본."""
+
+    def __init__(self, parent=None):
+        super().__init__("오늘 점심", soft=True, parent=parent)
+        self.set_watermark("🍱")
+        self.body.setSpacing(10)
+
+        lbl = QLabel("포털·Control DB(`/api/menu`)에서 메뉴를 확인하세요")
+        lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setWordWrap(True)
+        self.body.addWidget(lbl)
+        self.body.addStretch(1)
+
+
+class ScheduleCard(Card):
+    """shared/school_schedule.json 을 읽어서 표시하는 카드.
+    진대는 QScrollArea 로 감싸서 화면 크기에 관계없이 스크롤된다."""
+
+    def __init__(self, parent=None):
+        super().__init__("정규 일과표", soft=True, parent=parent)
+        self.set_watermark("⏰")
+        self.body.setSpacing(0)
+
+        # 데이터 로드
+        path = pathlib.Path(__file__).resolve().parent.parent.parent / "shared" / "school_schedule.json"
+        schedule = {}
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    schedule = json.load(f)
+            except Exception:
+                pass
+
+        if not schedule:
+            self.body.addWidget(QLabel("일과표를 불러올 수 없습니다."))
+            return
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background: transparent; border: none;")
+        
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_lay = QVBoxLayout(scroll_content)
+        scroll_lay.setContentsMargins(0, 0, 0, 0)
+        scroll_lay.setSpacing(10)
+
+        for i, (time, activity) in enumerate(schedule.items()):
+            row = CuteScheduleItem(i, time, activity)
+            scroll_lay.addWidget(row)
+        
+        scroll_lay.addStretch(1)
+        scroll.setWidget(scroll_content)
+        self.body.addWidget(scroll)
 
 
 class StatusBadge(QLabel):
@@ -500,7 +733,7 @@ class StatusBadge(QLabel):
                 color: {color_hex};
                 border-radius: 13px;
                 padding: 3px 14px;
-                font-size: 12px;
+                font-size: 9pt;
                 font-weight: 700;
             }}
             """
@@ -593,10 +826,15 @@ class BatteryBar(QWidget):
         p.setPen(QColor(COLORS["text"]))
         f = QFont(self.font())
         f.setBold(True)
-        f.setPointSize(11)
+        f.setPointSize(10)
         p.setFont(f)
-        label_rect = QRectF(rect.right() + 12, rect.top(), 50, rect.height())
-        p.drawText(label_rect, Qt.AlignVCenter | Qt.AlignLeft, f"{self._pct}%")
+        fm = p.fontMetrics()
+        val_str = f"{self._pct}%"
+        val_w = fm.horizontalAdvance(val_str) + 4
+        # Draw label inside widget so it never overflows on any OS
+        label_rect = QRectF(self.width() - val_w, 0, val_w, self.height())
+        # Shrink bar to leave room for the text
+        p.drawText(label_rect, Qt.AlignVCenter | Qt.AlignRight, val_str)
 
 
 # --------------------------------------------------------------------------
@@ -758,19 +996,27 @@ class JointBar(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
 
         f = QFont(self.font())
-        f.setPointSize(10)
+        f.setPointSize(9)
         p.setFont(f)
+        fm = p.fontMetrics()
+        # Dynamic label widths based on actual font metrics (cross-platform safe)
+        name_w = fm.horizontalAdvance("Shoulder") + 8  # widest expected name
+        val_w  = fm.horizontalAdvance("+180.0°") + 8   # widest expected value
+
         p.setPen(QColor(COLORS["text_muted"]))
-        p.drawText(QRectF(0, 0, 60, self.height()),
+        p.drawText(QRectF(0, 0, name_w, self.height()),
                    Qt.AlignVCenter | Qt.AlignLeft, self.joint.name)
 
         f.setBold(True)
         p.setFont(f)
         p.setPen(QColor(COLORS["text"]))
-        p.drawText(QRectF(self.width() - 60, 0, 60, self.height()),
-                   Qt.AlignVCenter | Qt.AlignRight, f"{self.joint.angle:+6.1f}°")
+        p.drawText(QRectF(self.width() - val_w, 0, val_w, self.height()),
+                   Qt.AlignVCenter | Qt.AlignRight, f"{self.joint.angle:+.1f}\u00b0")
 
-        track = QRectF(64, self.height() / 2 - 4, self.width() - 64 - 64, 8)
+        track_left  = name_w + 4
+        track_right = self.width() - val_w - 4
+        track_w = max(1, track_right - track_left)
+        track = QRectF(track_left, self.height() / 2 - 4, track_w, 8)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(COLORS["track"]))
         p.drawRoundedRect(track, 4, 4)
@@ -833,14 +1079,14 @@ class GripperIndicator(QWidget):
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(base, 4, 4)
 
-        body = QRectF(w / 2 - 18, h - 64, 36, 38)
+        body = QRectF(w / 2 - 15, h - 50, 30, 30)
         p.setBrush(QColor(self.accent))
-        p.drawRoundedRect(body, 8, 8)
+        p.drawRoundedRect(body, 6, 6)
 
-        finger_h = 44
-        spread = 10 + self._open * 38
+        finger_h = 30
+        spread = 8 + self._open * 30
         cx = w / 2
-        top = h - 64 - finger_h
+        top = h - 50 - finger_h
         for sign in (-1, 1):
             x = cx + sign * spread - 3
             p.setBrush(QColor(self.accent))
@@ -854,12 +1100,12 @@ class GripperIndicator(QWidget):
         p.setFont(f)
         p.setPen(QColor(COLORS["text"]))
         label = "열림" if self._open > 0.6 else ("닫힘" if self._open < 0.2 else "잡는 중")
-        p.drawText(QRectF(0, 8, w, 18), Qt.AlignCenter, label)
+        p.drawText(QRectF(0, 5, w, 20), Qt.AlignCenter, label)
         p.setPen(QColor(COLORS["text_muted"]))
         f.setBold(False)
         f.setPointSize(9)
         p.setFont(f)
-        p.drawText(QRectF(0, 26, w, 14), Qt.AlignCenter,
+        p.drawText(QRectF(0, 25, w, 15), Qt.AlignCenter,
                    f"{int(self._open * 100)}% open")
 
 
@@ -890,9 +1136,10 @@ class TaskRow(QWidget):
         lay.addWidget(self.icon, 0, Qt.AlignVCenter)
 
         self.label = QLabel(label)
+        self.label.setWordWrap(True)
         self.label.setStyleSheet(
             f"color: {COLORS['text'] if active else COLORS['text_muted']}; "
-            f"font-size: 13px; "
+            f"font-size: 10pt; "
             f"font-weight: {'700' if active else '500'}; "
             f"background: transparent;"
         )
@@ -992,7 +1239,7 @@ class MapView(QWidget):
             p.drawLine(0, int(gy * sy), w, int(gy * sy))
 
         f = QFont(self.font())
-        f.setPointSize(10)
+        f.setPointSize(9)
         f.setBold(True)
         p.setFont(f)
         for room in self._rooms:
@@ -1006,7 +1253,8 @@ class MapView(QWidget):
             icon_rect = QRectF(r.left() + 6, r.top() + 6, 22, 22)
             draw_icon(p, room.icon_kind, icon_rect, COLORS["text_soft"], line_ratio=0.14)
             p.setPen(QColor(COLORS["text_soft"]))
-            text_rect = QRectF(r.left() + 32, r.top() + 6, r.width() - 38, 22)
+            # More padding for label to avoid cropping
+            text_rect = QRectF(r.left() + 30, r.top() + 6, r.width() - 34, 22)
             p.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, room.label)
 
         # 경로
@@ -1062,7 +1310,7 @@ class MapView(QWidget):
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(label_rect, 9, 9)
         p.setPen(QColor(COLORS["text"]))
-        f.setPointSize(10)
+        f.setPointSize(9)
         p.setFont(f)
         p.drawText(label_rect, Qt.AlignCenter, "GogoPing")
 
@@ -1136,7 +1384,7 @@ class CameraView(QWidget):
         p.drawRoundedRect(bb, 4, 4)
         p.setPen(QColor("#FFFFFF"))
         f = QFont(self.font())
-        f.setPointSize(13)
+        f.setPointSize(11)
         f.setBold(True)
         p.setFont(f)
         p.drawText(bb, Qt.AlignCenter, "오늘의 인사\n안녕하세요")
@@ -1188,7 +1436,7 @@ class CameraView(QWidget):
         p.setBrush(dot_color)
         p.drawEllipse(QPointF(24, 24), 4, 4)
         p.setPen(QColor("#FFFFFF"))
-        f.setPointSize(10)
+        f.setPointSize(9)
         p.setFont(f)
         p.drawText(live.adjusted(34, 0, 0, 0), Qt.AlignVCenter | Qt.AlignLeft, "LIVE")
 
@@ -1252,7 +1500,7 @@ class CompassDial(QWidget):
 
         f = QFont(self.font())
         f.setBold(True)
-        f.setPointSize(10)
+        f.setPointSize(9)
         p.setFont(f)
         p.setPen(QColor(COLORS["text_muted"]))
         for label, ang in (("N", 0), ("E", 90), ("S", 180), ("W", 270)):
@@ -1279,9 +1527,9 @@ class CompassDial(QWidget):
         p.drawEllipse(QPointF(cx, cy), 8, 8)
 
         p.setPen(QColor(COLORS["text"]))
-        f.setPointSize(13)
+        f.setPointSize(11)
         p.setFont(f)
-        p.drawText(QRectF(0, cy + r * 0.45, self.width(), 18),
+        p.drawText(QRectF(0, cy + r * 0.45, self.width(), 20),
                    Qt.AlignCenter, f"{self.speed * 0.6:.2f} m/s")
 
 

@@ -1,6 +1,7 @@
 import { onBeforeUnmount, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
+import { useVoiceStore } from '@/stores/voice';
 import { useTTS } from '@/composables/useTTS';
 
 interface ModeAudioConfig {
@@ -16,7 +17,9 @@ interface ModeAudioConfig {
 export function useModeAnnouncer(audioByMode: Record<string, ModeAudioConfig> = {}): void {
   const { speak, cancel: cancelTTS } = useTTS();
   const mode = useModeStore();
+  const voice = useVoiceStore();
   const { currentMode } = storeToRefs(mode);
+  const { isSpeaking } = storeToRefs(voice);
 
   const elements = new Map<string, HTMLAudioElement>();
   // 발화 도중 다른 모드로 전환되면 stale mp3 재생을 막기 위한 토큰
@@ -40,6 +43,24 @@ export function useModeAnnouncer(audioByMode: Record<string, ModeAudioConfig> = 
       el.currentTime = 0;
     }
   }
+
+  /** 자장가 등 루프 BGM 과 웨이크/서버 TTS 가 동시에 나오면 음성이 뭉개져 들린다 — TTS 중엔 일시 정지. */
+  watch(isSpeaking, (speaking) => {
+    if (speaking) {
+      for (const el of elements.values()) {
+        if (!el.paused) el.pause();
+      }
+      return;
+    }
+    const config = audioByMode[currentMode.value];
+    if (!config?.loop) return;
+    const el = elements.get(currentMode.value);
+    if (el?.paused) {
+      el.play().catch(() => {
+        // autoplay / gesture
+      });
+    }
+  });
 
   watch(
     currentMode,

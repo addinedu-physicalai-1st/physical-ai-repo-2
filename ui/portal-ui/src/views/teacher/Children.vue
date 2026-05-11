@@ -162,7 +162,7 @@ function gotoRegister() {
     </PageHeader>
 
     <div class="layout">
-      <BaseCard class="list" :padded="false">
+      <BaseCard class="list grid-card--attendance" :padded="false">
         <template #header>
           <div class="list-head"><Icon name="users-round" :size="16" /><span>명단</span></div>
         </template>
@@ -330,4 +330,18 @@ function gotoRegister() {
 .muted { color: var(--color-text-muted); padding: var(--space-4); text-align: center; }
 .muted.small { padding: var(--space-2) 0; font-size: var(--font-size-sm); text-align: left; }
 .error.small { color: var(--color-status-danger); font-size: var(--font-size-xs); }
+.grid-card--attendance {
+  position: relative;
+  overflow: hidden;
+}
+.grid-card--attendance::after {
+  content: '🎒';
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  font-size: 140px;
+  opacity: 0.12;
+  transform: rotate(-15deg);
+  pointer-events: none;
+}
 </style>

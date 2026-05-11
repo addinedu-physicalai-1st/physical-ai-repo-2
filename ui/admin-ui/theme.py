@@ -59,7 +59,7 @@ ROBOTS = {
 
 STYLESHEET = f"""
 * {{
-    font-family: "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Helvetica Neue", sans-serif;
+    font-family: "Noto Sans KR", "Nanum Gothic", "Pretendard", "Apple SD Gothic Neo", "Helvetica Neue", sans-serif;
     color: {COLORS['text']};
 }}
 
@@ -73,14 +73,14 @@ QWidget#sidebar {{
 }}
 
 QLabel#brand {{
-    font-size: 20px;
+    font-size: 11pt;
     font-weight: 800;
     color: {COLORS['text']};
     padding: 4px 0 2px 0;
 }}
 
 QLabel#brandSub {{
-    font-size: 11px;
+    font-size: 8pt;
     color: {COLORS['text_muted']};
     letter-spacing: 1px;
 }}
@@ -91,7 +91,7 @@ QPushButton#navBtn {{
     border: none;
     border-radius: 14px;
     background: transparent;
-    font-size: 14px;
+    font-size: 10pt;
     font-weight: 600;
     color: {COLORS['text_soft']};
 }}
@@ -105,7 +105,7 @@ QPushButton#navBtn:checked {{
 }}
 
 QLabel#sidebarFooter {{
-    font-size: 11px;
+    font-size: 8pt;
     color: {COLORS['text_muted']};
 }}
 
@@ -122,35 +122,35 @@ QFrame#cardSoft {{
 }}
 
 QLabel#cardTitle {{
-    font-size: 13px;
+    font-size: 9pt;
     font-weight: 700;
     color: {COLORS['text_soft']};
     letter-spacing: 0.5px;
 }}
 
 QLabel#metricLabel {{
-    font-size: 12px;
+    font-size: 9pt;
     color: {COLORS['text_muted']};
 }}
 
 QLabel#metricValue {{
-    font-size: 14px;
+    font-size: 10pt;
     font-weight: 700;
     color: {COLORS['text']};
 }}
 
 QLabel#hero {{
-    font-size: 24px;
+    font-size: 17pt;
     font-weight: 800;
 }}
 
 QLabel#heroSub {{
-    font-size: 13px;
+    font-size: 9pt;
     color: {COLORS['text_muted']};
 }}
 
 QLabel#sectionTitle {{
-    font-size: 12px;
+    font-size: 8pt;
     font-weight: 700;
     color: {COLORS['text_muted']};
     letter-spacing: 1.2px;
@@ -163,7 +163,7 @@ QProgressBar {{
     height: 14px;
     text-align: center;
     color: {COLORS['text']};
-    font-size: 10px;
+    font-size: 8pt;
     font-weight: 700;
 }}
 QProgressBar::chunk {{
@@ -210,6 +210,7 @@ QToolTip {{
     padding: 4px 6px;
 }}
 """
+
 
 
 def apply_theme(app: QApplication) -> None:
