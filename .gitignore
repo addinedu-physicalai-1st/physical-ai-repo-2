@@ -22,3 +22,7 @@ log
 .vscode
 CLAUDE.local.md
 docs/superpowers/
+
+# 모델 가중치 — ultralytics 가 첫 실행 시 자동 다운로드
+server/ai/models/*.pt
+server/ai/models/*.onnx

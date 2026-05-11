@@ -112,6 +112,13 @@ case "$ACTION" in
       fi
     done
 
+    # YOLO 등 ML 모델 가중치 자동 다운로드 (없으면) — 첫 실행만 ~25MB 받음
+    echo "[run_server] ML 모델 가중치 확인"
+    if ! eval "$(wrap_cmd python scripts/install_models.py)"; then
+      echo "[run_server] ⚠ 모델 다운로드 실패 — 인터넷 확인 후 'python scripts/install_models.py' 수동 실행" >&2
+      exit 1
+    fi
+
     # 포트 충돌 사전 경고 (치명적이진 않음 — 사용자가 알아서 처리)
     # 8000=control, 8001=ai-hub, 8081=pgweb, 8100=streaming(WS)
     for port in 8000 8001 8081 8100; do

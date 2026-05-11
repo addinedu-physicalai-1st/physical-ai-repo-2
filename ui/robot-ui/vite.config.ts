@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => {
             '/api': {
               target: controlTarget,
               changeOrigin: true,
+              // ws: true → /api/...  WebSocket upgrade 도 Control Server 로 forward
+              // (vision 스트리밍 추론 등). HTTP / WS 같은 prefix 공유.
+              ws: true,
             },
           },
     },
