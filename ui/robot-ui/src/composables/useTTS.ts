@@ -174,6 +174,10 @@ export function useTTS(options: UseTTSOptions = {}): {
   let currentObjectUrl: string | null = null;
   let wakeAckAudio: HTMLAudioElement | null = null;
   let ttsFetchAbort: AbortController | null = null;
+  // cancel() 이 in-flight speak/playWakeAck 의 outer Promise 를 해소할 수 있게
+  // 현재 재생 단계의 finish 콜백을 보관. pause() 는 ended/error 를 발생시키지
+  // 않아 await 가 영영 끝나지 않는 문제를 막는다.
+  let pendingDone: (() => void) | null = null;
 
   function clearLipsync(): void {
     lipsyncDetach?.();
@@ -238,10 +242,15 @@ export function useTTS(options: UseTTSOptions = {}): {
       lipsyncDetach = attachSpeechLipsync(audio, text, voiceStore, graph);
 
       await new Promise<void>((resolve) => {
+        let settled = false;
         const done = () => {
+          if (settled) return;
+          settled = true;
+          if (pendingDone === done) pendingDone = null;
           finish();
           resolve();
         };
+        pendingDone = done;
         audio.onplaying = () => {
           isSpeaking.value = true;
           voiceStore.setSpeaking(true);
@@ -294,6 +303,7 @@ export function useTTS(options: UseTTSOptions = {}): {
         const finish = () => {
           if (settled) return;
           settled = true;
+          if (pendingDone === finish) pendingDone = null;
           clearLipsync();
           isSpeaking.value = false;
           voiceStore.setSpeaking(false);
@@ -301,6 +311,7 @@ export function useTTS(options: UseTTSOptions = {}): {
           options.onEnd?.();
           resolve();
         };
+        pendingDone = finish;
 
         audio.onplaying = () => {
           isSpeaking.value = true;
@@ -354,6 +365,12 @@ export function useTTS(options: UseTTSOptions = {}): {
     clearLipsync();
     isSpeaking.value = false;
     voiceStore.setSpeaking(false);
+    // in-flight speak/playWakeAck 의 outer Promise 를 즉시 해소. 이전엔 pause()
+    // 만 부르고 ended/error 가 안 떠 await 가 영구 hang 되며 onEnd 콜백·audio
+    // listener·MediaElementSource 가 누수됐다.
+    const done = pendingDone;
+    pendingDone = null;
+    done?.();
   }
 
   onBeforeUnmount(() => {

@@ -5,6 +5,14 @@ import { useSTT, type STTResult } from './useSTT';
 import { useTTS } from './useTTS';
 import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
+import {
+  buildWakeRegex,
+  isLikelyEchoOfRobotReply,
+  isStopIntent,
+  isWakeOnlyUtterance as isWakeOnlyUtterancePure,
+  normalizeWakeText as normalizeSpeechText,
+  tryWakeFromText as tryWakeFromTextPure,
+} from './wakeMatcher';
 
 const LISTENING_WINDOW_MS = 8000;
 // 명령 처리 후 UI 가 잠시 쉬는 상태 cooldown.
@@ -18,47 +26,11 @@ const WAKE_ACK_BARGE_IN_GRACE_MS = 220;
 // 호출어가 들어왔을 때 추가 발화를 기다리는 settle 시간.
 // 이 시간 내에 새 interim 이 안 오면 그 시점 텍스트로 처리한다.
 const WAKE_SETTLE_MS = 650;
-const STOP_TOKENS = ['정지', '멈춰', '그만', '스톱'];
 
 // STT 가 띄어쓰며 인식하는 케이스도 잡기 위해 wake word 음절 사이 \s* 허용
 //   ex) "고고 핑", "에듀 핑", "노리 암"
 // alias (예: '에듀핀') 도 같은 패턴으로 등록 — 매칭 후 canonical wakeWord 로 정규화한다.
-const WAKE_WORD_PATTERNS = WAKE_WORD_VARIANT_MAP.map(({ variant }) =>
-  variant.split('').join('\\s*'),
-);
-const WAKE_WORD_REGEX = new RegExp(`(${WAKE_WORD_PATTERNS.join('|')})[\\s,.!?]*(.*)$`);
-
-function normalizeWakeText(text: string): string {
-  return text.replace(/\s+/g, '').replace(/[^\p{Script=Hangul}a-zA-Z0-9]/gu, '').toLowerCase();
-}
-
-function wakeHeuristicMatch(compact: string, wakeWord: string): boolean {
-  if (!compact) return false;
-  if (wakeWord === '고고핑') {
-    return /(고고|꼬꼬)(핑|핀|팽|빙)/.test(compact);
-  }
-  if (wakeWord === '에듀핑') {
-    return /(에듀|애듀)(핑|핀|팽|빙)/.test(compact);
-  }
-  if (wakeWord === '노리암') {
-    return /(노리|놀이|노라)(암|아)/.test(compact);
-  }
-  return false;
-}
-
-function canonicalizeWakeWord(matched: string): string | null {
-  const compact = normalizeWakeText(matched);
-  const hit = WAKE_WORD_VARIANT_MAP.find((v) => v.variant === compact);
-  return hit?.canonical ?? null;
-}
-
-function isStopIntent(text: string): boolean {
-  return STOP_TOKENS.some((token) => text.includes(token));
-}
-
-function normalizeSpeechText(text: string): string {
-  return text.replace(/\s+/g, '').replace(/[^\p{Script=Hangul}a-zA-Z0-9]/gu, '').toLowerCase();
-}
+const WAKE_WORD_REGEX = buildWakeRegex(WAKE_WORD_VARIANT_MAP);
 
 /** 쉼표 구분 — LLM 에 원아 명단으로 전달 (이름 질문 환각 완화). 비우면 전송 안 함. */
 function classRosterFromEnv(): string[] | undefined {
@@ -172,33 +144,11 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   function tryWakeFromText(text: string): { wakeWord: string; remainder: string } | null {
-    const match = text.match(WAKE_WORD_REGEX);
-    if (match) {
-      const canonical = canonicalizeWakeWord(match[1] ?? '');
-      if (canonical === robot.wakeWord) {
-        return { wakeWord: canonical, remainder: (match[2] ?? '').trim() };
-      }
-    }
-
-    // Fallback: 공백/기호가 섞인 STT 결과에서도 호출어를 안정적으로 탐지
-    const compact = normalizeWakeText(text);
-    if (!compact) return null;
-    for (const v of WAKE_WORD_VARIANT_MAP) {
-      if (v.canonical !== robot.wakeWord) continue;
-      const vv = normalizeWakeText(v.variant);
-      if (vv && compact.includes(vv)) {
-        return { wakeWord: robot.wakeWord, remainder: '' };
-      }
-    }
-    if (wakeHeuristicMatch(compact, robot.wakeWord)) {
-      return { wakeWord: robot.wakeWord, remainder: '' };
-    }
-    return null;
+    return tryWakeFromTextPure(text, robot.wakeWord, WAKE_WORD_VARIANT_MAP, WAKE_WORD_REGEX);
   }
 
   function isWakeOnlyUtterance(text: string): boolean {
-    const wake = tryWakeFromText(text);
-    return !!wake && wake.remainder.trim().length === 0;
+    return isWakeOnlyUtterancePure(text, robot.wakeWord, WAKE_WORD_VARIANT_MAP, WAKE_WORD_REGEX);
   }
 
   async function fireSettle(): Promise<void> {
@@ -336,14 +286,7 @@ export function useVoiceController(robot: RobotConfig): {
     if (voice.state === 'speaking' && result.isFinal) {
       const heard = normalizeSpeechText(trimmed);
       const spoken = normalizeSpeechText(voice.robotReply ?? '');
-      const likelyEcho =
-        !heard ||
-        heard === spoken ||
-        (heard.length >= 2 && spoken.includes(heard)) ||
-        heard === '네' ||
-        heard === '네요';
-
-      if (!likelyEcho) {
+      if (!isLikelyEchoOfRobotReply(heard, spoken)) {
         skipTtsEndCleanupOnce = true;
         tts.cancel();
         voice.setSpeaking(false);

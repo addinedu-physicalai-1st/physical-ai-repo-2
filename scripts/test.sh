@@ -108,6 +108,19 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[ui/robot-ui] Vitest (wakeMatcher 등 순수 유틸)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+ROBOT_DIR="$REPO_ROOT/ui/robot-ui"
+if [[ -d "$ROBOT_DIR/node_modules" ]]; then
+  (cd "$ROBOT_DIR" && npm run test -- --run) || EXIT=1
+else
+  echo "  스킵: node_modules 없음 — ui/robot-ui 에서 npm install 후 재시도"
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "⏱ scripts/test.sh 전체 벽시계: $((SECONDS - SCRIPT_START))s"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [[ "$EXIT" -eq 0 ]]; then
