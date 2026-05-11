@@ -50,7 +50,7 @@ try:
     import rclpy  # noqa: F401
     from rclpy.node import Node
     from sensor_msgs.msg import JointState
-    from trajectory_msgs.msg import JointTrajectory  # noqa: F401  (real 타깃에서 사용)
+    from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
     _ROS_AVAILABLE = True
 except Exception as _e:  # pragma: no cover - env-specific
@@ -126,6 +126,9 @@ class NoriarmRosBridge:
         self._node: Node | None = None
         self._js_sub = None
         self._js_pub = None
+        self._jt_pub = None  # real arm_controller 용 JointTrajectory publisher
+        self._target: str = "sim"  # start() 에서 자동 감지
+        self._controller_joint_names: list[str] = []
         self._spin_thread: threading.Thread | None = None
         self._stopping = threading.Event()
 
@@ -151,11 +154,30 @@ class NoriarmRosBridge:
         self._js_sub = self._node.create_subscription(
             JointState, topic, self._on_joint_state, 10
         )
+
+        # 실물 OMX 연결 시 JointTrajectory publisher 도 같이 — arm_controller 가 받음.
+        # /dev/omx_follower (또는 manifest 의 real.port) 존재 = real 타깃.
+        real_port = (self._arm.real or {}).get("port") if hasattr(self._arm, "real") else None
+        self._target = "real" if real_port and Path(real_port).exists() else "sim"
+
+        controller_topic = getattr(self._arm, "controller_topic", None)
+        controller_joints = list(getattr(self._arm, "controller_joint_names", []) or [])
+        if self._target == "real" and controller_topic and controller_joints:
+            self._jt_pub = self._node.create_publisher(JointTrajectory, controller_topic, 10)
+            self._controller_joint_names = controller_joints
+            logger.info(
+                f"real 타깃 감지 ({real_port}) — JointTrajectory pub: "
+                f"{controller_topic} joints={controller_joints}"
+            )
+        else:
+            logger.info(f"sim 타깃 (real_port={real_port}, exists={bool(real_port and Path(real_port).exists())})")
+
         logger.info(
-            f"NoriarmRosBridge 시작: game={self._config.name} topic={topic} arm={self._arm.id}"
+            f"NoriarmRosBridge 시작: game={self._config.name} topic={topic} "
+            f"arm={self._arm.id} target={self._target}"
         )
         # 정책도 reset.
-        ctx = self._fw["GameContext"](game_name=self._config.name, target="sim")
+        ctx = self._fw["GameContext"](game_name=self._config.name, target=self._target)
         self._policy.reset(ctx)
 
         self._stopping.clear()
@@ -243,11 +265,20 @@ class NoriarmRosBridge:
         return {"ok": False, "reason": f"unknown action {action!r}"}
 
     async def _play_trajectory(self, traj: Any, name: str) -> None:
+        if self._target == "real" and self._jt_pub is not None:
+            await self._play_real(traj, name)
+        else:
+            await self._play_sim(traj, name)
+        # 정책을 다시 reset 해서 다음 답을 받을 수 있게.
+        ctx = self._fw["GameContext"](game_name=self._config.name, target=self._target)
+        self._policy.reset(ctx)
+
+    async def _play_sim(self, traj: Any, name: str) -> None:
+        """Sim 모드 — JointState 를 frame 마다 publish (URDF three.js 뷰어용)."""
         names = list(self._arm.sim.get("joint_state_names") or [])
         if not names:
             logger.error("joint_state_names 가 매니페스트에 없음 — 재생 취소")
             return
-        # 컬럼별 정규화 모드 → URDF 라디안 변환 함수 리스트. 매니페스트 누락 시 'degrees'.
         modes = list(self._arm.sim.get("joint_norm_modes") or ["degrees"] * len(names))
         if len(modes) != len(names):
             logger.warning(
@@ -256,13 +287,10 @@ class NoriarmRosBridge:
             modes = ["degrees"] * len(names)
         converters = [_norm_to_rad(m) for m in modes]
 
-        # URDF mimic joint (예: gripper_joint_2 = -1 * gripper_joint_1) 는 urdf-loader 가
-        # 자동 처리 — bridge 는 source joint 만 publish 한다.
         sliced = traj.slice_columns(len(names))
         period = 1.0 / sliced.hz
         logger.info(
-            f"trajectory 재생 시작: {name} frames={sliced.num_frames} duration={sliced.duration_s:.2f}s "
-            f"modes={modes}"
+            f"sim 재생: {name} frames={sliced.num_frames} duration={sliced.duration_s:.2f}s"
         )
         for frame in sliced.frames_deg:
             if self._stopping.is_set() or self._node is None:
@@ -274,9 +302,42 @@ class NoriarmRosBridge:
             msg.position = positions
             self._js_pub.publish(msg)
             await asyncio.sleep(period)
-        # 정책을 다시 reset 해서 다음 답을 받을 수 있게.
-        ctx = self._fw["GameContext"](game_name=self._config.name, target="sim")
-        self._policy.reset(ctx)
+
+    async def _play_real(self, traj: Any, name: str) -> None:
+        """Real 모드 — JointTrajectory 한 메시지에 모든 frame 을 점으로 담아 publish.
+
+        arm_controller (joint_trajectory_controller) 가 spline 보간으로 실행. 이렇게 하면
+        프레임 단위 publish latency 없이 controller 가 RT 루프에서 정확한 타이밍 보장.
+        """
+        n = len(self._controller_joint_names)
+        if n == 0:
+            logger.error("controller_joint_names 가 매니페스트에 없음 — 재생 취소")
+            return
+        # controller 는 arm 만 받음 (gripper 별도 controller). joint_norm_modes 의 앞 n 개 사용.
+        modes = list(self._arm.sim.get("joint_norm_modes") or ["degrees"] * n)[:n]
+        converters = [_norm_to_rad(m) for m in modes]
+
+        sliced = traj.slice_columns(n)
+        period = 1.0 / sliced.hz
+
+        msg = JointTrajectory()
+        msg.joint_names = list(self._controller_joint_names)
+        for i, frame in enumerate(sliced.frames_deg):
+            pt = JointTrajectoryPoint()
+            pt.positions = [converters[j](frame[j]) for j in range(n)]
+            t = (i + 1) * period
+            pt.time_from_start.sec = int(t)
+            pt.time_from_start.nanosec = int((t - int(t)) * 1e9)
+            msg.points.append(pt)
+
+        if self._node is None:
+            return
+        self._jt_pub.publish(msg)
+        logger.info(
+            f"real publish: {name} points={len(msg.points)} duration={sliced.duration_s:.2f}s"
+        )
+        # arm_controller 가 알아서 실행 — 우리는 duration 만큼 idle 대기 (다음 답 전).
+        await asyncio.sleep(sliced.duration_s)
         logger.info("trajectory 재생 완료, 정책 reset")
 
     # ---------------------------------------------- 정보 조회
