@@ -11,23 +11,29 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from server.control.config import settings
 
 
+# DATABASE_URL 끝에 `_test` 를 붙인 별도 DB 를 매 세션마다 drop/create 한다.
+# dev DB 와 호스트/계정은 동일하다는 전제 — admin 연결도 같은 인스턴스의
+# postgres DB 로 들어가 DROP/CREATE 를 수행하기 때문.
+_head, _name = settings.database_url.rsplit("/", 1)
+TEST_DATABASE_URL = f"{_head}/{_name}_test"
+TEST_DATABASE_NAME = f"{_name}_test"
+
+
 # ---- 세션 스코프: test DB drop/create + 테이블 생성 1회 ----
 
 @pytest_asyncio.fixture(scope="session")
 async def setup_test_db():
     """test DB 를 매 세션마다 drop/create + metadata.create_all."""
-    admin_url = settings.database_url.rsplit("/", 1)[0] + "/postgres"
+    admin_url = f"{_head}/postgres"
     admin_engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
 
-    test_db_name = settings.test_database_url.rsplit("/", 1)[1]
-
     async with admin_engine.connect() as conn:
-        await conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
-        await conn.execute(text(f"CREATE DATABASE {test_db_name}"))
+        await conn.execute(text(f"DROP DATABASE IF EXISTS {TEST_DATABASE_NAME}"))
+        await conn.execute(text(f"CREATE DATABASE {TEST_DATABASE_NAME}"))
     await admin_engine.dispose()
 
     from server.db.models import Base
-    engine = create_async_engine(settings.test_database_url)
+    engine = create_async_engine(TEST_DATABASE_URL)
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
@@ -42,7 +48,7 @@ async def db_session(setup_test_db) -> AsyncGenerator[AsyncSession, None]:
     """함수마다 새 connection + transaction → 끝에 rollback.
     join_transaction_mode="create_savepoint" 으로 session.commit() 이 외부 트랜잭션을 닫지 않음.
     """
-    engine = create_async_engine(settings.test_database_url)
+    engine = create_async_engine(TEST_DATABASE_URL)
     connection = await engine.connect()
     transaction = await connection.begin()
     SessionLocal = async_sessionmaker(
