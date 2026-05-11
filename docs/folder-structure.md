@@ -112,15 +112,58 @@ pingdergarten/
 │   │   ├── eduping_vision/           # 얼굴·객체·감정 인식 + 자연 촬영
 │   │   └── eduping_msgs/
 │   ├── gogoping_ws/src/              # GogoPing 라즈베리파이 + 노트북에서 빌드 (launch 분리)
-│   │   ├── vic_pinky/                # vendor (git submodule, pinklab-art/vic_pinky v1.0.0)
-│   │   ├── gogoping_bringup/
-│   │   │   └── launch/
-│   │   │       ├── pi.launch.py      # 라즈베리파이용 (vicpinky_bringup wrapping)
-│   │   │       └── laptop.launch.py  # 노트북용 (Nav2 + 응용 + 비전)
-│   │   ├── gogoping_modes/           # 보조·숨바꼭질·자장가
-│   │   ├── gogoping_vision/
-│   │   ├── gogoping_carry/           # 운반 액션
-│   │   └── gogoping_msgs/
+│   │   ├── vic_pinky/                # vendor (git submodule, pinklab-art/vic_pinky) — 모바일 베이스
+│   │   ├── sllidar_ros2/             # vendor (git submodule, Slamtec) — RPLiDAR C1 드라이버
+│   │   ├── open_manipulator/         # vendor (git submodule, ROBOTIS) — Pinky 양팔용 (GogoPing 본체 미사용)
+│   │   ├── py_trees_ros/             # vendor (git submodule, splintered-reality) — Behavior Tree
+│   │   ├── py_trees_ros_interfaces/  # vendor (git submodule) — BT 메시지/서비스 정의
+│   │   ├── py_trees_ros_viewer/      # vendor (git submodule) — BT 실시간 시각화
+│   │   └── gogoping/                 # 우리 app 코드 그룹 (vendor 와 분리)
+│   │       ├── gogoping_bringup/     # launch 통합 진입점 (vic_pinky_namespaced 흡수)
+│   │       │   └── launch/
+│   │       │       ├── pi.launch.py       # 라즈베리파이용 (vicpinky_bringup + sllidar + camera)
+│   │       │       └── laptop.launch.py   # 노트북용 (Nav2 + modes + vision)
+│   │       ├── gogoping_camera/      # USB 카메라 → UDP MJPEG 송출 (SR-CAM-001)
+│   │       ├── gogoping_camera_pan/  # 카메라 pan 서보 (Arduino)
+│   │       ├── gogoping_navigation/  # Nav2 wrapper (params + maps + launch)
+│   │       ├── gogoping_carry/       # 운반 액션 (책·간식 픽업·이동·내려놓기)
+│   │       ├── gogoping_follow/      # 추종 액션 (교사·아이 따라가기 — 사람 감지 + 거리 유지 + 손실 복구)
+│   │       ├── gogoping_msgs/        # ROS .msg/.srv/.action 정의 (ament_cmake)
+│   │       ├── gogoping_modes/       # 로봇 매니저 — FSM + Behavior Tree (보조·숨바꼭질·자장가)
+│   │       │   └── gogoping_modes/
+│   │       │       ├── __init__.py
+│   │       │       ├── main.py       # 프로그램 시작점 — rclpy.init + Node 생성 + FSM 인스턴스화 + spin
+│   │       │       ├── context.py    # 공유 데이터 + ROS 객체 저장소 (Node/publisher/subscriber 핸들 등)
+│   │       │       │
+│   │       │       ├── fsm/                     # 상태머신
+│   │       │       │   ├── __init__.py
+│   │       │       │   ├── robot_fsm.py         # 상태 정의 + 전환 규칙 + 현재 상태 추적
+│   │       │       │   └── states/              # 각 상태 클래스 (on_enter / on_exit / on_tick)
+│   │       │       │       ├── __init__.py
+│   │       │       │       └── <state_name>_state.py    # idle / manual / auto_nav / service /
+│   │       │       │                                    # return_home / error … 설계 진행 시 결정
+│   │       │       │
+│   │       │       ├── bt/                      # Behavior Tree (py_trees)
+│   │       │       │   ├── __init__.py
+│   │       │       │   ├── blackboard.py        # BT 노드 간 공유 데이터 저장소
+│   │       │       │   ├── behaviors/           # 개별 BT 노드 (action / condition)
+│   │       │       │   │   ├── __init__.py
+│   │       │       │   │   └── <category>/             # navigation / service / recovery / common
+│   │       │       │   │       ├── __init__.py
+│   │       │       │   │       └── <behavior_name>.py  # 설계 진행 시 결정
+│   │       │       │   └── trees/               # BT 트리 조립 (behaviors 조합)
+│   │       │       │       ├── __init__.py
+│   │       │       │       └── <tree_name>_tree.py     # nav / service / return … 설계 진행 시
+│   │       │       │
+│   │       │       ├── interfaces/   # 외부 HW / ROS action·service 호출 래퍼
+│   │       │       │   ├── __init__.py
+│   │       │       │   └── <iface_name>.py             # nav_client / servo_controller /
+│   │       │       │                                    # elevator_client / voice_interface …
+│   │       │       │
+│   │       │       └── utils/        # 공통 helper 함수 모음 (로그·수학·pose·시간 등) (optional)
+│   │       │                         # __init__.py 만 두고 시작. Rule of Three 적용 시 채움
+│   │       │                         # 후보: logger / math_utils / pose_utils / time_utils
+│   │       └── gogoping_vision/      # ⏳ 추후 — 얼굴 인식 / 사람 추종
 │   └── noriarm_ws/src/               # NoriArm 노트북에서 빌드
 │       ├── open_manipulator/         # vendor (git submodule, robotis-git/open_manipulator) — OMX
 │       ├── noriarm_bringup/
