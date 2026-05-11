@@ -1,5 +1,6 @@
-"""Wrapper launch — vicpinky_bringup 노드 구성을 'gogoping' namespace 아래로.
+"""GogoPing 라즈베리파이용 bringup launch.
 
+vic_pinky_namespaced/launch/gogoping_bringup.launch.py 를 흡수.
 upstream submodule 코드는 수정하지 않는다 (AC #19).
 sllidar driver 의 frame_id 를 URDF 의 laser_link 와 맞추기 위해
 bringup.launch.xml 을 통째 include 하지 않고 동등한 노드 구성을 여기서 기술한다.

@@ -45,7 +45,7 @@ CONTROL_SERVER_NAME=leekt ros2 launch gogoping_camera camera_stream.launch.py
 
 ### Bringup 통합 (Phase 2 후 자동)
 
-`vic_pinky_namespaced/launch/gogoping_bringup.launch.py` 가 IncludeLaunchDescription 으로 본 launch 를 포함.
+`gogoping_bringup/launch/pi.launch.py` 가 IncludeLaunchDescription 으로 본 launch 를 포함.
 `scripts/device-gogoping-pi.sh` 실행 시 bringup 과 함께 자동 시작/종료.
 
 ## Launch 인자

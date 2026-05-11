@@ -51,8 +51,8 @@ def test_router_has_no_pyqt_import() -> None:
 
 def test_launch_uses_push_ros_namespace() -> None:
     src = (
-        REPO / "device" / "gogoping_ws" / "src" / "vic_pinky_namespaced"
-        / "launch" / "gogoping_bringup.launch.py"
+        REPO / "device" / "gogoping_ws" / "src" / "gogoping" / "gogoping_bringup"
+        / "launch" / "pi.launch.py"
     ).read_text(encoding="utf-8")
     assert "PushRosNamespace('gogoping')" in src or \
            'PushRosNamespace("gogoping")' in src

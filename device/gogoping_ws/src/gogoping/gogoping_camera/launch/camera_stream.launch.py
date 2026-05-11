@@ -13,7 +13,7 @@ Launch 인자 (모두 default 값 있음):
   CONTROL_SERVER_NAME=leekt ros2 launch gogoping_camera camera_stream.launch.py
 
 bringup 통합:
-  vic_pinky_namespaced/launch/gogoping_bringup.launch.py 가 IncludeLaunchDescription 으로 포함.
+  gogoping_bringup/launch/pi.launch.py 가 IncludeLaunchDescription 으로 포함.
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument

@@ -8,9 +8,11 @@
   <license>Proprietary</license>
 
   <exec_depend>launch_ros</exec_depend>
-  <!-- vicpinky_bringup, sllidar_ros2, gogoping_camera 등 실제 의존은 -->
-  <!-- pi.launch.py / laptop.launch.py 구현 시 추가 -->
-
+  <exec_depend>vicpinky_bringup</exec_depend>
+  <exec_depend>vicpinky_description</exec_depend>
+  <exec_depend>sllidar_ros2</exec_depend>
+  <exec_depend>laser_filters</exec_depend>
+  <exec_depend>gogoping_camera</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
