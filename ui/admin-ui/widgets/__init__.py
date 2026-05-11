@@ -350,6 +350,31 @@ def draw_icon(p: QPainter, kind: str, rect: QRectF, color: str,
         p.setBrush(qcol); p.setPen(Qt.NoPen)
         p.drawEllipse(PT(0.50, 0.50), s * 0.12, s * 0.12)
 
+    elif kind == "cpu":
+        # 칩 본체 + 네 변의 핀 + 내부 점 4개
+        body = QRectF(PT(0.25, 0.25).x(), PT(0.25, 0.25).y(),
+                      sub.width() * 0.50, sub.height() * 0.50)
+        p.drawRoundedRect(body, sub.width() * 0.05, sub.width() * 0.05)
+        for t in (0.40, 0.60):
+            p.drawLine(PT(t, 0.10), PT(t, 0.25))
+            p.drawLine(PT(t, 0.75), PT(t, 0.90))
+            p.drawLine(PT(0.10, t), PT(0.25, t))
+            p.drawLine(PT(0.75, t), PT(0.90, t))
+        p.setBrush(qcol); p.setPen(Qt.NoPen)
+        for x, y in [(0.40, 0.40), (0.60, 0.40), (0.40, 0.60), (0.60, 0.60)]:
+            p.drawEllipse(PT(x, y), s * 0.035, s * 0.035)
+
+    elif kind == "radar":
+        # 좌하단 원점에서 뻗어나가는 동심 4분원 + 스캔 선
+        cx, cy = 0.18, 0.82
+        for frac in (0.45, 0.70, 0.95):
+            r = QRectF(PT(cx - frac, cy - frac).x(), PT(cx - frac, cy - frac).y(),
+                       sub.width() * frac * 2, sub.height() * frac * 2)
+            p.drawArc(r, 0, 90 * 16)
+        p.drawLine(PT(cx, cy), PT(cx + 0.78, cy - 0.30))
+        p.setBrush(qcol); p.setPen(Qt.NoPen)
+        p.drawEllipse(PT(cx, cy), s * 0.05, s * 0.05)
+
     else:
         # 알 수 없는 kind — 빈 사각 placeholder
         p.drawRoundedRect(sub, sub.width() * 0.12, sub.width() * 0.12)
@@ -572,6 +597,136 @@ class BatteryBar(QWidget):
         p.setFont(f)
         label_rect = QRectF(rect.right() + 12, rect.top(), 50, rect.height())
         p.drawText(label_rect, Qt.AlignVCenter | Qt.AlignLeft, f"{self._pct}%")
+
+
+# --------------------------------------------------------------------------
+# StatChip — 단일 행 파스텔 stat 카드 (시스템 상태 우측 스택용)
+# --------------------------------------------------------------------------
+
+
+class _ChipBar(QWidget):
+    """StatChip 내부 얇은 % 바. 배터리는 잔량에 따라 색이 바뀜."""
+
+    def __init__(self, accent_hex: str, auto_color: bool = False, parent=None):
+        super().__init__(parent)
+        self._accent = accent_hex
+        self._auto = auto_color
+        self._pct = 0
+        self.setFixedHeight(6)
+
+    def set_pct(self, pct: int) -> None:
+        self._pct = max(0, min(100, int(pct)))
+        self.update()
+
+    def paintEvent(self, _ev):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        rect = QRectF(self.rect())
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(255, 255, 255, 170))
+        p.drawRoundedRect(rect, 3, 3)
+        if self._pct > 0:
+            fill = QRectF(rect)
+            fill.setWidth(fill.width() * self._pct / 100.0)
+            if self._auto:
+                col = (COLORS["danger"] if self._pct < 20
+                       else COLORS["warning"] if self._pct < 40
+                       else COLORS["success"])
+            else:
+                col = self._accent
+            p.setBrush(QColor(col))
+            p.drawRoundedRect(fill, 3, 3)
+
+
+class StatChip(QFrame):
+    """파스텔 톤 단일 행 stat 카드.
+
+    좌측: 흰 원형 아바타 + 아이콘
+    중앙: 라벨(작게) + (옵션) 보조 문구
+    우측: 값(크게)
+    하단(옵션): 얇은 % 바
+
+    accent_hex 가 파스텔 배경/포인트 색을 결정한다.
+    with_bar=True 면 하단에 % 바 추가.
+    battery=True 면 % 바 색이 잔량에 따라 자동 변경.
+    """
+
+    def __init__(self,
+                 icon_kind: str,
+                 label: str,
+                 value: str,
+                 accent_hex: str,
+                 with_bar: bool = False,
+                 battery: bool = False,
+                 parent=None):
+        super().__init__(parent)
+        self._accent = accent_hex
+        bg = soften(accent_hex, 0.20)
+        border = soften(accent_hex, 0.55)
+        self.setObjectName("statChip")
+        self.setStyleSheet(
+            f"""
+            QFrame#statChip {{
+                background: {bg};
+                border: 1px solid {border};
+                border-radius: 16px;
+            }}
+            QFrame#statChip QLabel {{ background: transparent; }}
+            """
+        )
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setMinimumHeight(64 if with_bar else 54)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(12, 8, 14, 8)
+        outer.setSpacing(6)
+
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        row.setContentsMargins(0, 0, 0, 0)
+
+        # 흰 원형 아바타 + 아이콘
+        avatar = QFrame()
+        avatar.setFixedSize(32, 32)
+        avatar.setStyleSheet(
+            "background: rgba(255,255,255,0.78); "
+            "border-radius: 16px; border: none;"
+        )
+        a_lay = QVBoxLayout(avatar)
+        a_lay.setContentsMargins(0, 0, 0, 0)
+        a_lay.addWidget(Icon(icon_kind, size=18, color=accent_hex),
+                        0, Qt.AlignCenter)
+        avatar.setAttribute(Qt.WA_TransparentForMouseEvents)
+        row.addWidget(avatar, 0, Qt.AlignVCenter)
+
+        lbl = QLabel(label)
+        lbl.setStyleSheet(
+            f"color: {COLORS['text_soft']}; font-size: 12px; "
+            f"font-weight: 700; letter-spacing: 0.3px;"
+        )
+        row.addWidget(lbl, 0, Qt.AlignVCenter)
+        row.addStretch(1)
+
+        self._val = QLabel(value)
+        self._val.setStyleSheet(
+            f"color: {COLORS['text']}; font-size: 17px; font-weight: 800;"
+        )
+        self._val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        row.addWidget(self._val, 0, Qt.AlignVCenter)
+
+        outer.addLayout(row)
+
+        self._bar: _ChipBar | None = None
+        if with_bar:
+            self._bar = _ChipBar(accent_hex, auto_color=battery)
+            outer.addWidget(self._bar)
+
+    def set_value(self, value: str) -> None:
+        self._val.setText(value)
+
+    def set_pct(self, pct: int) -> None:
+        if self._bar is not None:
+            self._bar.set_pct(pct)
 
 
 # --------------------------------------------------------------------------

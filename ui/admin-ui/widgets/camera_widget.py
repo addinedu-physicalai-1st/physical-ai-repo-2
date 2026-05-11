@@ -148,11 +148,13 @@ class CameraStreamView(QWidget):
         bg.setColorAt(1, QColor("#11141d"))
         p.fillRect(rect, QBrush(bg))
 
-        # frame 표시
+        # frame 표시 — 위젯을 가득 채우도록 확대 (검정 letterbox 제거).
+        # 영상 종횡비와 위젯 종횡비가 다르면 상/하 또는 좌/우 일부가 잘리지만,
+        # 둥근 모서리 클립 안에서 자연스럽게 처리된다.
         if self._pixmap is not None and self._state in (_STATE_LIVE, _STATE_WAITING, _STATE_STALL):
             scaled = self._pixmap.scaled(
                 rect.size(),
-                Qt.KeepAspectRatio,
+                Qt.KeepAspectRatioByExpanding,
                 Qt.SmoothTransformation,
             )
             offset_x = (rect.width() - scaled.width()) // 2
