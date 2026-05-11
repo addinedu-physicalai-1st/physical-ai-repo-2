@@ -120,8 +120,9 @@ class OXBoardTask(VisionTask):
 
     name = "ox-board"
     classes = ("printed red blue OX sign board",)
-    # 인쇄된 색 채움 보드 (좌 파란 칸 + 흰 O / 우 빨간 칸 + 흰 X) 가 시각적으로 매우
-    # 강한 신호라 conf 0.9 에서도 안정 검출 — 가짜 양성 줄이는 게 우선이라 높게 둔다.
+    # 인쇄된 색 채움 보드가 시각적으로 매우 강한 신호 — false positive 줄이려 0.9 로 높게.
+    # 손이 일부 가려서 일시 미검출 되어도 UI 측 freeze (손이 bbox 안에 있으면 갱신 X) 가
+    # 깜빡임 방지.
     conf = 0.9
 
     def postprocess(self, frame: np.ndarray, results) -> list[dict]:
