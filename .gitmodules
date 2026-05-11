@@ -16,3 +16,15 @@
 	path = device/gogoping_ws/src/py_trees_ros_viewer
 	url = https://github.com/splintered-reality/py_trees_ros_viewer.git
 	branch = devel
+[submodule "device/noriarm_ws/src/DynamixelSDK"]
+	path = device/noriarm_ws/src/DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
+	branch = jazzy
+[submodule "device/noriarm_ws/src/dynamixel_interfaces"]
+	path = device/noriarm_ws/src/dynamixel_interfaces
+	url = https://github.com/ROBOTIS-GIT/dynamixel_interfaces.git
+	branch = jazzy
+[submodule "device/noriarm_ws/src/dynamixel_hardware_interface"]
+	path = device/noriarm_ws/src/dynamixel_hardware_interface
+	url = https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface.git
+	branch = jazzy
