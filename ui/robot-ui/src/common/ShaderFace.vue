@@ -68,7 +68,7 @@ const PRESETS: Record<EmotionId, FacePreset> = {
     R: { cx: 0.42, cy: 0.06, sx: 0.16, sy: 0.20, radius: 0.10, closure: 0, ...NO_SMILE },
     BL: { cx: -0.42, cy: 0.40, halfLen: 0.18, thickness: 0.04, tilt: 0, visible: 1, peak: 0 },
     BR: { cx: 0.42, cy: 0.40, halfLen: 0.18, thickness: 0.04, tilt: 0, visible: 1, peak: 0 },
-    M: { cx: 0, cy: -0.40, halfWidth: 0.16, bow: 0.04, thickness: 0.05, openness: 0 },
+    M: { cx: 0, cy: -0.40, halfWidth: 0.175, bow: 0.04, thickness: 0.052, openness: 0 },
   },
   hello: {
     L: { cx: -0.42, cy: 0.06, sx: 0.16, sy: 0.22, radius: 0.10, closure: 0, ...NO_SMILE },
@@ -96,7 +96,7 @@ const PRESETS: Record<EmotionId, FacePreset> = {
     R: { cx: 0.42, cy: 0.06, sx: 0.14, sy: 0.22, radius: 0.08, closure: 0, ...NO_SMILE },
     BL: { cx: -0.34, cy: 0.44, halfLen: 0.16, thickness: 0.04, tilt: -0.06, visible: 1, peak: 0 },
     BR: { cx: 0.34, cy: 0.44, halfLen: 0.16, thickness: 0.04, tilt: 0.06, visible: 1, peak: 0 },
-    M: { cx: 0, cy: -0.40, halfWidth: 0.10, bow: 0.02, thickness: 0.05, openness: 0 },
+    M: { cx: 0, cy: -0.40, halfWidth: 0.14, bow: 0.03, thickness: 0.052, openness: 0 },
   },
   bored: {
     L: { cx: -0.42, cy: 0.06, sx: 0.16, sy: 0.20, radius: 0.10, closure: 0.55, ...NO_SMILE },
@@ -242,38 +242,47 @@ float mouthCurveSDF(vec2 q, float halfWidth, float bow, float thickness) {
 }
 
 float mouthEllipseSDF(vec2 q, float halfWidth, float thickness, float openness) {
-  // 타원 ○ — openness 가 클수록 세로로 길어진다
-  vec2 ellSize = vec2(halfWidth * 0.55, thickness + halfWidth * 0.55 * openness);
+  // 귀여운 작은 ○ / 오·아 느낌: 가로·세로 비율을 ox 기준으로 맞춰 세로 슬릿·과장 입술 방지
+  float ox = halfWidth * (0.55 + 0.11 * (1.0 - openness));
+  float oyRaw = max(thickness * 0.8, halfWidth * 0.17) + halfWidth * (0.2 * openness + 0.05 * openness * openness);
+  float oy = min(oyRaw, ox * 0.84);
+  vec2 ellSize = vec2(ox, oy);
   float k = length(q / ellSize) - 1.0;
   return k * min(ellSize.x, ellSize.y);
-}  
+}
 
 float mouthSDF(vec2 p, vec2 center, float halfWidth, float bow, float thickness, float openness) {
   vec2 q = p - center;
-  // Clamp x to avoid parabola extending to infinity and causing spooky glow streaks
   float px = clamp(q.x, -halfWidth, halfWidth);
-  
-  // Parabola bend to match the smile/frown curve
-  // when x = 0, shift = -bow. when x = halfWidth, shift = 0
   float parabola = -bow + (bow / max(halfWidth * halfWidth, 0.0001)) * (px * px);
   
   float openY = max(openness, 0.0);
-  
-  // Simulate lower jaw dropping when mouth opens widely
-  float jawDrop = halfWidth * 0.2 * openY; 
-  
-  // Apply bend and drop to local space
+  float openGentle = pow(clamp(openY, 0.0, 1.35), 0.9);
+  float jawDrop = halfWidth * 0.012 * openGentle;
   vec2 qBend = vec2(q.x, q.y - parabola + jawDrop);
   
-  // The open mouth uses a mathematically exact rounded box in bent space
-  float r = thickness * 0.5 + openY * halfWidth * 0.3; 
-  float totalWidth = halfWidth * 0.95;
-  float bx = max(totalWidth - r, 0.0);
-  float totalHeight = thickness * 0.5 + openY * halfWidth * 0.4;
-  float by = max(totalHeight - r, 0.0);
+  float openFactor = clamp(openGentle * 1.02, 0.0, 1.0);
   
-  vec2 d_box = abs(qBend) - vec2(bx, by);
-  return length(max(d_box, 0.0)) + min(max(d_box.x, d_box.y), 0.0) - r;
+  // 닫힘: 가로로 긴 얇은 활. 벌림: 타원·캡슐 믹스로 작은 오/아 (가로만 과하게 벌리지 않음)
+  float halfW = mix(halfWidth * 0.97, halfWidth * (0.58 + 0.17 * openGentle), openFactor);
+  float halfH = mix(
+    thickness * 0.5,
+    thickness * 0.5 + halfWidth * (0.036 + 0.078 * openGentle),
+    openFactor
+  );
+  float rCorn = mix(
+    thickness * 0.5,
+    min(thickness * 0.58, min(halfW, halfH) * 0.42),
+    openFactor
+  );
+  float bx = max(halfW - rCorn, 0.0);
+  float by = max(halfH - rCorn, 0.0);
+  vec2 d_box_vec = abs(qBend) - vec2(bx, by);
+  float dCap = length(max(d_box_vec, 0.0)) + min(max(d_box_vec.x, d_box_vec.y), 0.0) - rCorn;
+  
+  float dEll = mouthEllipseSDF(qBend, halfWidth, thickness, openGentle);
+  float ellMix = smoothstep(0.1, 0.55, openFactor) * 0.8;
+  return mix(dCap, dEll, ellMix);
 }
 
 void main() {
@@ -357,70 +366,83 @@ let camera: THREE.OrthographicCamera | null = null;
 let material: THREE.ShaderMaterial | null = null;
 const voiceStore = useVoiceStore();
 
-// Korean Sub-syllable Phonetic Decomposition for Realistic Lip Sync
+/** 말할 때 입 모양은 **아** / **오** 두 가지만 사용 (가로 슬릿·과한 닫힘 지양). */
+const MOUTH_PRESET_AH = { openness: 0.4, width: 1.02, bow: 0.07 };
+const MOUTH_PRESET_OH = { openness: 0.42, width: 0.76, bow: 0.09 };
+/** 닫힘 대신 아주 작은 오 — 여전히 둥근 실루엣 */
+const MOUTH_PRESET_MICRO_OH = { openness: 0.15, width: 0.8, bow: 0.06 };
+
+function pickAhOrOhForHangul(vowelIdx: number, syllableCode: number): typeof MOUTH_PRESET_AH {
+  // ㅗ·ㅛ·ㅘ·ㅙ·ㅚ·ㅝ 계열(8–12) + 둥근 ㅜ·ㅠ·ㅟ(13–15) → 오. 나머지 모음 → 아.
+  if (vowelIdx >= 8 && vowelIdx <= 12) return MOUTH_PRESET_OH;
+  if (vowelIdx >= 13 && vowelIdx <= 15) return MOUTH_PRESET_OH;
+  if (vowelIdx >= 16 && vowelIdx <= 17) return syllableCode % 2 === 0 ? MOUTH_PRESET_OH : MOUTH_PRESET_AH;
+  return MOUTH_PRESET_AH;
+}
+
+// TTS 말풍선 구간 — 오/아 두 프리셋만으로 립싱크
 function getVisemeForSyllable(char: string, t_ms: number) {
   if (!char) return null;
   const code = char.charCodeAt(0);
-  
-  // Hangul Syllables: AC00–D7A3
+
   if (code < 0xAC00 || code > 0xD7A3) {
     if (char.trim() === '') return null;
-    // Generic bounce for non-Korean chars
-    const bounce = t_ms < 75 ? 0.8 : 0.4;
-    return { openness: bounce, width: 0.9, bowOffset: 0.0 };
+    const ohPulse = (code % 2 === 0 ? MOUTH_PRESET_OH : MOUTH_PRESET_AH);
+    const t = t_ms < 70 ? 0.42 : 0.78;
+    return {
+      openness: ohPulse.openness * t,
+      width: ohPulse.width * (0.92 + 0.06 * t),
+      bowOffset: ohPulse.bow * t,
+    };
   }
-  
+
   const index = code - 0xAC00;
   const onsetIdx = Math.floor(index / 588);
   const vowelIdx = Math.floor((index % 588) / 28);
   const codaIdx = index % 28;
-  
-  // Identify bilabials (ㅁ, ㅂ, ㅃ, ㅍ) which require lips to completely close
-  const isBilabialOnset = [6, 7, 8, 17].includes(onsetIdx); 
+
+  const isBilabialOnset = [6, 7, 8, 17].includes(onsetIdx);
   const isBilabialCoda = [16, 17, 10, 11, 14, 26, 18].includes(codaIdx);
 
-  // Base Vowel Viseme
-  let vOpenness = 0.6;
-  let vWidth = 1.0;
-  let vBow = 0.0;
-  
-  if ([0, 1, 2, 3].includes(vowelIdx)) { vOpenness = 1.1; vWidth = 1.05; vBow = -0.05; } // ㅏ (Ah)
-  else if ([4, 5, 6, 7].includes(vowelIdx)) { vOpenness = 0.8; vWidth = 0.95; vBow = 0.0; } // ㅓ (Eo)
-  else if ([8, 9, 10, 11, 12].includes(vowelIdx)) { vOpenness = 0.65; vWidth = 0.5; vBow = 0.1; } // ㅗ (Oh)
-  else if ([13, 14, 15, 16, 17].includes(vowelIdx)) { vOpenness = 0.4; vWidth = 0.35; vBow = 0.15; } // ㅜ (U)
-  else if ([18, 19].includes(vowelIdx)) { vOpenness = 0.2; vWidth = 1.25; vBow = 0.0; } // ㅡ (Eu)
-  else if (vowelIdx === 20) { vOpenness = 0.3; vWidth = 1.4; vBow = 0.05; } // ㅣ (E/I)
+  const base = pickAhOrOhForHangul(vowelIdx, code);
+  const vOpenness = base.openness;
+  const vWidth = base.width;
+  const vBow = base.bow;
 
-  let openness = vOpenness;
-  let width = vWidth;
-  let bow = vBow;
+  let openness: number;
+  let width: number;
+  let bow: number;
 
-  // Syllable Timing (assuming ~220ms per syllable block from TTS)
-  if (t_ms < 50) {
-    // 1. Onset Phase
+  if (t_ms < 52) {
     if (isBilabialOnset) {
-      openness = 0.0; // Lips closed
-      width = 0.8;
+      const m = MOUTH_PRESET_MICRO_OH;
+      openness = m.openness;
+      width = m.width;
+      bow = m.bow;
     } else {
-      openness = vOpenness * 0.3; // Slight prep opening
-      width = vWidth * 0.9;
+      openness = vOpenness * 0.38;
+      width = vWidth * 0.95;
+      bow = vBow * 0.85;
     }
-  } else if (t_ms < 150) {
-    // 2. Nucleus (Vowel) Phase
+  } else if (t_ms < 175) {
     openness = vOpenness;
     width = vWidth;
+    bow = vBow;
+  } else if (isBilabialCoda) {
+    const m = MOUTH_PRESET_MICRO_OH;
+    openness = m.openness;
+    width = m.width;
+    bow = m.bow;
+  } else if (codaIdx === 0) {
+    openness = vOpenness * 0.58;
+    width = vWidth * 0.96;
+    bow = vBow * 0.9;
   } else {
-    // 3. Coda Phase
-    if (isBilabialCoda) {
-      openness = 0.0; // Lips closed
-      width = 0.8;
-    } else if (codaIdx === 0) {
-      openness = vOpenness * 0.7; // Fade out slightly
-    } else {
-      openness = vOpenness * 0.4; // Tongue moves, jaw partially closes
-    }
+    openness = vOpenness * 0.36;
+    width = vWidth * 0.94;
+    bow = vBow * 0.85;
   }
-  
+
   return { openness, width, bowOffset: bow };
 }
 
@@ -605,19 +627,6 @@ function setupRenderer(canvas: HTMLCanvasElement): void {
       uRBrowTilt: { value: 0 },
       uRBrowVisible: { value: 1 },
       uRBrowPeak: { value: 0 },
-
-      uMouthCenter: { value: new THREE.Vector2() },
-      uMouthHalfWidth: { value: 0 },
-      uMouthBow: { value: 0 },
-      uMouthThickness: { value: 0 },
-      uMouthOpenness: { value: 0 },
-
-      uHandSize: { value: new THREE.Vector2(0.04, 0.20) },
-      uHand1Center: { value: new THREE.Vector2() },
-      uHand2Center: { value: new THREE.Vector2() },
-      uHand1Tilt: { value: 0 },
-      uHand2Tilt: { value: 0 },
-      uHandsActive: { value: 0 },
     },
   });
 
@@ -695,9 +704,9 @@ function tick(): void {
     const mt = (1 - Math.cos(mouthPhase)) * 0.5;
     displayed.M = {
       ...displayed.M,
-      openness: 1,
-      thickness: 0,
-      halfWidth: lerp(0.06, 0.16, mt),
+      openness: 0.52,
+      thickness: Math.max(displayed.M.thickness, 0.048),
+      halfWidth: lerp(0.08, 0.15, mt),
     };
     // 양손 작대기: \ ↔ / 좌우 흔들기 (0.55s 주기, ±45°)
     // 두 손이 거울 대칭으로 움직이도록 부호 반대 — 양손을 안팎으로 펼치는 인사 동작
@@ -741,8 +750,6 @@ function tick(): void {
   let renderM = { ...displayed.M };
   
   // Speech Chatter & Viseme Sync
-  const time = now / 1000;
-  
   if (voiceStore.currentChar !== lastSpokenChar) {
     lastSpokenChar = voiceStore.currentChar;
     charStartTime = now;
@@ -779,14 +786,17 @@ function tick(): void {
       if (viseme) {
         speechWeightTarget = 1.0;
         let openness = viseme.openness;
-        // 웃는 표정일 때는 입을 조금 더 크게 벌려 자연스럽게
         if (props.emotion === 'happy') {
-          openness *= 1.2;
+          openness *= 1.03;
         }
-        visemeTarget.value = { 
-          openness: openness, 
-          width: viseme.width,
-          bowOffset: viseme.bowOffset
+        const env = Number(voiceStore.speechEnvelope) || 0;
+        const envBoost = Math.pow(Math.min(1, env * 1.2), 0.7) * 0.32;
+        const width = viseme.width * (0.93 + env * 0.12);
+        openness = Math.min(openness * 0.72 + envBoost, 0.56);
+        visemeTarget.value = {
+          openness,
+          width,
+          bowOffset: viseme.bowOffset,
         };
       }
     }
@@ -795,22 +805,29 @@ function tick(): void {
     speechWeightTarget = 0.0;
   }
 
-  // Decay/Smooth toward target - Much softer alpha for organic, less spazzy movement
-  const alpha = 0.18; 
+  const alpha = 0.26;
   currentViseme.openness = currentViseme.openness * (1 - alpha) + visemeTarget.value.openness * alpha;
   currentViseme.width = currentViseme.width * (1 - alpha) + visemeTarget.value.width * alpha;
   currentViseme.bowOffset = currentViseme.bowOffset * (1 - alpha) + visemeTarget.value.bowOffset * alpha;
-  
-  // Independent speech weight allows explicit width/bow changes even for closed phonemes
-  const weightAlpha = 0.15;
+
+  const weightAlpha = 0.22;
   speechWeight = speechWeight * (1 - weightAlpha) + speechWeightTarget * weightAlpha;
 
-  // Apply viseme overrides using the independent speech weight
-  renderM.openness = lerp(displayed.M.openness, currentViseme.openness, speechWeight);
-  renderM.halfWidth = lerp(displayed.M.halfWidth, displayed.M.halfWidth * currentViseme.width, speechWeight);
-  renderM.bow = displayed.M.bow + currentViseme.bowOffset * speechWeight;
-
-
+  const baseW = displayed.M.halfWidth;
+  const visemeW = baseW * currentViseme.width;
+  const k = speechWeight;
+  if (props.speaking) {
+    // 표정 프리셋의 웃음 활(⌣) 입술은 말할 때 제외 — 오·아 타원만 보이게 베이스를 평평·소개방으로 고정
+    const neutralBow = 0.012;
+    const neutralOpen = 0.1;
+    renderM.openness = lerp(neutralOpen, currentViseme.openness, k);
+    renderM.halfWidth = lerp(baseW * 0.92, visemeW, k);
+    renderM.bow = lerp(neutralBow, neutralBow + currentViseme.bowOffset, k);
+  } else {
+    renderM.openness = lerp(displayed.M.openness, currentViseme.openness, k);
+    renderM.halfWidth = lerp(baseW, visemeW, k);
+    renderM.bow = displayed.M.bow + currentViseme.bowOffset * k;
+  }
 
   // Eyebrow shake when happy/smiling
   if (props.emotion === 'happy') {

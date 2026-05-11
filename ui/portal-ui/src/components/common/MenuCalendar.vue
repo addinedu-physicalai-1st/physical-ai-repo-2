@@ -140,6 +140,12 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토']
   align-items: start;
 }
 
+@media (max-width: 1023px) {
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .cal-head {
   display: flex;
   align-items: center;
@@ -174,7 +180,11 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 .wk-sun { color: var(--color-status-danger); }
 .wk-sat { color: var(--color-brand-secondary); }
 
-.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
 .cell {
   position: relative;
   min-height: 64px;

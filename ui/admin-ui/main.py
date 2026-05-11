@@ -63,12 +63,12 @@ class NavButton(QPushButton):
         text_box.setSpacing(2)
         n = QLabel(name)
         n.setStyleSheet(
-            "font-weight: 700; font-size: 14px; background: transparent;"
+            "font-weight: 700; font-size: 11pt; background: transparent;"
         )
         n.setAttribute(Qt.WA_TransparentForMouseEvents)
         t = QLabel(tagline)
         t.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 11px; background: transparent;"
+            f"color: {COLORS['text_muted']}; font-size: 9pt; background: transparent;"
         )
         t.setAttribute(Qt.WA_TransparentForMouseEvents)
         text_box.addWidget(n)
@@ -90,9 +90,11 @@ class Sidebar(QWidget):
     def __init__(self, on_select, parent=None):
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(260)
+        self.setMinimumWidth(220)
+        self.setMaximumWidth(320)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 24, 20, 20)
+        lay.setContentsMargins(10, 24, 10, 20)
         lay.setSpacing(14)
 
         # 브랜드
@@ -150,7 +152,7 @@ class Sidebar(QWidget):
         fl.setSpacing(6)
         self.clock = QLabel("--:--:--")
         self.clock.setStyleSheet(
-            f"font-size: 22px; font-weight: 800; color: {COLORS['text']};"
+            f"font-size: 17pt; font-weight: 800; color: {COLORS['text']};"
         )
         self.clock.setAlignment(Qt.AlignCenter)
         date = QLabel(datetime.now().strftime("%Y년 %m월 %d일 %a"))
@@ -182,9 +184,9 @@ class TopBar(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(72)
+        self.setMinimumHeight(80)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(28, 12, 28, 12)
+        lay.setContentsMargins(28, 16, 28, 12)
         lay.setSpacing(12)
 
         self.icon_box = QFrame()
@@ -207,7 +209,7 @@ class TopBar(QWidget):
 
         self.subtitle = QLabel("로봇 친구를 골라주세요")
         self.subtitle.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 12px;"
+            f"color: {COLORS['text_muted']}; font-size: 10pt;"
         )
 
         text_box = QVBoxLayout()
@@ -254,8 +256,8 @@ class AdminWindow(QMainWindow):
         root_lay.setSpacing(0)
 
         self.sidebar = Sidebar(self._select)
-        root_lay.addWidget(self.sidebar)
-
+        root_lay.addWidget(self.sidebar, 1)
+        
         right = QWidget()
         right.setObjectName("mainBg")
         right_lay = QVBoxLayout(right)
@@ -263,7 +265,7 @@ class AdminWindow(QMainWindow):
         right_lay.setSpacing(0)
         self.topbar = TopBar()
         right_lay.addWidget(self.topbar)
-
+        
         self.stack = QStackedWidget()
         self.pages: dict[str, QWidget] = {
             "noriarm":  NoriArmDashboard(),
@@ -274,7 +276,7 @@ class AdminWindow(QMainWindow):
             self.stack.addWidget(w)
             w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         right_lay.addWidget(self.stack, 1)
-        root_lay.addWidget(right, 1)
+        root_lay.addWidget(right, 4)
 
         self._select("noriarm")
 

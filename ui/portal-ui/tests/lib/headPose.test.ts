@@ -14,7 +14,8 @@ function frontalLandmarks() {
 
 function turnedLeftLandmarks() {
   const arr = frontalLandmarks()
-  arr[1] = { x: 0.4, y: 0.5, z: 0 }       // 코가 왼쪽
+  // estimateHeadPose: 코가 얼굴 수평 중심보다 오른쪽(x↑)이면 yaw 음수(사용자 왼쪽 본 효과)
+  arr[1] = { x: 0.62, y: 0.5, z: 0 }
   return arr
 }
 

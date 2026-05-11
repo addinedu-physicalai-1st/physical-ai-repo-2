@@ -43,7 +43,7 @@ PARENT_SAMPLES: Sequence[tuple[str, str, str]] = [
     ("parent3@test.com", "이알평", "이정우"),
     ("parent3@test.com", "이알평", "이지수"),
     ("parent3@test.com", "이알평", "이강택"),
-    ("parent4@test.com", "이알평", "이강택"),
+    ("parent4@test.com", "노수", "노영주"),
 ]
 
 

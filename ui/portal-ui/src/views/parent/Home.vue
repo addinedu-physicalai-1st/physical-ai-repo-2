@@ -15,20 +15,23 @@ const att = ref<AttendanceRecord | null>(null)
 const menu = ref<MenuEntry | null>(null)
 const photos = ref<Photo[]>([])
 const report = ref<Report | null>(null)
+const schedule = ref<Record<string, string>>({})
 
 watchEffect(async () => {
   if (child.selectedChildId === null) return
   const id = child.selectedChildId
-  const [a, m, p, r] = await Promise.all([
+  const [a, m, p, r, s] = await Promise.all([
     api.get<AttendanceRecord[]>(`/api/children/${id}/attendance?date=${today}`).then((arr) => arr[0] ?? null),
     api.get<MenuEntry>(`/api/menu?date=${today}`).catch(() => null),
     api.get<Photo[]>(`/api/children/${id}/photos?date=${today}`).catch(() => []),
     api.get<Report[]>(`/api/reports?child_id=${id}&date=${today}`).then((arr) => arr[0] ?? null),
+    api.get<Record<string, string>>('/api/schedule').catch(() => ({})),
   ])
   att.value = a
   menu.value = m
   photos.value = p
   report.value = r
+  schedule.value = s
 })
 
 const checkInLabel = computed(() => {
@@ -44,6 +47,18 @@ const checkOutHint = computed(() =>
 )
 
 const dateLabel = today.replace(/-/g, '.')
+
+const nextActivity = computed(() => {
+  const now = new Date()
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  
+  const entries = Object.entries(schedule.value)
+  for (const [timeRange, activity] of entries) {
+    const [start] = timeRange.split('-')
+    if (start > timeStr) return `${start} ${activity}`
+  }
+  return '오늘 일과 종료'
+})
 </script>
 
 <template>
@@ -78,6 +93,12 @@ const dateLabel = today.replace(/-/g, '.')
         :primary="report ? '오늘 보고서 보기' : '하원 후 생성됩니다'"
         secondary="이전 보고서"
         variant="warm"
+      />
+      <HomeCard
+        to="/parent/schedule" icon="calendar" title="일과표"
+        primary="정규 일과표 보기"
+        :secondary="nextActivity"
+        variant="info"
       />
     </div>
   </section>

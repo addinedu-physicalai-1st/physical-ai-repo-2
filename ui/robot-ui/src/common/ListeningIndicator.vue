@@ -8,6 +8,7 @@ const labelMap: Record<VoiceState, string> = {
   wake_detected: '대답 중',
   listening: '듣는 중',
   dispatching: '해석 중',
+  speaking: '말하는 중',
   cooldown: '...',
 };
 
@@ -16,6 +17,7 @@ const colorMap: Record<VoiceState, string> = {
   wake_detected: '#f59e0b',
   listening: '#16a34a',
   dispatching: '#3b82f6',
+  speaking: '#d97706',
   cooldown: '#9ca3af',
 };
 </script>
