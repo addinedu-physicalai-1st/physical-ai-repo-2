@@ -250,9 +250,13 @@ const progressLabel = computed(
           </div>
         </div>
 
-        <!-- 좌하단 floating: 카메라 라이브 뷰 + 카메라 셀렉트 -->
+        <!-- 좌하단 floating: 카메라 라이브 뷰 + 카메라 셀렉트.
+             질문 phase 동안만 armed=true → 손가락 1.5초 락인 → selectAnswer 자동 호출. -->
         <div class="vision-float">
-          <OXVisionPreview />
+          <OXVisionPreview
+            :armed="phase === 'question' && !submitting"
+            @select="(r: 'O' | 'X') => void selectAnswer(r)"
+          />
           <p class="vision-caption">
             <span class="status-dot status-vision" />
             보드 인식 카메라
