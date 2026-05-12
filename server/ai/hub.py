@@ -3,6 +3,7 @@
 Vite proxy 가 `/api/voice/intent` 를 이쪽으로 forward.
 나중에 Control Service 가 들어오면 Control 이 중간에서 받아 forward.
 """
+import asyncio
 import logging
 import re
 from contextlib import asynccontextmanager
@@ -15,7 +16,7 @@ from fastapi.responses import Response
 
 from pydantic import BaseModel, Field, field_validator
 
-from server.ai.vision import default_registry
+from server.ai.vision import OXBoardTask, default_registry
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,11 @@ from server.ai.robots import STOP_TOKENS, is_known_robot, modes_for, robot_displ
 
 @asynccontextmanager
 async def _hub_lifespan(_: FastAPI):
+    # Vision task 등록 — lifespan 을 지정하면 @app.on_event("startup") 핸들러는
+    # 무시되므로 (FastAPI 0.93+) 여기서 직접 등록.
+    if not default_registry.names():
+        default_registry.register(OXBoardTask())
+        logger.info(f"AI Hub vision tasks: {default_registry.names()}")
     if ai_settings.ollama_warmup_on_start:
         from server.ai.llm import warmup_ollama_models
 
@@ -49,14 +55,6 @@ app = FastAPI(
     version="0.1.0",
     lifespan=_hub_lifespan,
 )
-
-
-@app.on_event("startup")
-async def _register_vision_tasks() -> None:
-    """등록된 vision task 들. 새 task 추가 시 여기에 한 줄."""
-    if not default_registry.names():
-        default_registry.register(OXBoardTask())
-        logger.info(f"AI Hub vision tasks: {default_registry.names()}")
 
 
 class IntentRequest(BaseModel):

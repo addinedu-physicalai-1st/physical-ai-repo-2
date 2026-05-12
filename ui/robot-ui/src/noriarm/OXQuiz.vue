@@ -5,6 +5,10 @@ import { useModeStore } from '@/stores/mode';
 import oxQuizData from '../../../../shared/ox_quiz.json';
 import UrdfViewer from '@/noriarm/UrdfViewer.vue';
 import OXVisionPreview from '@/noriarm/OXVisionPreview.vue';
+import IntegratedCameraPreview from '@/noriarm/IntegratedCameraPreview.vue';
+import { useTTS } from '@/composables/useTTS';
+
+const tts = useTTS();
 
 interface OXQuestion {
   id: string;
@@ -44,6 +48,16 @@ const userClicked = ref<'O' | 'X' | null>(null);
 const realArmPresent = ref<boolean | null>(null);
 const showSimViewer = computed(() => realArmPresent.value !== true);
 
+// USB 외장 카메라 감지 여부 (OXVisionPreview emit). 없으면 카메라 패널 자체 숨김 —
+// 노트북 내장 카메라로는 OX 보드 인식을 시도하지 않는다.
+//   null  — 아직 감지 전 (패널 숨김 상태로 시작 — flicker 방지)
+//   true  — USB 카메라 발견 → 패널 노출
+//   false — USB 없음 → 패널 계속 숨김
+const usbCameraAvailable = ref<boolean | null>(null);
+
+// 내장 카메라 감지 (자연 촬영용, 우상단). 추론 안 함.
+const integratedCameraAvailable = ref<boolean | null>(null);
+
 // reveal/playback 단계 동안 중복 클릭 방지.
 const submitting = ref(false);
 
@@ -52,6 +66,26 @@ const isCorrect = computed(
 );
 
 let phaseTimer: number | null = null;
+
+// 두구두구 효과음 — thinking phase ("노리암이 답을 가리키고 있어요…") 시작 시 재생.
+// 모듈 로드 시점에 Audio 생성 + preload='auto' 로 mp3 를 미리 받아둠 — 클릭 직후
+// 첫 재생에서 fetch latency 가 안 끼게.
+const revealSfx = new Audio('/sounds/dugudugu.mp3');
+revealSfx.preload = 'auto';
+function playRevealSfx(): void {
+  try {
+    revealSfx.currentTime = 0;
+    void revealSfx.play().catch(() => {
+      /* 자동재생 정책 차단 등 — 조용히 무시 */
+    });
+  } catch {
+    /* Audio 재생 실패 무시 */
+  }
+}
+function stopRevealSfx(): void {
+  revealSfx.pause();
+  revealSfx.currentTime = 0;
+}
 
 function clearTimers(): void {
   if (phaseTimer != null) {
@@ -127,6 +161,9 @@ function startQuestion(): void {
   submitting.value = false;
   userClicked.value = null;
   phase.value = 'question';
+  // 문제 본문 TTS — 진입 직후 발화. 사용자가 답을 누르면 selectAnswer 에서 cancel.
+  const q = questions.value[currentIndex.value];
+  if (q) void tts.speak(q.question);
 }
 
 async function selectAnswer(clicked: 'O' | 'X'): Promise<void> {
@@ -139,8 +176,12 @@ async function selectAnswer(clicked: 'O' | 'X'): Promise<void> {
   if (clicked === q.answer) {
     score.value += 1;
   }
+  // 답 선택했으니 문제 낭독 중이면 끊는다.
+  tts.cancel();
 
   phase.value = 'thinking';
+  // 두구두구 — 사용자가 O/X 선택한 즉시 재생. 로봇이 답을 가리키는 동안 긴장감 유지.
+  playRevealSfx();
   const result = await dispatchTrajectory(q.answer);
   // 로봇이 답을 가리킨 후 원위치로 돌아오는 마지막 ~5 초 동안에는 이미 답이 정해진 상태이므로
   // trajectory 종료 5 초 전에 reveal 로 전환한다 — 발표가 늦다는 체감 제거.
@@ -165,6 +206,8 @@ async function selectAnswer(clicked: 'O' | 'X'): Promise<void> {
 
 function reset(): void {
   clearTimers();
+  stopRevealSfx();
+  tts.cancel();
   submitting.value = false;
   phase.value = 'intro';
   currentIndex.value = 0;
@@ -250,12 +293,25 @@ const progressLabel = computed(
           </div>
         </div>
 
+        <!-- 우상단 floating: 노트북 내장 카메라 라이브 (추론 X, 자연 촬영용 — 후속 확장).
+             내장 카메라가 없을 때는 패널 숨김. -->
+        <div v-show="integratedCameraAvailable === true" class="capture-float">
+          <IntegratedCameraPreview
+            @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
+          />
+          <p class="capture-caption">자연 촬영</p>
+        </div>
+
         <!-- 좌하단 floating: 카메라 라이브 뷰 + 카메라 셀렉트.
-             질문 phase 동안만 armed=true → 손가락 1.5초 락인 → selectAnswer 자동 호출. -->
-        <div class="vision-float">
+             질문 phase 동안만 armed=true → 손가락 1.5초 락인 → selectAnswer 자동 호출.
+             USB 외장 카메라가 있을 때만 노출 (노트북 내장 카메라는 인식 안 함).
+             OXVisionPreview 는 USB 감지를 위해 항상 mount 해야 하므로 wrapper 만
+             v-show 로 토글 — usbCameraAvailable 가 true 일 때만 표시. -->
+        <div v-show="usbCameraAvailable === true" class="vision-float">
           <OXVisionPreview
             :armed="phase === 'question' && !submitting"
             @select="(r: 'O' | 'X') => void selectAnswer(r)"
+            @usb-available="(v: boolean) => (usbCameraAvailable = v)"
           />
           <p class="vision-caption">
             <span class="status-dot status-vision" />
@@ -375,6 +431,25 @@ const progressLabel = computed(
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+.capture-float {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.capture-caption {
+  margin: 0;
+  color: #5b7a8c;
+  font-size: 12px;
+  font-weight: 600;
 }
 .vision-caption {
   margin: 0;

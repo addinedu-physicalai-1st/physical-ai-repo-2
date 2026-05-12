@@ -28,6 +28,12 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [region: 'O' | 'X'];
+  /**
+   * USB 카메라 감지 결과 — 부모가 카메라 패널 자체를 숨길지 결정.
+   * null = 감지 전, true = USB 있음 (스트림 시작), false = USB 없음 (idle, 노트북
+   * 내장 카메라로는 인식 안 함).
+   */
+  'usb-available': [available: boolean];
 }>();
 
 const LOCK_DURATION_MS = 1500;
@@ -95,6 +101,11 @@ const lockProgress = ref<number>(0);
 
 const hasCameras = computed(() => cameras.value.length > 0);
 
+function isUsbCamera(c: MediaDeviceInfo): boolean {
+  // label 이 비어있으면 (권한 미허용) USB 인지 알 수 없음 — 보수적으로 false.
+  return /usb|webcam/i.test(c.label);
+}
+
 async function listCameras(): Promise<void> {
   error.value = null;
   try {
@@ -108,15 +119,22 @@ async function listCameras(): Promise<void> {
       }
     }
     const devs = await navigator.mediaDevices.enumerateDevices();
-    cameras.value = devs.filter((d) => d.kind === 'videoinput');
-    if (!selectedDeviceId.value && cameras.value.length) {
-      // USB 추천: label 에 'usb' 포함 우선, 없으면 첫번째
-      const usb = cameras.value.find((c) => /usb/i.test(c.label));
-      selectedDeviceId.value = (usb ?? cameras.value[0]).deviceId;
+    const all = devs.filter((d) => d.kind === 'videoinput');
+    // 노트북 내장 카메라는 OX 보드 인식 정확도가 낮고 사용자가 보드를 들이대기도 어려움.
+    // USB 외장 카메라만 노출 — 없으면 패널 자체를 숨김 (부모가 처리).
+    cameras.value = all.filter(isUsbCamera);
+    if (cameras.value.length === 0) {
+      emit('usb-available', false);
+      return;
+    }
+    emit('usb-available', true);
+    if (!selectedDeviceId.value) {
+      selectedDeviceId.value = cameras.value[0].deviceId;
       await startStream();
     }
   } catch (e) {
     error.value = `카메라 목록 실패: ${e instanceof Error ? e.message : String(e)}`;
+    emit('usb-available', false);
   }
 }
 
