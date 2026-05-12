@@ -63,7 +63,7 @@ function handleStart(): void {
   background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
 }
 .app.bg-gogoping {
-  background: linear-gradient(135deg, #e6ff00 0%, #ccff00 100%);
+  background: linear-gradient(135deg, #eef8b8 0%, #d4ec90 100%);
 }
 .app.bg-noriarm {
   background: linear-gradient(135deg, #e8f5fb 0%, #c5e4f3 100%);

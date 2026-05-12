@@ -13,7 +13,7 @@ export interface RobotColorTokens {
 
 export const ROBOT_COLORS: Record<RobotId, RobotColorTokens> = {
   eduping: { face: '#db2777', chrome: '#db2777' },
-  gogoping: { face: '#bef32c', chrome: '#000000' },
+  gogoping: { face: '#b8e85e', chrome: '#000000' },
   noriarm: { face: '#3a8fc2', chrome: '#3a8fc2' },
 };
 
