@@ -17,7 +17,9 @@ var SLIDES = [
   '10-flow-assist.html',
   '11-flow-telemedicine.html',
   '12-flow-departure.html',
-  '13-questions.html',
+  '13-questions-imitation.html',
+  '14-questions-openarm.html',
+  '15-questions-driving.html',
 ];
 
 var SLIDE_TITLES = [
@@ -33,7 +35,9 @@ var SLIDE_TITLES = [
   '보조 — 교사 추종 · 운반',
   '원격 진단 — 의사 원격 진단',
   '하원 — 일일 보고서',
-  '질문 — 멘토님께',
+  '질문 1 — 모방학습',
+  '질문 2 — OpenArm',
+  '질문 3 — 자율주행',
 ];
 
 async function loadSlides() {
