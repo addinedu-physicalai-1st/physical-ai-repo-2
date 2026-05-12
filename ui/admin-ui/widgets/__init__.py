@@ -6,9 +6,7 @@
 
 from __future__ import annotations
 
-import json
 import math
-import pathlib
 import random
 from dataclasses import dataclass
 
@@ -396,67 +394,6 @@ def draw_icon(p: QPainter, kind: str, rect: QRectF, color: str,
     p.restore()
 
 
-class CuteScheduleItem(QWidget):
-    """일과표의 한 줄을 예쁘게 표시하는 위젯."""
-    def __init__(self, index: int, time: str, text: str, parent=None):
-        super().__init__(parent)
-        color = CUTE_COLORS[index % len(CUTE_COLORS)]
-        soft_bg = soften(color, 0.12)
-
-        # Vertical layout so text wraps inside the box, not just horizontal
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(12, 10, 12, 10)
-        lay.setSpacing(4)
-
-        self.setStyleSheet(f"""
-            QWidget {{
-                background: {soft_bg};
-                border-left: 4px solid {color};
-                border-radius: 8px;
-            }}
-        """)
-        # Allow the item to grow vertically as needed
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-        # Top row: index badge + time
-        top_row = QHBoxLayout()
-        top_row.setContentsMargins(0, 0, 0, 0)
-        top_row.setSpacing(8)
-
-        # 원형 인덱스
-        self.idx_lbl = QLabel(str(index + 1))
-        self.idx_lbl.setFixedSize(22, 22)
-        self.idx_lbl.setAlignment(Qt.AlignCenter)
-        self.idx_lbl.setStyleSheet(f"""
-            background: {color};
-            color: white;
-            border-radius: 11px;
-            font-weight: 700;
-            font-size: 8pt;
-            border: none;
-        """)
-
-        self.time_lbl = QLabel(time)
-        self.time_lbl.setStyleSheet(
-            f"color: {COLORS['text_soft']}; font-size: 8pt; font-weight: 500; background: transparent;"
-        )
-
-        top_row.addWidget(self.idx_lbl)
-        top_row.addWidget(self.time_lbl)
-        top_row.addStretch(1)
-
-        # Activity text — word wrap so it flows vertically inside the box
-        self.text_lbl = QLabel(text)
-        self.text_lbl.setWordWrap(True)
-        self.text_lbl.setStyleSheet(
-            f"color: {COLORS['text']}; font-size: 10pt; font-weight: 700; background: transparent;"
-        )
-        self.text_lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-        lay.addLayout(top_row)
-        lay.addWidget(self.text_lbl)
-
-
 class FlowLayout(QLayout):
     """아이템이 가로로 쌓이다가 공간이 부족하면 다음 줄로 넘어가게 하는 레이아웃."""
     def __init__(self, parent=None, spacing=8):
@@ -653,64 +590,6 @@ class Card(QFrame):
     def add_title_widget(self, w: QWidget) -> None:
         if self._title_row is not None:
             self._title_row.addWidget(w)
-
-
-class LunchCard(Card):
-    """오늘 점심 — Control `Menu` DB(`/api/menu`)가 정본."""
-
-    def __init__(self, parent=None):
-        super().__init__("오늘 점심", soft=True, parent=parent)
-        self.set_watermark("🍱")
-        self.body.setSpacing(10)
-
-        lbl = QLabel("포털·Control DB(`/api/menu`)에서 메뉴를 확인하세요")
-        lbl.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
-        lbl.setAlignment(Qt.AlignCenter)
-        lbl.setWordWrap(True)
-        self.body.addWidget(lbl)
-        self.body.addStretch(1)
-
-
-class ScheduleCard(Card):
-    """shared/school_schedule.json 을 읽어서 표시하는 카드.
-    진대는 QScrollArea 로 감싸서 화면 크기에 관계없이 스크롤된다."""
-
-    def __init__(self, parent=None):
-        super().__init__("정규 일과표", soft=True, parent=parent)
-        self.set_watermark("⏰")
-        self.body.setSpacing(0)
-
-        # 데이터 로드
-        path = pathlib.Path(__file__).resolve().parent.parent.parent / "shared" / "school_schedule.json"
-        schedule = {}
-        if path.exists():
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    schedule = json.load(f)
-            except Exception:
-                pass
-
-        if not schedule:
-            self.body.addWidget(QLabel("일과표를 불러올 수 없습니다."))
-            return
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("background: transparent; border: none;")
-        
-        scroll_content = QWidget()
-        scroll_content.setStyleSheet("background: transparent;")
-        scroll_lay = QVBoxLayout(scroll_content)
-        scroll_lay.setContentsMargins(0, 0, 0, 0)
-        scroll_lay.setSpacing(10)
-
-        for i, (time, activity) in enumerate(schedule.items()):
-            row = CuteScheduleItem(i, time, activity)
-            scroll_lay.addWidget(row)
-        
-        scroll_lay.addStretch(1)
-        scroll.setWidget(scroll_content)
-        self.body.addWidget(scroll)
 
 
 class StatusBadge(QLabel):

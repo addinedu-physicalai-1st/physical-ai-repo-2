@@ -32,8 +32,6 @@ from widgets import (
     JointPanel,
     MapView,
     MetricRow,
-    LunchCard,
-    ScheduleCard,
     StatChip,
     StatusBadge,
     TaskQueue,
@@ -116,11 +114,7 @@ class NoriArmDashboard(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(14)
-        main_lay.addLayout(grid, 2)
-
-        right_lay = QVBoxLayout()
-        right_lay.setSpacing(14)
-        main_lay.addLayout(right_lay, 1)
+        main_lay.addLayout(grid, 1)
 
         # 현재 작업
         self.task_card = Card("지금 하는 일")
@@ -188,19 +182,12 @@ class NoriArmDashboard(QWidget):
         ])
         queue_card.body.addWidget(self.queue)
 
-        # 학교 전체 일과 (추가)
-        self.school_schedule = ScheduleCard()
-        self.lunch_card = LunchCard()
-
         grid.addWidget(self.task_card,  0, 0, 1, 2)
         grid.addWidget(gripper_card,    0, 2, 1, 1)
         grid.addWidget(joint_card,      1, 0, 1, 2)
         grid.addWidget(system_card,     1, 2, 1, 1)
         grid.addWidget(queue_card,      2, 0, 1, 2)
-        
-        right_lay.addWidget(self.school_schedule)
-        right_lay.addWidget(self.lunch_card)
-        
+
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
@@ -353,14 +340,6 @@ class GogoPingDashboard(QWidget):
 
         outer.addWidget(self.teleop_card, 5)
 
-        schedule_lunch_row = QHBoxLayout()
-        schedule_lunch_row.setSpacing(14)
-        self.school_schedule = ScheduleCard()
-        self.lunch_card = LunchCard()
-        schedule_lunch_row.addWidget(self.school_schedule, 1)
-        schedule_lunch_row.addWidget(self.lunch_card, 1)
-        outer.addLayout(schedule_lunch_row, 2)
-
         self._tick = 0
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._on_tick)
@@ -411,11 +390,7 @@ class EduPingDashboard(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(14)
-        main_lay.addLayout(grid, 2)
-
-        right_lay = QVBoxLayout()
-        right_lay.setSpacing(14)
-        main_lay.addLayout(right_lay, 1)
+        main_lay.addLayout(grid, 1)
 
         # 현재 활동
         activity_card = Card("지금 함께하는 활동")
@@ -501,19 +476,13 @@ class EduPingDashboard(QWidget):
         ])
         schedule_card.body.addWidget(self.schedule)
 
-        # 학교 전체 일과 (추가)
-        self.school_schedule = ScheduleCard()
-        self.lunch_card = LunchCard()
-
         grid.addWidget(activity_card,  0, 0, 1, 2)
         grid.addWidget(location_card,  0, 2, 1, 1)
         grid.addWidget(joint_card,     1, 0, 1, 1)
         grid.addWidget(interact_card,  1, 1, 1, 1)
         grid.addWidget(system_card,    1, 2, 1, 1)
         grid.addWidget(schedule_card,  2, 0, 1, 2)
-        
-        right_lay.addWidget(self.school_schedule)
-        right_lay.addWidget(self.lunch_card)
+
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(2, 1)
