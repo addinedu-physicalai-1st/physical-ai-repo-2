@@ -44,5 +44,9 @@ setup(
     maintainer_email='dev@pingdergarten.local',
     description='GogoPing Nav2 wrapper + Gazebo 시뮬레이션 환경.',
     license='Proprietary',
-    entry_points={'console_scripts': []},
+    entry_points={
+        'console_scripts': [
+            'echo_pose = gogoping_navigation.echo_pose:main',
+        ],
+    },
 )
