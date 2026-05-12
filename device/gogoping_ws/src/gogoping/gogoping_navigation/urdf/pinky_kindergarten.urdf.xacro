@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<!-- Vic Pinky + 아기자기 유치원 얼굴 데코.
+     vicpinky_description/urdf/robot.urdf.xacro 를 include + visual-only 얼굴 요소 추가.
+     Materials - cute_yellow(머리), cute_white(흰자), cute_black(눈썹/눈동자), cute_red(입/볼). -->
+<robot name="pinky" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:arg name="namespace" default=""/>
+    <xacro:property name="prefix" value="$(arg namespace)"/>
+
+    <!-- 원본 Vic Pinky URDF 로드 -->
+    <xacro:include filename="$(find vicpinky_description)/urdf/robot.urdf.xacro"/>
+
+    <material name="cute_yellow">
+        <color rgba="0.78 0.88 0.20 1"/>
+    </material>
+    <material name="cute_white">
+        <color rgba="1.0 1.0 1.0 1"/>
+    </material>
+    <material name="cute_black">
+        <color rgba="0.05 0.05 0.05 1"/>
+    </material>
+    <material name="cute_red">
+        <color rgba="0.95 0.30 0.30 1"/>
+    </material>
+
+    <!-- 데코 link - visual 만 모음 -->
+    <link name="${prefix}face_decoration">
+        <inertial>
+            <origin xyz="0 0 0"/>
+            <mass value="0.001"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
+
+        <!-- 1) 노란 머리 박스 (라이다 가리지 않게 앞쪽만 덮음) -->
+        <!--    chassis 앞단 X=0.30, 상단 z=0.064. 머리는 그 앞에 살짝 띄워서. -->
+        <visual name="head_box">
+            <origin xyz="0.305 0 0.10" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.02 0.42 0.26"/>
+            </geometry>
+            <material name="cute_yellow"/>
+        </visual>
+
+        <!-- 2) 눈 — 흰자 (sphere) -->
+        <visual name="eye_left_white">
+            <origin xyz="0.318 0.10 0.16" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.045"/>
+            </geometry>
+            <material name="cute_white"/>
+        </visual>
+        <visual name="eye_right_white">
+            <origin xyz="0.318 -0.10 0.16" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.045"/>
+            </geometry>
+            <material name="cute_white"/>
+        </visual>
+
+        <!-- 3) 눈동자 (검은 sphere) -->
+        <visual name="eye_left_pupil">
+            <origin xyz="0.345 0.10 0.16" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+            <material name="cute_black"/>
+        </visual>
+        <visual name="eye_right_pupil">
+            <origin xyz="0.345 -0.10 0.16" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+            <material name="cute_black"/>
+        </visual>
+
+        <!-- 4) 눈썹 (검은 box, 눈 위쪽) -->
+        <visual name="brow_left">
+            <origin xyz="0.316 0.10 0.225" rpy="0 0.0 0.20"/>
+            <geometry>
+                <box size="0.005 0.11 0.022"/>
+            </geometry>
+            <material name="cute_black"/>
+        </visual>
+        <visual name="brow_right">
+            <origin xyz="0.316 -0.10 0.225" rpy="0 0.0 -0.20"/>
+            <geometry>
+                <box size="0.005 0.11 0.022"/>
+            </geometry>
+            <material name="cute_black"/>
+        </visual>
+
+        <!-- 5) 입 (빨간 box, 살짝 곡선 느낌으로 살짝 위쪽 회전) -->
+        <visual name="mouth">
+            <origin xyz="0.316 0 0.05" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.005 0.14 0.025"/>
+            </geometry>
+            <material name="cute_red"/>
+        </visual>
+
+        <!-- 6) 양쪽 입꼬리 작은 sphere (미소 효과) -->
+        <visual name="smile_left">
+            <origin xyz="0.318 0.075 0.063" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.018"/>
+            </geometry>
+            <material name="cute_red"/>
+        </visual>
+        <visual name="smile_right">
+            <origin xyz="0.318 -0.075 0.063" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.018"/>
+            </geometry>
+            <material name="cute_red"/>
+        </visual>
+
+        <!-- 7) 작은 볼터치 (분홍 sphere) -->
+        <visual name="cheek_left">
+            <origin xyz="0.316 0.165 0.10" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+            <material name="cute_red"/>
+        </visual>
+        <visual name="cheek_right">
+            <origin xyz="0.316 -0.165 0.10" rpy="0 0 0"/>
+            <geometry>
+                <sphere radius="0.025"/>
+            </geometry>
+            <material name="cute_red"/>
+        </visual>
+    </link>
+
+    <joint name="${prefix}face_decoration_joint" type="fixed">
+        <parent link="${prefix}base_link"/>
+        <child link="${prefix}face_decoration"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+</robot>

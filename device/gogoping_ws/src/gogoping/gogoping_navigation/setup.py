@@ -1,9 +1,18 @@
-"""gogoping_navigation setup."""
+"""gogoping_navigation setup — Nav2 wrapper + Gazebo 시뮬레이션 환경."""
 import os
 from glob import glob
 from setuptools import setup
 
 package_name = 'gogoping_navigation'
+
+
+def _data_glob(subdir, pattern='*'):
+    """share/<pkg>/<subdir>/ 로 설치할 파일 목록."""
+    return (
+        os.path.join('share', package_name, subdir),
+        glob(os.path.join(subdir, pattern)),
+    )
+
 
 setup(
     name=package_name,
@@ -13,20 +22,26 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'),
-            glob(os.path.join('launch', '*.launch.py'))),
-        (os.path.join('share', package_name, 'params'),
-            glob(os.path.join('params', '*.yaml'))),
-        (os.path.join('share', package_name, 'maps'),
-            glob(os.path.join('maps', '*'))),
-        (os.path.join('share', package_name, 'rviz'),
-            glob(os.path.join('rviz', '*.rviz'))),
+        _data_glob('launch', '*.launch.xml'),
+        _data_glob('config', '*.yaml'),
+        _data_glob('maps', '*'),
+        _data_glob('rviz', '*.rviz'),
+        _data_glob('urdf', '*.xacro'),
+        _data_glob('worlds', '*.world'),
+        # models (Gazebo) — 디렉토리 트리 보존
+        (os.path.join('share', package_name, 'models', 'pingdergarten'),
+            glob(os.path.join('models', 'pingdergarten', '*.sdf')) +
+            glob(os.path.join('models', 'pingdergarten', '*.config'))),
+        (os.path.join('share', package_name, 'models', 'pingdergarten',
+                      'materials', 'textures'),
+            glob(os.path.join('models', 'pingdergarten', 'materials',
+                              'textures', '*.png'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='pingdergarten',
     maintainer_email='dev@pingdergarten.local',
-    description='GogoPing Nav2 wrapper.',
+    description='GogoPing Nav2 wrapper + Gazebo 시뮬레이션 환경.',
     license='Proprietary',
     entry_points={'console_scripts': []},
 )

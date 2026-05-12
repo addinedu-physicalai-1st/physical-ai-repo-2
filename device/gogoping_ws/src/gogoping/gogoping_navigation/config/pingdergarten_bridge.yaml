@@ -1,0 +1,14 @@
+# 공용 ROS ↔ Gazebo 토픽 브리지.
+# 로봇별 센서/제어 토픽은 각 로봇 description/bringup 패키지의 bridge 에서 처리.
+
+- ros_topic_name: "clock"
+  gz_topic_name: "clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "tf"
+  gz_topic_name: "tf"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  gz_type_name: "gz.msgs.Pose_V"
+  direction: GZ_TO_ROS
