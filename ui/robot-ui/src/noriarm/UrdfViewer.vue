@@ -26,9 +26,9 @@ let animationId = 0;
 let eventSource: EventSource | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
-// 디폴트 뷰 — 위에서 거의 수직 내려다봄 (사용자가 OrbitControls 로 미세조정 가능).
-const VIEW_TARGET = new THREE.Vector3(0.135, 0.199, -0.015);
-const CAMERA_POSITION = new THREE.Vector3(0.12, 0.933, -0.015);
+// 디폴트 뷰 — 로봇 정면에서 살짝 위. OrbitControls 로 미세조정 가능.
+const VIEW_TARGET = new THREE.Vector3(0.135, 0.20, -0.015);
+const CAMERA_POSITION = new THREE.Vector3(0.7, 0.35, 0.0);
 
 interface JointStateMessage {
   name: string[];
