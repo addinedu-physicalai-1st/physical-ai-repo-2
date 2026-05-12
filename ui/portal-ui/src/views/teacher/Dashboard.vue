@@ -34,46 +34,38 @@ const summary = computed(() => {
   }
 })
 
+// TheMealDB — 무료, API key 불필요, CORS allow-all.
+// Korean 필터로 받은 목록에서 오늘 일자 기준 결정적으로 한 장 선택 — 같은 날 새로고침해도
+// 같은 사진이 뜨도록.
+const MEALDB_KOREAN_URL = 'https://www.themealdb.com/api/json/v1/1/filter.php?a=Korean'
+
+interface MealDBMeal {
+  idMeal: string
+  strMeal: string
+  strMealThumb: string
+}
+
 async function loadLunchImage(menuItems: string[]) {
   if (!menuItems.length) return
   lunchImageLoading.value = true
   lunchImageError.value = false
 
   try {
-    // Step 1: Check if SD already generated today's image
-    const status = await api.get<{ ready: boolean; url: string | null }>('/api/menu/bento-image-status')
-    if (status.ready && status.url) {
-      lunchImageUrl.value = status.url
-      lunchImageLoading.value = false
-      return
-    }
+    const res = await fetch(MEALDB_KOREAN_URL)
+    if (!res.ok) throw new Error(`MealDB HTTP ${res.status}`)
+    const body = (await res.json()) as { meals: MealDBMeal[] | null }
+    const meals = body.meals ?? []
+    if (!meals.length) throw new Error('No Korean meals returned')
 
-    // Step 2: SD image not ready — get Ollama prompt and use Puter.js
-    const promptData = await api.get<{ prompt: string; items: string[] }>('/api/menu/bento-prompt')
-    const prompt = promptData.prompt
-    if (!prompt) throw new Error('No prompt')
-
-    // Step 3: Use puter.ai.txt2img if available
-    const puter = (window as any).puter
-    if (puter && puter.ai && puter.ai.txt2img) {
-      const result = await puter.ai.txt2img(prompt)
-      if (result && result.src) {
-        lunchImageUrl.value = result.src
-      } else if (result instanceof HTMLImageElement) {
-        lunchImageUrl.value = result.src
-      } else if (typeof result === 'string') {
-        lunchImageUrl.value = result
-      } else {
-        throw new Error('Unexpected Puter result')
-      }
-    } else {
-      // Puter.js not loaded yet — fallback to static bento.png
-      lunchImageUrl.value = '/bento.png'
-    }
+    const dayOfYear = Math.floor(
+      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000,
+    )
+    const picked = meals[dayOfYear % meals.length]
+    lunchImageUrl.value = picked.strMealThumb
   } catch (e) {
-    console.warn('[LunchImage] Generation failed, using fallback:', e)
-    lunchImageUrl.value = '/bento.png'
+    console.warn('[LunchImage] CDN fetch failed:', e)
     lunchImageError.value = true
+    lunchImageUrl.value = null
   } finally {
     lunchImageLoading.value = false
   }
@@ -189,18 +181,20 @@ function getCuteColor(index: number) {
         </template>
         <div v-if="menu && menu.items.length" class="cute-container">
           <div class="lunch-hero">
-            <!-- Loading skeleton -->
             <div v-if="lunchImageLoading" class="lunch-hero__skeleton">
               <div class="lunch-hero__spinner"></div>
-              <span class="lunch-hero__spinner-text">AI 이미지 생성 중…</span>
+              <span class="lunch-hero__spinner-text">음식 사진 불러오는 중…</span>
             </div>
-            <!-- Generated or fallback image -->
             <img
               v-else-if="lunchImageUrl"
               :src="lunchImageUrl"
-              alt="Lunch"
+              alt="오늘 점심 사진"
               class="lunch-hero__img"
+              loading="lazy"
             />
+            <div v-else-if="lunchImageError" class="lunch-hero__skeleton">
+              <span class="lunch-hero__spinner-text">사진을 불러오지 못했어요</span>
+            </div>
           </div>
           <div class="cute-list">
             <div v-for="(item, index) in menu.items" :key="index" class="cute-tag" :style="`--tag-color: ${getCuteColor(index)}`">
