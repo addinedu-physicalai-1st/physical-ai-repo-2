@@ -48,7 +48,7 @@ function go(role: 'teacher' | 'parent') {
         </button>
       </div>
 
-      <footer class="landing__footer">Addinedu 4기 · 사랑의 에듀핑</footer>
+      <footer class="landing__footer">Addinedu · 사랑의 에듀핑</footer>
     </div>
   </main>
 </template>

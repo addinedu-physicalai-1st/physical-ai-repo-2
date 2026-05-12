@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-Addinedu 4기 최종 프로젝트 — **pingdergarten**. 유치원에서 아이와 놀아주고 교사를 보조하는 교육보조로봇 서비스. OpenArm(놀이·정리정돈), Pinky(등하원·교사 추종·운반·놀이), OMX 3대(교실 비치·Pinky 양팔)로 구성된 로봇이 등원부터 하원까지 하루 일과를 함께한다.
+Addinedu 최종 프로젝트 — **pingdergarten**. 유치원에서 아이와 놀아주고 교사를 보조하는 교육보조로봇 서비스. OpenArm(놀이·정리정돈), Pinky(등하원·교사 추종·운반·놀이), OMX 3대(교실 비치·Pinky 양팔)로 구성된 로봇이 등원부터 하원까지 하루 일과를 함께한다.
 
 - 팀명: 사랑의 에듀핑
 - 프로젝트명: pingdergarten
