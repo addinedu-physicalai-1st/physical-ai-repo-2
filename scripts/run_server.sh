@@ -86,6 +86,32 @@ case "$ACTION" in
       exit 1
     fi
 
+    # Ollama 점검 — 데몬 응답 확인 + 필수 모델 자동 pull. 모델 목록은 server/ai/config.py
+    # 의 REQUIRED_OLLAMA_MODELS 가 단일 source-of-truth.
+    # 모델 존재 확인은 `ollama show` 로 한다 — `bge-m3` 와 `bge-m3:latest` 처럼 태그
+    # 생략/명시를 동일하게 처리하므로 `ollama list` 파싱보다 안전.
+    if ! command -v ollama &>/dev/null; then
+      echo "[run_server] ollama CLI 가 PATH 에 없습니다 — https://ollama.com/download" >&2
+      exit 1
+    fi
+    if ! ollama list &>/dev/null; then
+      echo "[run_server] ollama 데몬 응답 없음 — 'ollama serve' 또는 macOS 앱 실행 후 재시도" >&2
+      exit 1
+    fi
+    echo "[run_server] 필수 ollama 모델 점검 ($ENV_DESC)"
+    mapfile -t REQUIRED_MODELS < <(eval "$(wrap_cmd python -m server.ai.config)")
+    for m in "${REQUIRED_MODELS[@]}"; do
+      if ollama show "$m" &>/dev/null; then
+        echo "  ✓ $m"
+      else
+        echo "  ↓ $m 없음 — pull..."
+        if ! ollama pull "$m"; then
+          echo "[run_server] ollama pull $m 실패" >&2
+          exit 1
+        fi
+      fi
+    done
+
     # 포트 충돌 사전 경고 (치명적이진 않음 — 사용자가 알아서 처리)
     # 8000=control, 8001=ai-hub, 8081=pgweb, 8100=streaming(WS)
     for port in 8000 8001 8081 8100; do
