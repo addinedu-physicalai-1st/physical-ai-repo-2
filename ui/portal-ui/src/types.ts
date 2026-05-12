@@ -52,10 +52,11 @@ export interface Report {
 
 export interface Photo {
   id: number
-  child_id: number
-  url: string               // /photos/... presigned path
+  child_id: number | null
+  url: string               // /api/photos-static/... 등 (Vite proxy 경유)
   taken_at: string
   emotion: string | null
+  emotion_score: number | null
   mode: string | null
 }
 

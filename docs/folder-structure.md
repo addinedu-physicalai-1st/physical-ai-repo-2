@@ -12,7 +12,7 @@ last_synced: "2026-05-06T14:29:29"
 pingdergarten/
 ├── .env                              # Atlassian 토큰 등 (모든 스크립트의 단일 소스, .gitignore)
 ├── .env.example
-├── docker-compose.yaml               # control / ai / postgres / minio
+├── docker-compose.yaml               # control / ai / postgres
 ├── CLAUDE.md
 │
 ├── docs/                             # Confluence 와 양방향 동기화되는 설계 문서
@@ -87,7 +87,7 @@ pingdergarten/
 │   │   ├── vision/                   # (TBD) 얼굴 인식
 │   │   ├── Dockerfile
 │   │   └── pyproject.toml
-│   └── db/                           # PostgreSQL + MinIO 데이터 계층
+│   └── db/                           # PostgreSQL 데이터 계층 (사진 binary 는 server/storage/ 로컬 디스크)
 │       ├── db_models/                # 공유 SQLAlchemy 모델 (control/ai 둘 다 import)
 │       │   ├── child.py              # child / parent / teacher / 매핑
 │       │   ├── attendance.py
@@ -101,7 +101,6 @@ pingdergarten/
 │       ├── migrations/               # alembic
 │       ├── seed/                     # 31일치 menu, named pose 카탈로그
 │       ├── postgres/                 # init.sql, role/extension
-│       ├── minio/                    # bucket init script (photos 버킷)
 │       └── pyproject.toml
 │
 ├── device/                                # ROS2 워크스페이스 (vendor = git submodule + apt 혼합)
@@ -207,7 +206,7 @@ pingdergarten/
 | GogoPing | 노트북 | Nav2/SLAM + `gogoping_*` 응용 + 비전 |
 | EduPing | 노트북 단독 | OpenArm USB 직결 + 비전 + `eduping_*` 응용 |
 | NoriArm | 노트북 단독 | OMX USB 직결 + 비전 + `noriarm_*` 응용 |
-| Control / AI Server | 별도 호스트 (docker-compose) | control + ai + postgres + minio |
+| Control / AI Server | 별도 호스트 (docker-compose) | control + ai + postgres |
 | Portal UI | 학부모·교사 모바일/PC | 같은 Wi-Fi LAN IP 로 접근 (Vite dev) |
 | Admin UI | 관리자 PC | PyQt5 데스크톱 앱 |
 

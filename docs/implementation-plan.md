@@ -14,7 +14,7 @@ last_synced: "2026-05-13T14:08:22"
 | --- | --- | --- |
 | Robot UI (EduPing·GogoPing·NoriArm 공유) | Vue 3 + Vite dev server (Chromium kiosk) + Pinia + Web Speech API (STT/TTS), 단일 코드베이스 — 각 로봇 노트북에서 `VITE_ROBOT=eduping/gogoping/noriarm` env 로 분기 인스턴스 실행, `server.proxy` 로 `/api/*` → Control Service REST (rosbridge·roslibjs·Nginx 미사용) | 공통 composables/components (호출어·STT·TTS·표정·모드 셀렉터·자연어 디스패처). 로봇별 모드 화면은 `defineAsyncComponent` 로 lazy load. 모드 매트릭스는 §0.2. 자연 촬영은 ROS2 노드가 단독 처리 (SR-PHOTO-001) |
 | Admin UI | PyQt5 데스크톱 앱 (Python 3.11 + PyQt5 + requests + websocket-client). Control Service REST 경유 (`requests.Session()` cookie jar 로 fastapi-users 세션 쿠키 유지) + WebSocket `/ws/robot-state` 로 로봇 상태 push 수신. ROS2 직접 통신 안 함 | 로봇 관제 — 위치·배터리·모드·작업 상태 실시간 모니터링 (SR-ADM-001), 보조 모드 UI 제어 (추종 대상 확정·정지·지도 기반 목적지 지정·도착 알림, SR-ADM-002~005) |
-| Portal Web | Vue 3 + Vite dev server (학부모·교사 공용 웹앱) + Pinia, `server.proxy` 로 `/api/*` → Control Service, `/photos/*` → MinIO | 교사 기능 (아동·학부모 등록, 출결 보드, 정보·보고서 보기), 학부모 기능 (로그인·등·하원·메뉴·사진·보고서 조회). 학부모·교사 모바일/PC 에서 같은 Wi-Fi LAN IP 로 접근 |
+| Portal Web | Vue 3 + Vite dev server (학부모·교사 공용 웹앱) + Pinia, `server.proxy` 로 `/api/*` → Control Service (사진 binary 는 Control Server 의 FastAPI StaticFiles `/api/photos-static/*` 를 같은 proxy 로 GET) | 교사 기능 (아동·학부모 등록, 출결 보드, 정보·보고서 보기), 학부모 기능 (로그인·등·하원·메뉴·사진·보고서 조회). 학부모·교사 모바일/PC 에서 같은 Wi-Fi LAN IP 로 접근 |
 
 ## 0.1 로봇 UI 모드
 
@@ -280,7 +280,7 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-OPS-015 | 자녀 정보 보기 | Portal Web 이 Control Service REST 로 child 테이블을 조회해 자녀 기본 정보 (이름·생년월일·반·등록 사진) 를 표시한다. 등록 사진 binary 는 Control Server 가 발급한 짧은 TTL presigned URL 로 브라우저가 MinIO 에서 직접 GET 한다. | Low |
+| SR-OPS-015 | 자녀 정보 보기 | Portal Web 이 Control Service REST 로 child 테이블을 조회해 자녀 기본 정보 (이름·생년월일·반·등록 사진) 를 표시한다. 등록 사진 binary 는 Control Server 가 FastAPI StaticFiles 로 마운트한 정적 경로 (`/api/photos-static/...`) 를 브라우저가 GET 한다. | Low |
 
 ### 5.4 학부모 — 로그인·계정
 
@@ -302,7 +302,7 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-PHOTO-003 | 학부모 사진 조회 | Portal Web 이 선택된 자녀가 포함된 positive 카테고리 사진을 표시하고 사진별 다운로드를 지원한다. 이미지 binary 는 Control Server 가 발급한 짧은 TTL presigned URL 로 브라우저가 Vite dev `/photos/*` proxy 경유로 MinIO 에서 직접 GET 한다. | Low |
+| SR-PHOTO-003 | 학부모 사진 조회 | Portal Web 이 선택된 자녀가 포함된 positive 카테고리 사진을 표시하고 사진별 다운로드를 지원한다. 이미지 binary 는 Control Server 가 FastAPI StaticFiles 로 마운트한 정적 경로 (`/api/photos-static/...`) 를 Vite dev proxy 경유로 브라우저가 GET 한다. | Low |
 
 ### 5.9 학부모 — 일과 보고서 조회
 
@@ -347,7 +347,7 @@ last_synced: "2026-05-13T14:08:22"
 | SR-DAT-004 | 운반 작업 이력 | DB 가 carry_job(요청·적재·도착·상태) 테이블에 운반 이력을 저장한다. | Low |
 | SR-DAT-005 | 작업 로그 | DB 가 task_log(시작·종료·결과·사유) 테이블에 작업 로그를 기록한다. | Low |
 | SR-DAT-009 | 모드 상태 | DB 가 `mode_history(robot_id, time, mode)` + 로봇별 현재 모드 캐시로 로봇별 독립 모드 상태를 기록한다. | High |
-| SR-DAT-011 | 사진첩 데이터 | 오브젝트 스토리지 (사진 binary) · DB `photo` 테이블 (경로·촬영시각·모드·트리거 child_id·감정 점수·감정 카테고리) · DB `photo_subject(photo_id, child_id)` N:N 매핑 테이블 (사진 내 등장한 모든 등록 아이) 로 분리 저장한다. 학부모 사진첩 조회 (SR-PHOTO-003) 는 `photo_subject` 매핑으로 자녀 포함 여부를 판정한다. Control Server 가 발급한 짧은 TTL presigned URL 로 학부모 브라우저는 Vite dev `/photos/*` proxy 경유, 교사앱(PyQt5)은 `requests.get(url)` 으로 MinIO 에 직접 접근한다. | Low |
+| SR-DAT-011 | 사진첩 데이터 | 로컬 디스크 (`server/storage/photos/`, 사진 binary) · DB `photo` 테이블 (경로·촬영시각·모드·트리거 child_id·감정 점수·감정 카테고리) · DB `photo_subject(photo_id, child_id)` N:N 매핑 테이블 (사진 내 등장한 모든 등록 아이) 로 분리 저장한다. 학부모 사진첩 조회 (SR-PHOTO-003) 는 `photo_subject` 매핑으로 자녀 포함 여부를 판정한다. Control Server 가 FastAPI StaticFiles 로 마운트한 정적 경로 (`/api/photos-static/...`) 를 학부모 브라우저는 Vite dev proxy 경유, 교사앱(PyQt5)은 `requests.get(url)` 으로 직접 GET 한다. | Low |
 | SR-DAT-012 | nav graph | DB 가 nav_graph 테이블에 SLAM 맵 위 nav graph (node·edge·named pose) 를 저장한다. (MVP: `shared/waypoints.yaml` + node-only — 2026-05-13 완료, DB 마이그레이션 + edge 그래프는 follow-up) | Low |
 | SR-DAT-013 | 비동기 작업 큐 데이터 | DB 가 ai_job(id·kind·payload·status·attempts·max_attempts·last_error·created_at·started_at·finished_at) 테이블에 §7.3 비동기 작업 큐 행을 저장한다. status 는 pending/running/done/failed 상태 머신을 가지며 worker 픽업은 `FOR UPDATE SKIP LOCKED` 로 race-safe 처리한다. | High |
 
@@ -404,6 +404,6 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-PHOTO-001 | 자연 촬영 | 각 로봇 자연 촬영 ROS2 노드가 §0.2 매트릭스의 자연 촬영 ✓ 모드 (놀이 모드) 동안 카메라 프레임을 구독해 감정 인식 결과가 happy/fun/interest (긍정) 또는 우울·두려움 (부정) 임계 초과 시 사진을 캡처해 Control Server 로 REST 업로드한다. Control Server 는 binary 를 MinIO 에 저장하고 `photo` 행 INSERT 후 `ai_job(kind=photo_classify)` INSERT 로 분류 작업을 enqueue 한다. UI 는 카메라를 점유하지 않는다. | Low |
+| SR-PHOTO-001 | 자연 촬영 | 각 로봇 자연 촬영 ROS2 노드가 §0.2 매트릭스의 자연 촬영 ✓ 모드 (놀이 모드) 동안 카메라 프레임을 구독해 감정 인식 결과가 happy/fun/interest (긍정) 또는 우울·두려움 (부정) 임계 초과 시 사진을 캡처해 Control Server 로 REST 업로드한다. Control Server 는 binary 를 로컬 디스크 (`server/storage/photos/`) 에 저장하고 `photo` 행 INSERT 후 `ai_job(kind=photo_classify)` INSERT 로 분류 작업을 enqueue 한다. UI 는 카메라를 점유하지 않는다. | Low |
 | SR-PHOTO-004 | 사진 메타데이터 첨부 | 자연 촬영 ROS2 노드가 캡처 시 (시각·모드·트리거 child_id·감정 점수·감정 카테고리(positive/negative)) 메타데이터를 사진과 함께 첨부해 전송한다. 모드는 자기 로봇 namespace 의 mode 토픽 (`/<robot>/mode`) 구독 결과, 트리거 child_id 는 자노드 얼굴 인식 매칭 결과 (감정 임계 초과를 일으킨 주체 1명) 를 사용한다. 프레임 내 다른 등장 아이의 식별·매핑은 SR-PHOTO-002 에서 후처리. | Low |
 | SR-PHOTO-005 | 자연 촬영 빈도 제한 | 자연 촬영 ROS2 노드가 5단(감정 임계치 / child 쿨다운 / 모드 한도 / 일일 한도 / 시각 중복 제거) throttling 을 통과한 프레임만 Control Server 로 업로드한다. | Low |

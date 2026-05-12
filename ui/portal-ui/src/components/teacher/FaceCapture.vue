@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { FaceMesh, type Results } from '@mediapipe/face_mesh'
 import {
   estimateHeadPose,
@@ -8,6 +8,12 @@ import {
   TARGET_HINTS,
 } from '@/lib/headPose'
 import Icon from '@/components/common/Icon.vue'
+
+const props = withDefaults(defineProps<{
+  uploading?: boolean
+}>(), {
+  uploading: false,
+})
 
 const emit = defineEmits<{
   (e: 'complete', images: Blob[]): void
@@ -19,6 +25,15 @@ const targetIndex = ref(0)
 const captured = ref<Blob[]>([])
 const thumbs = ref<string[]>([])
 const flash = ref(false)
+const finalizing = ref(false)
+
+const showSpinner = computed(() => finalizing.value || props.uploading)
+
+// 부모에서 업로드가 종료되면 (성공/실패 무관) finalizing 도 해제해 스피너가
+// 남는 일을 방지. 성공 시엔 부모가 capturing=false 로 본 컴포넌트를 unmount 한다.
+watch(() => props.uploading, (now, prev) => {
+  if (prev && !now) finalizing.value = false
+})
 
 const primaryHint = ref<string>('카메라 준비 중...')
 const detected = ref<boolean>(false)
@@ -29,6 +44,8 @@ let stream: MediaStream | null = null
 let faceMesh: FaceMesh | null = null
 let rafId: number | null = null
 let captureLockUntil = 0
+let capturePending = false
+let stopped = false
 
 const stepLabels: Record<string, string> = {
   front: '정면',
@@ -85,20 +102,28 @@ function handleResults(results: Results) {
   debugYaw.value = pose.yaw
   debugPitch.value = pose.pitch
 
-  if (Date.now() < captureLockUntil) return
+  if (capturePending || Date.now() < captureLockUntil) return
 
   if (matchesTarget(pose, target)) {
+    // canvas.toBlob 이 비동기라 락을 .then() 안에 두면 그 사이 프레임들이
+    // 모두 matchesTarget 을 통과해 다중 캡처가 발생한다. 동기적으로 잠근다.
+    capturePending = true
+    flash.value = true
+    setTimeout(() => { flash.value = false }, 200)
     captureFrame().then((blob) => {
+      captureLockUntil = Date.now() + 800
+      capturePending = false
       if (!blob) return
       captured.value.push(blob)
       thumbs.value.push(URL.createObjectURL(blob))
-      captureLockUntil = Date.now() + 800
-      flash.value = true
-      setTimeout(() => { flash.value = false }, 200)
 
       if (captured.value.length >= TARGET_ORDER.length) {
+        // 마지막 썸네일/체크 표시를 사용자가 인지하도록 잠시 대기 후 emit.
+        finalizing.value = true
         cleanup()
-        emit('complete', captured.value)
+        setTimeout(() => {
+          emit('complete', captured.value)
+        }, 600)
       } else {
         targetIndex.value += 1
       }
@@ -121,17 +146,30 @@ async function captureFrame(): Promise<Blob | null> {
 }
 
 async function loop() {
+  if (stopped) return
   if (videoRef.value && faceMesh && videoRef.value.readyState >= 2) {
-    await faceMesh.send({ image: videoRef.value })
+    try {
+      await faceMesh.send({ image: videoRef.value })
+    } catch {
+      // faceMesh 가 close 되는 도중 send 가 throw 할 수 있음 — 그냥 종료.
+      return
+    }
   }
+  // await 사이에 cleanup 이 일어났을 수 있으므로 재예약 직전에 다시 확인.
+  if (stopped) return
   rafId = requestAnimationFrame(loop)
 }
 
 function cleanup() {
+  if (stopped) return
+  stopped = true
   if (rafId !== null) cancelAnimationFrame(rafId)
   rafId = null
   stream?.getTracks().forEach((t) => t.stop())
-  faceMesh?.close()
+  stream = null
+  const mesh = faceMesh
+  faceMesh = null
+  mesh?.close()
 }
 
 onMounted(async () => {
@@ -161,6 +199,12 @@ onBeforeUnmount(() => {
           <div class="capture__oval" :class="{ 'capture__oval--ok': detected }" />
         </div>
         <div v-if="flash" class="capture__flash" />
+        <div v-if="showSpinner" class="capture__spinner" role="status" aria-live="polite">
+          <Icon name="loader-circle" :size="32" class="capture__spinner-icon" />
+          <span class="capture__spinner-label">
+            {{ props.uploading ? '얼굴 사진 등록 중...' : '캡처 완료, 업로드 준비 중...' }}
+          </span>
+        </div>
       </div>
 
       <div class="capture__thumbs">
@@ -272,6 +316,30 @@ onBeforeUnmount(() => {
   inset: 0;
   background: rgba(255, 255, 255, 0.4);
   pointer-events: none;
+}
+
+.capture__spinner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  backdrop-filter: blur(2px);
+  z-index: 2;
+}
+.capture__spinner-icon {
+  animation: capture-spin 1s linear infinite;
+}
+.capture__spinner-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+@keyframes capture-spin {
+  to { transform: rotate(360deg); }
 }
 
 .capture__thumbs {

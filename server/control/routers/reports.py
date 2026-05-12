@@ -1,18 +1,25 @@
-"""보고서 조회·편집."""
-from datetime import date as DateType, datetime, timezone
+"""보고서 조회·편집·생성."""
+from datetime import date as DateType, datetime, timezone, timedelta
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.control.auth import current_active_user
+from server.control.config import settings
 from server.control.deps import require_teacher
+from server.control.routers.photos import classify_unmapped_photos_for_date
 from server.control.schemas import ReportOut, ReportPatchPayload
-from server.db.models import Attendance, Child, ParentChild, Report, User
+from server.db.models import Attendance, Child, Menu, ParentChild, Photo, PhotoSubject, Report, User
 from server.db.session import get_session
 
 router = APIRouter(prefix="/api", tags=["reports"])
+
+# 보고서의 시각 표기는 KST 기준 (학부모·교사가 사람으로 읽는 시각).
+_KST = timezone(timedelta(hours=9))
 
 
 @router.get("/reports", response_model=list[ReportOut])
@@ -75,6 +82,115 @@ async def list_reports(
         )
     ).scalars().all()
     return [ReportOut.model_validate(r, from_attributes=True) for r in rows]
+
+
+class GenerateReportPayload(BaseModel):
+    child_id: int
+    date: DateType
+
+
+@router.post("/reports/generate", response_model=ReportOut)
+async def generate_report(
+    payload: GenerateReportPayload,
+    _: User = Depends(require_teacher),
+    session: AsyncSession = Depends(get_session),
+) -> ReportOut:
+    """교사가 임의 트리거 — 자녀 + 날짜의 일과 보고서를 LLM 으로 즉시 생성.
+
+    데이터 소스: 자연 촬영 사진 메타 (`photo` 테이블, 해당 일자) + 점심메뉴
+    (`menu` day-of-month). `mode_history` 는 미구현이라 제외. 결과는 `report`
+    테이블에 UPSERT — 이미 있으면 덮어쓴다 (교사가 의도적으로 재생성).
+    """
+    child = await session.get(Child, payload.child_id)
+    if child is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "child not found")
+
+    # 미분류 사진 back-fill — 업로드 시점에 얼굴 미검출 / 임베딩 미존재 등으로 매핑이
+    # 누락된 자연 촬영 사진을 face matching 으로 채운다. 보고서 생성 트리거 = 사진 분류 트리거.
+    await classify_unmapped_photos_for_date(session, payload.date)
+
+    # 그날의 자연 촬영 사진 메타 — KST 기준 일자 + photo_subject 매핑으로 이 자녀가 등장한 사진만.
+    day_start_kst = datetime.combine(payload.date, datetime.min.time(), _KST)
+    day_end_kst = day_start_kst + timedelta(days=1)
+    photos = (
+        await session.execute(
+            select(Photo)
+            .join(PhotoSubject, PhotoSubject.photo_id == Photo.id)
+            .where(
+                PhotoSubject.child_id == payload.child_id,
+                Photo.taken_at >= day_start_kst,
+                Photo.taken_at < day_end_kst,
+            )
+            .order_by(Photo.taken_at.asc())
+        )
+    ).scalars().all()
+
+    photo_events = [
+        {
+            "photo_id": p.id,
+            "time": p.taken_at.astimezone(_KST).strftime("%H:%M"),
+            "robot": p.robot or "unknown",
+            "mode": p.mode or "unknown",
+            "emotion": p.emotion or "neutral",
+            "score": f"{p.emotion_score:.2f}" if p.emotion_score is not None else "0.00",
+        }
+        for p in photos
+    ]
+
+    # 점심메뉴 — day-of-month 매칭.
+    menu_row = (
+        await session.execute(select(Menu).where(Menu.day == payload.date.day))
+    ).scalar_one_or_none()
+    menu_items: list[str] = list(menu_row.items) if menu_row else []
+
+    # AI Hub 호출.
+    try:
+        async with httpx.AsyncClient(timeout=settings.request_timeout_s) as client:
+            r = await client.post(
+                f"{settings.ai_hub_url}/report/generate",
+                json={
+                    "child_name": child.name,
+                    "date": payload.date.isoformat(),
+                    "photo_events": photo_events,
+                    "menu_items": menu_items,
+                },
+            )
+            r.raise_for_status()
+            content = str(r.json().get("content", "")).strip()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"AI Hub unavailable: {exc}"
+        ) from exc
+
+    if not content:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "AI Hub returned empty body")
+
+    # UPSERT — UNIQUE (child_id, date) 활용.
+    existing = (
+        await session.execute(
+            select(Report).where(
+                Report.child_id == payload.child_id,
+                Report.date == payload.date,
+            )
+        )
+    ).scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    if existing is None:
+        report = Report(
+            child_id=payload.child_id,
+            date=payload.date,
+            content=content,
+            created_at=now,
+            updated_at=None,
+        )
+        session.add(report)
+    else:
+        existing.content = content
+        existing.updated_at = now
+        report = existing
+    await session.commit()
+    await session.refresh(report)
+    return ReportOut.model_validate(report, from_attributes=True)
 
 
 @router.patch("/reports/{report_id}", response_model=ReportOut)

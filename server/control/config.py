@@ -32,6 +32,9 @@ class Settings:
     request_timeout_s: float = 30.0
     # 파일 저장소
     face_image_dir: str = "server/storage/face-images"
+    # 자연 촬영 사진 — server/storage/photos/{category}/YYYY/MM/DD/{name}.jpg 구조.
+    # 카테고리는 `natural`, 추후 `posed` 등이 들어올 수 있다.
+    photo_dir: str = "server/storage/photos"
     # fastapi-users 세션 쿠키 수명(초). 7일.
     cookie_max_age: int = 60 * 60 * 24 * 7
     # 얼굴 매칭 cosine distance — 작을수록 엄격.

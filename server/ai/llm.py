@@ -210,6 +210,108 @@ async def generate_chat(
     return _normalize_chat_dict(data)
 
 
+async def generate_report(
+    *,
+    child_name: str,
+    date_str: str,
+    photo_events: list[dict],
+    menu_items: list[str],
+) -> str:
+    """일과 보고서 — 자녀의 하루를 사진(있을 때) + 비사진 활동 타임라인으로 구성.
+
+    Args:
+        child_name: 자녀 이름 (예: "지수")
+        date_str: "YYYY-MM-DD"
+        photo_events: [{"time": "10:23", "photo_id": 42, "robot": "noriarm",
+                        "mode": "ox-quiz", "emotion": "happy", "score": "0.82"}]
+                      시각 오름차순. photo_id 는 정수.
+        menu_items: 점심메뉴 리스트 (예: ["김밥", "단무지"])
+
+    Returns:
+        구조화된 JSON 문자열. 형식:
+            {"events": [{"time": "HH:MM", "photo_id": int | None, "text": "..."}],
+             "summary": "..."}
+        events 는 시각 오름차순. 사진 기반 사건은 photo_id 가 입력 값과 동일해야 한다.
+        파싱 실패 시 LLMError raise.
+    """
+    has_photos = bool(photo_events)
+    photos_block = (
+        "\n".join(
+            f"- photo_id={p['photo_id']} · {p['time']} ({p['robot']}/{p['mode']}): {p['emotion']} (강도 {p['score']})"
+            for p in photo_events
+        )
+        if has_photos
+        else "(없음)"
+    )
+    menu_block = ", ".join(menu_items) if menu_items else "기록 없음"
+
+    system = (
+        "당신은 유치원 교사의 일일 보고서를 한국어로 작성하는 도우미입니다.\n"
+        "보고서는 시간순 타임라인 형식의 JSON 으로 출력합니다. 각 항목은 events 배열의 한 원소이며,\n"
+        "필드는 time (HH:MM), photo_id (정수 또는 null), text (40자 내외 한 줄 한국어 묘사) 입니다.\n"
+        "규칙:\n"
+        "1) '오늘 포착된 표정' 입력의 각 항목 (photo_id 있음) 은 events 에 반드시 한 번씩 포함하고, "
+        "photo_id 는 입력과 동일한 정수, time 도 입력과 동일하게 둡니다. text 는 감정·모드 사실에 근거해 자연스럽게 묘사하세요. "
+        "감정·시각·모드에 없는 사실은 만들지 마세요.\n"
+        "2) 사진이 없는 시각 (등원·간식·점심·낮잠·자유놀이·하원 등) 은 일반적인 유치원 일과를 참고해 2~5 항목 정도를 적절히 끼워넣되, "
+        "photo_id=null 로 두고 짧고 담담한 한 줄 (감정 단정 금지) 로 적습니다. 점심 시각엔 메뉴를 짧게 언급해 주세요.\n"
+        "3) events 는 time 오름차순으로 정렬합니다.\n"
+        "4) summary 필드에 하루를 정리하는 한 문장 (40~80자) 을 추가합니다.\n"
+        "5) 인사말·서명·이모지 없음.\n"
+        "출력은 반드시 다음 한 줄 JSON 형식만 포함합니다:\n"
+        '{"events": [{"time": "HH:MM", "photo_id": int_or_null, "text": "..."}], "summary": "..."}'
+    )
+    user = (
+        f"자녀 이름: {child_name}\n"
+        f"날짜: {date_str}\n"
+        f"점심메뉴: {menu_block}\n"
+        f"오늘 포착된 표정 (photo_id · 시각 · 로봇/모드 · 감정 · 강도):\n{photos_block}\n\n"
+        "위 사실을 사용해 events + summary JSON 을 작성해 주세요."
+    )
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+    raw = await _ollama_chat(
+        messages=messages,
+        num_predict=1024,
+        num_ctx=4096,
+        temperature=0.4,
+        model=settings.ollama_chat_model,
+    )
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        stripped = _strip_markdown_json_fence(raw)
+        try:
+            data = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise LLMError(f"보고서 JSON 파싱 실패: {raw[:200]}") from exc
+
+    events_in = data.get("events")
+    if not isinstance(events_in, list):
+        raise LLMError("LLM 응답에 events 배열 없음")
+    valid_photo_ids = {int(p["photo_id"]) for p in photo_events if "photo_id" in p}
+    cleaned_events: list[dict] = []
+    for ev in events_in:
+        if not isinstance(ev, dict):
+            continue
+        time_s = str(ev.get("time", "")).strip()
+        text_s = str(ev.get("text", "")).strip()
+        if not time_s or not text_s:
+            continue
+        pid = ev.get("photo_id")
+        # LLM 환각으로 알 수 없는 photo_id 가 들어오면 null 로 강제.
+        pid_int: int | None = None
+        if isinstance(pid, int) and pid in valid_photo_ids:
+            pid_int = pid
+        cleaned_events.append({"time": time_s, "photo_id": pid_int, "text": text_s})
+    cleaned_events.sort(key=lambda e: e["time"])
+
+    summary = str(data.get("summary", "")).strip()
+    return json.dumps({"events": cleaned_events, "summary": summary}, ensure_ascii=False)
+
+
 async def _ollama_chat(
     *,
     messages: list[dict[str, str]],

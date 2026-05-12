@@ -28,7 +28,7 @@ from server.ai.context import (
     try_schedule_first_reply,
     try_whereabouts_first_reply,
 )
-from server.ai.llm import LLMError, generate_chat
+from server.ai.llm import LLMError, generate_chat, generate_report
 from server.ai.edge_tts_synth import synthesize_edge_mp3
 from server.ai.config import settings as ai_settings
 
@@ -359,6 +359,41 @@ async def voice_intent(req: IntentRequest) -> dict:
             "emotion": "interest",
         }
     return {"kind": "chat", "reply": chat["reply"], "emotion": chat["emotion"]}
+
+
+class ReportPhotoEvent(BaseModel):
+    photo_id: int
+    time: str  # "HH:MM"
+    robot: str
+    mode: str
+    emotion: str
+    score: str  # "0.82"
+
+
+class ReportGenerateRequest(BaseModel):
+    child_name: str = Field(..., min_length=1, max_length=32)
+    date: str = Field(..., min_length=10, max_length=10)  # "YYYY-MM-DD"
+    photo_events: list[ReportPhotoEvent] = Field(default_factory=list, max_length=200)
+    menu_items: list[str] = Field(default_factory=list, max_length=20)
+
+
+@app.post("/report/generate")
+async def post_report_generate(req: ReportGenerateRequest) -> dict:
+    """자녀 한 명의 하루치 일과 보고서 — 자연 촬영 메타 + 점심메뉴 기반 자연어 요약.
+
+    Control Server 가 데이터 수집 후 forward. SR-RPT-001 의 동기 변형 — `ai_job` 큐
+    도입 전 임시 경로.
+    """
+    try:
+        body = await generate_report(
+            child_name=req.child_name,
+            date_str=req.date,
+            photo_events=[p.model_dump() for p in req.photo_events],
+            menu_items=req.menu_items,
+        )
+    except LLMError as exc:
+        raise HTTPException(status_code=502, detail=f"LLM failed: {exc}") from exc
+    return {"content": body}
 
 
 @app.get("/voice/tts")
