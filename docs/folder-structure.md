@@ -104,70 +104,90 @@ pingdergarten/
 │       ├── minio/                    # bucket init script (photos 버킷)
 │       └── pyproject.toml
 │
-├── device/                           # ROS2 워크스페이스 (vendor = git submodule + apt 혼합)
-│   ├── eduping_ws/src/               # EduPing 노트북에서 빌드
-│   │   ├── (OpenArm SDK)             # vendor — git submodule 위치/URL 미정 (정보 보완 후 추가)
-│   │   ├── eduping_bringup/          # launch / config
-│   │   ├── eduping_modes/            # 등원·하원·율동·가게놀이·정리정돈·무궁화꽃
-│   │   ├── eduping_vision/           # 얼굴·객체·감정 인식 + 자연 촬영
+├── device/                                # ROS2 워크스페이스 (vendor = git submodule + apt 혼합)
+│   ├── eduping_ws/src/                    # EduPing 노트북에서 빌드
+│   │   ├── (OpenArm SDK)                  # vendor — git submodule 위치/URL 미정
+│   │   ├── eduping_bringup/               # launch / config
+│   │   ├── eduping_modes/                 # 등원·하원·율동·가게놀이·정리정돈·무궁화꽃
+│   │   ├── eduping_vision/                # 얼굴·객체·감정 인식 + 자연 촬영
 │   │   └── eduping_msgs/
-│   ├── gogoping_ws/src/              # GogoPing 라즈베리파이 + 노트북에서 빌드 (launch 분리)
-│   │   ├── vic_pinky/                # vendor (git submodule, pinklab-art/vic_pinky) — 모바일 베이스
-│   │   ├── sllidar_ros2/             # vendor (git submodule, Slamtec) — RPLiDAR C1 드라이버
-│   │   ├── open_manipulator/         # vendor (git submodule, ROBOTIS) — Pinky 로봇팔
-│   │   ├── py_trees_ros/             # vendor (git submodule, splintered-reality) — Behavior Tree
-│   │   ├── py_trees_ros_interfaces/  # vendor (git submodule) — BT 메시지/서비스 정의
-│   │   ├── py_trees_ros_viewer/      # vendor (git submodule) — BT 실시간 시각화
-│   │   └── gogoping/                 # 우리 app 코드 그룹 (vendor 와 분리)
-│   │       ├── gogoping_bringup/     # launch 통합 진입점 (namespaced)
+│   │
+│   ├── gogoping_ws/src/                   # GogoPing 라즈베리파이 + 노트북에서 빌드 (launch 분리)
+│   │   ├── vic_pinky/                     # vendor (git submodule, pinklab-art/vic_pinky) — 모바일 베이스
+│   │   ├── sllidar_ros2/                  # vendor (git submodule, Slamtec) — RPLiDAR C1 드라이버
+│   │   ├── open_manipulator/              # vendor (git submodule, ROBOTIS) — Pinky 로봇팔
+│   │   ├── py_trees_ros/                  # vendor (git submodule, splintered-reality) — Behavior Tree
+│   │   ├── py_trees_ros_interfaces/       # vendor (git submodule) — BT 메시지/서비스 정의
+│   │   ├── py_trees_ros_viewer/           # vendor (git submodule) — BT 실시간 시각화
+│   │   └── gogoping/                      # 우리 app 코드 그룹 (vendor 와 분리)
+│   │       ├── gogoping_bringup/          # launch 통합 진입점 (namespaced)
 │   │       │   └── launch/
 │   │       │       ├── pi.launch.py       # 라즈베리파이용 (vicpinky_bringup + sllidar + camera)
 │   │       │       └── laptop.launch.py   # 노트북용 (Nav2 + modes + vision)
-│   │       ├── gogoping_camera/      # USB 카메라 → UDP MJPEG 송출 (SR-CAM-001)
-│   │       ├── gogoping_camera_pan/  # 카메라 pan 서보 (Arduino)
-│   │       ├── gogoping_navigation/  # Nav2 wrapper (params + maps + launch)
-│   │       ├── gogoping_carry/       # 운반 액션 (책·간식 픽업·이동·내려놓기)
-│   │       ├── gogoping_follow/      # 추종 액션 (교사·아이 따라가기 — 사람 감지 + 거리 유지 + 손실 복구)
-│   │       ├── gogoping_msgs/        # ROS .msg/.srv/.action 정의 (ament_cmake)
-│   │       ├── gogoping_modes/       # 로봇 매니저 — FSM + Behavior Tree (보조·숨바꼭질·자장가)
-│   │       │   └── gogoping_modes/
-│   │       │       ├── __init__.py
-│   │       │       ├── main.py       # 프로그램 시작점 — rclpy.init + Node 생성 + FSM 인스턴스화 + spin
-│   │       │       ├── context.py    # 공유 데이터 + ROS 객체 저장소 (Node/publisher/subscriber 핸들 등)
-│   │       │       │
-│   │       │       ├── fsm/                     # 상태머신
-│   │       │       │   ├── __init__.py
-│   │       │       │   ├── robot_fsm.py         # 상태 정의 + 전환 규칙 + 현재 상태 추적
-│   │       │       │   └── states/              # 각 상태 클래스 (on_enter / on_exit / on_tick)
-│   │       │       │       ├── __init__.py
-│   │       │       │       └── <state_name>_state.py    # idle / manual / auto_nav / service /
-│   │       │       │                                    # return_home / error … 설계 진행 시 결정
-│   │       │       │
-│   │       │       ├── bt/                      # Behavior Tree (py_trees)
-│   │       │       │   ├── __init__.py
-│   │       │       │   ├── blackboard.py        # BT 노드 간 공유 데이터 저장소
-│   │       │       │   ├── behaviors/           # 개별 BT 노드 (action / condition)
-│   │       │       │   │   ├── __init__.py
-│   │       │       │   │   └── <category>/             # navigation / service / recovery / common
-│   │       │       │   │       ├── __init__.py
-│   │       │       │   │       └── <behavior_name>.py  # 설계 진행 시 결정
-│   │       │       │   └── trees/               # BT 트리 조립 (behaviors 조합)
-│   │       │       │       ├── __init__.py
-│   │       │       │       └── <tree_name>_tree.py     # nav / service / return … 설계 진행 시
-│   │       │       │
-│   │       │       ├── interfaces/   # 외부 HW / ROS action·service 호출 래퍼
-│   │       │       │   ├── __init__.py
-│   │       │       │   └── <iface_name>.py             # nav_client / servo_controller /
-│   │       │       │                                    # elevator_client / voice_interface …
-│   │       │       │
-│   │       │       └── utils/        # 공통 helper 함수 모음 (로그·수학·pose·시간 등) (optional)
-│   │       │                         # __init__.py 만 두고 시작. Rule of Three 적용 시 채움
-│   │       │                         # 후보: logger / math_utils / pose_utils / time_utils
-│   │       └── gogoping_vision/      # ⏳ 추후 — 얼굴 인식 / 사람 추종
-│   └── noriarm_ws/src/               # NoriArm 노트북에서 빌드
-│       ├── open_manipulator/         # vendor (git submodule, robotis-git/open_manipulator) — OMX
+│   │       ├── gogoping_camera/           # USB 카메라 → UDP MJPEG 송출 (SR-CAM-001)
+│   │       ├── gogoping_camera_pan/       # Arduino 서보 (pyserial, UI/BT 양쪽 사용, 우선순위 토픽 분리)
+│   │       ├── gogoping_navigation/       # Nav2 wrapper (params + maps + launch)
+│   │       ├── gogoping_vision/           # YOLO / ReID(Deep SORT, OSNet) / face_recognition
+│   │       ├── gogoping_msgs/             # ROS .msg/.srv/.action 정의 (ament_cmake)
+│   │       └── gogoping_modes/            # 로봇 매니저 — FSM + Behavior Tree
+│   │           └── gogoping_modes/
+│   │               ├── __init__.py
+│   │               ├── main.py            # rclpy.init + Node + FSM 인스턴스화 + spin
+│   │               ├── context.py         # 공유 객체 저장소 (blackboard, interfaces, fsm 핸들)
+│   │               │
+│   │               ├── fsm/                          # 상태머신
+│   │               │   ├── robot_fsm.py              # 6 states + transition 규칙
+│   │               │   └── states/                   # 각 state 의 lifecycle (on_enter / on_exit)
+│   │               │       └── <state_name>_state.py # charging / idle / assist / play / returning / error
+│   │               │
+│   │               ├── bt/                           # Behavior Tree (py_trees)
+│   │               │   ├── blackboard.py             # 공유 변수 스키마 + 초기값 (Keys 상수, 권한 등록)
+│   │               │   │
+│   │               │   ├── behaviors/                # 개별 BT 노드 (Action / Condition)
+│   │               │   │   │                         # ※ 기본 .py 단일 파일, 복잡해지면 폴더로 전환 (컨벤션 참조)
+│   │               │   │   │
+│   │               │   │   ├── common/               # 모든 MainTree 공유 가드 + 분기 condition
+│   │               │   │   │   └── <behavior>.[py|/] # battery_full_monitor / battery_low_monitor /
+│   │               │   │   │                         # hardware_health_monitor / collision_event_handler /
+│   │               │   │   │                         # command_listener / docking_contact_check /
+│   │               │   │   │                         # check_task / check_carry_mode
+│   │               │   │   │
+│   │               │   │   ├── navigation/           # Nav2 호출 + 도킹 시퀀스
+│   │               │   │   │   └── <behavior>.[py|/] # navigate_to_pose / align_to_dock [스켈레톤] /
+│   │               │   │   │                         # approach_dock [스켈레톤] / verify_docking_contact [스켈레톤] /
+│   │               │   │   │                         # stop_base / maintain_distance / check_arrival
+│   │               │   │   │
+│   │               │   │   ├── perception/           # gogoping_vision 토픽 → blackboard 어댑터
+│   │               │   │   │   └── <behavior>.[py|/] # is_target_visible / detect_target_person /
+│   │               │   │   │                         # found_child / child_face_tracker / load_stability_check
+│   │               │   │   │
+│   │               │   │   ├── follow/               # 카메라 pan 제어 + 추종 관련
+│   │               │   │   │   └── <behavior>.[py|/] # face_tracking / wait_for_reappear /
+│   │               │   │   │                         # raise_camera_pan / pan_camera_sweep
+│   │               │   │   │
+│   │               │   │   ├── manual/               # 수동 모드 lifecycle
+│   │               │   │   │   └── <behavior>.[py|/] # enable_manual_control / wait_for_exit
+│   │               │   │   │
+│   │               │   │   └── recovery/             # 에러 처리
+│   │               │   │       └── <behavior>.[py|/] # stop_all_motors / notify_admin_ui / log_error_to_db
+│   │               │   │
+│   │               │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
+│   │               │       ├── main_trees/           # FSM state 별 MainTree (총 6개)
+│   │               │       │   └── BT_<state>_main.py    # charging / idle / assist / play / returning / error
+│   │               │       │
+│   │               │       └── sub_trees/            # 작업별 SubTree (총 5개)
+│   │               │           └── BT_<task>_sub.py      # carry / follow / lullaby / hide_and_seek / return
+│   │               │
+│   │               ├── interfaces/                   # 외부 HW / ROS action·service·topic 호출 래퍼
+│   │               │   └── <iface_name>.py           # nav2_client / camera_pan_client / ui_publisher /
+│   │               │                                 # battery_subscriber / collision_subscriber / db_logger
+│   │               │
+│   │               └── utils/                        # 공통 helper (Rule of Three 적용 시 채움)
+│   │
+│   └── noriarm_ws/src/                    # NoriArm 노트북에서 빌드
+│       ├── open_manipulator/              # vendor (git submodule, robotis-git/open_manipulator) — OMX
 │       ├── noriarm_bringup/
-│       ├── noriarm_modes/            # 블럭쌓기·정리
+│       ├── noriarm_modes/                 # 블럭쌓기·정리
 │       ├── noriarm_vision/
 │       └── noriarm_msgs/
 │
