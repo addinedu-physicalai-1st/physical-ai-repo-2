@@ -1,0 +1,29 @@
+<?xml version="1.0" ?>
+
+<!--
+  핑더가든 가제보 시뮬레이션 진입점.
+
+  world geometry 는 /home/tonyno/pingdergarten/map.pgm 에서 직접 생성된 것.
+  로봇은 별도 launch (pinky upload_robot, openarm spawn 등) 를 include 또는 후속 실행.
+-->
+<launch>
+    <arg name="world_name" default="pingdergarten.world"/>
+    <arg name="world" default="$(find-pkg-share gogoping_navigation)/worlds/$(var world_name)"/>
+    <arg name="bridge_params" default="$(find-pkg-share gogoping_navigation)/config/pingdergarten_bridge.yaml"/>
+    <arg name="gui" default="true"/>
+
+    <set_env name="GZ_SIM_RESOURCE_PATH"
+             value="$(find-pkg-share gogoping_navigation)/models:$(env HOME)/.gazebo/models"/>
+
+    <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
+        <arg name='gz_args' value='-r -s -v3 $(var world)'/>
+        <arg name='on_exit_shutdown' value='true'/>
+    </include>
+
+    <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py" if="$(var gui)">
+        <arg name='gz_args' value='-g -v3 '/>
+    </include>
+
+    <node pkg="ros_gz_bridge" exec="parameter_bridge" name='gz_bridge' output='screen'
+          args="--ros-args -p config_file:=$(var bridge_params)"/>
+</launch>

@@ -1,0 +1,53 @@
+<?xml version="1.0" ?>
+
+<!--
+  핑더가든 가제보 시뮬레이션 + Vic Pinky 스폰.
+
+  스폰 위치 기본값: 입구 (world frame).
+    x = 0.20  (입구 중앙)
+    y = -7.00 (입구 남측, 복도 진입 전 위치)
+    Y(yaw) = 1.5708 (북쪽 = 복도 방향)
+
+  vicpinky_description / vicpinky_gazebo 가 빌드/소싱돼 있어야 함.
+-->
+<launch>
+    <arg name="namespace" default=""/>
+    <arg name="world_name" default="pingdergarten.world"/>
+    <arg name="world" default="$(find-pkg-share gogoping_navigation)/worlds/$(var world_name)"/>
+    <arg name="bridge_params" default="$(find-pkg-share gogoping_navigation)/config/pingdergarten_bridge.yaml"/>
+    <arg name="gui" default="true"/>
+
+    <!-- Pinky spawn pose (world frame) -->
+    <arg name="spawn_x" default="0.20"/>
+    <arg name="spawn_y" default="-7.00"/>
+    <arg name="spawn_z" default="0.10"/>
+    <arg name="spawn_yaw" default="1.5708"/>
+
+    <!-- vicpinky_description 부모 경로 추가 → model://vicpinky_description/... 해석 가능 -->
+    <set_env name="GZ_SIM_RESOURCE_PATH"
+             value="$(find-pkg-share gogoping_navigation)/models:$(find-pkg-share vicpinky_description)/..:$(env HOME)/.gazebo/models"/>
+
+    <!-- gz server -->
+    <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
+        <arg name='gz_args' value='-r -s -v3 $(var world)'/>
+        <arg name='on_exit_shutdown' value='true'/>
+    </include>
+
+    <!-- gz GUI -->
+    <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py" if="$(var gui)">
+        <arg name='gz_args' value='-g -v3 '/>
+    </include>
+
+    <!-- 공용 토픽 브리지 (clock, tf) -->
+    <node pkg="ros_gz_bridge" exec="parameter_bridge" name='gz_bridge' output='screen'
+          args="--ros-args -p config_file:=$(var bridge_params)"/>
+
+    <!-- Vic Pinky + 유치원 얼굴 데코 스폰 -->
+    <include file="$(find-pkg-share gogoping_navigation)/launch/spawn_pinky_kindergarten.launch.xml">
+        <arg name='namespace' value='$(var namespace)'/>
+        <arg name='x' value='$(var spawn_x)'/>
+        <arg name='y' value='$(var spawn_y)'/>
+        <arg name='z' value='$(var spawn_z)'/>
+        <arg name='Y' value='$(var spawn_yaw)'/>
+    </include>
+</launch>
