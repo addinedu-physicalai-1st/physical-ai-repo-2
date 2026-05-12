@@ -123,27 +123,37 @@ async function saveParent() {
 
 async function onFaceCaptured(images: Blob[]) {
   if (!selected.value) return
+  const childId = selected.value.id
   uploadingFace.value = true
   faceError.value = null
+  // 업로드: InsightFace 임베딩 5장 추출이 CPU 동기 작업이라 수초 걸린다.
+  // 무한 대기 방지를 위해 60s 타임아웃을 둔다.
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), 60_000)
   try {
     const form = new FormData()
     images.forEach((b, i) => form.append('files', b, `face_${i}.jpg`))
-    const res = await fetch(`/api/children/${selected.value.id}/face-images`, {
+    const res = await fetch(`/api/children/${childId}/face-images`, {
       method: 'POST',
       credentials: 'include',
       body: form,
+      signal: controller.signal,
     })
-    if (!res.ok) throw new Error(`upload failed: ${res.status}`)
+    if (!res.ok) throw new Error(`업로드 실패 (HTTP ${res.status})`)
 
-    const refreshed = await api.get<ChildDetail>(`/api/children/${selected.value.id}`)
+    const refreshed = await api.get<ChildDetail>(`/api/children/${childId}`)
     selected.value = refreshed
     notesDraft.value = refreshed.notes ?? ''
     const inList = children.value.find((c) => c.id === refreshed.id)
     if (inList) inList.photo_url = refreshed.photo_url
     capturing.value = false
   } catch (e) {
-    faceError.value = (e as Error).message
+    const msg = (e as Error).name === 'AbortError'
+      ? '서버 응답 시간 초과 — 다시 시도해주세요.'
+      : (e as Error).message
+    faceError.value = msg
   } finally {
+    window.clearTimeout(timer)
     uploadingFace.value = false
   }
 }
@@ -221,8 +231,7 @@ function gotoRegister() {
               <p v-else class="muted small">등록된 얼굴 사진이 없습니다.</p>
             </div>
             <div v-else>
-              <p v-if="uploadingFace" class="muted small">업로드 중...</p>
-              <FaceCapture v-else @complete="onFaceCaptured" />
+              <FaceCapture :uploading="uploadingFace" @complete="onFaceCaptured" />
             </div>
             <p v-if="faceError" class="error small">{{ faceError }}</p>
           </section>

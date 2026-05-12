@@ -50,11 +50,19 @@ class ReportOut(BaseModel):
 
 class PhotoOut(BaseModel):
     id: int
-    child_id: int
+    child_id: int | None
     url: str
     taken_at: datetime
     emotion: str | None
+    emotion_score: float | None
     mode: str | None
+
+
+class NaturalPhotoOut(BaseModel):
+    photo_id: int
+    url: str
+    # 같은 session_id 로 이미 INSERT 된 행을 돌려준 경우 True (멱등).
+    already: bool
 
 
 class RegisterChildPayload(BaseModel):

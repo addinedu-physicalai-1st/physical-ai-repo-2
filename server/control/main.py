@@ -210,6 +210,14 @@ app.mount(
     name="face-images",
 )
 
+# 자연 촬영 사진 정적 노출 — photos.py 의 url 컬럼이 /api/photos-static/natural/... 형태로 저장된다.
+os.makedirs(settings.photo_dir, exist_ok=True)
+app.mount(
+    "/api/photos-static",
+    StaticFiles(directory=settings.photo_dir),
+    name="photos-static",
+)
+
 
 class VoiceIntentRequest(BaseModel):
     text: str = Field(..., min_length=1)

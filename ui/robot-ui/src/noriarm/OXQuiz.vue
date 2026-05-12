@@ -55,8 +55,20 @@ const showSimViewer = computed(() => realArmPresent.value !== true);
 //   false — USB 없음 → 패널 계속 숨김
 const usbCameraAvailable = ref<boolean | null>(null);
 
-// 내장 카메라 감지 (자연 촬영용, 우상단). 추론 안 함.
+// 내장 카메라 감지 (자연 촬영용, 우상단).
 const integratedCameraAvailable = ref<boolean | null>(null);
+// 자연 촬영 — 한 세션당 최대 1장. done 화면에서 결과 라인에 사용.
+const naturalShotCount = ref(0);
+// IntegratedCameraPreview 에 넘기는 resetKey — startQuiz 마다 +1 해서 락 해제 trigger.
+const captureResetKey = ref(0);
+// 자연 촬영 활성 phase — 게임 진행 중 (intro/done 제외).
+const captureArmed = computed(
+  () => phase.value === 'question' || phase.value === 'thinking' || phase.value === 'reveal',
+);
+
+function handleNaturalShot(): void {
+  naturalShotCount.value += 1;
+}
 
 // reveal/playback 단계 동안 중복 클릭 방지.
 const submitting = ref(false);
@@ -153,6 +165,9 @@ function startQuiz(): void {
   currentIndex.value = 0;
   score.value = 0;
   userClicked.value = null;
+  // 새 세션 — 직전 캡처 락 해제 + 카운트 리셋.
+  naturalShotCount.value = 0;
+  captureResetKey.value += 1;
   startQuestion();
 }
 
@@ -214,6 +229,8 @@ function reset(): void {
   questions.value = [];
   score.value = 0;
   userClicked.value = null;
+  naturalShotCount.value = 0;
+  captureResetKey.value += 1;
 }
 
 watch(isActive, (active, prev) => {
@@ -287,17 +304,26 @@ const progressLabel = computed(
             <span class="score-total"> / {{ questions.length }}</span>
           </div>
           <p class="subtitle">{{ score === questions.length ? '완벽해요! 🎉' : score > 0 ? '잘했어요 👏' : '다음에는 더 잘할 수 있어요!' }}</p>
+          <p class="natural-shot-line">
+            {{ naturalShotCount > 0 ? '오늘의 표정 1장 찍었어요 📸' : '사진은 못 찍었어요' }}
+          </p>
           <div class="done-actions">
             <button class="primary" @click="startQuiz">다시 하기</button>
             <button class="secondary" @click="exitToIdle">그만 하기</button>
           </div>
         </div>
 
-        <!-- 우상단 floating: 노트북 내장 카메라 라이브 (추론 X, 자연 촬영용 — 후속 확장).
-             내장 카메라가 없을 때는 패널 숨김. -->
+        <!-- 우상단 floating: 노트북 내장 카메라 + 자연 촬영. 게임 진행 중 happy/sad 임계
+             초과 시 한 세션당 1장만 캡처 → Control Server 업로드. 내장 카메라가
+             없으면 패널 숨김. -->
         <div v-show="integratedCameraAvailable === true" class="capture-float">
           <IntegratedCameraPreview
+            :armed="captureArmed"
+            :reset-key="captureResetKey"
+            robot="noriarm"
+            mode="ox-quiz"
             @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
+            @captured="handleNaturalShot"
           />
           <p class="capture-caption">자연 촬영</p>
         </div>
@@ -510,6 +536,12 @@ const progressLabel = computed(
   display: flex;
   gap: 16px;
   justify-content: center;
+}
+.natural-shot-line {
+  margin: -8px 0 24px;
+  color: #5b7a8c;
+  font-size: 16px;
+  font-weight: 600;
 }
 .progress {
   font-size: 18px;
