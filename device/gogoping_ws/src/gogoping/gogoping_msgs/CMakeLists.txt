@@ -13,6 +13,7 @@ find_package(geometry_msgs REQUIRED)
 # 메시지 / 서비스 / 액션 정의 — 실제 정의 추가 시 아래 목록에 등록.
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Placeholder.msg"
+  "srv/SendCommand.srv"
   DEPENDENCIES std_msgs geometry_msgs
 )
 
