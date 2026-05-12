@@ -210,29 +210,6 @@ async def generate_chat(
     return _normalize_chat_dict(data)
 
 
-async def generate_bento_prompt(items: list[str]) -> str:
-    """Ollama 를 사용하여 급식 메뉴 기반의 이미지 생성 프롬프트를 생성."""
-    from server.ai.prompts import lunch_image
-    
-    messages = [
-        {"role": "system", "content": lunch_image.bento_prompt_system()},
-        {"role": "user", "content": lunch_image.bento_prompt_user(items)},
-    ]
-
-    raw = await _ollama_chat(
-        messages=messages,
-        num_predict=200,
-        num_ctx=1024,
-        temperature=0.7,
-    )
-    
-    try:
-        data = json.loads(raw)
-        return data.get("prompt", raw)
-    except json.JSONDecodeError:
-        return raw
-
-
 async def _ollama_chat(
     *,
     messages: list[dict[str, str]],
