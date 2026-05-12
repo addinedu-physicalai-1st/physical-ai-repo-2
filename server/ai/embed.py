@@ -5,10 +5,7 @@ chat 모델과는 별개로 임베딩 전용 모델을 별도 호출한다.
 """
 import httpx
 
-from server.ai.config import settings
-
-EMBED_MODEL = "bge-m3"
-EMBED_DIM = 1024
+from server.ai.config import EMBED_DIM, EMBED_MODEL, settings
 
 
 class EmbedError(Exception):

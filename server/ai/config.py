@@ -46,3 +46,22 @@ class Settings:
 
 
 settings = Settings()
+
+
+# --- 임베딩 (RAG 용 텍스트 → 벡터) ---
+EMBED_MODEL = "bge-m3"
+EMBED_DIM = 1024
+
+
+# --- run_server.sh 가 기동 전에 ollama pull 로 보장하는 모델 목록 ---
+# 셸 스크립트가 `python -m server.ai.config` 로 한 줄당 한 모델씩 받아간다.
+REQUIRED_OLLAMA_MODELS: tuple[str, ...] = (
+    settings.ollama_model,
+    settings.ollama_chat_model,
+    EMBED_MODEL,
+)
+
+
+if __name__ == "__main__":
+    for _m in REQUIRED_OLLAMA_MODELS:
+        print(_m)
