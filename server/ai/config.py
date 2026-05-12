@@ -1,8 +1,15 @@
-"""Settings — env 로 override 가능 (`OLLAMA_HOST`, `OLLAMA_MODEL`, `AI_PORT` 등)."""
-from pydantic_settings import BaseSettings
+"""AI Hub settings — 모든 값이 코드 기본값으로 박혀 있다.
+
+이 모듈의 필드는 **env override 를 받지 않는다**. 모델 교체·레이턴시 튜닝·
+음성 옵션 변경은 모두 이 파일을 직접 수정해서 한다 (`.env` 에 노브를 흩뿌리지 않기 위함).
+"""
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # env_prefix 를 실제로 쓰이지 않는 토큰으로 잠가 모든 필드가 env 와 결합되지 않도록 한다.
+    model_config = SettingsConfigDict(env_prefix="__DISABLED__", extra="ignore")
+
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:0.5b"
     # 잡담(chat) 전용 — 의도 분류(ollama_model)보다 크게 둘 수 있음. `ollama pull qwen2.5:3b` 필요.
@@ -34,15 +41,10 @@ class Settings(BaseSettings):
 
     # Edge neural — 한국어 남성: InJoon / Hyunsu(Multilingual). 아동 전용 화자는 없음.
     edge_tts_voice: str = "ko-KR-InJoonNeural"
-    # edge-tts 는 `Communicate(..., pitch=)` 만 SSML 안쪽에 반영된다. `+NNHz` / `+N.Nst` / `+N%` — env: EDGE_TTS_PITCH_PCT
+    # edge-tts 는 `Communicate(..., pitch=)` 만 SSML 안쪽에 반영된다. `+NNHz` / `+N.Nst` / `+N%`.
     edge_tts_pitch_pct: str = "+3.5st"
-    # 말 속도(밝기) — `^[+-]\\d+%$` 만. EDGE_TTS_RATE
+    # 말 속도(밝기) — `^[+-]\\d+%$` 만.
     edge_tts_rate: str = "+14%"
-
-    class Config:
-        env_prefix = ""
-        env_file = ".env"
-        extra = "ignore"
 
 
 settings = Settings()
