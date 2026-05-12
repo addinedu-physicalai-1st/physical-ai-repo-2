@@ -1,15 +1,13 @@
-"""AI Hub settings — 모든 값이 코드 기본값으로 박혀 있다.
+"""AI Hub settings — 모두 코드 기본값.
 
-이 모듈의 필드는 **env override 를 받지 않는다**. 모델 교체·레이턴시 튜닝·
-음성 옵션 변경은 모두 이 파일을 직접 수정해서 한다 (`.env` 에 노브를 흩뿌리지 않기 위함).
+env override 를 받지 않는다. 모델 교체·레이턴시 튜닝·음성 옵션 변경은 이 파일을
+직접 수정해서 한다 (`.env` 에 노브를 흩뿌리지 않기 위함).
 """
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from dataclasses import dataclass
 
 
-class Settings(BaseSettings):
-    # env_prefix 를 실제로 쓰이지 않는 토큰으로 잠가 모든 필드가 env 와 결합되지 않도록 한다.
-    model_config = SettingsConfigDict(env_prefix="__DISABLED__", extra="ignore")
-
+@dataclass
+class Settings:
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:0.5b"
     # 잡담(chat) 전용 — 의도 분류(ollama_model)보다 크게 둘 수 있음. `ollama pull qwen2.5:3b` 필요.
