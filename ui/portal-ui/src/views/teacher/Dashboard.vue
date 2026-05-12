@@ -35,9 +35,12 @@ const summary = computed(() => {
 })
 
 // TheMealDB — 무료, API key 불필요, CORS allow-all.
-// Korean 필터로 받은 목록에서 오늘 일자 기준 결정적으로 한 장 선택 — 같은 날 새로고침해도
-// 같은 사진이 뜨도록.
-const MEALDB_KOREAN_URL = 'https://www.themealdb.com/api/json/v1/1/filter.php?a=Korean'
+// `Korean` 영역은 데이터가 0개라 동아시아 4개 영역을 풀링한 뒤 오늘 일자(day-of-year)
+// 기준으로 한 장을 결정적으로 고른다. 같은 날엔 새로고침해도 같은 사진, 일자가 바뀌면
+// 다른 음식. 풀 크기 ~90개로 한 학년 안에서 ~2회 반복.
+const MEALDB_AREAS = ['Japanese', 'Chinese', 'Thai', 'Vietnamese']
+const MEALDB_FILTER = (area: string) =>
+  `https://www.themealdb.com/api/json/v1/1/filter.php?a=${encodeURIComponent(area)}`
 
 interface MealDBMeal {
   idMeal: string
@@ -51,17 +54,23 @@ async function loadLunchImage(menuItems: string[]) {
   lunchImageError.value = false
 
   try {
-    const res = await fetch(MEALDB_KOREAN_URL)
-    if (!res.ok) throw new Error(`MealDB HTTP ${res.status}`)
-    const body = (await res.json()) as { meals: MealDBMeal[] | null }
-    const meals = body.meals ?? []
-    if (!meals.length) throw new Error('No Korean meals returned')
+    const responses = await Promise.all(
+      MEALDB_AREAS.map((a) =>
+        fetch(MEALDB_FILTER(a))
+          .then((r) => (r.ok ? r.json() : { meals: null }))
+          .catch(() => ({ meals: null })),
+      ),
+    )
+    const pool: MealDBMeal[] = responses
+      .flatMap((body: { meals: MealDBMeal[] | null }) => body.meals ?? [])
+      // idMeal 로 정렬해 매 호출 순서가 같도록 — day-of-year 인덱싱의 안정성 보장.
+      .sort((a, b) => a.idMeal.localeCompare(b.idMeal))
+    if (!pool.length) throw new Error('Empty meal pool')
 
     const dayOfYear = Math.floor(
       (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000,
     )
-    const picked = meals[dayOfYear % meals.length]
-    lunchImageUrl.value = picked.strMealThumb
+    lunchImageUrl.value = pool[dayOfYear % pool.length].strMealThumb
   } catch (e) {
     console.warn('[LunchImage] CDN fetch failed:', e)
     lunchImageError.value = true
