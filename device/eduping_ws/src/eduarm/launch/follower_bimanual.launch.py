@@ -150,6 +150,17 @@ def _inactive_forward_position(_context: LaunchContext):
     )]
 
 
+def _soft_start(_context: LaunchContext):
+    """controller 활성화 직후 hold-pose 보간 goal — 시작 jerk 완화."""
+    return [Node(
+        package="eduarm",
+        executable="soft_start_node",
+        name="eduping_soft_start",
+        output="screen",
+        parameters=[{"ramp_s": 2.0, "timeout_s": 10.0}],
+    )]
+
+
 def generate_launch_description():
     # 우리 wrapper 가 device-eduping.sh 에서 hardware_type 인자를 전달하는데,
     # upstream 은 use_fake_hardware (bool) 를 받음. 변환 매핑:
@@ -207,6 +218,9 @@ def generate_launch_description():
     )
 
     delay_s = 1.0
+    # soft_start 는 JTC 가 active 가 된 직후에 hold-pose 를 보내야 하므로 spawner
+    # 보다 살짝 늦게 (spawn → 활성화 완료까지 ~1s) 띄움.
+    soft_start_delay_s = delay_s + 2.0
     return LaunchDescription(
         declared_arguments
         + [OpaqueFunction(function=_to_use_fake_hardware)]
@@ -221,5 +235,7 @@ def generate_launch_description():
                         actions=[OpaqueFunction(function=_gripper_controllers)]),
             TimerAction(period=delay_s,
                         actions=[OpaqueFunction(function=_inactive_forward_position)]),
+            TimerAction(period=soft_start_delay_s,
+                        actions=[OpaqueFunction(function=_soft_start)]),
         ]
     )
