@@ -1,0 +1,15 @@
+name: morning
+kind: greeting
+recorded_at: 2026-05-13T00:00:00Z
+sample_hz: 20
+note: stub for testing playback before any real recording exists
+joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6, joint_7, gripper]
+keyframes:
+  - { t: 0.0, pos: [0.0,  0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0] }
+  - { t: 0.5, pos: [0.0, -0.3, 0.0,  0.6, 0.0, 0.3, 0.0, 0.0] }
+  - { t: 1.0, pos: [0.0, -0.5, 0.0,  1.0, 0.0, 0.5, 0.0, 0.0] }
+  - { t: 1.5, pos: [0.0, -0.5, 0.0,  1.0, 0.5, 0.5, 0.0, 0.0] }
+  - { t: 2.0, pos: [0.0, -0.5, 0.0,  1.0, 0.0, 0.5, 0.0, 0.0] }
+  - { t: 2.5, pos: [0.0, -0.5, 0.0,  1.0, 0.5, 0.5, 0.0, 0.0] }
+  - { t: 3.0, pos: [0.0, -0.3, 0.0,  0.6, 0.0, 0.3, 0.0, 0.0] }
+  - { t: 3.5, pos: [0.0,  0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0] }
