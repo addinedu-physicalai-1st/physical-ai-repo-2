@@ -67,6 +67,15 @@ TOPIC_TRAJECTORY = "/eduping/joint_trajectory"
 KIND_DANCE = "dance"
 KIND_GREETING = "greeting"
 
+# --- 부드러운 시작 보간 파라미터 -------------------------------------------
+# 재생 시작 / 실물 동기화 켤 때 현재 pose ↔ 목표 pose 간 갭을 보고 ramp 를 끼움.
+PLAYBACK_RAMP_MIN_S = 0.3
+PLAYBACK_RAMP_MAX_S = 2.5
+PLAYBACK_RAMP_MAX_VEL = 1.5   # rad/s — 갭 / 이 값 = ramp 시간 (clamp 사이)
+TELEOP_MAX_VEL_RAD_S = 2.0    # rad/s — SmoothDamp 의 catch-up 단계 속도 cap
+TELEOP_SMOOTH_TIME_S = 0.25   # SmoothDamp 시정수 — target 도달까지 nominal 시간
+TELEOP_TICK_DT_MAX = 0.04     # dt clamp 상한 — leader stale 시 단일 tick 점프 방지
+
 
 # --- 데이터 -----------------------------------------------------------------
 
@@ -134,6 +143,13 @@ class EdupingRosBridge:
         self._real_active_val: bool = False
         # Live teleop 독립 상태 — 녹화와 무관하게 leader → forward_position 패스스루 ON/OFF.
         self._teleop_active: bool = False
+        # Teleop SmoothDamp tracking — cmd + per-joint velocity 를 함께 유지.
+        # set_live_teleop(True) 시 None → 첫 mirror 콜백에서 현재 follower 로 초기화.
+        self._teleop_cmd_right: list[float] | None = None
+        self._teleop_cmd_left: list[float] | None = None
+        self._teleop_vel_right: list[float] | None = None
+        self._teleop_vel_left: list[float] | None = None
+        self._teleop_last_tick_s: float = 0.0
 
         # listener: dict[topic_name, set[callback]] — WS hub 들이 등록.
         self._listeners_state: set[Callable[[dict], Any]] = set()
@@ -245,8 +261,10 @@ class EdupingRosBridge:
             self._mirror_leader_to_follower(names, pos)
 
     def _mirror_leader_to_follower(self, names: list[str], pos: list[float]) -> None:
-        """녹화 중 live teleop — 양팔 7개씩 forward_position_controller 토픽에 publish.
+        """live teleop — SmoothDamp (임계감쇠 2차 필터) 로 leader 추격.
 
+        per-joint velocity state 를 유지해서 가속도 연속 (jerk-free). 큰 갭 catch-up
+        단계는 max_speed 로 cap, 가까워지면 smooth_time 시정수로 자연 감속.
         그리퍼는 GripperActionController 라 streaming 안 됨 — mirror 제외.
         """
         right_idx, left_idx = [], []
@@ -258,13 +276,64 @@ class EdupingRosBridge:
                 left_idx.append(names.index(l_name))
             except ValueError:
                 return  # 이름이 다르면 (구 녹화 leader 등) 스킵
+        target_right = [float(pos[i]) for i in right_idx]
+        target_left = [float(pos[i]) for i in left_idx]
+
+        now = time.monotonic()
+        with self._lock:
+            cmd_right = self._teleop_cmd_right
+            cmd_left = self._teleop_cmd_left
+            vel_right = self._teleop_vel_right
+            vel_left = self._teleop_vel_left
+            last_tick = self._teleop_last_tick_s
+            if cmd_right is None or cmd_left is None:
+                init_r, init_l = _extract_arm_pos(self._follower)
+                if cmd_right is None:
+                    cmd_right = init_r if init_r is not None else list(target_right)
+                if cmd_left is None:
+                    cmd_left = init_l if init_l is not None else list(target_left)
+                vel_right = [0.0] * 7
+                vel_left = [0.0] * 7
+            self._teleop_last_tick_s = now
+
+        dt = (now - last_tick) if last_tick > 0 else TELEOP_TICK_DT_MAX
+        stale = dt > TELEOP_TICK_DT_MAX
+        if stale:
+            # leader 가 잠시 멈췄다 재개 — velocity 리셋 안 하면 stale 직전 속도로 튐.
+            vel_right = [0.0] * 7
+            vel_left = [0.0] * 7
+            dt = TELEOP_TICK_DT_MAX
+        dt = max(0.001, dt)
+
+        # mypy 만족 — None 분기는 위에서 처리됨
+        assert vel_right is not None and vel_left is not None
+
+        new_right_pos: list[float] = []
+        new_right_vel: list[float] = []
+        for c, t, v in zip(cmd_right, target_right, vel_right):
+            np_, nv = _smooth_damp(c, t, v, TELEOP_SMOOTH_TIME_S, TELEOP_MAX_VEL_RAD_S, dt)
+            new_right_pos.append(np_)
+            new_right_vel.append(nv)
+        new_left_pos: list[float] = []
+        new_left_vel: list[float] = []
+        for c, t, v in zip(cmd_left, target_left, vel_left):
+            np_, nv = _smooth_damp(c, t, v, TELEOP_SMOOTH_TIME_S, TELEOP_MAX_VEL_RAD_S, dt)
+            new_left_pos.append(np_)
+            new_left_vel.append(nv)
+
+        with self._lock:
+            self._teleop_cmd_right = new_right_pos
+            self._teleop_cmd_left = new_left_pos
+            self._teleop_vel_right = new_right_vel
+            self._teleop_vel_left = new_left_vel
+
         if self._pub_right_forward is not None:
             m = Float64MultiArray()
-            m.data = [float(pos[i]) for i in right_idx]
+            m.data = [float(x) for x in new_right_pos]
             self._pub_right_forward.publish(m)
         if self._pub_left_forward is not None:
             m = Float64MultiArray()
-            m.data = [float(pos[i]) for i in left_idx]
+            m.data = [float(x) for x in new_left_pos]
             self._pub_left_forward.publish(m)
 
     def _on_follower(self, msg: "JointState") -> None:
@@ -364,12 +433,23 @@ class EdupingRosBridge:
                 return {"active": False, "switch": "failed", "hint": "실물 bringup 가 떠 있는지 확인"}
             with self._lock:
                 self._teleop_active = True
+                # 새 추격 세션 — cmd/vel 을 None 으로 두면 첫 mirror 콜백에서 시드.
+                self._teleop_cmd_right = None
+                self._teleop_cmd_left = None
+                self._teleop_vel_right = None
+                self._teleop_vel_left = None
+                # 첫 dt 가 huge 가 안 되도록 enable 시점을 last_tick 으로 박음.
+                self._teleop_last_tick_s = time.monotonic()
             return {"active": True, "switch": "ok"}
         else:
             with self._lock:
                 if not self._teleop_active:
                     return {"active": False, "switch": "noop"}
                 self._teleop_active = False
+                self._teleop_cmd_right = None
+                self._teleop_cmd_left = None
+                self._teleop_vel_right = None
+                self._teleop_vel_left = None
             self._switch_controllers(
                 activate=["right_joint_trajectory_controller", "left_joint_trajectory_controller"],
                 deactivate=["right_forward_position_controller", "left_forward_position_controller"],
@@ -450,10 +530,13 @@ class EdupingRosBridge:
         if not routine.keyframes:
             raise ValueError(f"{path}: keyframes 비어있음")
 
+        # 첫 keyframe 와 현재 follower pose 차이로 부드러운 ramp 시간 산출.
+        ramp_s = self._compute_ramp_s(routine)
+
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
         for kf in routine.keyframes:
-            t_scaled = kf.t / speed
+            t_scaled = (kf.t / speed) + ramp_s
             sec = int(t_scaled)
             nsec = int((t_scaled - sec) * 1e9)
             pt = JointTrajectoryPoint()
@@ -466,22 +549,44 @@ class EdupingRosBridge:
         self._js_pub.publish(msg)
         # 내부 보간 루프 시동 — UI follower 채널 (sim 검수용). 실물 publish 시엔
         # 실제 robot 의 /joint_states 가 _follower 를 덮어쓰니 시각화도 실제 거동.
-        self._start_playback(routine.joint_names, routine.keyframes, speed)
+        self._start_playback(routine.joint_names, routine.keyframes, speed, ramp_s)
 
         result = {
             "ok": True,
             "target": target,
             "path": str(path),
             "frame_count": len(msg.points),
-            "duration_s": round(routine.duration_s / speed, 3),
+            "duration_s": round((routine.duration_s / speed) + ramp_s, 3),
             "speed": speed,
+            "ramp_s": round(ramp_s, 3),
         }
         if target == "real":
-            real_status = self._send_real_follower_goals(routine, speed)
+            real_status = self._send_real_follower_goals(routine, speed, ramp_s)
             result["real"] = real_status
         return result
 
-    def _send_real_follower_goals(self, routine: Any, speed: float) -> dict:
+    def _compute_ramp_s(self, routine: Any) -> float:
+        """현재 follower pose 와 routine 첫 keyframe 의 최대 갭 → ramp 시간 (clamp).
+
+        follower 가 비어있으면 MIN 으로 fallback.
+        """
+        first_pos = list(routine.keyframes[0].pos)
+        names = list(routine.joint_names)
+        with self._lock:
+            f_names = list(self._follower.joint_names)
+            f_pos = list(self._follower.positions)
+        if not f_names:
+            return PLAYBACK_RAMP_MIN_S
+        max_gap = 0.0
+        for n, target in zip(names, first_pos):
+            try:
+                idx = f_names.index(n)
+            except ValueError:
+                continue
+            max_gap = max(max_gap, abs(float(f_pos[idx]) - float(target)))
+        return max(PLAYBACK_RAMP_MIN_S, min(PLAYBACK_RAMP_MAX_S, max_gap / PLAYBACK_RAMP_MAX_VEL))
+
+    def _send_real_follower_goals(self, routine: Any, speed: float, ramp_s: float) -> dict:
         """4 controller (양팔 trajectory + 양 gripper) 에 action goal 분배.
 
         녹화 YAML 의 joint 명이 URDF 명 (`openarm_{side}_jointN`, `openarm_{side}_finger_joint1`)
@@ -510,8 +615,11 @@ class EdupingRosBridge:
         right_goal.trajectory.joint_names = right_arm
         left_goal = FollowJointTrajectory.Goal()
         left_goal.trajectory.joint_names = left_arm
-        for kf in routine.keyframes:
-            t = float(kf.t) / speed
+        kf_last_idx = len(routine.keyframes) - 1
+        for kf_i, kf in enumerate(routine.keyframes):
+            # 첫 point 를 ramp_s 만큼 미루면 joint_trajectory_controller 가 spline 으로
+            # 현재 pose → 이 point 사이 부드럽게 보간 → 시작 jerk 제거.
+            t = (float(kf.t) / speed) + ramp_s
             sec = int(t)
             nsec = int((t - sec) * 1e9)
             d = Duration(sec=sec, nanosec=nsec)
@@ -519,11 +627,17 @@ class EdupingRosBridge:
             r_pt = JointTrajectoryPoint()
             r_pt.positions = [float(kf.pos[i]) for i in idx_right]
             r_pt.time_from_start = d
-            right_goal.trajectory.points.append(r_pt)
-
             l_pt = JointTrajectoryPoint()
             l_pt.positions = [float(kf.pos[i]) for i in idx_left]
             l_pt.time_from_start = d
+
+            # 첫·끝 point 에 velocities=0 명시 → JTC 가 정지 상태에서 ease-in / ease-out
+            # spline 으로 자연스럽게 가속·감속.
+            if kf_i == 0 or kf_i == kf_last_idx:
+                r_pt.velocities = [0.0] * 7
+                l_pt.velocities = [0.0] * 7
+
+            right_goal.trajectory.points.append(r_pt)
             left_goal.trajectory.points.append(l_pt)
 
         # 그리퍼 — 마지막 keyframe 값을 단발로
@@ -598,12 +712,28 @@ class EdupingRosBridge:
         logger.info("switch_controller OK — message=%r", msg)
         return True
 
-    def _start_playback(self, joint_names: list[str], keyframes: list[Any], speed: float) -> None:
+    def _start_playback(
+        self,
+        joint_names: list[str],
+        keyframes: list[Any],
+        speed: float,
+        ramp_s: float,
+    ) -> None:
         self._stop_playback()
         self._playback_stop.clear()
+        # 현재 follower pose 를 joint_names 순서로 캡쳐 — ramp-in 시작점.
+        with self._lock:
+            f_names = list(self._follower.joint_names)
+            f_pos = list(self._follower.positions)
+        start_pos: list[float] | None = None
+        if f_names:
+            try:
+                start_pos = [float(f_pos[f_names.index(n)]) for n in joint_names]
+            except ValueError:
+                start_pos = None
         self._playback_thread = threading.Thread(
             target=self._playback_loop,
-            args=(list(joint_names), list(keyframes), float(speed)),
+            args=(list(joint_names), list(keyframes), float(speed), float(ramp_s), start_pos),
             name="eduping-playback",
             daemon=True,
         )
@@ -616,22 +746,39 @@ class EdupingRosBridge:
             thr.join(timeout=1.0)
         self._playback_thread = None
 
-    def _playback_loop(self, names: list[str], keyframes: list[Any], speed: float) -> None:
+    def _playback_loop(
+        self,
+        names: list[str],
+        keyframes: list[Any],
+        speed: float,
+        ramp_s: float,
+        start_pos: list[float] | None,
+    ) -> None:
         if not keyframes:
             return
         period = 1.0 / 30.0
+        target_first = [float(x) for x in keyframes[0].pos]
+        # start_pos 없거나 길이 불일치면 ramp 스킵 — keyframe[0] 부터 바로 시작.
+        if start_pos is None or len(start_pos) != len(target_first):
+            ramp_s = 0.0
         start = time.monotonic()
         end_t = float(keyframes[-1].t)
         while not self._playback_stop.is_set():
             now = time.monotonic()
-            elapsed = (now - start) * speed
-            if elapsed >= end_t:
-                pos = [float(x) for x in keyframes[-1].pos]
-                with self._lock:
-                    self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
-                break
-            # 선형 보간 — 양 끝 keyframe 사이에서.
-            pos = _interp_keyframes(keyframes, elapsed)
+            elapsed = now - start
+            if ramp_s > 0 and elapsed < ramp_s:
+                # ramp-in — smoothstep (3r²-2r³) 로 가속/감속이 부드러운 S-curve.
+                r = elapsed / ramp_s
+                s = r * r * (3.0 - 2.0 * r)
+                pos = [a + s * (b - a) for a, b in zip(start_pos, target_first)]  # type: ignore[arg-type]
+            else:
+                t = (elapsed - ramp_s) * speed
+                if t >= end_t:
+                    pos = [float(x) for x in keyframes[-1].pos]
+                    with self._lock:
+                        self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
+                    break
+                pos = _interp_keyframes(keyframes, t)
             with self._lock:
                 self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
             time.sleep(period)
@@ -657,6 +804,81 @@ def _estimate_hz(samples: list[tuple[float, list[float]]]) -> int:
     if duration <= 0:
         return 50
     return max(1, int(round((len(samples) - 1) / duration)))
+
+
+def _step_toward(current: float, target: float, max_step: float) -> float:
+    """current 를 target 방향으로 최대 max_step 만큼 이동. 차이가 작으면 target 직접 반환."""
+    diff = target - current
+    if diff > max_step:
+        return current + max_step
+    if diff < -max_step:
+        return current - max_step
+    return target
+
+
+def _smooth_damp(
+    current: float,
+    target: float,
+    velocity: float,
+    smooth_time: float,
+    max_speed: float,
+    dt: float,
+) -> tuple[float, float]:
+    """Unity-style SmoothDamp — 임계감쇠 (critical damping).
+
+    smooth_time 에 가까이 target 에 도달하도록 부드럽게 가속·감속. 가속·속도·위치가
+    연속이라 jerk-free 느낌. max_speed 는 큰 갭 catch-up 단계의 속도 cap.
+
+    velocity 는 persistent state — 호출마다 반환값으로 갱신해서 다음 호출에 넘김.
+    """
+    smooth_time = max(1e-4, smooth_time)
+    omega = 2.0 / smooth_time
+    x = omega * dt
+    exp_factor = 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
+
+    change = current - target
+    original_target = target
+
+    # max_speed clamp (catch-up 단계의 효과 속도 한계)
+    max_change = max_speed * smooth_time
+    if change > max_change:
+        change = max_change
+    elif change < -max_change:
+        change = -max_change
+    target_clamped = current - change
+
+    temp = (velocity + omega * change) * dt
+    new_velocity = (velocity - omega * temp) * exp_factor
+    new_position = target_clamped + (change + temp) * exp_factor
+
+    # 원래 target 을 지나치면 snap (오버슈트 방지)
+    diff_orig = original_target - current
+    if (diff_orig > 0.0 and new_position > original_target) or (
+        diff_orig < 0.0 and new_position < original_target
+    ):
+        new_position = original_target
+        new_velocity = (new_position - current) / dt if dt > 0 else 0.0
+
+    return new_position, new_velocity
+
+
+def _extract_arm_pos(js: _JsState) -> tuple[list[float] | None, list[float] | None]:
+    """JS 에서 7+7 arm joint pos 추출. 둘 다 못 찾으면 (None, None)."""
+    if not js.joint_names:
+        return None, None
+    right: list[float] = []
+    left: list[float] = []
+    for i in range(1, 8):
+        r_name = f"openarm_right_joint{i}"
+        l_name = f"openarm_left_joint{i}"
+        try:
+            ri = js.joint_names.index(r_name)
+            li = js.joint_names.index(l_name)
+        except ValueError:
+            return None, None
+        right.append(float(js.positions[ri]))
+        left.append(float(js.positions[li]))
+    return right, left
 
 
 def _interp_keyframes(keyframes: list[Any], t: float) -> list[float]:
