@@ -1,0 +1,140 @@
+<?xml version="1.0" ?>
+<!--
+  핑더가든 sim + Vic Pinky + nav2 풀스택.
+
+  launch_sim_with_pinky.launch.xml (gazebo + Pinky spawn + 토픽 bridge) +
+  nav2 (map_server + AMCL + planner + controller + behavior + bt_navigator +
+  waypoint_follower + velocity_smoother + costmap) 를 한 번에 띄운다.
+
+  TF tree (예상):
+    map  → gogoping/odom            (AMCL 발행)
+         → gogoping/base_footprint  (gazebo odom plugin → /tf)
+         → gogoping/base_link       (URDF static)
+         → gogoping/lidar, camera, …
+
+  WaypointsRosBridge (server/control/waypoints/ros_bridge.py) 가 이 transform 을
+  lookup 하여 map frame 의 정확한 로봇 pose 를 얻는다.
+
+  주의:
+   * Gazebo `ros_gz_bridge` 가 /tf 를 root namespace 로 발행하므로 nav2 노드도
+     root namespace 에서 띄우고, 토픽은 /gogoping/* 절대경로로 지정한다
+     (vicpinky_navigation/launch/bringup_launch.xml 의 push-ros-namespace +
+     /tf→tf remap 패턴은 여기서 쓰지 않는다).
+   * laser_filters 가 /gogoping/scan → /gogoping/scan_filtered 를 생성.
+-->
+<launch>
+    <arg name="namespace" default="gogoping"/>
+    <arg name="world_name" default="pingdergarten.world"/>
+    <arg name="map" default="$(find-pkg-share gogoping_navigation)/maps/map.yaml"/>
+    <arg name="params_file"
+         default="$(find-pkg-share gogoping_navigation)/params/nav2_params_sim.yaml"/>
+    <arg name="laser_filter_params"
+         default="$(find-pkg-share gogoping_navigation)/params/laser_filter_sim.yaml"/>
+    <arg name="use_sim_time" default="true"/>
+    <arg name="autostart" default="true"/>
+    <arg name="log_level" default="info"/>
+    <!-- laser_filters 가 설치돼 있을 때만 true 로 (ros-jazzy-laser-filters).
+         false (default) 면 nav2 가 raw /gogoping/scan 직접 사용. -->
+    <arg name="use_laser_filter" default="false"/>
+
+    <!-- 1) gazebo + Vic Pinky spawn -->
+    <include file="$(find-pkg-share gogoping_navigation)/launch/launch_sim_with_pinky.launch.xml">
+        <arg name='namespace' value='$(var namespace)'/>
+        <arg name='world_name' value='$(var world_name)'/>
+    </include>
+
+    <!-- 2) laser_filters: /gogoping/scan → /gogoping/scan_filtered
+         (vicpinky_bringup/config/laser_filter.yaml 의 sim 버전 사용)
+         use_laser_filter:=true 이고 ros-jazzy-laser-filters 가 설치된 경우에만 활성. -->
+    <group if="$(var use_laser_filter)">
+        <node pkg="laser_filters" exec="scan_to_scan_filter_chain"
+              name="scan_to_scan_filter_chain"
+              namespace="$(var namespace)" output="screen">
+            <param from="$(var laser_filter_params)"/>
+            <param name="use_sim_time" value="$(var use_sim_time)"/>
+        </node>
+    </group>
+
+    <!-- 3) nav2 stack — root namespace, topics 절대경로 사용.
+            (push-ros-namespace 안 함 → /tf 가 global 그대로) -->
+
+    <!-- 3a) map_server -->
+    <node pkg="nav2_map_server" exec="map_server" name="map_server" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="yaml_filename" value="$(var map)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- 3b) AMCL — scan_topic 은 params 에서 /gogoping/scan_filtered 로 설정됨 -->
+    <node pkg="nav2_amcl" exec="amcl" name="amcl" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- 3c) lifecycle manager (localization) -->
+    <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
+          name="lifecycle_manager_localization" output="screen">
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <param name="autostart" value="$(var autostart)"/>
+        <param name="node_names" value="['map_server', 'amcl']"/>
+    </node>
+
+    <!-- 3d) controller_server -->
+    <node pkg="nav2_controller" exec="controller_server" name="controller_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
+    </node>
+
+    <!-- 3e) planner_server -->
+    <node pkg="nav2_planner" exec="planner_server" name="planner_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- 3f) behavior_server -->
+    <node pkg="nav2_behaviors" exec="behavior_server" name="behavior_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- 3g) bt_navigator -->
+    <node pkg="nav2_bt_navigator" exec="bt_navigator" name="bt_navigator"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- 3h) waypoint_follower -->
+    <node pkg="nav2_waypoint_follower" exec="waypoint_follower"
+          name="waypoint_follower" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- 3i) velocity_smoother — cmd_vel_nav → /gogoping/cmd_vel -->
+    <node pkg="nav2_velocity_smoother" exec="velocity_smoother"
+          name="velocity_smoother" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
+        <remap from="cmd_vel_smoothed" to="/gogoping/cmd_vel"/>
+    </node>
+
+    <!-- 3j) lifecycle manager (navigation) -->
+    <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
+          name="lifecycle_manager_navigation" output="screen">
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <param name="autostart" value="$(var autostart)"/>
+        <param name="node_names"
+               value="['controller_server', 'planner_server', 'behavior_server',
+                       'bt_navigator', 'waypoint_follower', 'velocity_smoother']"/>
+    </node>
+</launch>

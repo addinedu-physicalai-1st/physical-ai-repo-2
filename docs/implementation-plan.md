@@ -352,7 +352,7 @@ last_synced: "2026-05-04T13:33:23"
 | SR-DAT-005 | 작업 로그 | DB 가 task_log(시작·종료·결과·사유) 테이블에 작업 로그를 기록한다. | Low |
 | SR-DAT-009 | 모드 상태 | DB 가 `mode_history(robot_id, time, mode)` + 로봇별 현재 모드 캐시로 로봇별 독립 모드 상태를 기록한다. | High |
 | SR-DAT-011 | 사진첩 데이터 | 오브젝트 스토리지 (사진 binary) · DB `photo` 테이블 (경로·촬영시각·모드·트리거 child_id·감정 점수·감정 카테고리) · DB `photo_subject(photo_id, child_id)` N:N 매핑 테이블 (사진 내 등장한 모든 등록 아이) 로 분리 저장한다. 학부모 사진첩 조회 (SR-PHOTO-003) 는 `photo_subject` 매핑으로 자녀 포함 여부를 판정한다. Control Server 가 발급한 짧은 TTL presigned URL 로 학부모 브라우저는 Vite dev `/photos/*` proxy 경유, 교사앱(PyQt5)은 `requests.get(url)` 으로 MinIO 에 직접 접근한다. | Low |
-| SR-DAT-012 | nav graph | DB 가 nav_graph 테이블에 SLAM 맵 위 nav graph (node·edge·named pose) 를 저장한다. | Low |
+| SR-DAT-012 | nav graph | DB 가 nav_graph 테이블에 SLAM 맵 위 nav graph (node·edge·named pose) 를 저장한다. (MVP: `shared/waypoints.yaml` + node-only — 2026-05-13 완료, DB 마이그레이션 + edge 그래프는 follow-up) | Low |
 | SR-DAT-013 | 비동기 작업 큐 데이터 | DB 가 ai_job(id·kind·payload·status·attempts·max_attempts·last_error·created_at·started_at·finished_at) 테이블에 §7.3 비동기 작업 큐 행을 저장한다. status 는 pending/running/done/failed 상태 머신을 가지며 worker 픽업은 `FOR UPDATE SKIP LOCKED` 로 race-safe 처리한다. | High |
 
 ## 7. AI Server (Vision + LLM)
