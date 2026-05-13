@@ -26,7 +26,9 @@ from PyQt5.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QSlider,
@@ -571,6 +573,7 @@ class TeleopCard(QWidget):
         send_cmd_vel: SendCmdFn,
         get_health: Callable[[], dict | None] | None = None,
         machine_ips_json: pathlib.Path | None = None,
+        control_url: str = "http://localhost:8000",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -580,6 +583,7 @@ class TeleopCard(QWidget):
         self._send = send_cmd_vel
         self._get_health = get_health
         self._ips_json = machine_ips_json or self.DEFAULT_VIC_IPS_JSON
+        self._control_url = control_url
 
         self._keys_down: set[int] = set()
         self._buttons_down: set[str] = set()
@@ -661,6 +665,14 @@ class TeleopCard(QWidget):
         self.cmd_row = LiveReadout(self)
         cockpit.addWidget(self.cmd_row, 0)
         cockpit.addWidget(self._build_sliders(), 0)
+
+        # 웨이포인트 "여기 저장" 버튼
+        self._save_btn = QPushButton("📍 여기 저장")
+        self._save_btn.setObjectName("teleopSaveWaypoint")
+        self._save_btn.setFocusPolicy(Qt.NoFocus)
+        self._save_btn.clicked.connect(self._on_save_waypoint)
+        cockpit.addWidget(self._save_btn, 0)
+
         cockpit.addStretch(1)
         main_row.addLayout(cockpit, 3)
 
@@ -926,6 +938,41 @@ class TeleopCard(QWidget):
             self.mode_badge.set_status("REAL", COLORS["primary"])
         else:
             self.mode_badge.set_status("—", COLORS["text_muted"])
+
+    # --------------------------------------------------- waypoint save
+
+    def _on_save_waypoint(self) -> None:
+        import httpx
+        while True:
+            name, ok = QInputDialog.getText(self, "웨이포인트 저장", "이름:")
+            if not ok:
+                return
+            name = name.strip()
+            if not name:
+                QMessageBox.warning(self, "오류", "이름을 입력해주세요.")
+                continue
+            try:
+                r = httpx.post(
+                    f"{self._control_url}/waypoints",
+                    json={"name": name}, timeout=2.0,
+                )
+            except httpx.HTTPError as e:
+                QMessageBox.critical(self, "통신 오류", str(e))
+                return
+            if r.status_code == 201:
+                data = r.json()
+                QMessageBox.information(
+                    self, "저장됨",
+                    f"{data['name']} 저장 ({data['x']:.2f}, {data['y']:.2f})",
+                )
+                return
+            try:
+                msg = r.json().get("detail", r.text)
+            except Exception:
+                msg = r.text
+            QMessageBox.warning(self, "저장 실패", msg)
+            if isinstance(msg, str) and "odom" in msg:
+                return
 
     # --------------------------------------------------- health
 

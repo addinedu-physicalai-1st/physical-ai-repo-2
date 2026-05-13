@@ -1,0 +1,14 @@
+# scan_to_scan_filter_chain config for sim — robot footprint polygon
+# excludes the robot body from /gogoping/scan to produce /gogoping/scan_filtered.
+#
+# vicpinky_bringup/config/laser_filter.yaml 의 sim 버전. polygon_frame 만
+# `gogoping/base_link` 로 prefix 추가.
+/**:
+  ros__parameters:
+    filter1:
+      name: polygon_filter
+      type: laser_filters/LaserScanPolygonFilter
+      params:
+        polygon_frame: gogoping/base_link
+        polygon: '[[0.35, -0.30], [0.35, 0.30], [-0.35, 0.30], [-0.35, -0.30]]'
+        invert: false

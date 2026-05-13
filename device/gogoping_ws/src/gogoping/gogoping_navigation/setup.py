@@ -24,6 +24,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         _data_glob('launch', '*.launch.xml'),
         _data_glob('config', '*.yaml'),
+        _data_glob('params', '*.yaml'),
         _data_glob('maps', '*'),
         _data_glob('rviz', '*.rviz'),
         _data_glob('urdf', '*.xacro'),

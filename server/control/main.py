@@ -28,6 +28,8 @@ from server.control.routers import reports as reports_router
 from server.control.routers import schedule as schedule_router
 from server.control.teleop.ros_bridge import RosBridge
 from server.control.teleop.router import install as install_teleop
+from server.control.waypoints.ros_bridge import WaypointsRosBridge
+from server.control.waypoints.router import install as install_waypoints
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,11 @@ async def lifespan(app: FastAPI):
         _teleop_bridge.start()
     except Exception as e:
         logger.warning(f"teleop RosBridge 시작 실패: {e}")
+
+    try:
+        _waypoints_bridge.start()
+    except Exception as e:
+        logger.warning(f"waypoints RosBridge 시작 실패: {e}")
 
     try:
         await _teleop_hub.start()
@@ -102,6 +109,10 @@ async def lifespan(app: FastAPI):
         _teleop_bridge.shutdown()
     except Exception:
         pass
+    try:
+        _waypoints_bridge.shutdown()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="Pingdergarten Control", version="0.1.0", lifespan=lifespan)
@@ -129,6 +140,10 @@ app.include_router(schedule_router.router)
 # install_teleop 가 라우터를 부착하고 hub 를 반환한다. 실제 start/stop 은 lifespan 에서.
 _teleop_bridge = RosBridge()
 _teleop_hub = install_teleop(app, _teleop_bridge)
+
+# waypoints (GogoPing waypoint Goto / patrol) — REST + SSE
+_waypoints_bridge = WaypointsRosBridge()
+install_waypoints(app, _waypoints_bridge)
 
 
 # NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.

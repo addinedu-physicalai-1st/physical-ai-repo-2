@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import math
+import os
 import random
 
 from PyQt5.QtCore import Qt, QTimer
@@ -30,7 +31,6 @@ from widgets import (
     IconText,
     Joint,
     JointPanel,
-    MapView,
     MetricRow,
     StatChip,
     StatusBadge,
@@ -38,6 +38,7 @@ from widgets import (
     soften,
 )
 from widgets.camera_widget import CameraStreamView
+from widgets.waypoint_map_card import WaypointMapCard
 
 
 # --------------------------------------------------------------------------
@@ -317,11 +318,11 @@ class GogoPingDashboard(QWidget):
             self.camera = CameraView()
         self.camera_card.body.addWidget(self.camera, 1)
 
-        self.map_card = Card("실내 맵 · 위치")
-        self.map_card.set_watermark("🗺️")
-        self.map_view = MapView()
-        self.map_view.setMinimumHeight(220)
-        self.map_card.body.addWidget(self.map_view, 1)
+        control_url = os.environ.get(
+            "PINGDER_CONTROL_URL", "http://localhost:8000",
+        )
+        self.map_card = WaypointMapCard(control_url=control_url)
+        self.map_card.setMinimumHeight(220)
 
         monitor_row = QHBoxLayout()
         monitor_row.setSpacing(14)
@@ -335,6 +336,7 @@ class GogoPingDashboard(QWidget):
         self.teleop_card = TeleopCard(
             send_cmd_vel=self.teleop_client.post_cmd_vel,
             get_health=self.teleop_client.get_health,
+            control_url=control_url,
         )
         self.teleop_client.connect_state_ws(self.teleop_card.on_state)
 
@@ -347,7 +349,6 @@ class GogoPingDashboard(QWidget):
 
     def _on_tick(self) -> None:
         self._tick += 1
-        self.map_view.step(0.010)
         # 실 stream 위젯은 frame_received signal 로 자동 업데이트, mock CameraView 만 step 필요
         if isinstance(self.camera, CameraView):
             self.camera.step()

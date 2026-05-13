@@ -46,9 +46,11 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 |---|---|---|---|---|
 | `destination_key` | `str` | `command_listener` | `navigate_to_pose` | carry goto 목적지 (DB named_pose) |
 | `hide_position_key` | `str` | `command_listener` / config | `navigate_to_pose` | 숨바꼭질 숨을 위치 |
-| `search_waypoints` | `list[str]` | config | `navigate_to_pose` (loop) | 숨바꼭질 탐색 waypoint |
+| `search_waypoints` | `list[str]` | config / `command_listener` | `navigate_to_pose` (loop) | 숨바꼭질 탐색 waypoint |
 | `home_position_key` | `str` | config | `navigate_to_pose` | 숨바꼭질 원위치 |
 | `charging_dock_approach_key` | `str` | config | `navigate_to_pose` | 도킹 접근 위치 |
+
+> 주: `search_waypoints` 는 BT 의 `command_listener` 가 control-server 의 `GET /waypoints/patrol/hide_and_seek_search` 에서 가져와 세팅한다. control-server 도달 실패 시 `${PINGDER_BT_CACHE_DIR:-/tmp/pingder}/hide_and_seek_search.json` 캐시 fallback. helper: `gogoping_modes.utils.waypoints_client.fetch_patrol`.
 
 ### 에러 (fault 발화한 monitor 가 W)
 
