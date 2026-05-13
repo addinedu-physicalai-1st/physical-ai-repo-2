@@ -112,6 +112,9 @@ class EdupingRosBridge:
         self._leader = _JsState()
         self._follower = _JsState()
         self._recording = _RecordingState()
+        # Playback: bridge 내부 보간기 — sim_twin_node 없이도 UI follower 채널에 동작.
+        self._playback_thread: threading.Thread | None = None
+        self._playback_stop = threading.Event()
 
         # listener: dict[topic_name, set[callback]] — WS hub 들이 등록.
         self._listeners_state: set[Callable[[dict], Any]] = set()
@@ -152,6 +155,7 @@ class EdupingRosBridge:
 
     def stop(self) -> None:
         self._stopping.set()
+        self._stop_playback()
         if self._executor is not None:
             try:
                 self._executor.shutdown()
@@ -322,6 +326,10 @@ class EdupingRosBridge:
         if self._js_pub is None:
             raise BridgeUnavailable("publisher not initialized — start() 호출 안됨")
         self._js_pub.publish(msg)
+        # 내부 보간 루프 시동 — sim_twin_node 없이도 UI 가 follower 채널로 동작 확인 가능.
+        # 실물 follower 가 /joint_states 를 publish 하는 환경에선 그쪽이 _follower 를
+        # 덮으니, 본 루프는 sim 검수용으로 작동.
+        self._start_playback(routine.joint_names, routine.keyframes, speed)
         return {
             "ok": True,
             "path": str(path),
@@ -329,6 +337,44 @@ class EdupingRosBridge:
             "duration_s": round(routine.duration_s / speed, 3),
             "speed": speed,
         }
+
+    def _start_playback(self, joint_names: list[str], keyframes: list[Any], speed: float) -> None:
+        self._stop_playback()
+        self._playback_stop.clear()
+        self._playback_thread = threading.Thread(
+            target=self._playback_loop,
+            args=(list(joint_names), list(keyframes), float(speed)),
+            name="eduping-playback",
+            daemon=True,
+        )
+        self._playback_thread.start()
+
+    def _stop_playback(self) -> None:
+        thr = self._playback_thread
+        if thr is not None and thr.is_alive():
+            self._playback_stop.set()
+            thr.join(timeout=1.0)
+        self._playback_thread = None
+
+    def _playback_loop(self, names: list[str], keyframes: list[Any], speed: float) -> None:
+        if not keyframes:
+            return
+        period = 1.0 / 30.0
+        start = time.monotonic()
+        end_t = float(keyframes[-1].t)
+        while not self._playback_stop.is_set():
+            now = time.monotonic()
+            elapsed = (now - start) * speed
+            if elapsed >= end_t:
+                pos = [float(x) for x in keyframes[-1].pos]
+                with self._lock:
+                    self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
+                break
+            # 선형 보간 — 양 끝 keyframe 사이에서.
+            pos = _interp_keyframes(keyframes, elapsed)
+            with self._lock:
+                self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
+            time.sleep(period)
 
 
 # --- helpers ----------------------------------------------------------------
@@ -351,6 +397,19 @@ def _estimate_hz(samples: list[tuple[float, list[float]]]) -> int:
     if duration <= 0:
         return 50
     return max(1, int(round((len(samples) - 1) / duration)))
+
+
+def _interp_keyframes(keyframes: list[Any], t: float) -> list[float]:
+    """keyframes 사이를 선형 보간. t 가 마지막을 넘으면 끝 위치 반환."""
+    if t <= keyframes[0].t:
+        return [float(x) for x in keyframes[0].pos]
+    for i in range(len(keyframes) - 1):
+        a, b = keyframes[i], keyframes[i + 1]
+        if a.t <= t <= b.t:
+            span = max(b.t - a.t, 1e-9)
+            ratio = (t - a.t) / span
+            return [float(a.pos[j]) + ratio * float(b.pos[j] - a.pos[j]) for j in range(len(a.pos))]
+    return [float(x) for x in keyframes[-1].pos]
 
 
 # --- exceptions -------------------------------------------------------------

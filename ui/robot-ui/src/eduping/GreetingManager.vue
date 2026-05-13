@@ -34,6 +34,22 @@ const error = ref('');
 
 const selectedMeta = computed(() => slots.value[selected.value]);
 
+// 재생 중에는 viewer 를 follower (재생 결과) 로 전환. 종료 후 leader 로 복귀.
+const isPlaying = ref(false);
+let playbackTimer: number | null = null;
+function onPlayed(payload: { ok: boolean; duration_s: number }): void {
+  if (!payload.ok) return;
+  if (playbackTimer !== null) {
+    window.clearTimeout(playbackTimer);
+  }
+  isPlaying.value = true;
+  const ms = Math.max(200, Math.round(payload.duration_s * 1000));
+  playbackTimer = window.setTimeout(() => {
+    isPlaying.value = false;
+    playbackTimer = null;
+  }, ms);
+}
+
 async function refresh(): Promise<void> {
   loading.value = true;
   error.value = '';
@@ -65,7 +81,7 @@ onMounted(refresh);
 
     <div class="grid">
       <div class="viewer">
-        <OpenarmViewer source="leader" />
+        <OpenarmViewer :source="isPlaying ? 'follower' : 'leader'" />
       </div>
 
       <aside class="side">
@@ -103,6 +119,7 @@ onMounted(refresh);
             kind="greeting"
             :name="selected"
             @recorded="refresh"
+            @played="onPlayed"
           />
         </section>
       </aside>
