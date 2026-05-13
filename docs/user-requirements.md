@@ -2,8 +2,8 @@
 confluence_page_id: "41058328"
 confluence_url: "https://woolimi.atlassian.net/wiki/spaces/FN/pages/41058328/User+Requirements"
 title: "User Requirements"
-confluence_version: 19
-last_synced: "2026-05-04T13:27:41"
+confluence_version: 20
+last_synced: "2026-05-13T14:08:20"
 ---
 
 # 사용자 요구사항 (User Requirements)
@@ -34,12 +34,6 @@ last_synced: "2026-05-04T13:27:41"
 | UR-ID | Name | Description |
 | --- | --- | --- |
 | UR-007 | 짐 운반 보조 | 교사는 짐 운반에 시스템의 도움을 받을 수 있어야 한다. |
-
-## 5. 정리 보조
-
-| UR-ID | Name | Description |
-| --- | --- | --- |
-| UR-008 | 장난감 정리 | 교사는 레크리에이션 후 장난감을 바구니에 정리하는 데 시스템의 도움을 받을 수 있어야 한다. |
 
 ## 6. 낮잠
 

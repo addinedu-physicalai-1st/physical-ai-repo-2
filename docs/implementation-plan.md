@@ -2,8 +2,8 @@
 confluence_page_id: "48332818"
 confluence_url: "https://woolimi.atlassian.net/wiki/spaces/FN/pages/48332818/Implementation+Plan"
 title: "Implementation Plan"
-confluence_version: 7
-last_synced: "2026-05-04T13:33:23"
+confluence_version: 8
+last_synced: "2026-05-13T14:08:22"
 ---
 
 # 구현 계획 (Implementation Plan)
@@ -20,9 +20,9 @@ last_synced: "2026-05-04T13:33:23"
 
 | 로봇 UI | 모드 |
 | --- | --- |
-| EduPing UI | 대기, 등원, 하원, 율동, 가게놀이, 정리정돈, 무궁화꽃이 피었습니다 |
+| EduPing UI | 대기, 등원, 하원, 율동, 무궁화꽃이 피었습니다 |
 | GogoPing UI | 대기, 보조, 숨바꼭질, 자장가 |
-| NoriArm UI | 대기, 블럭쌓기, 정리 |
+| NoriArm UI | 대기, 블럭쌓기, OX 퀴즈, 가게놀이 |
 
 ## 0.2 모드별 동작 매트릭스
 
@@ -32,8 +32,6 @@ last_synced: "2026-05-04T13:33:23"
 | EduPing UI | 등원 | ✓ | ✓ | ✗ | ✓ | hello |
 | EduPing UI | 하원 | ✓ | ✓ | ✗ | ✓ | hello |
 | EduPing UI | 율동 | ✓ | ✓ | ✓ | ✓ | fun |
-| EduPing UI | 가게놀이 | ✓ | ✓ | ✓ | ✗ | fun |
-| EduPing UI | 정리정돈 | ✓ | ✓ | ✗ | ✓ | interest |
 | EduPing UI | 무궁화꽃이 피었습니다 | ✓ | ✓ | ✓ | ✓ | fun |
 | GogoPing UI | 대기 | ✓ | ✓ | ✗ | ✗ | basic |
 | GogoPing UI | 보조 | ✓ | ✓ | ✗ | ✓ | basic |
@@ -41,7 +39,8 @@ last_synced: "2026-05-04T13:33:23"
 | GogoPing UI | 자장가 | ✓ | ✓ | ✗ | ✗ | sleep |
 | NoriArm UI | 대기 | ✓ | ✓ | ✗ | ✗ | basic |
 | NoriArm UI | 블럭쌓기 | ✓ | ✓ | ✓ | ✓ | interest |
-| NoriArm UI | 정리 | ✓ | ✓ | ✗ | ✓ | interest |
+| NoriArm UI | OX 퀴즈 | ✓ | ✓ | ✓ | ✓ | fun |
+| NoriArm UI | 가게놀이 | ✓ | ✓ | ✓ | ✗ | fun |
 
 ## 0.3 표정 자원
 
@@ -67,19 +66,6 @@ last_synced: "2026-05-04T13:33:23"
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
 | SR-PLAY-002 | 율동 재생 | EduPing UI 의 동요 리스트 (Robot UI 코드베이스의 정적 `dance_songs.json` — 제목·길이·trajectory ID·mp3 경로 메타) 에서 곡을 선택하면 EduPing UI (브라우저 `<audio>`) 가 `public/audio/` 의 mp3 를 재생하고 EduPing(OpenArm 양팔) 이 EduPing ROS2 패키지 내부에 사전 녹화로 둔 trajectory 를 같은 시점에 재생한다 (Control Server REST 로 trajectory ID 전달 후 동기 시작). | High |
-
-### 1.2 가게놀이
-
-| S ID | Name | Description | Priority |
-| --- | --- | --- | --- |
-| SR-PLAY-009 | 가게놀이 | EduPing UI 가 ① §8.2 명령 인터페이스의 모드 전환으로 가게놀이 모드 진입, ② 아이가 호출어("에듀핑")를 부르면 EduPing 이 음성으로 대답한 뒤 노트북 마이크 + 음성 인식 으로 후속 모형 요청 발화를 수신, ③ 의도 분류 LLM 으로 발화에서 모형 3종 (사과 / 우유팩 / 아이스크림콘) 중 하나를 선택, ④ 선택된 모형을 env_state task one-hot ([1,0,0] 사과 / [0,1,0] 우유팩 / [0,0,1] 콘) 으로 인코딩해 가게놀이 통합 ACT 정책 1개를 호출 (lerobot ACT 의 env_state 입력에 주입하면 같은 카메라 이미지에 대해 env_state 에 따라 transformer self-attention 이 다른 영역을 attend 하므로 다른 action chunk 출력), ⑤ ACT 출력 action chunk 를 매 timestep OpenArm 양팔에 적용해 한 팔로 모형을 잡고 다른 팔의 바구니에 담아 아이에게 건네고 홈 위치로 복귀, ⑥ 홈 위치 도달 또는 타임아웃 시 추론을 정지하고 다음 요청 대기 상태로 돌아간다. | High |
-
-### 1.3 정리정돈
-
-| S ID | Name | Description | Priority |
-| --- | --- | --- | --- |
-| SR-CLEAN-001 | 정리정돈 | EduPing UI 가 ① §8.2 명령 인터페이스의 모드 전환으로 정리정돈 모드 진입, ② EduPing Top Camera + OpenArm 그리퍼 카메라의 객체 인식 으로 시야 내 가게놀이 모형 3종 (사과 / 우유팩 / 아이스크림콘) 을 검출, ③ 모방학습 정책 으로 검출된 모형을 바구니 위치(미정) 로 옮긴다. | High |
-| SR-CLEAN-002 | 정리정돈 자동 종료 | 시야 내 정리 대상이 0 이면 정리정돈 모드를 자동 종료한다. | High |
 
 ### 1.4 무궁화꽃이 피었습니다
 
@@ -222,13 +208,6 @@ last_synced: "2026-05-04T13:33:23"
 | 진행 | 시작 안내 또는 출발 위치에 변화 | NoriArm Top 카메라 + 객체 인식 으로 5개 출발 위치 ROI 모니터링, 로봇 ROI 2개 중 자기 색 블럭이 남아있으면 모방학습 정책 (블럭쌓기 ACT) 으로 1개 집어 쌓고 (그리퍼 카메라로 픽업 직전 정밀 검증) 홈 복귀, 로봇 ROI 가 모두 비고 사람 ROI 만 남은 상태에서는 사람 차례로 대기 | interest | (5개 ROI 모두 빔) 종료 |
 | 종료 (전역 트리거) | 5개 출발 위치 ROI 모두 빔 또는 호출어 + 자연어 종료 명령 또는 UI 종료 | 축하 음성 합성 + 대기 모드로 전환 | happy | 대기 |
 
-### 3.2 정리
-
-| S ID | Name | Description | Priority |
-| --- | --- | --- | --- |
-| SR-CLEAN-003 | NoriArm 정리 | NoriArm 이 정리 모드에 진입해 Top 카메라 + 객체 인식 으로 쌓인 블럭과 5개 출발 위치 ROI 를 모니터링하고, 모방학습 정책 (정리 ACT) 으로 검출된 블럭을 색별 매칭 (사람 색 → 사람 ROI 빈 곳 / 로봇 색 → 로봇 ROI 빈 곳, SR-PLAY-003 과 동일 매핑) 으로 다시 옮긴다 (그리퍼 카메라로 픽업 직전 정밀 검증). | High |
-| SR-CLEAN-004 | NoriArm 정리 자동 종료 | 5개 출발 위치 ROI 가 모두 채워지면 정리 모드를 자동 종료한다. | High |
-
 ### 3.3 게임 프레임워크 (NoriArm 공통)
 
 | S ID | Name | Description | Priority |
@@ -250,6 +229,23 @@ last_synced: "2026-05-04T13:33:23"
 | SR-PLAY-011 | OX 퀴즈 — 손 터치 검출 | overhead 카메라 + 손 검출 (mediapipe Hands) 으로 아이가 O 또는 X 영역 위에 손을 올린 시점을 검출해 정답 여부를 판정하고 점수를 누적한다. 검출 이벤트는 게임 세션 WebSocket 으로 NoriArm UI 에 실시간 push 한다. **sim/real 모두 동일한 vision 파이프라인을 노트북 웹캠에 돌리고, sim/real 차이는 OMX 팔 레이어 (joint_state_only vs Dynamixel) 에만 국한** — 팀장 노트북 한 대로 책상에 O/X 영역 두 개를 종이로 표시해두고 회귀 테스트한다. ROI 보정은 캘리브레이션 단계로 분리. | Medium |
 | SR-PLAY-012 | OX 퀴즈 — smolVLA 정책 | rule_based 대신 smolVLA 모방학습 추론으로 답을 가리키는 trajectory 를 생성하는 대안 정책을 추가한다. 매니페스트의 `policy.kind` 만 `smolvla` 로 바꾸면 동일 게임 루프 / UI 가 ML 정책으로 동작. | Low |
 | SR-PLAY-013 | OX 퀴즈 세션 API | Control Server REST 가 `POST /api/noriarm/games/ox-quiz/sessions` 로 게임 세션을 시작하고, `POST /api/noriarm/games/ox-quiz/sessions/{id}/answer` 로 정답을 받으면 §3.3 게임 프레임워크의 룰 정책을 호출해 trajectory publish 를 트리거한다. 게임 이벤트(다음 문제·손 검출·정답·점수·종료)는 SSE `/api/noriarm/games/ox-quiz/sessions/{id}/events` 로 NoriArm UI 에 push, 로봇팔 관절값은 SSE `/api/noriarm/joint-states/stream` 으로 별도 push (three.js URDF 뷰어용). rosbridge_websocket / roslibjs 는 사용하지 않는다 — Control Server 가 직접 다리. | Medium |
+
+### 3.5 가게놀이
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
+| SR-PLAY-009 | 가게놀이 | NoriArm 이 가게놀이 모드에 진입해 아이의 음성 모형 요청을 받아 OMX 팔로 모형을 집어 아이에게 건네는 놀이를 아래 단계 머신으로 진행한다. NoriArm 게임 프레임워크 (§3.3) 의 매니페스트로 OMX 팔 1대 + Top 카메라 + Gripper 카메라 + Policy (rule_based / smolvla) 를 구성한다. | High |
+
+#### 단계 머신
+
+| 단계 | 트리거 | 동작 | 표정 | 다음 단계 |
+| --- | --- | --- | --- | --- |
+| 진입 | §8.2 명령 인터페이스의 모드 전환 | 모드 진입, 모형 3종 (사과 / 우유팩 / 아이스크림콘) 사전 배치 ROI 검증 | hello | 요청 대기 |
+| 요청 대기 | 진입 직후 또는 전달 완료 | 음성 합성 으로 안내 ("뭐 줄까?"). 호출어 후속 발화 대기 | basic | 요청 수신 |
+| 요청 수신 | 호출어 + 후속 발화 | 노트북 마이크 + 음성 인식 → 의도 분류 LLM 으로 모형 3종 중 하나 선택 (의도 불분명 시 음성 합성 으로 재요청) | interest | 픽업 |
+| 픽업 | 모형 선택 확정 | NoriArm Top 카메라 + 객체 인식 으로 선택 모형의 위치를 검출, Policy 가 OMX 팔로 픽업 trajectory 를 생성 (그리퍼 카메라로 픽업 직전 정밀 검증) | interest | 전달 |
+| 전달 | 픽업 완료 | 음성 합성 으로 안내 ("여기 있어"), OMX 팔이 아이 측 ROI 로 모형을 옮겨 release. 사람이 받아간 것을 ROI 비어있음 으로 검출 | happy | (남은 모형) 요청 대기 / (모두 빔) 종료 |
+| 종료 (전역 트리거) | 모든 모형 소진 또는 호출어 + 자연어 종료 명령 또는 UI 종료 | 종료 음성 재생, 대기 모드로 전환 | happy | 대기 |
 
 ## 4. Admin UI (PyQt5 데스크톱 앱, 로봇 관제)
 

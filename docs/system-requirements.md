@@ -2,8 +2,8 @@
 confluence_page_id: "40763414"
 confluence_url: "https://woolimi.atlassian.net/wiki/spaces/FN/pages/40763414/System+Requirements"
 title: "System Requirements"
-confluence_version: 24
-last_synced: "2026-05-08T02:06:25"
+confluence_version: 25
+last_synced: "2026-05-13T14:08:21"
 ---
 
 # 시스템 요구사항 (System Requirements)
@@ -43,7 +43,7 @@ last_synced: "2026-05-08T02:06:25"
 | SR-PLAY-003 | 블럭쌓기 | 시스템은 블럭을 아이와 번갈아 쌓는 협동 놀이를 진행한다. | UR-006 | High |
 | SR-PLAY-004 | 무궁화꽃이 피었습니다 | 시스템은 참가 아이를 등록하고 무궁화꽃이 피었습니다 게임을 진행한다. | UR-006 | Low |
 | SR-PLAY-007 | 숨바꼭질 | 시스템은 참가 아이를 등록하고 숨바꼭질 게임을 진행한다. | UR-006 | High |
-| SR-PLAY-009 | 가게놀이 | 시스템은 아이의 모형 요청 음성을 받아 모형을 바구니에 담아 건넨다. | UR-006 | High |
+| SR-PLAY-009 | 가게놀이 | 시스템은 아이의 모형 요청 음성을 받아 해당 모형을 집어 아이에게 건넨다. | UR-006 | High |
 | SR-PLAY-010 | OX 퀴즈 | 시스템은 OX 퀴즈를 출제하고, 아이들의 손 위치를 카메라로 인식해 O/X 응답을 집계한 뒤 팔 동작으로 정답을 공개한다. | UR-006 | High |
 
 ### 1.4 보조 (SR-CAR-*)
@@ -57,15 +57,6 @@ last_synced: "2026-05-08T02:06:25"
 | SR-CAR-005 | 자율 주행 | 시스템은 지정된 목적지까지 자율 주행한다. | UR-007 | High |
 | SR-CAR-006 | 도착 알림 | 시스템은 목적지 도착 시 음성과 UI(SR-ADM-005)로 알린다. | UR-007 | High |
 | SR-CAR-007 | 운반 후 대기 | 시스템은 운반 완료 후 그 자리에서 대기한다. | UR-007 | High |
-
-### 1.5 정리 (SR-CLEAN-*)
-
-| S ID | Name | Description | 관련 UR | Priority |
-| --- | --- | --- | --- | --- |
-| SR-CLEAN-001 | 정리정돈 | 시스템은 가게놀이 모형을 바구니에 정리한다. | UR-008 | High |
-| SR-CLEAN-002 | 정리정돈 자동 종료 | 시스템은 정리 대상이 없으면 정리정돈 모드를 자동 종료한다. | UR-008 | High |
-| SR-CLEAN-003 | 블럭 정리 | 시스템은 쌓인 블럭을 원래 위치로 되돌린다. | UR-008 | High |
-| SR-CLEAN-004 | 블럭 정리 자동 종료 | 시스템은 모든 블럭이 제자리에 돌아오면 정리 모드를 자동 종료한다. | UR-008 | High |
 
 ### 1.6 낮잠 (SR-NAP-*)
 
