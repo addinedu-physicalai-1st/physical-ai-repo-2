@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>핑더가든 구현 진척도</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>핑더가든 구현 진척도</h1>
+      <div class="subtitle">UI 메뉴 단위 · 세부 SR 은 펼쳐서 확인 · Robot UI 카드는 클릭하면 데모 페이지</div>
+      <div class="overall" id="overall"></div>
+    </header>
+
+    <div class="group-title">Robot UI</div>
+    <div class="grid" id="grid-robot"></div>
+
+    <div class="group-title">Portal UI</div>
+    <div class="grid" id="grid-portal"></div>
+
+    <footer>
+      집계 기준: <code>docs/implementation-plan.md</code> · <code>docs/implemented.md</code> + 실제 소스 (<code>ui/robot-ui</code> · <code>ui/portal-ui</code> · <code>ui/admin-ui</code>)
+    </footer>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    const { LABEL, tally, pct, rollup } = window.PINGDER_UTIL;
+    const { robot: ROBOT, portal: PORTAL } = window.PINGDER_DATA;
+
+    function renderFeature(f) {
+      const t = tally(f.subs);
+      const p = pct(t);
+      const status = rollup(t);
+      const subs = f.subs.map((s) => `
+        <li class="sub">
+          <span class="sub-badge ${s.s}">${LABEL[s.s]}</span>
+          <span class="sub-name">${s.name}</span>
+          <span class="sub-id">${s.id}</span>
+        </li>`).join('');
+      return `
+      <details class="feat">
+        <summary>
+          <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 4 10 8 6 12"></polyline>
+          </svg>
+          <span class="f-name">${f.name}</span>
+          <span class="f-mini-bar">
+            <span class="seg-done" style="width:${p.done}%"></span>
+            <span class="seg-partial" style="width:${p.partial}%"></span>
+            <span class="seg-planned" style="width:${p.planned}%"></span>
+          </span>
+          <span class="f-count">${t.done}/${p.total}</span>
+          <span class="f-status ${status}">${LABEL[status]}</span>
+        </summary>
+        <ul class="subs">${subs}</ul>
+      </details>`;
+    }
+
+    function renderCard(card) {
+      const all = card.features.flatMap((f) => f.subs);
+      const t = tally(all);
+      const p = pct(t);
+      const score = Math.round(p.done + p.partial * 0.5);
+      const feats = card.features.map(renderFeature).join('');
+      const linkable = !!card.hero;
+      const hero = card.hero ? `<img class="card-hero" src="${card.hero}" alt="${card.title} 미리보기" />` : '';
+      const cue = linkable ? `<span class="card-cue">데모 보기 →</span>` : '';
+      const inner = `
+        <div class="card-head">
+          <div class="card-title">${card.title} ${cue}</div>
+          <div class="card-stats">${t.done} / ${p.total} 완료 · ${score}%</div>
+        </div>
+        <div class="card-sub">${card.sub}</div>
+        ${hero}
+        <div class="bar">
+          <span class="seg-done" style="width:${p.done}%"></span>
+          <span class="seg-partial" style="width:${p.partial}%"></span>
+          <span class="seg-planned" style="width:${p.planned}%"></span>
+        </div>
+        ${feats}`;
+      if (linkable) {
+        return `<a class="card card-link" href="detail.html?ui=${card.id}">${inner}</a>`;
+      }
+      return `<article class="card">${inner}</article>`;
+    }
+
+    function renderGrid(id, cards) {
+      document.getElementById(id).innerHTML = cards.map(renderCard).join('');
+    }
+
+    function renderOverall() {
+      const all = [...ROBOT, ...PORTAL].flatMap((c) => c.features).flatMap((f) => f.subs);
+      const t = tally(all);
+      const p = pct(t);
+      const score = Math.round(p.done + p.partial * 0.5);
+      document.getElementById('overall').innerHTML = `
+        <div>
+          <div class="overall-num">${score}%</div>
+          <div class="subtitle">완료 ${t.done} · 진행 ${t.partial} · 계획 ${t.planned} (총 ${p.total})</div>
+        </div>
+        <div class="overall-bar">
+          <span class="seg-done" style="width:${p.done}%"></span>
+          <span class="seg-partial" style="width:${p.partial}%"></span>
+          <span class="seg-planned" style="width:${p.planned}%"></span>
+        </div>
+        <div class="legend">
+          <span><span class="dot done"></span>완료</span>
+          <span><span class="dot partial"></span>진행중</span>
+          <span><span class="dot planned"></span>계획</span>
+        </div>`;
+    }
+
+    renderOverall();
+    renderGrid('grid-robot', ROBOT);
+    renderGrid('grid-portal', PORTAL);
+  </script>
+</body>
+</html>

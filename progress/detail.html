@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>핑더가든 구현 진척도 — 데모</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="detail-top">
+      <a class="back-link" href="progress.html">← 진척도로 돌아가기</a>
+      <div class="legend">
+        <span><span class="dot done"></span>완료</span>
+        <span><span class="dot partial"></span>진행중</span>
+        <span><span class="dot planned"></span>계획</span>
+      </div>
+    </div>
+    <header id="detail-head"></header>
+    <div class="mode-grid" id="mode-grid"></div>
+  </div>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="확대 이미지">
+    <button class="lightbox-close" aria-label="닫기">×</button>
+    <img id="lightbox-img" alt="" />
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    const { LABEL, tally, pct, rollup } = window.PINGDER_UTIL;
+    const { robot: ROBOT, portal: PORTAL } = window.PINGDER_DATA;
+
+    const qs = new URLSearchParams(location.search);
+    const id = qs.get('ui') || 'eduping';
+    const card = [...ROBOT, ...PORTAL].find((c) => c.id === id);
+
+    if (!card) {
+      document.getElementById('detail-head').innerHTML = `<h1>알 수 없는 UI: ${id}</h1>`;
+    } else {
+      renderHead(card);
+      renderModes(card);
+    }
+
+    function renderHead(card) {
+      const all = card.features.flatMap((f) => f.subs);
+      const t = tally(all);
+      const p = pct(t);
+      const score = Math.round(p.done + p.partial * 0.5);
+      document.getElementById('detail-head').innerHTML = `
+        <h1>${card.title}</h1>
+        <div class="subtitle">${card.sub}</div>
+        <div class="overall" style="margin-top: 14px;">
+          <div>
+            <div class="overall-num">${score}%</div>
+            <div class="subtitle">완료 ${t.done} · 진행 ${t.partial} · 계획 ${t.planned} (총 ${p.total})</div>
+          </div>
+          <div class="overall-bar">
+            <span class="seg-done" style="width:${p.done}%"></span>
+            <span class="seg-partial" style="width:${p.partial}%"></span>
+            <span class="seg-planned" style="width:${p.planned}%"></span>
+          </div>
+        </div>`;
+    }
+
+    function renderModes(card) {
+      const html = card.features.map((f) => {
+        const t = tally(f.subs);
+        const p = pct(t);
+        const status = rollup(t);
+        const shot = f.image
+          ? `<img class="mode-shot" src="${f.image}" alt="${f.name}" loading="lazy" onerror="this.outerHTML='<div class=&quot;mode-placeholder&quot;>데모 캡처 준비 중</div>'" />`
+          : `<div class="mode-placeholder">데모 캡처 준비 중</div>`;
+        const subs = f.subs.map((s) => `
+          <li class="sub">
+            <span class="sub-badge ${s.s}">${LABEL[s.s]}</span>
+            <span class="sub-name">${s.name}</span>
+            <span class="sub-id">${s.id}</span>
+          </li>`).join('');
+        return `
+          <article class="mode-card">
+            ${shot}
+            <div class="mode-body">
+              <div class="mode-head">
+                <div class="mode-name">${f.name}</div>
+                <div class="mode-count">${t.done}/${p.total} · <span class="f-status ${status}" style="font-size: 9px;">${LABEL[status]}</span></div>
+              </div>
+              <div class="mode-bar">
+                <span class="seg-done" style="width:${p.done}%"></span>
+                <span class="seg-partial" style="width:${p.partial}%"></span>
+                <span class="seg-planned" style="width:${p.planned}%"></span>
+              </div>
+              <ul class="mode-subs">${subs}</ul>
+            </div>
+          </article>`;
+      }).join('');
+      document.getElementById('mode-grid').innerHTML = html;
+    }
+
+    // ===== Lightbox =====
+    const lb = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lightbox-img');
+    const lbCap = document.getElementById('lightbox-caption');
+    const lbClose = lb.querySelector('.lightbox-close');
+
+    function openLightbox(src, caption) {
+      lbImg.src = src;
+      lbImg.alt = caption || '';
+      lbCap.textContent = caption || '';
+      lb.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+      lb.classList.remove('open');
+      lbImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    document.getElementById('mode-grid').addEventListener('click', (e) => {
+      const img = e.target.closest('img.mode-shot');
+      if (!img) return;
+      openLightbox(img.src, img.alt);
+    });
+    lb.addEventListener('click', (e) => {
+      // 배경 클릭 시 닫기. 단, 이미지 자체 클릭은 통과.
+      if (e.target === lbImg) return;
+      closeLightbox();
+    });
+    lbClose.addEventListener('click', closeLightbox);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lb.classList.contains('open')) closeLightbox();
+    });
+  </script>
+</body>
+</html>
