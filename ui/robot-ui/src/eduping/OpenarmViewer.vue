@@ -34,27 +34,8 @@ let resizeObserver: ResizeObserver | null = null;
 const VIEW_TARGET = new THREE.Vector3(0.0, 0.4, 0.0);
 const CAMERA_POSITION = new THREE.Vector3(1.2, 0.7, 1.0);
 
-// 백엔드 joint 명 → URDF joint 명 매핑 (양팔 16 joint).
-// 백엔드(joint_names.py): right_joint_1..right_gripper, left_joint_1..left_gripper
-// URDF(bimanual): openarm_{right|left}_jointN, openarm_{right|left}_finger_joint1 (joint2 는 mimic)
-const JOINT_NAME_MAP: Record<string, string> = {
-  right_joint_1: 'openarm_right_joint1',
-  right_joint_2: 'openarm_right_joint2',
-  right_joint_3: 'openarm_right_joint3',
-  right_joint_4: 'openarm_right_joint4',
-  right_joint_5: 'openarm_right_joint5',
-  right_joint_6: 'openarm_right_joint6',
-  right_joint_7: 'openarm_right_joint7',
-  right_gripper: 'openarm_right_finger_joint1',
-  left_joint_1: 'openarm_left_joint1',
-  left_joint_2: 'openarm_left_joint2',
-  left_joint_3: 'openarm_left_joint3',
-  left_joint_4: 'openarm_left_joint4',
-  left_joint_5: 'openarm_left_joint5',
-  left_joint_6: 'openarm_left_joint6',
-  left_joint_7: 'openarm_left_joint7',
-  left_gripper: 'openarm_left_finger_joint1',
-};
+// 백엔드와 URDF 둘 다 동일 명명 (openarm_{right|left}_joint1..7, openarm_{right|left}_finger_joint1).
+// 변환 레이어 없이 setJointValue 에 그대로 전달.
 
 const stateWs = useEdupingStateWs();
 
@@ -116,9 +97,8 @@ function applyJointState(snap: JointSnapshot | null): void {
   if (!robot || !snap) return;
   const { joint_names: names, positions } = snap;
   for (let i = 0; i < names.length; i++) {
-    const urdfName = JOINT_NAME_MAP[names[i]] ?? names[i];
     try {
-      robot.setJointValue(urdfName, positions[i]);
+      robot.setJointValue(names[i], positions[i]);
     } catch {
       /* unknown joint — silently skip */
     }
@@ -201,6 +181,7 @@ onBeforeUnmount(() => {
       {{ props.source === 'leader' ? '리더 (입력)' : '팔로워 (출력)' }}
       <span v-if="!stateWs.connected.value" class="dot-disconnected">●</span>
     </div>
+    <div v-if="stateWs.realActive.value" class="real-badge">🤖 실물 연결됨</div>
   </div>
 </template>
 
@@ -251,5 +232,18 @@ onBeforeUnmount(() => {
 .dot-disconnected {
   margin-left: 4px;
   color: #c14545;
+}
+.real-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #f59e0b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 </style>

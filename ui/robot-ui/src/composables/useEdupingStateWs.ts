@@ -5,7 +5,7 @@
  * snapshot { ts, leader: {joint_names, positions, age_s} | null, follower: ... | null } 을
  * 그대로 reactive 로 노출. 자동 재연결 (1.5s).
  */
-import { onBeforeUnmount, ref, type Ref } from 'vue';
+import { computed, onBeforeUnmount, ref, type ComputedRef, type Ref } from 'vue';
 
 export interface JointSnapshot {
   joint_names: string[];
@@ -17,12 +17,16 @@ export interface StateSnapshot {
   ts: number;
   leader: JointSnapshot | null;
   follower: JointSnapshot | null;
+  real_active?: boolean;
 }
 
 export interface UseEdupingStateWs {
   connected: Ref<boolean>;
   leader: Ref<JointSnapshot | null>;
   follower: Ref<JointSnapshot | null>;
+  realActive: Ref<boolean>;
+  /** leader 토픽이 최근 2초 내에 들어왔는지 — leader bringup 가동 여부. */
+  leaderActive: ComputedRef<boolean>;
   start: () => void;
   stop: () => void;
 }
@@ -33,6 +37,14 @@ export function useEdupingStateWs(): UseEdupingStateWs {
   const connected = ref(false);
   const leader = ref<JointSnapshot | null>(null);
   const follower = ref<JointSnapshot | null>(null);
+  const realActive = ref(false);
+
+  const leaderActive = computed(() => {
+    const l = leader.value;
+    if (!l) return false;
+    const age = l.age_s ?? Infinity;
+    return age < 2.0;
+  });
 
   let ws: WebSocket | null = null;
   let stopRequested = false;
@@ -60,6 +72,7 @@ export function useEdupingStateWs(): UseEdupingStateWs {
         const snap = JSON.parse(ev.data) as StateSnapshot;
         leader.value = snap.leader;
         follower.value = snap.follower;
+        realActive.value = !!snap.real_active;
       } catch (err) {
         console.warn('[edupingState] parse 실패', err);
       }
@@ -106,5 +119,5 @@ export function useEdupingStateWs(): UseEdupingStateWs {
 
   onBeforeUnmount(stop);
 
-  return { connected, leader, follower, start, stop };
+  return { connected, leader, follower, realActive, leaderActive, start, stop };
 }

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
@@ -35,8 +36,12 @@ logger = logging.getLogger(__name__)
 try:
     import rclpy  # noqa: F401
     from builtin_interfaces.msg import Duration
+    from control_msgs.action import FollowJointTrajectory, GripperCommand
+    from controller_manager_msgs.srv import SwitchController
+    from rclpy.action import ActionClient
     from rclpy.node import Node
     from sensor_msgs.msg import JointState
+    from std_msgs.msg import Float64MultiArray
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
     _ROS_AVAILABLE = True
@@ -115,6 +120,20 @@ class EdupingRosBridge:
         # Playback: bridge 내부 보간기 — sim_twin_node 없이도 UI follower 채널에 동작.
         self._playback_thread: threading.Thread | None = None
         self._playback_stop = threading.Event()
+        # Real follower 의 ros2_control action client 4 종 — start() 에서 생성.
+        self._ac_right_arm: Any = None
+        self._ac_left_arm: Any = None
+        self._ac_right_gripper: Any = None
+        self._ac_left_gripper: Any = None
+        # Live teleop — forward_position_controller 토픽 publisher + 컨트롤러 스위칭 서비스.
+        self._pub_right_forward: Any = None
+        self._pub_left_forward: Any = None
+        self._switch_controller_cli: Any = None
+        # "실물 follower 연결됨" 캐시 (tmux 세션 hardware_type 검사 TTL).
+        self._real_active_at: float = 0.0
+        self._real_active_val: bool = False
+        # Live teleop 독립 상태 — 녹화와 무관하게 leader → forward_position 패스스루 ON/OFF.
+        self._teleop_active: bool = False
 
         # listener: dict[topic_name, set[callback]] — WS hub 들이 등록.
         self._listeners_state: set[Callable[[dict], Any]] = set()
@@ -140,6 +159,29 @@ class EdupingRosBridge:
         self._js_pub = self._node.create_publisher(JointTrajectory, TOPIC_TRAJECTORY, 10)
         self._node.create_subscription(JointState, TOPIC_LEADER, self._on_leader, 50)
         self._node.create_subscription(JointState, TOPIC_FOLLOWER, self._on_follower, 50)
+        # Real follower action clients — server 가 아직 안 떠 있을 수 있으니 wait 은 send 시점.
+        self._ac_right_arm = ActionClient(
+            self._node, FollowJointTrajectory, "/right_joint_trajectory_controller/follow_joint_trajectory"
+        )
+        self._ac_left_arm = ActionClient(
+            self._node, FollowJointTrajectory, "/left_joint_trajectory_controller/follow_joint_trajectory"
+        )
+        self._ac_right_gripper = ActionClient(
+            self._node, GripperCommand, "/right_gripper_controller/gripper_cmd"
+        )
+        self._ac_left_gripper = ActionClient(
+            self._node, GripperCommand, "/left_gripper_controller/gripper_cmd"
+        )
+        # Live teleop publishers + switch service client.
+        self._pub_right_forward = self._node.create_publisher(
+            Float64MultiArray, "/right_forward_position_controller/commands", 10
+        )
+        self._pub_left_forward = self._node.create_publisher(
+            Float64MultiArray, "/left_forward_position_controller/commands", 10
+        )
+        self._switch_controller_cli = self._node.create_client(
+            SwitchController, "/controller_manager/switch_controller"
+        )
         # teleop 패턴 — 명시 SingleThreadedExecutor 에 본 노드만 add. 노리암/teleop 와
         # 같은 프로세스에 공존할 때 rclpy.spin_once 글로벌 default executor 경합 회피.
         self._executor = SingleThreadedExecutor()
@@ -155,6 +197,12 @@ class EdupingRosBridge:
 
     def stop(self) -> None:
         self._stopping.set()
+        # teleop 켜져있으면 종료 전에 끔 — 컨트롤러를 joint_trajectory 로 복귀시켜야 다음 재생 정상.
+        if self._teleop_active:
+            try:
+                self.set_live_teleop(False)
+            except Exception:  # noqa: BLE001
+                pass
         self._stop_playback()
         if self._executor is not None:
             try:
@@ -192,6 +240,32 @@ class EdupingRosBridge:
                 if not self._recording.joint_names:
                     self._recording.joint_names = list(names)
                 self._recording.samples.append((t_rel, list(pos)))
+            mirror = self._teleop_active
+        if mirror:
+            self._mirror_leader_to_follower(names, pos)
+
+    def _mirror_leader_to_follower(self, names: list[str], pos: list[float]) -> None:
+        """녹화 중 live teleop — 양팔 7개씩 forward_position_controller 토픽에 publish.
+
+        그리퍼는 GripperActionController 라 streaming 안 됨 — mirror 제외.
+        """
+        right_idx, left_idx = [], []
+        for i in range(1, 8):
+            r_name = f"openarm_right_joint{i}"
+            l_name = f"openarm_left_joint{i}"
+            try:
+                right_idx.append(names.index(r_name))
+                left_idx.append(names.index(l_name))
+            except ValueError:
+                return  # 이름이 다르면 (구 녹화 leader 등) 스킵
+        if self._pub_right_forward is not None:
+            m = Float64MultiArray()
+            m.data = [float(pos[i]) for i in right_idx]
+            self._pub_right_forward.publish(m)
+        if self._pub_left_forward is not None:
+            m = Float64MultiArray()
+            m.data = [float(pos[i]) for i in left_idx]
+            self._pub_left_forward.publish(m)
 
     def _on_follower(self, msg: "JointState") -> None:
         names = list(msg.name)
@@ -207,7 +281,32 @@ class EdupingRosBridge:
                 "ts": time.time(),
                 "leader": _js_to_dict(self._leader),
                 "follower": _js_to_dict(self._follower),
+                "real_active": self.is_real_follower_active(),
             }
+
+    def is_real_follower_active(self) -> bool:
+        """tmux 의 eduping-device 세션에 hardware_type=real bringup 이 떠있는지 — 3s TTL 캐시."""
+        now = time.monotonic()
+        if now - self._real_active_at <= 3.0:
+            return self._real_active_val
+        active = False
+        try:
+            result = subprocess.run(
+                ["tmux", "display-message", "-t", "eduping-device", "-p", "#{pane_start_command}"],
+                capture_output=True,
+                text=True,
+                timeout=0.5,
+            )
+            if result.returncode == 0 and (
+                "hardware_type:=real" in result.stdout
+                or "hardware_type=real" in result.stdout
+            ):
+                active = True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            active = False
+        self._real_active_val = active
+        self._real_active_at = now
+        return active
 
     def recording_snapshot(self) -> dict:
         with self._lock:
@@ -243,6 +342,39 @@ class EdupingRosBridge:
                 samples=[],
             )
         return {"active": True, "kind": kind, "name": name}
+
+    # ---------- live teleop (녹화 / 재생과 독립) -----------------------------
+
+    def set_live_teleop(self, enabled: bool) -> dict:
+        """leader → forward_position_controller passthrough 토글.
+
+        켤 때: joint_trajectory_controller 비활성 + forward_position_controller 활성으로 스위치.
+        끌 때: 역방향 스위치.
+        controller 스위치 실패 시 teleop 플래그 OFF 유지 + 에러 메시지 반환.
+        """
+        if enabled:
+            with self._lock:
+                if self._teleop_active:
+                    return {"active": True, "switch": "noop"}
+            ok = self._switch_controllers(
+                activate=["right_forward_position_controller", "left_forward_position_controller"],
+                deactivate=["right_joint_trajectory_controller", "left_joint_trajectory_controller"],
+            )
+            if not ok:
+                return {"active": False, "switch": "failed", "hint": "실물 bringup 가 떠 있는지 확인"}
+            with self._lock:
+                self._teleop_active = True
+            return {"active": True, "switch": "ok"}
+        else:
+            with self._lock:
+                if not self._teleop_active:
+                    return {"active": False, "switch": "noop"}
+                self._teleop_active = False
+            self._switch_controllers(
+                activate=["right_joint_trajectory_controller", "left_joint_trajectory_controller"],
+                deactivate=["right_forward_position_controller", "left_forward_position_controller"],
+            )
+            return {"active": False, "switch": "ok"}
 
     def stop_recording(self, save: bool) -> dict:
         with self._lock:
@@ -291,9 +423,15 @@ class EdupingRosBridge:
 
     # ---------- playback ----------------------------------------------------
 
-    def play_routine(self, kind: str, name: str, *, speed: float = 1.0) -> dict:
+    def play_routine(
+        self, kind: str, name: str, *, speed: float = 1.0, target: str = "sim"
+    ) -> dict:
         if speed <= 0:
             speed = 1.0
+        if target == "real" and self._teleop_active:
+            raise ValueError(
+                "실물 동기화 (teleop) 가 켜져있는 상태에서는 실물 재생 불가 — 토글 끄고 다시 시도하세요."
+            )
         from eduarm.routines_io import (  # type: ignore[import-not-found]
             dance_motion_path,
             greeting_yaml_path,
@@ -326,17 +464,139 @@ class EdupingRosBridge:
         if self._js_pub is None:
             raise BridgeUnavailable("publisher not initialized — start() 호출 안됨")
         self._js_pub.publish(msg)
-        # 내부 보간 루프 시동 — sim_twin_node 없이도 UI 가 follower 채널로 동작 확인 가능.
-        # 실물 follower 가 /joint_states 를 publish 하는 환경에선 그쪽이 _follower 를
-        # 덮으니, 본 루프는 sim 검수용으로 작동.
+        # 내부 보간 루프 시동 — UI follower 채널 (sim 검수용). 실물 publish 시엔
+        # 실제 robot 의 /joint_states 가 _follower 를 덮어쓰니 시각화도 실제 거동.
         self._start_playback(routine.joint_names, routine.keyframes, speed)
-        return {
+
+        result = {
             "ok": True,
+            "target": target,
             "path": str(path),
             "frame_count": len(msg.points),
             "duration_s": round(routine.duration_s / speed, 3),
             "speed": speed,
         }
+        if target == "real":
+            real_status = self._send_real_follower_goals(routine, speed)
+            result["real"] = real_status
+        return result
+
+    def _send_real_follower_goals(self, routine: Any, speed: float) -> dict:
+        """4 controller (양팔 trajectory + 양 gripper) 에 action goal 분배.
+
+        녹화 YAML 의 joint 명이 URDF 명 (`openarm_{side}_jointN`, `openarm_{side}_finger_joint1`)
+        와 동일하다는 전제. 양팔은 FollowJointTrajectory 로 모든 keyframe, 그리퍼는
+        GripperCommand 로 마지막 keyframe 값만 (단발 action) 전송.
+
+        action server 가 미가동 (실물 bringup 안 됨) 이면 그 채널은 skip 하고 다른
+        채널만 처리 — 부분 실패도 status 에 반영.
+        """
+        names = list(routine.joint_names)
+        right_arm = [f"openarm_right_joint{i}" for i in range(1, 8)]
+        left_arm = [f"openarm_left_joint{i}" for i in range(1, 8)]
+        right_grip = "openarm_right_finger_joint1"
+        left_grip = "openarm_left_finger_joint1"
+
+        try:
+            idx_right = [names.index(n) for n in right_arm]
+            idx_left = [names.index(n) for n in left_arm]
+            idx_rgrip = names.index(right_grip)
+            idx_lgrip = names.index(left_grip)
+        except ValueError as e:
+            raise ValueError(f"녹화에 URDF joint 누락 — re-record 필요: {e}") from None
+
+        # 양팔 trajectory goal 빌드
+        right_goal = FollowJointTrajectory.Goal()
+        right_goal.trajectory.joint_names = right_arm
+        left_goal = FollowJointTrajectory.Goal()
+        left_goal.trajectory.joint_names = left_arm
+        for kf in routine.keyframes:
+            t = float(kf.t) / speed
+            sec = int(t)
+            nsec = int((t - sec) * 1e9)
+            d = Duration(sec=sec, nanosec=nsec)
+
+            r_pt = JointTrajectoryPoint()
+            r_pt.positions = [float(kf.pos[i]) for i in idx_right]
+            r_pt.time_from_start = d
+            right_goal.trajectory.points.append(r_pt)
+
+            l_pt = JointTrajectoryPoint()
+            l_pt.positions = [float(kf.pos[i]) for i in idx_left]
+            l_pt.time_from_start = d
+            left_goal.trajectory.points.append(l_pt)
+
+        # 그리퍼 — 마지막 keyframe 값을 단발로
+        final = routine.keyframes[-1].pos
+        rgrip_goal = GripperCommand.Goal()
+        rgrip_goal.command.position = float(final[idx_rgrip])
+        rgrip_goal.command.max_effort = 5.0
+        lgrip_goal = GripperCommand.Goal()
+        lgrip_goal.command.position = float(final[idx_lgrip])
+        lgrip_goal.command.max_effort = 5.0
+
+        targets = [
+            ("right_arm", self._ac_right_arm, right_goal),
+            ("left_arm", self._ac_left_arm, left_goal),
+            ("right_gripper", self._ac_right_gripper, rgrip_goal),
+            ("left_gripper", self._ac_left_gripper, lgrip_goal),
+        ]
+        status: dict[str, str] = {}
+        for label, client, goal in targets:
+            if client is None:
+                status[label] = "client missing"
+                continue
+            if not client.wait_for_server(timeout_sec=1.5):
+                logger.warning("[%s] action server 미가동 — skip", label)
+                status[label] = "server unavailable"
+                continue
+            client.send_goal_async(goal)
+            status[label] = "sent"
+            logger.info("[%s] goal sent", label)
+        return status
+
+    def _switch_controllers(self, *, activate: list[str], deactivate: list[str]) -> bool:
+        """controller_manager 의 switch_controller 호출. 실물 bringup 안 떠 있으면 False."""
+        cli = self._switch_controller_cli
+        if cli is None:
+            logger.warning("switch_controller client 미초기화 (bridge.start 호출 안 됨)")
+            return False
+        if not cli.wait_for_service(timeout_sec=1.5):
+            logger.warning(
+                "switch_controller 서비스 미가동 — controller_manager (실물 bringup) 가 떠 있는지 확인"
+            )
+            return False
+        req = SwitchController.Request()
+        req.activate_controllers = list(activate)
+        req.deactivate_controllers = list(deactivate)
+        req.strictness = SwitchController.Request.STRICT
+        req.activate_asap = True
+        logger.info(
+            "switch_controller 호출 — activate=%s deactivate=%s (STRICT)", activate, deactivate
+        )
+        future = cli.call_async(req)
+        deadline = time.monotonic() + 3.0
+        while not future.done() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        if not future.done():
+            logger.warning("switch_controller 응답 타임아웃 (3s)")
+            return False
+        try:
+            resp = future.result()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("switch_controller exception: %s", exc)
+            return False
+        ok = bool(getattr(resp, "ok", False))
+        msg = getattr(resp, "message", "")
+        if not ok:
+            logger.warning(
+                "switch_controller 거부됨 — ok=False message=%r. controller 가 'inactive' 상태에 "
+                "있는지 'ros2 control list_controllers' 로 확인",
+                msg,
+            )
+            return False
+        logger.info("switch_controller OK — message=%r", msg)
+        return True
 
     def _start_playback(self, joint_names: list[str], keyframes: list[Any], speed: float) -> None:
         self._stop_playback()

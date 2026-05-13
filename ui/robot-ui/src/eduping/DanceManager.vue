@@ -11,6 +11,7 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { useModeStore } from '@/stores/mode';
+import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import OpenarmViewer from './OpenarmViewer.vue';
 import RecorderControls from './RecorderControls.vue';
 
@@ -24,6 +25,8 @@ interface DanceItem {
 }
 
 const mode = useModeStore();
+const stateWs = useEdupingStateWs();
+stateWs.start();
 
 const items = ref<DanceItem[]>([]);
 const selectedSlug = ref<string>('');
@@ -136,6 +139,12 @@ onMounted(refresh);
       <button type="button" class="btn-close" @click="close">닫기</button>
     </header>
 
+    <div v-if="!stateWs.leaderActive.value" class="leader-warning">
+      ⚠ <strong>리더 디바이스가 연결되어 있지 않습니다.</strong>
+      녹화·재생을 사용하려면 리더 디바이스를 먼저 켜주세요 —
+      <code>scripts/device-eduping-leader.sh 3</code>
+    </div>
+
     <div class="grid">
       <div class="viewer">
         <OpenarmViewer :source="isPlaying ? 'follower' : 'leader'" />
@@ -238,6 +247,22 @@ onMounted(refresh);
   background: rgba(219, 39, 119, 0.08);
 }
 .bar h2 { margin: 0; font-size: 22px; color: #be185d; }
+.leader-warning {
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.leader-warning code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+}
 .btn-close {
   padding: 6px 14px;
   background: white;

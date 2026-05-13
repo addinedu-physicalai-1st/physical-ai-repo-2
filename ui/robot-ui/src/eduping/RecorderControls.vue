@@ -8,8 +8,10 @@
  * 상태는 useEdupingRecordingWs 한 인스턴스를 부모/형제와 공유 (provide/inject 안 씀 —
  * 단순히 자체 인스턴스). 서버측 단일 state machine 이라 복수 클라이언트가 같은 값 봄.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useEdupingRecordingWs } from '@/composables/useEdupingRecordingWs';
+import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
+import WarningModal from '@/common/WarningModal.vue';
 
 const props = defineProps<{
   kind: 'dance' | 'greeting';
@@ -19,18 +21,58 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'recorded', payload: { saved: boolean; frame_count: number; duration_s: number }): void;
+  (e: 'recorded', payload: { frame_count: number; duration_s: number }): void;
   (e: 'played', payload: { ok: boolean; duration_s: number }): void;
 }>();
 
 const recWs = useEdupingRecordingWs();
 recWs.start();
+const stateWs = useEdupingStateWs();
+stateWs.start();
 
 const inflight = ref(false);
 const lastError = ref('');
 const countdown = ref<number | null>(null);
-const playSpeed = ref(1.0);
-const playTarget = ref<'sim' | 'real'>('sim');
+const liveTeleop = ref(false);   // 실물 동기화 토글 — 녹화/재생과 독립적으로 leader→실물 mirror
+const teleopBusy = ref(false);   // 토글 POST 진행 중 잠금
+const playConfirmOpen = ref(false);
+
+const realActive = computed(() => stateWs.realActive.value);
+const leaderActive = computed(() => stateWs.leaderActive.value);
+
+// 실물 끊기면 teleop 자동 OFF (controller 가 사라져서 publish 가 의미 없어짐).
+watch(realActive, (real) => {
+  if (!real && liveTeleop.value) {
+    liveTeleop.value = false;
+  }
+});
+
+// 토글 변화 → 즉시 /api/eduping/teleop POST. 실패 시 상태 롤백.
+watch(liveTeleop, async (newVal, oldVal) => {
+  if (newVal === oldVal) return;
+  teleopBusy.value = true;
+  try {
+    const res = await fetch('/api/eduping/teleop', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled: newVal }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || (json && json.switch === 'failed')) {
+      const msg = json?.hint ?? json?.detail ?? `teleop ${newVal ? '켜기' : '끄기'} 실패`;
+      lastError.value = String(msg);
+      // 롤백
+      liveTeleop.value = oldVal;
+    } else {
+      lastError.value = '';
+    }
+  } catch (err) {
+    lastError.value = (err as Error).message;
+    liveTeleop.value = oldVal;
+  } finally {
+    teleopBusy.value = false;
+  }
+});
 
 const isMine = computed(
   () => recWs.recording.value?.active && recWs.recording.value.kind === props.kind && recWs.recording.value.name === props.name,
@@ -86,12 +128,11 @@ async function startRecording(): Promise<void> {
   }
 }
 
-async function stopRecording(save: boolean): Promise<void> {
+async function stopRecording(): Promise<void> {
   if (inflight.value) return;
   try {
-    const result = await postJson(`${urlPrefix()}/record/stop`, { save });
+    const result = await postJson(`${urlPrefix()}/record/stop`, { save: true });
     emit('recorded', {
-      saved: !!result?.saved,
       frame_count: result?.frame_count ?? 0,
       duration_s: result?.duration_s ?? 0,
     });
@@ -102,15 +143,25 @@ async function stopRecording(save: boolean): Promise<void> {
 
 async function play(): Promise<void> {
   if (props.disabled || inflight.value) return;
+  if (realActive.value) {
+    playConfirmOpen.value = true;
+    return;
+  }
+  await doPlay();
+}
+
+async function doPlay(): Promise<void> {
+  const target = realActive.value ? 'real' : 'sim';
   try {
-    const result = await postJson(`${urlPrefix()}/play`, {
-      target: playTarget.value,
-      speed: playSpeed.value,
-    });
+    const result = await postJson(`${urlPrefix()}/play`, { target });
     emit('played', { ok: !!result?.ok, duration_s: result?.duration_s ?? 0 });
   } catch {
     /* error in lastError */
   }
+}
+
+function onPlayConfirmed(): void {
+  void doPlay();
 }
 </script>
 
@@ -138,52 +189,60 @@ async function play(): Promise<void> {
       </template>
     </div>
 
-    <div class="row">
+    <label
+      v-if="realActive"
+      class="teleop-toggle"
+      :class="{ active: liveTeleop }"
+    >
+      <input
+        type="checkbox"
+        v-model="liveTeleop"
+        :disabled="teleopBusy || !leaderActive"
+      />
+      <span class="teleop-label">
+        {{ teleopBusy ? '⏳ 전환 중…' : (liveTeleop ? '🤖 실물 동기화 ON' : '🤖 실물 동기화 OFF') }}
+      </span>
+    </label>
+
+    <section class="action-group">
+      <header class="group-title">녹화</header>
       <button
+        v-if="!isMine"
         type="button"
-        class="btn btn-rec"
-        :disabled="props.disabled || inflight || isMine || countdown != null"
+        class="btn btn-block btn-rec"
+        :disabled="props.disabled || inflight || countdown != null || !leaderActive"
         @click="startRecording"
       >● 녹화 시작</button>
       <button
+        v-else
         type="button"
-        class="btn btn-stop-save"
-        :disabled="!isMine || inflight"
-        @click="stopRecording(true)"
+        class="btn btn-block btn-stop-save"
+        :disabled="inflight"
+        @click="stopRecording"
       >■ 중지 · 저장</button>
-      <button
-        type="button"
-        class="btn btn-stop-discard"
-        :disabled="!isMine || inflight"
-        @click="stopRecording(false)"
-      >✗ 중지 · 버리기</button>
-    </div>
+    </section>
 
-    <div class="row">
+    <section class="action-group">
+      <header class="group-title">재생</header>
       <button
         type="button"
-        class="btn btn-play"
+        class="btn btn-block btn-play"
+        :class="{ 'btn-play-real': realActive }"
         :disabled="props.disabled || inflight || isMine"
         @click="play"
-      >▶ 재생</button>
-      <label class="select-label">
-        대상
-        <select v-model="playTarget" :disabled="inflight">
-          <option value="sim">sim (three.js)</option>
-          <option value="real">real (실물 controller)</option>
-        </select>
-      </label>
-      <label class="select-label">
-        속도
-        <select v-model.number="playSpeed" :disabled="inflight">
-          <option :value="0.5">0.5×</option>
-          <option :value="1.0">1.0×</option>
-          <option :value="1.5">1.5×</option>
-        </select>
-      </label>
-    </div>
+      >▶ 재생{{ realActive ? ' (실물)' : '' }}</button>
+    </section>
 
     <div v-if="lastError" class="err">{{ lastError }}</div>
+
+    <WarningModal
+      v-model:open="playConfirmOpen"
+      title="실물 로봇이 연결되어 있습니다"
+      :message="'재생 시 양팔이 움직입니다.\n주변에 사람이나 장애물이 없는지 확인해주세요.\n\n계속하시겠습니까?'"
+      okText="계속"
+      cancelText="취소"
+      @ok="onPlayConfirmed"
+    />
   </div>
 </template>
 
@@ -191,8 +250,8 @@ async function play(): Promise<void> {
 .recorder {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 14px;
+  padding: 14px 16px;
   background: rgba(255, 255, 255, 0.92);
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -203,6 +262,10 @@ async function play(): Promise<void> {
   align-items: center;
   gap: 10px;
   font-weight: 600;
+  min-height: 24px;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
 }
 .status .dot {
   width: 10px;
@@ -231,43 +294,42 @@ async function play(): Promise<void> {
 }
 .status .metric + .metric { margin-left: 8px; }
 
-.row {
+.action-group {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
+}
+.group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding-left: 2px;
 }
 .btn {
-  padding: 8px 14px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  transition: filter 0.1s;
+  transition: filter 0.1s, transform 0.05s;
 }
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.btn:not(:disabled):hover { filter: brightness(1.05); }
+.btn:not(:disabled):hover { filter: brightness(1.06); }
+.btn:not(:disabled):active { transform: translateY(1px); }
+.btn-block {
+  width: 100%;
+  padding: 14px 16px;
+}
 .btn-rec        { background: #fee2e2; color: #b91c1c; }
 .btn-stop-save  { background: #d1fae5; color: #065f46; }
-.btn-stop-discard { background: #f3f4f6; color: #475569; }
 .btn-play       { background: #dbeafe; color: #1d4ed8; }
-.select-label {
-  font-size: 13px;
-  color: #475569;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.select-label select {
-  padding: 4px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background: white;
-}
+.btn-play-real  { background: #fef3c7; color: #b45309; border: 1px solid #f59e0b; }
+
 .err {
   color: #c14545;
   font-size: 13px;
@@ -275,4 +337,32 @@ async function play(): Promise<void> {
   padding: 6px 10px;
   border-radius: 8px;
 }
+
+.teleop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  user-select: none;
+  background: #f8fafc;
+  transition: background 0.12s, border-color 0.12s;
+}
+.teleop-toggle:hover { background: #f1f5f9; }
+.teleop-toggle.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #78350f;
+}
+.teleop-toggle input[type='checkbox'] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: #f59e0b;
+}
+.teleop-label { flex: 1; }
 </style>

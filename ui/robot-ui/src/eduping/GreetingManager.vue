@@ -7,6 +7,7 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { useModeStore } from '@/stores/mode';
+import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import OpenarmViewer from './OpenarmViewer.vue';
 import RecorderControls from './RecorderControls.vue';
 
@@ -26,6 +27,8 @@ const SLOT_LABELS: Record<SlotId, string> = {
 };
 
 const mode = useModeStore();
+const stateWs = useEdupingStateWs();
+stateWs.start();
 
 const slots = ref<Record<SlotId, SlotMeta | null>>({ morning: null, evening: null });
 const selected = ref<SlotId>('morning');
@@ -78,6 +81,12 @@ onMounted(refresh);
       <h2>👋 등하원 인사 설정</h2>
       <button type="button" class="btn-close" @click="close">닫기</button>
     </header>
+
+    <div v-if="!stateWs.leaderActive.value" class="leader-warning">
+      ⚠ <strong>리더 디바이스가 연결되어 있지 않습니다.</strong>
+      녹화·재생을 사용하려면 리더 디바이스를 먼저 켜주세요 —
+      <code>scripts/device-eduping-leader.sh 3</code>
+    </div>
 
     <div class="grid">
       <div class="viewer">
@@ -142,6 +151,22 @@ onMounted(refresh);
   justify-content: space-between;
   padding: 14px 24px;
   background: rgba(37, 99, 235, 0.08);
+}
+.leader-warning {
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.leader-warning code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 13px;
 }
 .bar h2 { margin: 0; font-size: 22px; color: #1d4ed8; }
 .btn-close {
