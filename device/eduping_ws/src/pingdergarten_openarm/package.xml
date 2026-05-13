@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>pingdergarten_openarm</name>
+  <version>0.1.0</version>
+  <description>
+    Pingdergarten OpenArm 노드 — eduping persona (율동 / 등하원 인사 / 원격 진찰).
+    leader joint_states 녹화·재생, sim twin, 추후 admittance · EE teleop.
+  </description>
+  <maintainer email="dev@pingdergarten.local">pingdergarten</maintainer>
+  <license>Proprietary</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <!-- feetech leader 노드 (실물 mini leader) 는 후속 PR — scservo_sdk 의존 추가 예정 -->
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

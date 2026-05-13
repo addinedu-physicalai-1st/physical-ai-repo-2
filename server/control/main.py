@@ -46,10 +46,13 @@ _NORIARM_OX_MANIFEST = (
     / "game.yaml"
 )
 
+# eduping (OpenArm) 율동/인사 routine 저장소 — repo_root/shared/.
+_SHARED_DIR = Path(__file__).resolve().parents[2] / "shared"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """ROS bridge lifecycle. ROS 환경 미source 시 graceful skip — noriarm 엔드포인트만 503.
+    """ROS bridge lifecycle. ROS 환경 미source 시 graceful skip — noriarm/eduping 엔드포인트만 503.
 
     Vision (YOLO) 추론은 AI Hub (server/ai/hub.py) 가 담당 — Control Server 는 proxy.
 
@@ -71,7 +74,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"teleop hub 시작 실패: {e}")
 
-    bridge = None
+    noriarm_bridge = None
+    eduping_bridge = None
+    eduping_hubs_started = False
+
+    # --- NoriArm ---------------------------------------------------------
     try:
         from server.control.noriarm.ros_bridge import (
             BridgeUnavailable,
@@ -88,19 +95,52 @@ async def lifespan(app: FastAPI):
             logger.warning(f"OX 매니페스트 없음: {_NORIARM_OX_MANIFEST}")
         else:
             try:
-                bridge = NoriarmRosBridge(_NORIARM_OX_MANIFEST)
-                bridge.start(asyncio.get_running_loop())
-                app.state.noriarm_bridge = bridge
+                noriarm_bridge = NoriarmRosBridge(_NORIARM_OX_MANIFEST)
+                noriarm_bridge.start(asyncio.get_running_loop())
+                app.state.noriarm_bridge = noriarm_bridge
                 logger.info("NoriArm ROS bridge 활성화됨")
             except BridgeUnavailable as e:
                 logger.warning(f"NoriArm bridge 초기화 실패: {e}")
     except ImportError as e:
         logger.warning(f"noriarm 모듈 import 실패: {e}")
 
+    # --- Eduping (OpenArm) ----------------------------------------------
+    try:
+        from server.control.eduping.ros_bridge import (
+            BridgeUnavailable as EdupingBridgeUnavailable,
+            EdupingRosBridge,
+            ros_available as eduping_ros_available,
+        )
+        from server.control.eduping.router import start_hubs as start_eduping_hubs
+
+        if not eduping_ros_available():
+            logger.warning(
+                "ROS import 실패 — /api/eduping/* 엔드포인트는 503 으로 응답합니다."
+            )
+        elif not _SHARED_DIR.is_dir():
+            logger.warning(f"shared/ 디렉토리 없음: {_SHARED_DIR}")
+        else:
+            try:
+                eduping_bridge = EdupingRosBridge(_SHARED_DIR)
+                eduping_bridge.start(asyncio.get_running_loop())
+                await start_eduping_hubs(app, eduping_bridge)
+                eduping_hubs_started = True
+                logger.info("Eduping ROS bridge 활성화됨")
+            except EdupingBridgeUnavailable as e:
+                logger.warning(f"Eduping bridge 초기화 실패: {e}")
+    except ImportError as e:
+        logger.warning(f"eduping 모듈 import 실패: {e}")
+
     yield
 
-    if bridge is not None:
-        bridge.stop()
+    if eduping_hubs_started:
+        from server.control.eduping.router import stop_hubs as stop_eduping_hubs
+
+        await stop_eduping_hubs()
+    if eduping_bridge is not None:
+        eduping_bridge.stop()
+    if noriarm_bridge is not None:
+        noriarm_bridge.stop()
     try:
         await _teleop_hub.stop()
     except Exception:
@@ -153,6 +193,14 @@ try:
     app.include_router(noriarm_router)
 except ImportError as e:
     logger.warning(f"noriarm router 등록 실패 — endpoint 비활성: {e}")
+
+# Eduping (OpenArm) — bridge 미가동 시 503 자동 응답. 라우터 자체는 항상 등록.
+try:
+    from server.control.eduping.router import register_router as register_eduping_router
+
+    register_eduping_router(app)
+except ImportError as e:
+    logger.warning(f"eduping router 등록 실패 — endpoint 비활성: {e}")
 
 # 얼굴 이미지 정적 노출 — DB 의 photo_url 은 /api/face-images/{child_id}/{idx}.jpg 형태로 저장된다.
 os.makedirs(settings.face_image_dir, exist_ok=True)
