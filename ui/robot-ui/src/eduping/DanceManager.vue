@@ -40,6 +40,22 @@ const newSubmitting = ref(false);
 
 const selected = computed(() => items.value.find((i) => i.slug === selectedSlug.value));
 
+// 재생 중 viewer 를 follower 채널로 일시 전환.
+const isPlaying = ref(false);
+let playbackTimer: number | null = null;
+function onPlayed(payload: { ok: boolean; duration_s: number }): void {
+  if (!payload.ok) return;
+  if (playbackTimer !== null) {
+    window.clearTimeout(playbackTimer);
+  }
+  isPlaying.value = true;
+  const ms = Math.max(200, Math.round(payload.duration_s * 1000));
+  playbackTimer = window.setTimeout(() => {
+    isPlaying.value = false;
+    playbackTimer = null;
+  }, ms);
+}
+
 async function refresh(): Promise<void> {
   loading.value = true;
   error.value = '';
@@ -122,7 +138,7 @@ onMounted(refresh);
 
     <div class="grid">
       <div class="viewer">
-        <OpenarmViewer source="leader" />
+        <OpenarmViewer :source="isPlaying ? 'follower' : 'leader'" />
       </div>
 
       <aside class="side">
@@ -194,6 +210,7 @@ onMounted(refresh);
             kind="dance"
             :name="selected.slug"
             @recorded="refresh"
+            @played="onPlayed"
           />
         </section>
         <section v-else class="recorder-section muted">
