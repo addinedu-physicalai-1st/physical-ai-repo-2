@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# scripts/device-eduping.sh — OpenArm 양팔 follower bringup (mock / real).
+# scripts/device-eduping.sh — OpenArm 양팔 follower bringup (실물 전용).
 #
-# 인터랙티브 메뉴 (인자 없을 때 자동 표시) — 또는 인자로 1/2/3/down/status 직접:
+# 인터랙티브 메뉴 (인자 없을 때 자동 표시) — 또는 인자로 직접:
 #
-#   1 (mock)         openarm_bringup mock 모드 (CAN/하드웨어 없이 토픽만)
-#   2 (check)        실물 follower 16 모터 preflight 만 (openarm-can-motor-check)
-#   3 (real)         실물 bringup (모터 preflight 통과 후 openarm_bringup hardware_type=real)
+#   0 (setup)        CAN-FD 인터페이스 설정 (lerobot-setup-can --mode=setup, 부팅 후 1회)
+#   1 (check)        통신 & 모터 점검 (lerobot-setup-can --mode=test, 양팔 ping)
+#   2 (calibrate)    lerobot openarm_follower 양팔 캘리브레이션 (CAN 인터페이스별 1회 셋업)
+#   3 (real)         실물 bringup (preflight 없이 바로 openarm_bringup hardware_type=real)
 #   down             세션 종료
 #   status           세션 상태
 #
 # 사용:
 #   scripts/device-eduping.sh             # 인터랙티브 메뉴
-#   scripts/device-eduping.sh 1           # mock 바로
-#   scripts/device-eduping.sh 3           # real bringup (check + bringup)
+#   scripts/device-eduping.sh 3           # real bringup (preflight 없이 바로 띄움)
 #   scripts/device-eduping.sh down
 #
 #   RIGHT_CAN=can0 LEFT_CAN=can1 ARM_TYPE=v10 scripts/device-eduping.sh 3
-#   SKIP_MOTOR_CHECK=1 scripts/device-eduping.sh 3                 # preflight 우회
 #
 # 의존:
 #   - tmux, /opt/ros/jazzy, device/eduping_ws/ 빌드 완료
-#   - 실물 (real) : PEAK CAN 드라이버 + can0(right)/can1(left) up + openarm-can-motor-check
+#   - PEAK CAN 드라이버 + can0(right)/can1(left) up
+#   - 같은 env (pdg) 에 lerobot 설치
 #   - 호출 셸의 ROS_DOMAIN_ID 그대로 사용
 set -euo pipefail
 
@@ -31,6 +31,7 @@ ACTION="${1:-}"
 ARM_TYPE="${ARM_TYPE:-v10}"
 RIGHT_CAN="${RIGHT_CAN:-can0}"
 LEFT_CAN="${LEFT_CAN:-can1}"
+CALIBRATION_ID="${CALIBRATION_ID:-my_openarm_follower}"
 
 ROS_SETUP="/opt/ros/jazzy/setup.bash"
 WS_SETUP="$WS_DIR/install/setup.bash"
@@ -64,35 +65,100 @@ check_can_interfaces() {
   done
 }
 
-# --- follower 16 모터 (양팔 × 8) preflight ------------------------------
-stage_motor_check() {
-  log "[check] follower 모터 점검 (양팔 16개)"
-  if ! command -v openarm-can-motor-check &>/dev/null; then
-    log "  ✗ openarm-can-motor-check 명령 없음 — openarm_can 빌드/설치 확인" >&2
+# --- lerobot openarm_follower 양팔 calibration --------------------------
+# 양팔 각각 별도 실행 (CAN 인터페이스가 분리됨). 이미 JSON 있으면 묻고, 동의 시 재실행.
+# JSON 경로 (lerobot 기본):
+#   ~/.cache/huggingface/lerobot/calibration/robots/openarm_follower/$CALIBRATION_ID.json
+stage_calibrate_follower() {
+  log "[calibrate] lerobot openarm_follower 양팔 캘리브레이션"
+  if ! command -v lerobot-calibrate &>/dev/null; then
+    log "  ✗ lerobot-calibrate 명령 없음 — 현재 env 에 lerobot 미설치" >&2
+    log "    같은 env (pdg) 에 lerobot 설치 후 재실행." >&2
+    return 1
+  fi
+  check_can_interfaces
+
+  local cal_dir="$HOME/.cache/huggingface/lerobot/calibration/robots/openarm_follower"
+  local cal_file="$cal_dir/$CALIBRATION_ID.json"
+  local do_run=1
+  if [[ -f "$cal_file" ]]; then
+    log "  ✓ 기존 JSON 존재: $cal_file"
+    local answer
+    read -rp "  다시 캘리브레이션 하시겠습니까? [y/N]: " answer >&2
+    case "$answer" in
+      y|Y|yes|YES) do_run=1 ;;
+      *)           log "  → 기존 JSON 그대로 사용"; return 0 ;;
+    esac
+  fi
+
+  if [[ "$do_run" -eq 1 ]]; then
+    log "  [1/2] 오른팔 ($RIGHT_CAN)"
+    lerobot-calibrate \
+      --robot.type=openarm_follower \
+      --robot.port="$RIGHT_CAN" \
+      --robot.side=right \
+      --robot.id="$CALIBRATION_ID" \
+      || { log "  ✗ 오른팔 캘리브레이션 실패" >&2; return 1; }
+
+    log "  [2/2] 왼팔 ($LEFT_CAN)"
+    lerobot-calibrate \
+      --robot.type=openarm_follower \
+      --robot.port="$LEFT_CAN" \
+      --robot.side=left \
+      --robot.id="$CALIBRATION_ID" \
+      || { log "  ✗ 왼팔 캘리브레이션 실패" >&2; return 1; }
+
+    log "  ✓ 양팔 캘리브레이션 완료"
+  fi
+}
+
+# --- 0. CAN-FD 인터페이스 설정 (1회/부팅) -------------------------------
+# lerobot-setup-can --mode=setup : CAN-FD bitrate 등을 잡음 (sudo 필요할 수 있음).
+# 부팅 후 한 번만 실행. 모터 점검 / bringup 은 인터페이스가 이미 UP 인 상태 가정.
+stage_can_setup_only() {
+  log "[인터페이스 설정] CAN-FD setup"
+  if ! command -v lerobot-setup-can &>/dev/null; then
+    log "  ✗ lerobot-setup-can 명령 없음 — 같은 env (pdg) 에 lerobot 설치 필요" >&2
+    return 1
+  fi
+  local IFACES="$RIGHT_CAN,$LEFT_CAN"
+  lerobot-setup-can --mode=setup --interfaces="$IFACES" \
+    || { log "  ✗ CAN-FD setup 실패" >&2; return 1; }
+  log "  ✓ 인터페이스 설정 완료 ($IFACES)"
+}
+
+# --- 1. 통신 & 모터 점검 (lerobot-setup-can --mode=test) ---------------
+# 사전조건: 0 번 (인터페이스 설정) 으로 CAN 이 UP. UP 여부 ip link 로 확인하고
+# lerobot-setup-can --mode=test 로 양팔 모터 ping.
+stage_can_motor_test() {
+  log "[통신 & 모터 점검] 모터 ping test"
+
+  log "  [1/2] CAN 인터페이스 UP 여부 확인"
+  local CAN_LINES
+  CAN_LINES=$(ip link show 2>/dev/null | grep -E 'can[0-9]' || true)
+  if [[ -z "$CAN_LINES" ]]; then
+    log "  ✗ can* 인터페이스 없음 — 0번 (인터페이스 설정) 먼저 실행" >&2
+    return 1
+  fi
+  echo "$CAN_LINES" | sed 's/^/    /'
+  for IF in "$RIGHT_CAN" "$LEFT_CAN"; do
+    if ! ip link show "$IF" &>/dev/null; then
+      log "  ✗ $IF 없음 — 0번 (인터페이스 설정) 먼저 실행" >&2
+      return 1
+    fi
+  done
+
+  if ! command -v lerobot-setup-can &>/dev/null; then
+    log "  ✗ lerobot-setup-can 명령 없음" >&2
     return 1
   fi
 
-  FAILED=()
-  for CAN_PAIR in "right:$RIGHT_CAN" "left:$LEFT_CAN"; do
-    SIDE="${CAN_PAIR%%:*}"
-    IFACE="${CAN_PAIR##*:}"
-    for i in 1 2 3 4 5 6 7 8; do
-      RECV=$((i + 16))
-      OUT=$(openarm-can-motor-check "$i" "$RECV" "$IFACE" -fd 2>&1)
-      if echo "$OUT" | grep -qE '^(Error:|Failed)'; then
-        echo "  ✗ $SIDE id=$i/$RECV ($IFACE) — 응답 없음"
-        FAILED+=("$SIDE/$i")
-      else
-        echo "  ✓ $SIDE id=$i/$RECV ($IFACE)"
-      fi
-    done
-  done
-  if [[ ${#FAILED[@]} -gt 0 ]]; then
-    log "✗ ${#FAILED[@]}/16 모터 응답 없음: ${FAILED[*]}" >&2
-    log "  전원·CAN 결선·motor ID 확인. 우회: SKIP_MOTOR_CHECK=1" >&2
-    return 1
-  fi
-  log "✓ 16/16 모터 OK"
+  log "  [2/2] 모터 ping test (lerobot-setup-can --mode=test)"
+  local IFACES="$RIGHT_CAN,$LEFT_CAN"
+  lerobot-setup-can --mode=test --interfaces="$IFACES" \
+    || { log "  ✗ 모터 test 실패 — 전원·결선·ID 확인" >&2; return 1; }
+
+  log "✓ 모터 점검 통과"
 }
 
 # --- bringup tmux 띄움 (mock 또는 real) ---------------------------------
@@ -100,22 +166,32 @@ stage_bringup() {
   local HARDWARE_TYPE="$1"  # mock | real
 
   if tmux has-session -t "$SESSION" 2>/dev/null; then
-    log "세션 '$SESSION' 이미 떠있음 — attach"
+    # 기존 세션의 hardware_type 을 첫 윈도우 명령에서 추출해 mode mismatch 검사.
+    local CUR_HW
+    CUR_HW=$(tmux list-windows -t "$SESSION" -F '#{window_name} #{pane_current_command}' 2>/dev/null | true)
+    local CUR_CMD
+    CUR_CMD=$(tmux display-message -t "$SESSION" -p '#{pane_start_command}' 2>/dev/null || true)
+    # pane_start_command 에서 hardware_type=... 추출
+    local CUR_MODE=""
+    if [[ "$CUR_CMD" == *"hardware_type=real"* ]]; then
+      CUR_MODE="real"
+    elif [[ "$CUR_CMD" == *"hardware_type=mock"* ]]; then
+      CUR_MODE="mock"
+    fi
+    if [[ -n "$CUR_MODE" && "$CUR_MODE" != "$HARDWARE_TYPE" ]]; then
+      log "✗ 기존 세션 '$SESSION' 이 hardware_type=$CUR_MODE 로 떠 있음 (요청: $HARDWARE_TYPE)" >&2
+      log "  먼저 'scripts/device-eduping.sh down' 으로 종료한 뒤 재시도." >&2
+      exit 1
+    fi
+    log "세션 '$SESSION' 이미 떠있음 (hardware_type=${CUR_MODE:-unknown}) — attach"
     exec tmux attach -t "$SESSION"
   fi
   require_env
 
-  if [[ "$HARDWARE_TYPE" == "real" ]]; then
-    check_can_interfaces
-    if [[ "${SKIP_MOTOR_CHECK:-0}" != "1" ]]; then
-      stage_motor_check || { log "✗ 모터 점검 실패 — bringup 중단" >&2; exit 1; }
-    else
-      log "[check] (SKIP_MOTOR_CHECK=1 — 우회)"
-    fi
-  fi
-
+  # eduarm 의 wrapper launch — upstream openarm.bimanual 을 IncludeLaunchDescription 으로
+  # 그대로 부르되 RViz 만 TimerAction 으로 죽임 (robot-ui 의 three.js 가 시각화 담당).
   BRINGUP_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
-    ros2 launch openarm_bringup openarm.bimanual.launch.py \
+    ros2 launch eduarm follower_bimanual.launch.py \
       arm_type:=$ARM_TYPE hardware_type:=$HARDWARE_TYPE \
       right_can_interface:=$RIGHT_CAN left_can_interface:=$LEFT_CAN'"
 
@@ -136,14 +212,15 @@ stage_bringup() {
 prompt_menu() {
   cat >&2 <<EOF
 === eduping-device 메뉴 ===
-  1) mock bringup        (하드웨어 없이 토픽만)
-  2) follower 모터 점검   (real 시 16 모터 ping, bringup 안 함)
+  0) 인터페이스 설정      (lerobot-setup-can --mode=setup, 부팅 후 1회)
+  1) 통신 & 모터 점검     (lerobot-setup-can --mode=test, 양팔 ping)
+  2) calibrate           (lerobot openarm_follower 양팔 캘리브레이션)
   3) real bringup        (모터 점검 → 실물 hardware_type=real)
   s) status / d) down
   q) 종료
 EOF
   local choice
-  read -rp "선택 [1/2/3/s/d/q]: " choice >&2
+  read -rp "선택 [0/1/2/3/s/d/q]: " choice >&2
   echo "$choice"
 }
 
@@ -152,13 +229,14 @@ if [[ -z "$ACTION" ]]; then
 fi
 
 case "$ACTION" in
-  1|mock)
-    stage_bringup "mock"
+  0|setup|interface)
+    stage_can_setup_only
     ;;
-  2|check)
-    require_env
-    check_can_interfaces
-    stage_motor_check
+  1|check|test|comm)
+    stage_can_motor_test
+    ;;
+  2|c|cal|calibrate)
+    stage_calibrate_follower
     ;;
   3|real|up)
     stage_bringup "real"
@@ -184,7 +262,7 @@ case "$ACTION" in
     ;;
   *)
     echo "알 수 없는 선택: $ACTION" >&2
-    echo "usage: $0 [1|2|3|mock|check|real|down|status]" >&2
+    echo "usage: $0 [0|1|2|3|setup|check|calibrate|real|down|status]" >&2
     exit 2
     ;;
 esac

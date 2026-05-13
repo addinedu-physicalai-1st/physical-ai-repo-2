@@ -4,9 +4,10 @@ lerobot 의 `openarm_mini.OpenArmMini.get_action()` 변환 파이프라인을 �
 포팅. lerobot 패키지 자체는 import 하지 않음 (torch 등 헤비 의존성 회피).
 scservo_sdk (pip: `feetech-servo-sdk`) 만 의존.
 
-토픽: `/eduping/leader/joint_states` (sensor_msgs/JointState, 16 joints, radian)
-명명: `right_joint_1..right_joint_7, right_gripper, left_joint_1..left_joint_7, left_gripper`
-       (joint_names.py 의 OPENARM_JOINT_NAMES 와 동일)
+토픽: `/eduping/leader/joint_states` (sensor_msgs/JointState, 16 joints)
+명명: URDF (openarm_description) 와 동일 —
+       openarm_{right|left}_joint1..joint7  (revolute, rad)
+       openarm_{right|left}_finger_joint1   (prismatic, m)
 
 ROS 파라미터:
   - topic            (str, default '/eduping/leader/joint_states')
@@ -51,7 +52,6 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
-from .joint_names import OPENARM_JOINT_NAMES
 
 
 # --- lerobot/openarm_mini.py 의 상수 (1:1 포팅) -----------------------------
@@ -227,7 +227,12 @@ class FeetechLeaderNode(Node):
             self.get_logger().fatal(f"calibration JSON 없음: {cal_path}")
             raise SystemExit(2)
         calibration = load_calibration(cal_path)
-        missing = [n for n in OPENARM_JOINT_NAMES if n not in calibration]
+        # calibration JSON 키는 lerobot 가 생성 — `right_joint_1..gripper`, `left_joint_1..gripper`
+        # (URDF 명 아님). MOTOR_NAMES_PER_ARM × side 로 구성.
+        expected_cal_keys = [
+            f"{side}_{name}" for side in ("right", "left") for name in MOTOR_NAMES_PER_ARM
+        ]
+        missing = [n for n in expected_cal_keys if n not in calibration]
         if missing:
             self.get_logger().fatal(f"calibration 누락 키: {missing}")
             raise SystemExit(2)
@@ -307,7 +312,12 @@ class FeetechLeaderNode(Node):
                 val_deg = deg_map[motor_name]
                 if motor_name != "gripper" and motor_name in flips:
                     val_deg = -val_deg
-                names.append(f"{side}_{target}")
+                # URDF 명으로 publish — joint_N → openarm_{side}_jointN, gripper → openarm_{side}_finger_joint1
+                if target == "gripper":
+                    urdf_name = f"openarm_{side}_finger_joint1"
+                else:
+                    urdf_name = f"openarm_{side}_{target.replace('_', '')}"
+                names.append(urdf_name)
                 if motor_name == "gripper":
                     # URDF finger_joint1 (prismatic): 0 m = 활짝 열림, 0.044 m = 완전히 닫힘.
                     # read_degrees gripper: raw=rmin → val_deg=0, raw=rmax → val_deg=-65.

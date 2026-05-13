@@ -3,8 +3,20 @@ import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { postModeClick } from '@/composables/useIntentDispatch';
+import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
+import WarningModal from '@/common/WarningModal.vue';
 import type { ModeTreeNode, ModeTreeGroup } from '@/config/robots';
 import { chromeAccent } from '@/config/colors';
+
+// eduping 의 이 모드들은 leader 디바이스가 필요 — 진입 전 미리 체크.
+const EDUPING_LEADER_REQUIRED = new Set(['등하원 인사 설정', '율동 등록']);
+
+const edupingStateWs = useEdupingStateWs();
+edupingStateWs.start();
+
+const warningOpen = ref(false);
+const warningTitle = ref('');
+const warningMessage = ref('');
 
 const mode = useModeStore();
 const { robot, currentMode } = storeToRefs(mode);
@@ -35,6 +47,18 @@ function toggle(id: string): void {
 
 async function select(id: string): Promise<void> {
   if (id === currentMode.value) return;
+  // eduping 의 leader-required 모드 — 진입 전 leader 연결 확인.
+  if (robot.value.id === 'eduping' && EDUPING_LEADER_REQUIRED.has(id)) {
+    if (!edupingStateWs.leaderActive.value) {
+      warningTitle.value = '리더 디바이스가 연결되어 있지 않습니다';
+      warningMessage.value =
+        `'${id}' 모드는 리더 디바이스가 필요합니다.\n\n` +
+        '먼저 리더 bringup 을 실행해주세요:\n' +
+        '    scripts/device-eduping-leader.sh 3';
+      warningOpen.value = true;
+      return;
+    }
+  }
   mode.setMode(id);
   try {
     await postModeClick(id, robot.value.id);
@@ -157,6 +181,11 @@ watch(
       </template>
     </div>
   </nav>
+  <WarningModal
+    v-model:open="warningOpen"
+    :title="warningTitle"
+    :message="warningMessage"
+  />
 </template>
 
 <style scoped>

@@ -95,6 +95,10 @@ class StopRecordIn(BaseModel):
     save: bool = Field(default=True)
 
 
+class TeleopIn(BaseModel):
+    enabled: bool
+
+
 class PlayIn(BaseModel):
     target: Literal["sim", "real"] = "sim"
     speed: float = Field(default=1.0, ge=0.1, le=2.0)
@@ -113,6 +117,20 @@ async def health(req: Request) -> dict:
         "bridge_running": bridge is not None,
         "routines_root": str(bridge.routines_root) if bridge else None,
     }
+
+
+@router.post("/teleop")
+async def teleop_toggle(req: Request, body: TeleopIn) -> dict:
+    """leader → forward_position_controller 패스스루 ON/OFF.
+
+    녹화/재생과 독립. 켜놓은 상태로 leader 를 움직이면 실물도 따라 움직임.
+    실물 follower (controller_manager) 가 떠 있어야 함 — 미가동 시 ok=False 반환.
+    """
+    bridge = _bridge(req)
+    try:
+        return bridge.set_live_teleop(body.enabled)
+    except BridgeUnavailable as e:
+        raise HTTPException(503, str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +266,7 @@ async def dance_play(req: Request, slug: str, body: PlayIn) -> dict:
     if not SLUG_RE.match(slug):
         raise HTTPException(400, "invalid slug")
     try:
-        return bridge.play_routine(KIND_DANCE, slug, speed=body.speed) | {"target": body.target}
+        return bridge.play_routine(KIND_DANCE, slug, speed=body.speed, target=body.target)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except (ValueError, BridgeUnavailable) as e:
@@ -298,7 +316,7 @@ async def greeting_play(req: Request, slot: str, body: PlayIn) -> dict:
     _check_slot(slot)
     bridge = _bridge(req)
     try:
-        return bridge.play_routine(KIND_GREETING, slot, speed=body.speed) | {"target": body.target}
+        return bridge.play_routine(KIND_GREETING, slot, speed=body.speed, target=body.target)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except (ValueError, BridgeUnavailable) as e:
