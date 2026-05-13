@@ -22,5 +22,9 @@ setup(
     maintainer_email='dev@pingdergarten.local',
     description='GogoPing launch 통합 진입점.',
     license='Proprietary',
-    entry_points={'console_scripts': []},
+    entry_points={
+        'console_scripts': [
+            'sim_status_publisher = gogoping_bringup.sim_status_publisher:main',
+        ],
+    },
 )

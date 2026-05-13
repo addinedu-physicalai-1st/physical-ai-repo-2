@@ -597,9 +597,15 @@ class TeleopCard(QWidget):
         # ---------- 헤더: 통신 상태 + IP ----------
         head_row = QHBoxLayout()
         head_row.setSpacing(8)
+        # 배지 텍스트 변경 시 인접 위젯이 흔들리지 않도록 너비 고정.
         self.comm_badge = StatusBadge("연결 대기", COLORS["text_muted"])
         self.comm_badge.setObjectName("teleopCommBadge")
+        self.comm_badge.setMinimumWidth(80)
         head_row.addWidget(self.comm_badge)
+        self.mode_badge = StatusBadge("—", COLORS["text_muted"])
+        self.mode_badge.setObjectName("teleopModeBadge")
+        self.mode_badge.setMinimumWidth(60)
+        head_row.addWidget(self.mode_badge)
         head_row.addStretch(1)
         self.ip_label = QLabel(f"vic · {_load_vic_ip(self._ips_json)}")
         self.ip_label.setObjectName("teleopIpLabel")
@@ -913,6 +919,14 @@ class TeleopCard(QWidget):
         else:
             self.comm_badge.set_status(label or "연결 대기", COLORS["danger"])
 
+    def _set_mode_badge(self, mode: str) -> None:
+        if mode == "sim":
+            self.mode_badge.set_status("SIM", COLORS["sky"])
+        elif mode == "real":
+            self.mode_badge.set_status("REAL", COLORS["primary"])
+        else:
+            self.mode_badge.set_status("—", COLORS["text_muted"])
+
     # --------------------------------------------------- health
 
     def _on_health_tick(self) -> None:
@@ -921,5 +935,7 @@ class TeleopCard(QWidget):
         info = self._get_health()
         if info is None:
             self._set_comm_badge(False, label="통신 끊김")
+            self._set_mode_badge("—")
             return
         self._set_comm_badge(bool(info.get("ros_ok", False)))
+        self._set_mode_badge(info.get("mode", "—"))

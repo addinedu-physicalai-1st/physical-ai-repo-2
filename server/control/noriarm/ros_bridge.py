@@ -146,7 +146,9 @@ class NoriarmRosBridge:
         if self._node is not None:
             return
         self._loop = loop
-        rclpy.init()
+        # 같은 프로세스의 다른 bridge 가 먼저 init 했을 수 있다.
+        if not rclpy.ok():
+            rclpy.init()
         self._node = rclpy.create_node("control_noriarm_bridge")
 
         topic = self._arm.sim.get("joint_state_topic", "/joint_states")

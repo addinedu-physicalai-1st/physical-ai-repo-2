@@ -141,6 +141,13 @@ scripts/ui-admin.sh
 # PyQt5 GUI (macOS/Linux 지원)
 ```
 
+### 가제보 시뮬레이션
+
+**GogoPing 핑더가든 world** (시뮬레이션 테스트)
+```bash
+scripts/device-gogoping-sim.sh  # 또는 down / status
+```
+
 ## 환경 변수
 
 [설치 4)](#4-env-생성) 단계에서 `.env` 를 만든 뒤 필요한 값만 채운다. 주요 키는 [.env.example](.env.example) 참고.
