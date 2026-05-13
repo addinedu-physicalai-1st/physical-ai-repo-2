@@ -14,7 +14,7 @@ Addinedu 최종 프로젝트 | 팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-06-04
 
 | 디렉터리 | 역할 |
 |---|---|
-| `server/ai` | AI Hub — 음성 명령 의도 분류 (Ollama Qwen2.5 / Gemma3 / bge-m3) |
+| `server/ai` | AI Hub — 음성 명령 의도 분류·잡담·보고서 (Ollama: `qwen2.5:0.5b` 분류 / `qwen2.5:3b` 잡담 / `qwen2.5:7b` 보고서, `bge-m3` 임베딩) |
 | `server/control` | Control Service — REST/WS 게이트웨이, ROS2 브리지 |
 | `ui/robot-ui` | 교사용 웹 UI (Vue 3) |
 
@@ -71,16 +71,17 @@ pip install -e .
 
 #### 2) Ollama 모델 pull
 
-AI Hub 가 사용하는 3개 모델을 미리 받는다 (총 약 6–7 GB):
+AI Hub 가 사용하는 모델을 미리 받는다 (기본값은 [`server/ai/config.py`](server/ai/config.py) `Settings` 와 동일):
 
 ```bash
 ollama serve &              # 데몬이 떠있지 않은 경우
-ollama pull qwen2.5:3b      # 의도 분류
-ollama pull gemma3:4b       # 잡담 응답
+ollama pull qwen2.5:0.5b    # 의도 분류 (짧은 JSON)
+ollama pull qwen2.5:3b      # 잡담 (짧은 응답)
+ollama pull qwen2.5:7b      # 일과 보고서 JSON 생성
 ollama pull bge-m3          # RAG 임베딩
 ```
 
-모델·호스트 override: `OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_CHAT_MODEL` 환경 변수.
+호스트·모델 태그는 **`server/ai/config.py` 의 `Settings` 를 직접 수정**한다 (해당 모듈은 런타임 `.env` 로 덮어쓰지 않음). Ollama 데몬을 다른 머신에 두는 경우에만 그쪽 `OLLAMA_HOST` 를 Ollama CLI/서비스 설정으로 맞춘다.
 
 #### 3) UI 의존성 (선택)
 

@@ -25,7 +25,7 @@ describe('RegisterWizard', () => {
     const step1 = w.find('[data-test="step1"]')
     const inputs = step1.findAll('input')
     await inputs[0].setValue('김민준')
-    await inputs[1].setValue('2021-03-12')
+    await inputs[2].setValue('2021-03-12')
     await step1.find('select').setValue('햇살반')
     const nextBtn = w.findAll('button').find((b) => b.text().includes('다음'))!
     await nextBtn.trigger('click')
@@ -37,7 +37,7 @@ describe('RegisterWizard', () => {
     const step1 = w.find('[data-test="step1"]')
     const s1Inputs = step1.findAll('input')
     await s1Inputs[0].setValue('A')
-    await s1Inputs[1].setValue('2021-01-01')
+    await s1Inputs[2].setValue('2021-01-01')
     await step1.find('select').setValue('햇살반')
     const nextBtn = w.findAll('button').find((b) => b.text().includes('다음'))!
     await nextBtn.trigger('click')
@@ -58,7 +58,7 @@ describe('RegisterWizard', () => {
     const step1 = w.find('[data-test="step1"]')
     const s1Inputs = step1.findAll('input')
     await s1Inputs[0].setValue('김민준')
-    await s1Inputs[1].setValue('2021-03-12')
+    await s1Inputs[2].setValue('2021-03-12')
     await step1.find('select').setValue('햇살반')
     const nextBtn = w.findAll('button').find((b) => b.text().includes('다음'))!
     await nextBtn.trigger('click')
@@ -74,6 +74,7 @@ describe('RegisterWizard', () => {
     expect(w.emitted('submit')).toBeTruthy()
     const payload = w.emitted('submit')![0][0] as any
     expect(payload.child.name).toBe('김민준')
+    expect(payload.child.given_name).toBeNull()
     expect(payload.child.class_name).toBe('햇살반')
     expect(payload.parent.email).toBe('mom@example.com')
     expect(payload.parent.phone).toBe('010-1234-5678')

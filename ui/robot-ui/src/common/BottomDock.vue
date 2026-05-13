@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, watch } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
-import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
+import { VOICE_CONTROLLER_KEY, VOICE_UI_SESSION_KEY } from '@/composables/voiceControllerKey';
 import { useAudioLevel } from '@/composables/useAudioLevel';
 import { faceAccent } from '@/config/colors';
 import CommandBar from './CommandBar.vue';
@@ -20,6 +20,8 @@ const controller = inject(VOICE_CONTROLLER_KEY);
 if (!controller) throw new Error('VOICE_CONTROLLER_KEY not provided');
 const ctrl = controller;
 
+const voiceUiSession = inject(VOICE_UI_SESSION_KEY, ref(false));
+
 const audio = useAudioLevel();
 
 // voiceMode 토글 — STT on/off 전환 (초기 시작은 App.vue handleStart 가 처리)
@@ -28,19 +30,23 @@ watch(voiceMode, (next, prev) => {
   else if (next === 'text' && prev === 'voice') ctrl.stop();
 });
 
-// listening/wake_detected 동안 마이크 시각화용 AudioContext on
-watch([voiceMode, state], async ([vm, st]) => {
-  const wantAudio = vm === 'voice' && (st === 'listening' || st === 'wake_detected');
-  if (wantAudio) {
-    try {
-      await audio.start();
-    } catch (e) {
-      console.warn('[Mic] Failed to start audio visualization:', e);
+// 마이크(getUserMedia)는 음성 상태마다 켰다 끄면 OS 인디케이터가 깜빡임.
+// 시작 제스처 이후·음성 모드인 동안만 한 스트림 유지, 타이핑 모드로 바꿀 때만 해제.
+watch(
+  [voiceMode, voiceUiSession],
+  async ([vm, session]) => {
+    if (vm === 'voice' && session) {
+      try {
+        await audio.start();
+      } catch (e) {
+        console.warn('[Mic] Failed to start audio visualization:', e);
+      }
+    } else {
+      audio.stop();
     }
-  } else {
-    audio.stop();
-  }
-});
+  },
+  { immediate: true },
+);
 
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'

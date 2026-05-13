@@ -12,6 +12,7 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
   "httpx>=0.27",
+  "es-hangul>=0.1.0",
   "pydantic>=2.9",
   # DB / 인증
   "sqlalchemy[asyncio]>=2.0",

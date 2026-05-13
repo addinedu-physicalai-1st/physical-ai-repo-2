@@ -6,3 +6,15 @@ export function localDateKey(d: Date = new Date()): string {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+/** 서버 보고서·사진 일자와 맞추기 위한 KST 달력 'YYYY-MM-DD'. */
+export function seoulDateKey(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(d)
+    .slice(0, 10)
+}

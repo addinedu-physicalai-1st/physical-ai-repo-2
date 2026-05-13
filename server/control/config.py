@@ -30,6 +30,8 @@ class Settings:
     # --- 튜닝 노브 (env 미연동, 코드 수정으로만 변경) ---
     ai_hub_url: str = "http://localhost:8001"
     request_timeout_s: float = 30.0
+    # 보고서 생성은 Hub→Ollama 가 길 수 있어 별도 상한(초).
+    ai_hub_report_timeout_s: float = 300.0
     # 파일 저장소
     face_image_dir: str = "server/storage/face-images"
     # 자연 촬영 사진 — server/storage/photos/{category}/YYYY/MM/DD/{name}.jpg 구조.

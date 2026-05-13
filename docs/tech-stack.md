@@ -11,11 +11,11 @@
 | Educator UI | Python 3.11 + PyQt5 + requests (`Session()` cookie jar) + websocket-client + cv2/QCamera — 데스크톱 앱 | 교사 운영용 데스크톱 앱. Control Service REST + WebSocket (`/ws/robot-state` 로 로봇 상태 실시간 수신, SR-OPS-019) 경유. rclpy 직접 호출 안 함. fastapi-users 의 HttpOnly 쿠키 인증을 `requests.Session()` 으로 유지하고 같은 쿠키를 WebSocket handshake 헤더로 전달. 사진 binary 는 Control Server 의 FastAPI StaticFiles URL 을 `requests.get(url)` 로 직접 GET. 카메라 캡처 (등록 15장) 는 cv2 또는 QCamera, 지도 위젯 (SLAM 맵 + nav graph) 은 QGraphicsView + QPixmap |
 | Robot UI | Vue 3 + Vite dev server (Chromium kiosk) + Pinia + Web Speech API (STT/TTS) + three.js (셰이더 표정) — **단일 코드베이스**, 각 로봇 노트북에서 `VITE_ROBOT=eduping/gogoping/noriarm` env 로 분기 인스턴스 실행. `server.proxy` 로 `/api/*` → Control Service | 공통 composables/components (~50%): 호출어 감지·STT·TTS·표정 (three.js 셰이더 — `ShaderFace.vue`)·모드 셀렉터·자연어 명령 디스패처·인접 정지 표시기. 로봇별 모드 화면 (~50%) 은 `defineAsyncComponent` 로 분기 인스턴스에서만 lazy load. GogoPing 지도 위젯 (Canvas + PGM/PNG 맵 + nav graph 좌표 오버레이) 은 GogoPing 인스턴스에서만 활성. 자연 촬영은 ROS2 노드가 단독 처리하므로 UI 미관여. Nginx 미사용 (개발 전용) |
 | AI Server | Python 3.11 + FastAPI + httpx + (얼굴 인식) + (LLM SDK) | Vision · Intent · LLM 라우팅 (STT/TTS 는 브라우저 UI 의 Web Speech API 가 처리하므로 서버에 없음), api 프로세스 (의도 분류 동기) + worker 프로세스 (`ai_job` 큐 폴링), 단일 코드베이스, 재시작 시 `running → pending` 일괄 reset |
-| LLM | Ollama + Qwen 3 4B (호스트 네이티브 설치 — 컨테이너 미사용) | 의도 분류 + 일과 보고서 모두 4B 단일 모델 공유. 원격 LLM (Gemini 등) 미사용 — fallback 없음. RTX 3060 6GB VRAM 에서 Q4 양자화 시 ~2.5GB 사용, vision 워크로드 (YOLO/face) 와 공존 가능. 학습용 RTX 5090 데스크탑에 별도 인스턴스로 띄워 LAN 호출도 가능 (`OLLAMA_HOST=0.0.0.0:11434`). Qwen3 의 `think=false` 옵션 사용해 의도 분류 latency 최소화 |
+| LLM | Ollama + 로컬 GGUF (호스트 네이티브 — 컨테이너 미사용) | **구현 기준** [`server/ai/config.py`](../server/ai/config.py) `Settings`: 의도 분류 `qwen2.5:0.5b`, 잡담 `qwen2.5:3b`, 일과 보고서 `qwen2.5:7b` (`ollama_report_model`), RAG 임베딩 `bge-m3`. 원격 LLM (Gemini 등) 미사용 — fallback 없음. 호스트·모델명은 해당 dataclass 기본값을 코드에서 바꿈(현재 Python 설정은 `.env` 로 덮어쓰지 않음). Ollama 데몬을 LAN 에 바인딩해 쓰는 것은 별개(`ollama serve` 바인드 등). |
 | DB | PostgreSQL 15 | Control 도메인 + ai_job 테이블 공유 |
 | Object Storage | 로컬 디스크 (`server/storage/`) + FastAPI `StaticFiles` 마운트 | 사진 binary. 추후 오브젝트 스토리지 도입 시 어댑터로 교체 |
 | Inter-service | Browser → Vite dev server `server.proxy` → Control Service (브라우저 입장 same-origin), Control → AI: HTTP POST `/jobs`, AI Hub / AI Worker → Ollama: HTTP `:11434` (호스트 네이티브, 컨테이너에서는 `host.docker.internal:11434` 또는 호스트 IP), Control / AI Server 가 공유 SQLAlchemy 모델 패키지 (예: `pingdergarten_models/`) 로 동일 PostgreSQL 접근 | Redis 미사용 |
-| 개발/배포 환경 | Docker Compose (control / ai / postgres) + 호스트 Ollama + 각 노트북에서 `vite dev` 실행: parent-ui (1개, Vue 3) + robot-ui (3개 인스턴스, Vue 3, `VITE_ROBOT=eduping/gogoping/noriarm` env 분기로 같은 코드베이스 실행) + 교사 PC 에서 `python -m educator_app` (PyQt5) — 노트북 16GB / RTX 3060 가능. 학습용 RTX 5090 데스크탑 별도 | 발표 시연 환경 전용 (Flask·Nginx·rosbridge 미사용). Ollama Qwen 3B 양자화 (호스트 네이티브) + 서버 측 STT/TTS 0GB (브라우저가 처리) — Whisper·Edge-TTS 미사용 |
+| 개발/배포 환경 | Docker Compose (control / ai / postgres) + 호스트 Ollama + 각 노트북에서 `vite dev` 실행: parent-ui (1개, Vue 3) + robot-ui (3개 인스턴스, Vue 3, `VITE_ROBOT=eduping/gogoping/noriarm` env 분기로 같은 코드베이스 실행) + 교사 PC 에서 `python -m educator_app` (PyQt5) — 노트북 16GB / RTX 3060 가능. 학습용 RTX 5090 데스크탑 별도 | 발표 시연 환경 전용 (Flask·Nginx·rosbridge 미사용). Ollama 에 **qwen2.5:0.5b + qwen2.5:3b + qwen2.5:7b + bge-m3** 로드 (호스트 네이티브). 로봇 UI STT 는 브라우저 Web Speech — 서버 Whisper 미사용. |
 
 ## 2. 추상 동사 → 구현체 매핑
 
@@ -37,8 +37,9 @@
 | 음성 인식 (STT) | 브라우저 Web Speech API (`webkitSpeechRecognition`, ko-KR) | 클라이언트(로봇 UI) 측 STT — 서버 메모리 0, 인터넷 의존 (Chrome 의 경우 Google STT 백엔드) |
 | 음성 합성 (TTS) | 브라우저 `window.speechSynthesis` API (ko-KR voice) | 클라이언트(로봇 UI) 측 TTS — 서버 메모리 0, OS TTS 사용 (오프라인 가능) |
 | 호출어 감지 | 브라우저 Web Speech API STT 항상 듣기 모드 + 텍스트 매칭 | "에듀핑" / "고고핑" / "노리암" — 별도 wake word 모델(OpenWakeWord/Porcupine) 미사용 |
-| 의도 분류 LLM | 로컬 Ollama + Qwen 3 4B (rule-base 결합) | 모드 전환 / 모드 내 서브 명령 라우팅 |
-| 일과 보고서 LLM | 로컬 Ollama + Qwen 3 4B (의도 분류 LLM 과 모델 공유) | 3B 단일 모델로 의도 분류 + 보고서 통합. 원격 fallback 없음 |
+| 의도 분류 LLM | 로컬 Ollama `qwen2.5:0.5b` (허브 규칙·라우팅과 결합) | 모드 전환 / 모드 내 서브 명령 라우팅 — `classify_intent` 가 기본 모델로 호출 |
+| 잡담 LLM | 로컬 Ollama `qwen2.5:3b` | `generate_chat` — 짧은 응답·낮은 지연 우선. 원격 fallback 없음 |
+| 일과 보고서 LLM | 로컬 Ollama `qwen2.5:7b` (`Settings.ollama_report_model`) | `generate_report` JSON — 규칙·타임라인 품질 우선. VRAM 부족 시 `config.py` 에서 `qwen2.5:3b` 로 낮출 수 있음 |
 | 오디오 재생 | 브라우저 `<audio>` element (HTMLAudioElement) | mp3 자장가·무궁화꽃 노래 등 — 클라이언트(로봇 UI) 측 재생, 서버 메모리 0. pygame.mixer 미사용 |
 | 이미지 처리 | OpenCV | 얼굴 캡처 전처리, 품질 필터 |
 | 입력 검증 | Pydantic + 정규표현식 | 등록 폼 |

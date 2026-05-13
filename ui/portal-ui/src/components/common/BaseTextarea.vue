@@ -8,7 +8,9 @@ withDefaults(defineProps<{
   required?: boolean
   disabled?: boolean
   rows?: number
-}>(), { rows: 4 })
+  /** 마운트 직후 포커스 (인라인 편집 등) */
+  autofocus?: boolean
+}>(), { rows: 4, autofocus: false })
 
 defineEmits<{ (e: 'update:modelValue', value: string): void }>()
 </script>
@@ -26,6 +28,7 @@ defineEmits<{ (e: 'update:modelValue', value: string): void }>()
       :disabled="disabled"
       :rows="rows"
       class="field__input"
+      :autofocus="autofocus"
       @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
     />
     <span v-if="error" class="field__msg field__msg--error">{{ error }}</span>

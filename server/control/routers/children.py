@@ -36,12 +36,14 @@ async def create_child(
     teacher: User = Depends(require_teacher),
     session: AsyncSession = Depends(get_session),
 ) -> ChildOut:
+    gn = (payload.given_name or "").strip() or None
     child = Child(
         name=payload.name,
         birth_date=payload.birth_date,
         class_name=payload.class_name,
         photo_url=None,
         notes=payload.notes,
+        given_name=gn,
         created_at=datetime.now(timezone.utc),
     )
     session.add(child)
@@ -96,6 +98,7 @@ async def get_child(
         class_name=child.class_name,
         photo_url=child.photo_url,
         notes=child.notes,
+        given_name=child.given_name,
         parents=parents,
     )
 
@@ -112,6 +115,8 @@ async def patch_child(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Child not found")
     if payload.notes is not None:
         child.notes = payload.notes
+    if payload.given_name is not None:
+        child.given_name = (payload.given_name.strip() or None)
     await session.commit()
     return ChildOut.model_validate(child, from_attributes=True)
 

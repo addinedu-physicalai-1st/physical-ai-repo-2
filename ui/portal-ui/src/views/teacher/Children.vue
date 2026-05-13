@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
+import { api, ApiError } from '@/api/client'
 import type { Child, ChildDetail, ParentInfo } from '@/types'
 import FaceCapture from '@/components/teacher/FaceCapture.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -18,6 +18,7 @@ const router = useRouter()
 const children = ref<Child[]>([])
 const selected = ref<ChildDetail | null>(null)
 const loading = ref(true)
+const listError = ref<string | null>(null)
 
 const notesDraft = ref('')
 const editingNotes = ref(false)
@@ -40,8 +41,24 @@ const sorted = computed(() =>
 )
 
 onMounted(async () => {
+  listError.value = null
   try {
     children.value = await api.get<Child[]>('/api/children')
+  } catch (e) {
+    children.value = []
+    if (e instanceof ApiError) {
+      if (e.status === 401) {
+        listError.value =
+          '로그인이 필요하거나 세션이 만료되었습니다. 교사 계정으로 다시 로그인해 주세요.'
+      } else if (e.status === 502 || e.status === 503) {
+        listError.value =
+          `연결할 수 없습니다 (HTTP ${e.status}). Control 서버가 떠 있는지, Vite 프록시(CONTROL_URL)를 확인해 주세요.`
+      } else {
+        listError.value = `목록을 불러오지 못했습니다 (HTTP ${e.status}). DB 마이그레이션(예: alembic upgrade head)과 서버 로그를 확인해 주세요.`
+      }
+    } else {
+      listError.value = '목록을 불러오지 못했습니다. 네트워크와 서버 상태를 확인해 주세요.'
+    }
   } finally {
     loading.value = false
   }
@@ -177,7 +194,7 @@ function gotoRegister() {
           <div class="list-head"><Icon name="users-round" :size="16" /><span>명단</span></div>
         </template>
         <p v-if="loading" class="muted">불러오는 중...</p>
-        <ul v-else class="ul">
+        <ul v-else-if="!listError && sorted.length" class="ul">
           <li
             v-for="c in sorted"
             :key="c.id"
@@ -193,10 +210,16 @@ function gotoRegister() {
           </li>
         </ul>
         <BaseEmptyState
-          v-if="!loading && !sorted.length"
+          v-if="!loading && listError"
+          icon="alert-circle"
+          title="명단을 불러오지 못했습니다"
+          :description="listError"
+        />
+        <BaseEmptyState
+          v-else-if="!loading && !sorted.length"
           icon="users-round"
           title="등록된 어린이가 없습니다"
-          description="새 어린이 등록 버튼으로 시작하세요."
+          description="DB에 원아 행이 없거나 아직 등록하지 않았습니다. 시드( python -m server.db.seed )를 돌렸는지 확인하거나, 새 어린이 등록으로 추가하세요."
         />
       </BaseCard>
 

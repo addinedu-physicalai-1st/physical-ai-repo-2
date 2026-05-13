@@ -48,16 +48,15 @@ const userClicked = ref<'O' | 'X' | null>(null);
 const realArmPresent = ref<boolean | null>(null);
 const showSimViewer = computed(() => realArmPresent.value !== true);
 
-// USB 외장 카메라 감지 여부 (OXVisionPreview emit). 없으면 카메라 패널 자체 숨김 —
-// 노트북 내장 카메라로는 OX 보드 인식을 시도하지 않는다.
-//   null  — 아직 감지 전 (패널 숨김 상태로 시작 — flicker 방지)
-//   true  — USB 카메라 발견 → 패널 노출
-//   false — USB 없음 → 패널 계속 숨김
+// 외장 카메라(보드·YOLO) 감지 — OXVisionPreview emit. 없으면 보드 패널 숨김.
+//   null  — 감지 전
+//   true  — 외장 후보 있음 → 좌하단 패널
+//   false — 없음
 const usbCameraAvailable = ref<boolean | null>(null);
 
-// 내장 카메라 감지 (자연 촬영용, 우상단).
+// 내장 카메라 감지 (자연 촬영용, 우상단). USB 보드 카메라와 동시에 있어도 마운트되어 probe.
 const integratedCameraAvailable = ref<boolean | null>(null);
-// 자연 촬영 — 한 세션당 최대 1장. done 화면에서 결과 라인에 사용.
+// 자연 촬영 — 세션 동안 표정이 잡힐 때마다 쿨다운 후 추가 저장. done 화면에서 장 수 집계.
 const naturalShotCount = ref(0);
 // IntegratedCameraPreview 에 넘기는 resetKey — startQuiz 마다 +1 해서 락 해제 trigger.
 const captureResetKey = ref(0);
@@ -65,6 +64,10 @@ const captureResetKey = ref(0);
 const captureArmed = computed(
   () => phase.value === 'question' || phase.value === 'thinking' || phase.value === 'reveal',
 );
+
+/** 내장 카메라 probe 가 끝나고 없을 때만(false) OX 패널 안에서 표정 PIP·두 번째 스트림 사용.
+ * null(probe 전) 이면 끄기 — 내장이 있으면 곧 우상단으로 가므로 노트북 화면이 USB 위에 겹치는 것 방지. */
+const oxPanelEmotionEnabled = computed(() => integratedCameraAvailable.value === false);
 
 function handleNaturalShot(): void {
   naturalShotCount.value += 1;
@@ -231,12 +234,14 @@ function reset(): void {
   userClicked.value = null;
   naturalShotCount.value = 0;
   captureResetKey.value += 1;
+  integratedCameraAvailable.value = null;
 }
 
 watch(isActive, (active, prev) => {
   if (!active && prev) reset();
   if (active && !prev) {
     phase.value = 'intro';
+    integratedCameraAvailable.value = null;
     void checkRealArmHealth();
   }
 });
@@ -305,7 +310,10 @@ const progressLabel = computed(
           </div>
           <p class="subtitle">{{ score === questions.length ? '완벽해요! 🎉' : score > 0 ? '잘했어요 👏' : '다음에는 더 잘할 수 있어요!' }}</p>
           <p class="natural-shot-line">
-            {{ naturalShotCount > 0 ? '오늘의 표정 1장 찍었어요 📸' : '사진은 못 찍었어요' }}
+            <template v-if="naturalShotCount > 0">
+              오늘의 표정 {{ naturalShotCount }}장 찍었어요 📸
+            </template>
+            <template v-else>사진은 못 찍었어요</template>
           </p>
           <div class="done-actions">
             <button class="primary" @click="startQuiz">다시 하기</button>
@@ -313,9 +321,7 @@ const progressLabel = computed(
           </div>
         </div>
 
-        <!-- 우상단 floating: 노트북 내장 카메라 + 자연 촬영. 게임 진행 중 happy/sad 임계
-             초과 시 한 세션당 1장만 캡처 → Control Server 업로드. 내장 카메라가
-             없으면 패널 숨김. -->
+        <!-- 우상단: 내장 등 첫 videoinput — 표정(자연 촬영). USB 보드 카메라가 있어도 같은 위치 유지. -->
         <div v-show="integratedCameraAvailable === true" class="capture-float">
           <IntegratedCameraPreview
             :armed="captureArmed"
@@ -325,23 +331,31 @@ const progressLabel = computed(
             @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
             @captured="handleNaturalShot"
           />
-          <p class="capture-caption">자연 촬영</p>
+          <p class="capture-caption">표정 촬영 (내장 카메라)</p>
         </div>
 
-        <!-- 좌하단 floating: 카메라 라이브 뷰 + 카메라 셀렉트.
-             질문 phase 동안만 armed=true → 손가락 1.5초 락인 → selectAnswer 자동 호출.
-             USB 외장 카메라가 있을 때만 노출 (노트북 내장 카메라는 인식 안 함).
-             OXVisionPreview 는 USB 감지를 위해 항상 mount 해야 하므로 wrapper 만
-             v-show 로 토글 — usbCameraAvailable 가 true 일 때만 표시. -->
+        <!-- 좌하단: USB/외장 카메라 — 보드 영상 + YOLO WebSocket + mediapipe Hands.
+             enumerate 순서의 첫 번째가 내장이면 기본 선택은 2번째(보드) 쪽으로 잡히도록 OXVisionPreview 내부에서 처리.
+             내장이 우상단에서 표정을 담당하면 여기서는 emotion-armed 를 끈다. -->
         <div v-show="usbCameraAvailable === true" class="vision-float">
           <OXVisionPreview
             :armed="phase === 'question' && !submitting"
+            :emotion-armed="captureArmed && oxPanelEmotionEnabled"
+            :emotion-reset-key="captureResetKey"
+            robot="noriarm"
+            mode="ox-quiz"
             @select="(r: 'O' | 'X') => void selectAnswer(r)"
             @usb-available="(v: boolean) => (usbCameraAvailable = v)"
+            @emotion-captured="handleNaturalShot"
           />
           <p class="vision-caption">
             <span class="status-dot status-vision" />
-            보드 인식 카메라
+            <template v-if="integratedCameraAvailable === true">
+              보드·손 인식 (YOLO)
+            </template>
+            <template v-else>
+              보드 인식 · 첫 카메라는 표정 · 문제·생각·해설 단계에서만 인식
+            </template>
           </p>
         </div>
 

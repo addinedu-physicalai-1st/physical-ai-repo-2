@@ -21,6 +21,7 @@ const step = ref<1 | 2>(1)
 const CLASS_OPTIONS = ['햇살반', '꽃잎반', '햇님반']
 
 const childName = ref('')
+const childGivenName = ref('')
 const childBirth = ref('')
 const childClass = ref('')
 const childNotes = ref('')
@@ -64,6 +65,7 @@ function submit() {
       birth_date: childBirth.value,
       class_name: childClass.value.trim(),
       notes: childNotes.value.trim() || null,
+      given_name: childGivenName.value.trim() || null,
     },
     parent: {
       name: parentName.value.trim(),
@@ -97,7 +99,12 @@ function back() {
     </ol>
 
     <div v-if="step === 1" class="form" data-test="step1">
-      <BaseInput v-model="childName" label="이름" required />
+      <BaseInput v-model="childName" label="이름 (등록명)" required />
+      <BaseInput
+        v-model="childGivenName"
+        label="보고서 호칭 (선택)"
+        placeholder="비우면 이름에서 성 한 글자만 뗀 호칭으로 추정"
+      />
       <BaseInput v-model="childBirth" label="생년월일" type="date" required />
       <BaseSelect
         v-model="childClass"
