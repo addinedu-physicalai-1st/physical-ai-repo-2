@@ -35,6 +35,8 @@ dependencies = [
   "linuxpy>=0.24; sys_platform == 'linux'",
   # NoriArm 게임 프레임워크 매니페스트 (YAML)
   "pyyaml>=6.0",
+  # OpenArm mini (Feetech STS3215) leader 읽기 — `import scservo_sdk as scs`
+  "feetech-servo-sdk>=1.0",
   # AI Hub vision 추론 (YOLO-World) — 첫 실행 시 가중치 자동 다운로드
   "ultralytics>=8.4,<9",
   # ROS 2 jazzy 빌드 — colcon + rosidl_generator_* 가 empy 3.x API 사용 (4.x 와 비호환).

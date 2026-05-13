@@ -1,7 +1,7 @@
 """routines_player_node — CLI 검증용 standalone YAML 재생기.
 
 사용:
-  ros2 run pingdergarten_openarm routines_player_node --ros-args \
+  ros2 run eduarm routines_player_node --ros-args \
     -p file:=$REPO/shared/openarm_greeting/morning.yaml
 
 기본 경로: 첫 trajectory 발행 후 KeyboardInterrupt 까지 대기 (sim_twin 의 /joint_states

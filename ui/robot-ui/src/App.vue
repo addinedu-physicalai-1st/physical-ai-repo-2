@@ -11,6 +11,8 @@ import ModeSelectorFab from '@/common/ModeSelectorFab.vue';
 import BottomDock from '@/common/BottomDock.vue';
 import StartOverlay from '@/common/StartOverlay.vue';
 import AttendanceCamera from '@/eduping/AttendanceCamera.vue';
+import DanceManager from '@/eduping/DanceManager.vue';
+import GreetingManager from '@/eduping/GreetingManager.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
 
 const mode = useModeStore();
@@ -25,6 +27,8 @@ const attendanceMode = computed<'IN' | 'OUT' | null>(() => {
 });
 
 const showOXQuiz = computed(() => robot.value.id === 'noriarm');
+const showDanceManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '율동 등록');
+const showGreetingManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '등하원 인사 설정');
 
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
@@ -52,6 +56,8 @@ function handleStart(): void {
     <div class="brand">{{ robot.displayName }}</div>
     <AttendanceCamera :mode="attendanceMode" />
     <OXQuiz v-if="showOXQuiz" />
+    <DanceManager v-if="showDanceManager" />
+    <GreetingManager v-if="showGreetingManager" />
     <StartOverlay v-if="!started" @start="handleStart" />
   </div>
 </template>

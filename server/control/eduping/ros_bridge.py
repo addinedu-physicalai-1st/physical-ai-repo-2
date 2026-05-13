@@ -103,6 +103,7 @@ class EdupingRosBridge:
 
         self._lock = threading.Lock()
         self._node: Node | None = None
+        self._executor: Any = None
         self._js_pub = None
         self._spin_thread: threading.Thread | None = None
         self._stopping = threading.Event()
@@ -127,6 +128,8 @@ class EdupingRosBridge:
     def start(self, loop: asyncio.AbstractEventLoop) -> None:
         if self._node is not None:
             return
+        from rclpy.executors import SingleThreadedExecutor
+
         self._loop = loop
         if not rclpy.ok():
             rclpy.init()
@@ -134,7 +137,13 @@ class EdupingRosBridge:
         self._js_pub = self._node.create_publisher(JointTrajectory, TOPIC_TRAJECTORY, 10)
         self._node.create_subscription(JointState, TOPIC_LEADER, self._on_leader, 50)
         self._node.create_subscription(JointState, TOPIC_FOLLOWER, self._on_follower, 50)
-        self._spin_thread = threading.Thread(target=self._spin, name="eduping-rclpy", daemon=True)
+        # teleop 패턴 — 명시 SingleThreadedExecutor 에 본 노드만 add. 노리암/teleop 와
+        # 같은 프로세스에 공존할 때 rclpy.spin_once 글로벌 default executor 경합 회피.
+        self._executor = SingleThreadedExecutor()
+        self._executor.add_node(self._node)
+        self._spin_thread = threading.Thread(
+            target=self._spin, name="eduping-rclpy", daemon=True
+        )
         self._spin_thread.start()
         logger.info(
             "EdupingRosBridge started — leader_sub=%s follower_sub=%s traj_pub=%s root=%s",
@@ -143,6 +152,12 @@ class EdupingRosBridge:
 
     def stop(self) -> None:
         self._stopping.set()
+        if self._executor is not None:
+            try:
+                self._executor.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+            self._executor = None
         if self._node is not None:
             try:
                 self._node.destroy_node()
@@ -152,15 +167,12 @@ class EdupingRosBridge:
         # rclpy.shutdown() 은 다른 bridge 와 공유될 수 있어 호출하지 않음.
 
     def _spin(self) -> None:
-        node = self._node
-        if node is None:
+        if self._executor is None:
             return
-        while not self._stopping.is_set() and rclpy.ok():
-            try:
-                rclpy.spin_once(node, timeout_sec=0.05)
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("spin_once 예외: %s", exc)
-                time.sleep(0.05)
+        try:
+            self._executor.spin()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("eduping executor spin 종료: %s", exc)
 
     # ---------- subscribers -------------------------------------------------
 
@@ -246,7 +258,7 @@ class EdupingRosBridge:
             return result
 
         # save → routines_io
-        from pingdergarten_openarm.routines_io import (  # type: ignore[import-not-found]
+        from eduarm.routines_io import (  # type: ignore[import-not-found]
             Routine,
             build_keyframes,
             dance_motion_path,
@@ -278,7 +290,7 @@ class EdupingRosBridge:
     def play_routine(self, kind: str, name: str, *, speed: float = 1.0) -> dict:
         if speed <= 0:
             speed = 1.0
-        from pingdergarten_openarm.routines_io import (  # type: ignore[import-not-found]
+        from eduarm.routines_io import (  # type: ignore[import-not-found]
             dance_motion_path,
             greeting_yaml_path,
             load_routine,

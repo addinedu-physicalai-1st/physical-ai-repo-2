@@ -28,7 +28,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument("period_s", default_value="6.0"),
 
         Node(
-            package="pingdergarten_openarm",
+            package="eduarm",
             executable="fake_leader_node",
             name="fake_leader_node",
             output="screen",
@@ -40,7 +40,7 @@ def generate_launch_description() -> LaunchDescription:
             }],
         ),
         Node(
-            package="pingdergarten_openarm",
+            package="eduarm",
             executable="sim_twin_node",
             name="sim_twin_node",
             output="screen",
