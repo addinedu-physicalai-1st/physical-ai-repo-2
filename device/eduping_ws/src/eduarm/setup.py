@@ -1,9 +1,9 @@
-"""pingdergarten_openarm setup."""
+"""eduarm setup."""
 import os
 from glob import glob
 from setuptools import find_packages, setup
 
-package_name = 'pingdergarten_openarm'
+package_name = 'eduarm'
 
 setup(
     name=package_name,
@@ -23,12 +23,13 @@ setup(
     license='Proprietary',
     entry_points={
         'console_scripts': [
-            'sim_twin_node = pingdergarten_openarm.sim_twin_node:main',
-            'fake_leader_node = pingdergarten_openarm.fake_leader_node:main',
+            'sim_twin_node = eduarm.sim_twin_node:main',
+            'fake_leader_node = eduarm.fake_leader_node:main',
+            'feetech_leader_node = eduarm.feetech_leader_node:main',
             # 녹화는 FastAPI bridge (server/control/eduping/ros_bridge.py) 가 처리.
             # 재생은 bridge 가 기본 경로지만, CLI 검증 (yaml 파일 한 개를 한 번 재생)
             # 용으로 standalone 노드 한 개 유지.
-            'routines_player_node = pingdergarten_openarm.routines_player_node:main',
+            'routines_player_node = eduarm.routines_player_node:main',
         ],
     },
 )

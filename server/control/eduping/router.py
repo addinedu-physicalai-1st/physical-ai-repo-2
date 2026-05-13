@@ -123,7 +123,7 @@ async def health(req: Request) -> dict:
 @router.get("/dance")
 async def list_dance(req: Request) -> dict:
     bridge = _bridge(req)
-    from pingdergarten_openarm.routines_io import list_dances
+    from eduarm.routines_io import list_dances
 
     return {"items": list_dances(bridge.routines_root)}
 
@@ -142,7 +142,7 @@ async def create_dance(
     if suffix not in ALLOWED_AUDIO_EXTS:
         raise HTTPException(400, f"audio ext {suffix!r} not allowed (allowed: {sorted(ALLOWED_AUDIO_EXTS)})")
 
-    from pingdergarten_openarm.routines_io import (
+    from eduarm.routines_io import (
         dance_dir,
         write_dance_meta,
     )
@@ -192,7 +192,7 @@ async def delete_dance(req: Request, slug: str) -> dict:
     bridge = _bridge(req)
     if not SLUG_RE.match(slug):
         raise HTTPException(400, "invalid slug")
-    from pingdergarten_openarm.routines_io import dance_dir
+    from eduarm.routines_io import dance_dir
 
     d = dance_dir(bridge.routines_root, slug)
     if not d.exists():
@@ -206,7 +206,7 @@ async def dance_record_start(req: Request, slug: str) -> dict:
     bridge = _bridge(req)
     if not SLUG_RE.match(slug):
         raise HTTPException(400, "invalid slug")
-    from pingdergarten_openarm.routines_io import dance_dir
+    from eduarm.routines_io import dance_dir
 
     if not dance_dir(bridge.routines_root, slug).exists():
         raise HTTPException(404, f"dance {slug!r} not found — POST /dance 로 먼저 생성")
@@ -226,7 +226,7 @@ async def dance_record_stop(req: Request, slug: str, body: StopRecordIn) -> dict
 
     # meta.json 의 duration / sample_hz 갱신 (저장된 경우)
     if result.get("saved") and result.get("kind") == KIND_DANCE:
-        from pingdergarten_openarm.routines_io import (
+        from eduarm.routines_io import (
             read_dance_meta,
             write_dance_meta,
         )
@@ -263,7 +263,7 @@ async def dance_play(req: Request, slug: str, body: PlayIn) -> dict:
 @router.get("/greeting")
 async def list_greeting(req: Request) -> dict:
     bridge = _bridge(req)
-    from pingdergarten_openarm.routines_io import list_greetings
+    from eduarm.routines_io import list_greetings
 
     return {"slots": list_greetings(bridge.routines_root)}
 

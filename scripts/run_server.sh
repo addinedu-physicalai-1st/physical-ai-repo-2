@@ -147,7 +147,7 @@ case "$ACTION" in
       "$(wrap_cmd uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload)"
 
     # window 3: control :8000 — NoriArm + Eduping(OpenArm) 통합용 ROS 환경.
-    # ROS jazzy → eduping_ws install (pingdergarten_openarm 등) → noriarm_framework PYTHONPATH 순서.
+    # ROS jazzy → eduping_ws install (eduarm 등) → noriarm_framework PYTHONPATH 순서.
     NORIARM_FRAMEWORK_PATH="$REPO_ROOT/device/noriarm_ws/src/noriarm_framework"
     ROS_SETUP="/opt/ros/jazzy/setup.bash"
     EDUPING_WS_SETUP="$REPO_ROOT/device/eduping_ws/install/setup.bash"

@@ -1,8 +1,10 @@
-"""fake_leader_node — 실물 mini leader 없을 때 합성 joint_states 발행.
+"""fake_leader_node — 실물 mini leader 없을 때 합성 joint_states 발행 (양팔 16 joint).
 
 `/eduping/leader/joint_states` (sensor_msgs/JointState) 를 50Hz 로 발행. 각 joint
 는 위상이 다른 사인파로 천천히 움직여서 routine_recorder/three.js 가 시각적으로
 "무언가 들어오고 있다" 를 검증할 수 있게 함.
+
+왼팔은 부호 반대로 — 양팔이 서로 다르게 움직이는 게 시각적으로 보이도록.
 
 ROS 파라미터:
   - topic        (str,   default '/eduping/leader/joint_states')
@@ -45,7 +47,7 @@ class FakeLeaderNode(Node):
             self.get_parameter("period_s").get_parameter_value().double_value
         )
         self._omega: float = 2.0 * math.pi / max(period, 0.1)
-        # joint 별 위상 — 0, π/4, π/2, ... 골고루 분산
+        # joint 별 위상 — 0, 2π/16, 4π/16, ... 골고루 분산
         self._phases: list[float] = [
             (i / NUM_JOINTS) * 2.0 * math.pi for i in range(NUM_JOINTS)
         ]
@@ -55,7 +57,8 @@ class FakeLeaderNode(Node):
         self._t0_s: float = self._now_s()
 
         self.get_logger().info(
-            f"fake_leader: topic={topic} rate={rate_hz}Hz amp={self._amplitude} period={period}s"
+            f"fake_leader (bimanual): topic={topic} rate={rate_hz}Hz amp={self._amplitude} "
+            f"period={period}s joints={NUM_JOINTS}"
         )
 
     def _tick(self) -> None:
@@ -63,14 +66,15 @@ class FakeLeaderNode(Node):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = list(OPENARM_JOINT_NAMES)
-        # gripper 만 0~1 정규화 위주로
         pos: list[float] = []
-        for i, ph in enumerate(self._phases):
-            if OPENARM_JOINT_NAMES[i] == "gripper":
-                # 0 ~ 0.5 사이로 천천히
-                pos.append(0.25 + 0.25 * math.sin(self._omega * t + ph))
+        for i, name in enumerate(OPENARM_JOINT_NAMES):
+            phase = self._phases[i]
+            sign = -1.0 if name.startswith("left_") else 1.0
+            if name.endswith("gripper"):
+                # gripper 는 0 ~ 0.5 사이 (음수 의미 없음)
+                pos.append(0.25 + 0.25 * math.sin(self._omega * t + phase))
             else:
-                pos.append(self._amplitude * math.sin(self._omega * t + ph))
+                pos.append(sign * self._amplitude * math.sin(self._omega * t + phase))
         msg.position = pos
         self._pub.publish(msg)
 
