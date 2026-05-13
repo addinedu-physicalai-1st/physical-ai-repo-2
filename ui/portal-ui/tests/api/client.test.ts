@@ -22,6 +22,23 @@ describe('api client', () => {
     await expect(api.get('/api/x')).rejects.toBeInstanceOf(ApiError)
   })
 
+  it('parses FastAPI detail string on error JSON', async () => {
+    ;(global.fetch as any).mockResolvedValue(
+      new Response(JSON.stringify({ detail: 'AI Hub unavailable: connection refused' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    try {
+      await api.get('/api/reports/generate')
+      expect.fail('should throw')
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError)
+      expect((e as ApiError).detail).toBe('AI Hub unavailable: connection refused')
+      expect((e as ApiError).status).toBe(502)
+    }
+  })
+
   it('sends credentials on every request', async () => {
     ;(global.fetch as any).mockResolvedValue(new Response('{}', { status: 200 }))
     await api.get('/api/x')

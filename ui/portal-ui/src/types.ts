@@ -14,6 +14,8 @@ export interface Child {
   class_name: string
   photo_url: string | null
   notes: string | null
+  /** 보고서·호출용 이름. 비우면 서버에서 성 제거 추정 */
+  given_name: string | null
 }
 
 export interface ParentInfo {
@@ -41,6 +43,14 @@ export interface MenuEntry {
   items: string[]
 }
 
+/** GET /api/reports·POST generate·PATCH 가 `attendance` 테이블을 붙여 줌 (교사·검증용). */
+export interface ReportAttendanceDebug {
+  has_check_in: boolean
+  has_check_out: boolean
+  check_in_kst: string | null
+  check_out_kst: string | null
+}
+
 export interface Report {
   id: number
   child_id: number
@@ -48,6 +58,7 @@ export interface Report {
   content: string
   created_at: string
   updated_at: string | null
+  attendance_debug?: ReportAttendanceDebug | null
 }
 
 export interface Photo {
@@ -65,6 +76,7 @@ export interface RegisterChildPayload {
   birth_date: string
   class_name: string
   notes: string | null
+  given_name?: string | null
 }
 
 export interface RegisterParentPayload {

@@ -14,6 +14,8 @@ withDefaults(defineProps<{
   iconStart?: string
   minlength?: number
   maxlength?: number
+  min?: string
+  max?: string
 }>(), { type: 'text' })
 
 defineEmits<{ (e: 'update:modelValue', value: string): void }>()
@@ -36,6 +38,8 @@ defineEmits<{ (e: 'update:modelValue', value: string): void }>()
         :autocomplete="autocomplete"
         :minlength="minlength"
         :maxlength="maxlength"
+        :min="min"
+        :max="max"
         :class="['field__input', { 'field__input--icon': !!iconStart }]"
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       />

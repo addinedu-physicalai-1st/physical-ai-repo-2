@@ -1,22 +1,25 @@
 /**
  * 자연 촬영 — 노트북 내장 카메라 video stream 에서 happy/sad 표정을 검출하고
- * 임계 초과 시 단일 프레임을 캡처해 Control Server 로 업로드한다.
+ * 임계 초과 시 JPEG 를 캡처해 Control Server 로 업로드한다.
  *
- * 사용처: NoriArm UI 의 OX 퀴즈 — 게임 한 세션당 최대 1장.
+ * 사용처: NoriArm UI 의 OX 퀴즈 등 — 세션 동안 표정이 다시 잡히면 추가 촬영 가능.
  *
  * 동작:
  *   - face-api.js (TinyFaceDetector + FaceExpressionNet) 를 lazy 로드해 5fps 추론
- *   - happy ≥ 0.75 또는 sad ≥ 0.60 가 연속 3프레임 지속되면 캡처 1회
- *   - 캡처 후 검출 루프 정지 — 한 세션당 1장 락 (`captured.value = true`)
- *   - 모드 이탈 시 외부에서 `reset()` 호출해 다시 1장 가능
+ *   - happy/sad 가 임계 이상으로 연속 SUSTAIN_FRAMES 프레임 지속되면 JPEG 업로드 1회
+ *   - 업로드 성공 후 CAPTURE_COOLDOWN_MS 동안은 재촬영만 막고, 추론 루프는 유지 (HUD 갱신)
+ *   - 모드 이탈 시 `reset()` 으로 쿨다운·누적 상태 초기화
  */
 import { computed, onUnmounted, ref, shallowRef } from 'vue';
 
 const MODEL_URL = '/models/face-api';
 const INFER_INTERVAL_MS = 200; // 5 fps
 const SUSTAIN_FRAMES = 3; // ~600ms 연속 지속
-const HAPPY_THRESHOLD = 0.75;
-const SAD_THRESHOLD = 0.6;
+/** 직전 업로드 직후 같은 표정으로 연속 저장되는 것 방지 */
+const CAPTURE_COOLDOWN_MS = 2800;
+/** 너무 높으면 자연스러운 미소에서도 태그/업로드가 거의 안 뜸 */
+const HAPPY_THRESHOLD = 0.62;
+const SAD_THRESHOLD = 0.48;
 const JPEG_QUALITY = 0.82;
 const MAX_WIDTH = 640;
 
@@ -55,9 +58,9 @@ export interface EmotionCaptureHandle {
   attach: (video: HTMLVideoElement) => void;
   /** stream detach + 추론 정지. 모드 이탈·언마운트 시 호출. */
   detach: () => void;
-  /** 세션 락 해제 — 다음 세션에서 다시 1장 가능. */
+  /** 세션 상태 초기화 — 쿨다운·누적 해제 후 다시 촬영 가능. */
   reset: () => void;
-  /** 한 번 캡처됐는지 (UI 의 "사진 N장 찍었어요" 라인용) */
+  /** 한 번이라도 성공 업로드가 있었는지 (짧은 피드백·스타일용; 쿨다운 후에도 true 유지 가능) */
   captured: import('vue').Ref<boolean>;
   /** 마지막 캡처된 감정 (라벨 토스트용) */
   lastEmotion: import('vue').Ref<'happy' | 'sad' | null>;
@@ -65,6 +68,16 @@ export interface EmotionCaptureHandle {
   flashTick: import('vue').Ref<number>;
   /** 모델 로드·카메라 권한 등에서 막혔는지 (UI 가 회색 처리 등에 사용 가능) */
   ready: import('vue').ComputedRef<boolean>;
+  /** 현재 프레임에서 얼굴 검출 여부 — 라이브 HUD (촬영 전에도 표시) */
+  faceDetected: import('vue').Ref<boolean>;
+  liveHappy: import('vue').Ref<number>;
+  liveSad: import('vue').Ref<number>;
+  /** 임계 만족 중 연속 프레임 수 (촬영 직전 1…SUSTAIN_FRAMES) */
+  sustainProgress: import('vue').Ref<number>;
+  /** 업로드 실패 시 짧은 메시지; 성공 시 null */
+  uploadError: import('vue').Ref<string | null>;
+  /** 직전 촬영 업로드 후 쿨다운 중 — HUD 는 숨기고 얼굴 비율 표시는 유지 */
+  inCaptureCooldown: import('vue').Ref<boolean>;
 }
 
 export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptureHandle {
@@ -72,12 +85,20 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
   const lastEmotion = ref<'happy' | 'sad' | null>(null);
   const flashTick = ref(0);
   const modelLoaded = ref(false);
+  const faceDetected = ref(false);
+  const liveHappy = ref(0);
+  const liveSad = ref(0);
+  const sustainProgress = ref(0);
+  const uploadError = ref<string | null>(null);
+  const inCaptureCooldown = ref(false);
   const videoRef = shallowRef<HTMLVideoElement | null>(null);
   let timer: number | null = null;
   let sustainCount = 0;
   let sustainEmotion: 'happy' | 'sad' | null = null;
   let inflight = false;
   let sessionId = crypto.randomUUID();
+  let captureCooldownUntil = 0;
+  let cooldownClearTimer: number | null = null;
 
   async function ensureModels(): Promise<FaceApi | null> {
     try {
@@ -95,32 +116,62 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       window.clearInterval(timer);
       timer = null;
     }
+    if (cooldownClearTimer != null) {
+      window.clearTimeout(cooldownClearTimer);
+      cooldownClearTimer = null;
+    }
     sustainCount = 0;
     sustainEmotion = null;
+    sustainProgress.value = 0;
   }
 
   async function tick(): Promise<void> {
     if (inflight) return;
-    if (captured.value) return; // 락 — 세션당 1장
-    if (!options.enabled()) return;
+    if (!options.enabled()) {
+      faceDetected.value = false;
+      liveHappy.value = 0;
+      liveSad.value = 0;
+      sustainProgress.value = 0;
+      sustainCount = 0;
+      sustainEmotion = null;
+      return;
+    }
     const video = videoRef.value;
     if (!video || video.readyState < 2 || video.videoWidth === 0) return;
     const api = _faceApi;
     if (!api) return;
     inflight = true;
+    const nowMs = Date.now();
+    const inCooldown = nowMs < captureCooldownUntil;
     try {
       const result = await api
-        .detectSingleFace(video, new api.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+        .detectSingleFace(
+          video,
+          new api.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }),
+        )
         .withFaceExpressions();
       if (!result) {
         sustainCount = 0;
         sustainEmotion = null;
+        faceDetected.value = false;
+        liveHappy.value = 0;
+        liveSad.value = 0;
+        sustainProgress.value = 0;
         return;
       }
       const exp = result.expressions;
       // FaceExpressions 의 7 클래스 중 happy/sad 만 트리거
       const happy = exp.happy ?? 0;
       const sad = exp.sad ?? 0;
+      faceDetected.value = true;
+      liveHappy.value = happy;
+      liveSad.value = sad;
+      if (inCooldown) {
+        sustainCount = 0;
+        sustainEmotion = null;
+        sustainProgress.value = 0;
+        return;
+      }
       let hit: 'happy' | 'sad' | null = null;
       let hitScore = 0;
       if (happy >= HAPPY_THRESHOLD) {
@@ -133,6 +184,7 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       if (hit === null) {
         sustainCount = 0;
         sustainEmotion = null;
+        sustainProgress.value = 0;
         return;
       }
       if (sustainEmotion !== hit) {
@@ -141,14 +193,22 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       } else {
         sustainCount += 1;
       }
+      sustainProgress.value = sustainCount;
       if (sustainCount >= SUSTAIN_FRAMES) {
-        // 캡처 + 업로드. 임계 만족 — 락을 즉시 걸어 중복 호출 방지.
-        captured.value = true;
-        clearLoop();
+        sustainCount = 0;
+        sustainEmotion = null;
+        sustainProgress.value = 0;
         const ok = await captureAndUpload(video, hit, hitScore);
-        if (!ok) {
-          // 업로드 실패 시 락 해제해서 다음 임계 초과 때 재시도
-          captured.value = false;
+        if (ok) {
+          captured.value = true;
+          captureCooldownUntil = Date.now() + CAPTURE_COOLDOWN_MS;
+          inCaptureCooldown.value = true;
+          if (cooldownClearTimer != null) window.clearTimeout(cooldownClearTimer);
+          cooldownClearTimer = window.setTimeout(() => {
+            cooldownClearTimer = null;
+            inCaptureCooldown.value = false;
+            captureCooldownUntil = 0;
+          }, CAPTURE_COOLDOWN_MS);
         }
       }
     } catch (err) {
@@ -166,6 +226,7 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
   ): Promise<boolean> {
     const blob = await snapshotJpeg(video);
     if (!blob) return false;
+    uploadError.value = null;
     try {
       const form = new FormData();
       form.append('file', blob, 'shot.jpg');
@@ -175,13 +236,17 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       form.append('score', String(score));
       form.append('session_id', sessionId);
       const r = await fetch('/api/photos/natural', { method: 'POST', body: form });
-      if (!r.ok) return false;
+      if (!r.ok) {
+        uploadError.value = `사진 저장 실패 (${r.status})`;
+        return false;
+      }
       const data = (await r.json()) as { photo_id: number; url: string };
       lastEmotion.value = emotion;
       flashTick.value += 1;
       options.onCaptured?.({ emotion, score, photoId: data.photo_id, url: data.url });
       return true;
     } catch (err) {
+      uploadError.value = '사진 저장에 연결하지 못했어요';
       console.warn('[useEmotionCapture] upload failed', err);
       return false;
     }
@@ -218,6 +283,8 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
 
   function detach(): void {
     clearLoop();
+    inCaptureCooldown.value = false;
+    captureCooldownUntil = 0;
     videoRef.value = null;
   }
 
@@ -226,6 +293,14 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
     lastEmotion.value = null;
     sustainCount = 0;
     sustainEmotion = null;
+    sustainProgress.value = 0;
+    uploadError.value = null;
+    captureCooldownUntil = 0;
+    inCaptureCooldown.value = false;
+    if (cooldownClearTimer != null) {
+      window.clearTimeout(cooldownClearTimer);
+      cooldownClearTimer = null;
+    }
     sessionId = crypto.randomUUID();
   }
 
@@ -235,5 +310,19 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
     clearLoop();
   });
 
-  return { attach, detach, reset, captured, lastEmotion, flashTick, ready };
+  return {
+    attach,
+    detach,
+    reset,
+    captured,
+    lastEmotion,
+    flashTick,
+    ready,
+    faceDetected,
+    liveHappy,
+    liveSad,
+    sustainProgress,
+    uploadError,
+    inCaptureCooldown,
+  };
 }

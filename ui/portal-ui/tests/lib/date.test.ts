@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localDateKey } from '@/lib/date'
+import { localDateKey, seoulDateKey } from '@/lib/date'
 
 describe('localDateKey', () => {
   it('formats local date as YYYY-MM-DD', () => {
@@ -22,5 +22,12 @@ describe('localDateKey', () => {
   it('defaults to current time when no arg', () => {
     const result = localDateKey()
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('seoulDateKey', () => {
+  it('formats as YYYY-MM-DD', () => {
+    const d = new Date('2026-05-11T15:00:00Z')
+    expect(seoulDateKey(d)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })

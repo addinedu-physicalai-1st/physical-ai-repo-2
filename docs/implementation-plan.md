@@ -363,7 +363,7 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-RPT-001 | 일과 보고서 생성 | AI Server worker 가 `ai_job(kind=report)` 큐에서 작업을 픽업해 해당 child_id 의 하루치 사진 메타데이터 (SR-PHOTO-004 의 시각·감정 카테고리·모드·트리거 child_id) · 모드 이력 (SR-DAT-009 mode_history, 낮잠 시작·종료 시각 포함) · 당일 점심메뉴 (SR-DAT-007 menu) 를 로컬 LLM (Qwen 3 4B, 의도 분류 LLM 과 모델 공유) 으로 자연어 요약해 DB report 테이블에 저장한다. enqueue 는 SR-OUT-006 하원 시각 기록 시점에 Control Server 가 처리한다. | Low |
+| SR-RPT-001 | 일과 보고서 생성 | AI Server worker 가 `ai_job(kind=report)` 큐에서 작업을 픽업해 해당 child_id 의 하루치 사진 메타데이터 (SR-PHOTO-004 의 시각·감정 카테고리·모드·트리거 child_id) · 모드 이력 (SR-DAT-009 mode_history, 낮잠 시작·종료 시각 포함) · 당일 점심메뉴 (SR-DAT-007 menu) 를 로컬 Ollama LLM (`server/ai/config.py` 의 `ollama_report_model`, 기본 `qwen2.5:7b` — 잡담용 `ollama_chat_model`·의도 분류용 `ollama_model` 과 별도) 으로 자연어 요약해 DB report 테이블에 저장한다. enqueue 는 SR-OUT-006 하원 시각 기록 시점에 Control Server 가 처리한다. | Low |
 
 ### 7.3 비동기 작업 큐
 
@@ -376,7 +376,7 @@ last_synced: "2026-05-13T14:08:22"
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
 | SR-VOICE-001 | 음성 입력 수신 | 각 로봇 UI (브라우저) 가 호출어 감지 신호 후 마이크 음성을 캡처해 클라이언트 측에서 텍스트로 변환한 뒤 Vite dev server `server.proxy` 를 통해 Control Service `/api/voice/intent` 에 텍스트를 전송한다. Control Service 가 AI Hub (의도 분류 LLM) 호출 후 결과에 따라 ROS2 명령을 publish 한다. | High |
-| SR-VOICE-004 | 잡담 응답 | AI Hub 가 SR-VOICE-003 의도 분류 결과가 mode_change·sub_command 어디에도 해당하지 않을 때 동일 LLM (Qwen3 4B) 으로 한국어 1~2문장 자연어 응답을 생성해 `/api/voice/intent` 응답에 `{kind: "chat", reply: "..."}` 로 돌려주고, 로봇 UI 가 받은 reply 를 SR-VOICE-005 TTS 로 음성 출력한다. 모드·구동기 상태는 변경하지 않는다. 응답 LLM 호출이 실패하면 `{kind: "ignored"}` 로 graceful fallback 한다. | High |
+| SR-VOICE-004 | 잡담 응답 | AI Hub 가 SR-VOICE-003 의도 분류 결과가 mode_change·sub_command 어디에도 해당하지 않을 때 잡담 전용 Ollama 모델 (`ollama_chat_model`, 기본 `qwen2.5:3b`) 으로 한국어 1~2문장 자연어 응답을 생성해 `/api/voice/intent` 응답에 `{kind: "chat", reply: "..."}` 로 돌려주고, 로봇 UI 가 받은 reply 를 SR-VOICE-005 TTS 로 음성 출력한다. 모드·구동기 상태는 변경하지 않는다. 응답 LLM 호출이 실패하면 `{kind: "ignored"}` 로 graceful fallback 한다. | High |
 
 ## 8. 다중 UI 공통
 

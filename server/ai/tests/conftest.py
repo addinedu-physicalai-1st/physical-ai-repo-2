@@ -1,12 +1,19 @@
-"""AnyIO 테스트는 asyncio 만 사용한다.
+"""공유 테스트 픽스처 — 일과표 JSON 등 레포 파일을 한 번만 읽는다."""
 
-기본 anyio pytest 플러그인은 trio 가 설치되어 있으면 같은 코루틴 테스트를
-`[asyncio]` / `[trio]` 로 두 번 돌린다. `httpx.AsyncClient` 는 asyncio 전용이라
-trio 쪽 teardown 에서 `RuntimeError: Event loop is closed` 가 날 수 있다.
-"""
+import json
+from pathlib import Path
+
 import pytest
 
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
-@pytest.fixture(scope="module", params=["asyncio"])
-def anyio_backend(request: pytest.FixtureRequest) -> str:
-    return request.param
+
+@pytest.fixture(scope="module")
+def shared_school_schedule() -> dict[str, str]:
+    """`shared/school_schedule.json` — 하드코딩 대신 실제 원본과 동기."""
+    path = _REPO_ROOT / "shared" / "school_schedule.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    out = {str(k).strip(): str(v).strip() for k, v in data.items() if str(k).strip() and str(v).strip()}
+    assert out, "school_schedule.json 비어 있음"
+    return out

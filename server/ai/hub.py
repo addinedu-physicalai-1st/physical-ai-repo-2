@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 from server.ai.context import (
     build_chat_context,
     fetch_registered_children_labels,
+    load_school_schedule_dict,
     try_attendance_first_reply,
     try_report_first_reply,
     try_schedule_first_reply,
@@ -370,11 +371,21 @@ class ReportPhotoEvent(BaseModel):
     score: str  # "0.82"
 
 
+class ReportAttendanceIn(BaseModel):
+    check_in_kst: str | None = Field(None, max_length=8)
+    check_out_kst: str | None = Field(None, max_length=8)
+
+
 class ReportGenerateRequest(BaseModel):
     child_name: str = Field(..., min_length=1, max_length=32)
-    date: str = Field(..., min_length=10, max_length=10)  # "YYYY-MM-DD"
+    registered_full_name: str | None = Field(None, max_length=64)
+    class_name: str = Field(..., min_length=1, max_length=64)
+    birth_date: str = Field(..., min_length=10, max_length=10)  # "YYYY-MM-DD"
+    date: str = Field(..., min_length=10, max_length=10)  # 보고서 일자
     photo_events: list[ReportPhotoEvent] = Field(default_factory=list, max_length=200)
     menu_items: list[str] = Field(default_factory=list, max_length=20)
+    child_notes: str | None = Field(None, max_length=4000)
+    attendance: ReportAttendanceIn | None = None
 
 
 @app.post("/report/generate")
@@ -385,11 +396,19 @@ async def post_report_generate(req: ReportGenerateRequest) -> dict:
     도입 전 임시 경로.
     """
     try:
+        sched = load_school_schedule_dict()
+        att = req.attendance.model_dump() if req.attendance else None
         body = await generate_report(
             child_name=req.child_name,
+            registered_full_name=req.registered_full_name,
+            class_name=req.class_name,
+            birth_date_str=req.birth_date,
             date_str=req.date,
             photo_events=[p.model_dump() for p in req.photo_events],
             menu_items=req.menu_items,
+            schedule=sched,
+            child_notes=req.child_notes,
+            attendance=att,
         )
     except LLMError as exc:
         raise HTTPException(status_code=502, detail=f"LLM failed: {exc}") from exc

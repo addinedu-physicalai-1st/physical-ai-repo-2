@@ -2,12 +2,12 @@
 /**
  * 노트북 내장 카메라 라이브 프리뷰 + 자연 촬영.
  *
- * USB 외장 카메라는 OXVisionPreview 가 점유 (OX 보드 인식) — 여기서는 라벨에 'usb'/'webcam'
- * 미포함인 첫 카메라를 picks. 내장 카메라가 없으면 패널 자체가 안 보이도록 부모에 emit.
+ * 브라우저 `videoinput` 목록의 **첫 번째** 카메라(enumerate 순)로 표정 촬영.
+ * OX 퀴즈에서 USB 보드 카메라가 있어도 우상단에 같이 띄워 내장만 표정에 쓴다.
  *
  * 자연 촬영: `useEmotionCapture` 가 video stream 위에서 5fps 추론, happy/sad 임계 초과 시
- * 1프레임을 Control Server 로 업로드한다. 한 게임 세션당 최대 1장 — 부모가 `armed=false`
- * 또는 `:reset-on="key"` 로 락 해제.
+ * 프레임을 Control Server 로 업로드한다. 연속 촬영은 쿨다운(약 2.8초) 간격으로 허용한다.
+ * 부모가 `armed=false` 또는 `:reset-on="key"` 로 세션 상태를 초기화한다.
  */
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
@@ -39,9 +39,7 @@ const emotionCapture = useEmotionCapture({
   onCaptured: (info) => emit('captured', info),
 });
 
-function isUsbCamera(label: string): boolean {
-  return /usb|webcam/i.test(label);
-}
+const EMOTION_SUSTAIN_MAX = 3;
 
 async function start(): Promise<void> {
   error.value = null;
@@ -56,14 +54,14 @@ async function start(): Promise<void> {
     }
     const devs = await navigator.mediaDevices.enumerateDevices();
     const videos = devs.filter((d) => d.kind === 'videoinput');
-    const integrated = videos.find((d) => !isUsbCamera(d.label));
-    if (!integrated) {
+    const first = videos[0];
+    if (!first) {
       emit('integrated-available', false);
       return;
     }
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        deviceId: { exact: integrated.deviceId },
+        deviceId: { exact: first.deviceId },
         width: { ideal: 640 },
         height: { ideal: 360 },
       },
@@ -90,7 +88,7 @@ function stop(): void {
   if (videoRef.value) videoRef.value.srcObject = null;
 }
 
-// 부모가 resetKey 증가시키면 세션 락 해제 — 다음 happy/sad 트리거에 다시 1장 가능.
+// 부모가 resetKey 증가시키면 세션 초기화 — 다음 표정 트리거부터 다시 촬영 가능.
 watch(
   () => props.resetKey,
   () => emotionCapture.reset(),
@@ -117,6 +115,23 @@ onUnmounted(stop);
     >
       📸 {{ emotionCapture.lastEmotion.value === 'happy' ? '활짝!' : '시무룩' }}
     </div>
+    <div
+      v-if="armed && !emotionCapture.inCaptureCooldown.value && emotionCapture.ready.value"
+      class="emotion-live-hud"
+      :class="{ 'has-face': emotionCapture.faceDetected.value }"
+    >
+      <template v-if="!emotionCapture.faceDetected.value">얼굴 찾는 중…</template>
+      <template v-else>
+        웃음 {{ (emotionCapture.liveHappy.value * 100).toFixed(0) }}% · 슬픔
+        {{ (emotionCapture.liveSad.value * 100).toFixed(0) }}%
+        <span v-if="emotionCapture.sustainProgress.value > 0" class="emotion-sustain">
+          · {{ emotionCapture.sustainProgress.value }}/{{ EMOTION_SUSTAIN_MAX }}
+        </span>
+      </template>
+    </div>
+    <p v-if="emotionCapture.uploadError.value" class="cam-upload-err">
+      {{ emotionCapture.uploadError.value }}
+    </p>
     <p v-if="error" class="cam-error">{{ error }}</p>
   </div>
 </template>
@@ -171,6 +186,41 @@ onUnmounted(stop);
 }
 .emotion-tag.is-sad {
   background: rgba(193, 69, 69, 0.92);
+}
+.emotion-live-hud {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 28px;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(30, 45, 58, 0.75);
+  pointer-events: none;
+  line-height: 1.2;
+  text-align: center;
+}
+.emotion-live-hud.has-face {
+  background: rgba(45, 110, 75, 0.82);
+}
+.emotion-sustain {
+  font-weight: 800;
+}
+.cam-upload-err {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px 6px;
+  font-size: 10px;
+  color: #ffb4b4;
+  background: rgba(80, 20, 20, 0.85);
+  text-align: center;
+  z-index: 3;
 }
 .cam-error {
   position: absolute;

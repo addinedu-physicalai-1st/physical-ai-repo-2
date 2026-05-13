@@ -1,22 +1,33 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { api } from '@/api/client'
-import { localDateKey } from '@/lib/date'
+import { useRoute } from 'vue-router'
+import { api, ApiError } from '@/api/client'
+import { seoulDateKey } from '@/lib/date'
+import { defaultKoreanReportName, polishReportKorean } from '@/lib/korean'
 import type { Child, Photo, Report } from '@/types'
 import ReportEditor from '@/components/teacher/ReportEditor.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import BaseCard from '@/components/common/BaseCard.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
-import BaseInput from '@/components/common/BaseInput.vue'
+import ReportDateField from '@/components/teacher/ReportDateField.vue'
 import BaseEmptyState from '@/components/common/BaseEmptyState.vue'
 import BaseAvatar from '@/components/common/BaseAvatar.vue'
 import BaseBadge from '@/components/common/BaseBadge.vue'
+import BaseTextarea from '@/components/common/BaseTextarea.vue'
+import BaseButton from '@/components/common/BaseButton.vue'
 import Icon from '@/components/common/Icon.vue'
 
-const today = localDateKey()
+const route = useRoute()
+
+function parseIsoDateQuery(v: unknown): string | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
+  return v
+}
+
 const children = ref<Child[]>([])
 const className = ref<string>('')
-const date = ref(today)
+const date = ref(parseIsoDateQuery(route.query.date) ?? seoulDateKey())
+const maxReportDate = computed(() => seoulDateKey())
 // child_id → 그날의 Report (null 이면 미작성)
 const reports = ref<Map<number, Report | null>>(new Map())
 // child_id → 그날의 자연 촬영 사진 (lazy — 선택된 자녀만 fetch)
@@ -27,6 +38,18 @@ const photosLoading = ref(false)
 const error = ref<string | null>(null)
 const generating = ref<Set<number>>(new Set())
 const generateError = ref<Map<number, string>>(new Map())
+const clearingReport = ref(false)
+
+/** 타임라인 한 줄 인라인 편집 (JSON 이벤트의 text 만 갱신) */
+const editingEventIndex = ref<number | null>(null)
+const editingDraft = ref('')
+const timelineSavingIndex = ref<number | null>(null)
+const timelineSaveError = ref<string | null>(null)
+
+const editingSummary = ref(false)
+const summaryDraft = ref('')
+const summarySaving = ref(false)
+const summarySaveError = ref<string | null>(null)
 
 const classNames = computed(() => {
   const set = new Set(children.value.map((c) => c.class_name))
@@ -38,6 +61,25 @@ const filtered = computed(() =>
     .filter((c) => !className.value || c.class_name === className.value)
     .sort((a, b) => a.name.localeCompare(b.name)),
 )
+
+const childSelectOptions = computed(() =>
+  filtered.value.map((c) => ({
+    value: String(c.id),
+    label: `${c.name} · ${reports.value.get(c.id) ? '작성됨' : '대기'}`,
+  })),
+)
+
+const selectedChildIdStr = computed({
+  get: () => (selectedChildId.value == null ? '' : String(selectedChildId.value)),
+  set: (v: string) => {
+    if (!v.trim()) {
+      selectedChildId.value = null
+      return
+    }
+    const n = Number(v)
+    selectedChildId.value = Number.isFinite(n) ? n : null
+  },
+})
 
 const selectedChild = computed(() =>
   filtered.value.find((c) => c.id === selectedChildId.value) ?? null,
@@ -84,6 +126,29 @@ const parsedReport = computed<ReportTimeline | null>(() => {
   return { events: [], summary: r.content }
 })
 
+/** 보고서 조사 후처리에 쓰는 호칭 — 서버와 동일: given_name 우선, 없으면 성 제거 추정 */
+const reportAddressName = computed(() => {
+  const c = selectedChild.value
+  if (!c) return ''
+  return (c.given_name ?? '').trim() || defaultKoreanReportName(c.name)
+})
+
+/** 화면 표시용 — es-hangul 규칙으로 이/가·은/는 등만 다듬음 (저장 본문은 그대로) */
+const parsedReportDisplay = computed<ReportTimeline | null>(() => {
+  const raw = parsedReport.value
+  if (!raw) return null
+  const addr = reportAddressName.value.trim()
+  if (!addr) return raw
+  const cls = (selectedChild.value?.class_name ?? '').trim()
+  return {
+    events: raw.events.map((ev) => ({
+      ...ev,
+      text: polishReportKorean(addr, ev.text, cls),
+    })),
+    summary: polishReportKorean(addr, raw.summary, cls),
+  }
+})
+
 onMounted(async () => {
   children.value = await api.get<Child[]>('/api/children')
   if (classNames.value.length) className.value = classNames.value[0]
@@ -122,7 +187,135 @@ watch([filtered, date], async () => {
   }
 }, { immediate: true })
 
+watch(
+  () => [route.fullPath, filtered.value.map((c) => c.id).join(',')] as const,
+  () => {
+    if (!route.path.startsWith('/teacher/reports')) return
+    if (!filtered.value.length) return
+    const ds = parseIsoDateQuery(route.query.date)
+    if (ds) date.value = ds
+    const qc = route.query.child
+    if (typeof qc !== 'string' || !/^\d+$/.test(qc)) return
+    const id = Number(qc)
+    if (!filtered.value.some((c) => c.id === id)) return
+    selectedChildId.value = id
+  },
+)
+
+watch(
+  [selectedChildId, date, () => selectedReport.value?.id ?? null, () => selectedReport.value?.updated_at ?? ''],
+  () => {
+    cancelInlineEdits()
+  },
+)
+
 // 자녀 선택 → 그날의 사진 lazy fetch (캐시 있으면 skip).
+function cancelInlineEdits() {
+  editingEventIndex.value = null
+  editingDraft.value = ''
+  timelineSaveError.value = null
+  editingSummary.value = false
+  summaryDraft.value = ''
+  summarySaveError.value = null
+}
+
+function beginTimelineEdit(eventIndex: number) {
+  const disp = parsedReportDisplay.value
+  if (!disp?.events[eventIndex]) return
+  editingSummary.value = false
+  summaryDraft.value = ''
+  summarySaveError.value = null
+  editingEventIndex.value = eventIndex
+  editingDraft.value = disp.events[eventIndex].text
+  timelineSaveError.value = null
+}
+
+function beginSummaryEdit() {
+  const disp = parsedReportDisplay.value
+  if (!disp?.summary) return
+  editingEventIndex.value = null
+  editingDraft.value = ''
+  timelineSaveError.value = null
+  editingSummary.value = true
+  summaryDraft.value = disp.summary
+  summarySaveError.value = null
+}
+
+async function saveSummary() {
+  const r = selectedReport.value
+  if (!r) return
+  summarySaveError.value = null
+  let obj: { events: ReportEvent[]; summary?: string }
+  try {
+    obj = JSON.parse(r.content) as { events: ReportEvent[]; summary?: string }
+  } catch {
+    summarySaveError.value = '보고서 형식을 읽을 수 없습니다. 아래 JSON 편집을 이용해 주세요.'
+    return
+  }
+  const summary = summaryDraft.value.trim()
+  if (!summary) {
+    summarySaveError.value = '내용을 입력해 주세요.'
+    return
+  }
+  const newContent = JSON.stringify({
+    events: Array.isArray(obj.events) ? obj.events : [],
+    summary,
+  })
+  summarySaving.value = true
+  try {
+    const updated = await api.patch<Report>(`/api/reports/${r.id}`, {
+      content: newContent,
+    })
+    onSaved(updated)
+    cancelInlineEdits()
+  } catch {
+    summarySaveError.value = '저장에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    summarySaving.value = false
+  }
+}
+
+async function saveTimelineEvent(eventIndex: number) {
+  const r = selectedReport.value
+  if (!r) return
+  timelineSaveError.value = null
+  let obj: { events: ReportEvent[]; summary?: string }
+  try {
+    obj = JSON.parse(r.content) as { events: ReportEvent[]; summary?: string }
+  } catch {
+    timelineSaveError.value = '보고서 형식을 읽을 수 없습니다. 아래 JSON 편집을 이용해 주세요.'
+    return
+  }
+  if (!Array.isArray(obj.events) || !obj.events[eventIndex]) {
+    timelineSaveError.value = '해당 타임라인 줄을 찾을 수 없습니다.'
+    return
+  }
+  const text = editingDraft.value.trim()
+  if (!text) {
+    timelineSaveError.value = '내용을 입력해 주세요.'
+    return
+  }
+  const nextEvents = obj.events.map((ev, j) =>
+    j === eventIndex ? { ...ev, text } : ev,
+  )
+  const newContent = JSON.stringify({
+    events: nextEvents,
+    summary: typeof obj.summary === 'string' ? obj.summary : '',
+  })
+  timelineSavingIndex.value = eventIndex
+  try {
+    const updated = await api.patch<Report>(`/api/reports/${r.id}`, {
+      content: newContent,
+    })
+    onSaved(updated)
+    cancelInlineEdits()
+  } catch {
+    timelineSaveError.value = '저장에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    timelineSavingIndex.value = null
+  }
+}
+
 watch(selectedChildId, async (id) => {
   if (id === null || photos.value.has(id)) return
   photosLoading.value = true
@@ -158,10 +351,42 @@ async function generate(childId: number) {
     // 생성 트리거가 미분류 사진을 back-fill 했을 수 있으므로 사진도 재조회.
     const list = await api.get<Photo[]>(`/api/children/${childId}/photos?date=${date.value}`)
     photos.value.set(childId, list)
-  } catch {
-    generateError.value.set(childId, '보고서 생성 실패 — 잠시 후 다시 시도해 주세요.')
+  } catch (e) {
+    const fallback = '보고서 생성 실패 — 잠시 후 다시 시도해 주세요.'
+    if (e instanceof ApiError) {
+      const d = e.detail?.trim()
+      generateError.value.set(
+        childId,
+        d
+          ? `${d} (HTTP ${e.status})`
+          : `요청 실패 (HTTP ${e.status}). ${fallback}`,
+      )
+    } else {
+      generateError.value.set(childId, fallback)
+    }
   } finally {
     generating.value.delete(childId)
+  }
+}
+
+async function clearSelectedReport() {
+  const r = selectedReport.value
+  const cid = selectedChildId.value
+  const child = selectedChild.value
+  if (!r || cid === null || !child) return
+  const ok = window.confirm(
+    `「${child.name}」의 ${date.value} 일과 보고서를 삭제할까요? 삭제 후에는 AI 로 다시 생성할 수 있습니다.`,
+  )
+  if (!ok) return
+  clearingReport.value = true
+  generateError.value.delete(cid)
+  try {
+    await api.delete(`/api/reports/${r.id}`)
+    reports.value.set(cid, null)
+  } catch {
+    generateError.value.set(cid, '보고서 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+  } finally {
+    clearingReport.value = false
   }
 }
 
@@ -186,7 +411,10 @@ function emotionLabel(emotion: string | null): string {
 
 <template>
   <section>
-    <PageHeader title="일과 보고서" description="반과 날짜를 선택하고, 왼쪽 목록에서 어린이를 클릭하면 그날의 표정 타임라인과 보고서가 표시됩니다." />
+    <PageHeader
+      title="일과 보고서"
+      description="반과 날짜를 선택한 뒤 어린이를 고르면 그날의 표정 타임라인과 보고서가 표시됩니다."
+    />
 
     <div class="filters">
       <BaseSelect
@@ -194,7 +422,7 @@ function emotionLabel(emotion: string | null): string {
         label="반"
         :options="classNames.map(cn => ({ value: cn, label: cn }))"
       />
-      <BaseInput v-model="date" type="date" label="날짜" />
+      <ReportDateField v-model="date" label="날짜" :max-date="maxReportDate" />
     </div>
 
     <p v-if="error" class="info">{{ error }}</p>
@@ -207,7 +435,15 @@ function emotionLabel(emotion: string | null): string {
     />
 
     <div v-else class="layout">
-      <BaseCard class="list" :padded="false">
+      <BaseSelect
+        v-model="selectedChildIdStr"
+        class="child-select-mobile"
+        label="어린이"
+        :options="childSelectOptions"
+        placeholder="선택…"
+      />
+
+      <BaseCard class="list child-list-desktop" :padded="false">
         <template #header>
           <div class="list-head"><Icon name="users-round" :size="16" /><span>어린이 목록</span></div>
         </template>
@@ -235,7 +471,7 @@ function emotionLabel(emotion: string | null): string {
           v-if="!selectedChild"
           icon="user-round"
           title="어린이를 선택하세요"
-          description="왼쪽 목록에서 보고서를 볼 어린이를 선택합니다."
+          description="목록이나 위쪽 선택란에서 보고서를 볼 어린이를 고릅니다."
         />
         <div v-else class="detail__body">
           <header class="detail__head">
@@ -249,8 +485,8 @@ function emotionLabel(emotion: string | null): string {
             </BaseBadge>
           </header>
 
-          <section class="block">
-            <h3><Icon name="clock" :size="14" /> 오늘의 일과 타임라인</h3>
+          <section class="block block--timeline">
+            <h3 class="timeline-section-title"><Icon name="clock" :size="14" /> 오늘의 일과 타임라인</h3>
 
             <!-- 보고서 없음 → 빈 상태 + 생성 버튼 -->
             <template v-if="!selectedReport">
@@ -265,9 +501,13 @@ function emotionLabel(emotion: string | null): string {
 
             <!-- 보고서 있음 → 타임라인 + 요약 -->
             <template v-else>
-              <ol v-if="parsedReport && parsedReport.events.length > 0" class="timeline">
+              <div
+                v-if="parsedReportDisplay && parsedReportDisplay.events.length > 0"
+                class="timeline-wrap"
+              >
+              <ol class="timeline">
                 <li
-                  v-for="(ev, i) in parsedReport.events"
+                  v-for="(ev, i) in parsedReportDisplay.events"
                   :key="`${ev.time}-${i}`"
                   class="timeline__entry"
                   :class="[
@@ -278,13 +518,70 @@ function emotionLabel(emotion: string | null): string {
                   <div class="timeline__rail">
                     <span class="timeline__dot" />
                   </div>
-                  <div class="timeline__card" :class="{ 'timeline__card--text': !ev.photo_id }">
-                    <template v-if="ev.photo_id && selectedPhotosById.has(ev.photo_id)">
+                  <div
+                    class="timeline__card"
+                    :class="{
+                      'timeline__card--text': !ev.photo_id,
+                      'timeline__card--editing': editingEventIndex === i,
+                    }"
+                  >
+                    <div
+                      v-if="editingEventIndex === i"
+                      class="timeline__edit"
+                      @click.stop
+                      @keydown.escape.prevent="cancelInlineEdits"
+                    >
+                      <template v-if="ev.photo_id && selectedPhotosById.has(ev.photo_id)">
+                        <a
+                          :href="selectedPhotosById.get(ev.photo_id)!.url"
+                          target="_blank"
+                          rel="noopener"
+                          class="timeline__thumb-link"
+                          @click.stop
+                        >
+                          <img
+                            :src="selectedPhotosById.get(ev.photo_id)!.url"
+                            :alt="emotionLabel(selectedPhotosById.get(ev.photo_id)!.emotion)"
+                            class="timeline__thumb"
+                            loading="lazy"
+                          />
+                        </a>
+                      </template>
+                      <BaseTextarea
+                        v-model="editingDraft"
+                        :rows="ev.photo_id ? 3 : 4"
+                        :disabled="timelineSavingIndex === i"
+                        autofocus
+                        hint="저장하면 이 시간대 문장만 바뀝니다. Esc 로 취소."
+                      />
+                      <div class="timeline__edit-actions">
+                        <BaseButton
+                          variant="ghost"
+                          size="sm"
+                          :disabled="timelineSavingIndex === i"
+                          @click="cancelInlineEdits"
+                        >
+                          취소
+                        </BaseButton>
+                        <BaseButton
+                          variant="primary"
+                          size="sm"
+                          icon-start="save"
+                          :loading="timelineSavingIndex === i"
+                          @click="saveTimelineEvent(i)"
+                        >
+                          저장
+                        </BaseButton>
+                      </div>
+                      <p v-if="timelineSaveError" class="timeline__edit-err">{{ timelineSaveError }}</p>
+                    </div>
+                    <template v-else-if="ev.photo_id && selectedPhotosById.has(ev.photo_id)">
                       <a
                         :href="selectedPhotosById.get(ev.photo_id)!.url"
                         target="_blank"
                         rel="noopener"
                         class="timeline__thumb-link"
+                        @click.stop
                       >
                         <img
                           :src="selectedPhotosById.get(ev.photo_id)!.url"
@@ -293,7 +590,14 @@ function emotionLabel(emotion: string | null): string {
                           loading="lazy"
                         />
                       </a>
-                      <div class="timeline__body">
+                      <div
+                        class="timeline__body timeline__body--editable"
+                        role="button"
+                        tabindex="0"
+                        title="탭하여 이 문장 편집"
+                        @click="beginTimelineEdit(i)"
+                        @keydown.enter.prevent="beginTimelineEdit(i)"
+                      >
                         <p class="timeline__text">{{ ev.text }}</p>
                         <div class="timeline__meta">
                           <span class="timeline__emotion">{{ emotionLabel(selectedPhotosById.get(ev.photo_id)!.emotion) }}</span>
@@ -307,28 +611,84 @@ function emotionLabel(emotion: string | null): string {
                       </div>
                     </template>
                     <template v-else>
-                      <p class="timeline__text">{{ ev.text }}</p>
+                      <button
+                        type="button"
+                        class="timeline__text-card"
+                        title="탭하여 이 문장 편집"
+                        @click="beginTimelineEdit(i)"
+                      >
+                        <p class="timeline__text">{{ ev.text }}</p>
+                      </button>
                     </template>
                   </div>
                 </li>
               </ol>
+              </div>
 
               <!-- legacy 평문 보고서 (events 없음) — content 전체를 한 블록으로. -->
-              <div v-else-if="parsedReport && parsedReport.summary" class="legacy-report">
-                {{ parsedReport.summary }}
+              <div v-else-if="parsedReportDisplay && parsedReportDisplay.summary" class="legacy-report">
+                {{ parsedReportDisplay.summary }}
               </div>
 
               <!-- 하루 정리 -->
-              <p v-if="parsedReport && parsedReport.events.length > 0 && parsedReport.summary" class="summary">
-                {{ parsedReport.summary }}
-              </p>
+              <div
+                v-if="
+                  parsedReportDisplay &&
+                  parsedReportDisplay.events.length > 0 &&
+                  parsedReportDisplay.summary
+                "
+                class="summary-wrap"
+              >
+                <div
+                  v-if="editingSummary"
+                  class="summary summary--editing"
+                  @keydown.escape.prevent="cancelInlineEdits"
+                >
+                  <BaseTextarea
+                    v-model="summaryDraft"
+                    :rows="5"
+                    :disabled="summarySaving"
+                    autofocus
+                    hint="저장하면 하루 정리 문장만 바뀝니다. Esc 로 취소."
+                  />
+                  <div class="summary__actions">
+                    <BaseButton
+                      variant="ghost"
+                      size="sm"
+                      :disabled="summarySaving"
+                      @click="cancelInlineEdits"
+                    >
+                      취소
+                    </BaseButton>
+                    <BaseButton
+                      variant="primary"
+                      size="sm"
+                      icon-start="save"
+                      :loading="summarySaving"
+                      @click="saveSummary"
+                    >
+                      저장
+                    </BaseButton>
+                  </div>
+                  <p v-if="summarySaveError" class="summary__err">{{ summarySaveError }}</p>
+                </div>
+                <button
+                  v-else
+                  type="button"
+                  class="summary summary--clickable"
+                  title="탭하여 하루 정리 편집"
+                  @click="beginSummaryEdit"
+                >
+                  {{ parsedReportDisplay.summary }}
+                </button>
+              </div>
             </template>
 
             <div class="actions">
               <button
                 type="button"
                 class="generate-btn"
-                :disabled="generating.has(selectedChild.id)"
+                :disabled="generating.has(selectedChild.id) || clearingReport"
                 @click="generate(selectedChild.id)"
               >
                 <template v-if="generating.has(selectedChild.id)">
@@ -341,6 +701,16 @@ function emotionLabel(emotion: string | null): string {
                   ✨ AI 로 보고서 생성
                 </template>
               </button>
+              <!-- 항상 같은 자리에 둠 — 보고서 없으면 비활성(숨기지 않음) -->
+              <button
+                type="button"
+                class="clear-btn"
+                :disabled="!selectedReport || generating.has(selectedChild.id) || clearingReport"
+                :title="selectedReport ? '이 날짜 보고서를 DB에서 삭제합니다' : '삭제할 보고서가 없습니다'"
+                @click="clearSelectedReport"
+              >
+                {{ clearingReport ? '삭제 중…' : '🗑 보고서 비우기' }}
+              </button>
               <span v-if="generateError.get(selectedChild.id)" class="err">
                 {{ generateError.get(selectedChild.id) }}
               </span>
@@ -349,7 +719,7 @@ function emotionLabel(emotion: string | null): string {
 
           <!-- 원본 편집 (raw JSON / 평문) — 접어둠. 필요 시 펼쳐서 직접 수정 가능. -->
           <details v-if="selectedReport" class="raw-edit">
-            <summary>본문 직접 편집 (개발자용)</summary>
+            <summary>고급: JSON·전체 본문 직접 편집</summary>
             <ReportEditor :report="selectedReport" @saved="onSaved" />
           </details>
         </div>
@@ -359,9 +729,13 @@ function emotionLabel(emotion: string | null): string {
 </template>
 
 <style scoped>
+section {
+  min-width: 0;
+}
+
 .filters {
   display: grid;
-  grid-template-columns: 200px 200px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-3);
   margin-bottom: var(--space-5);
 }
@@ -369,11 +743,20 @@ function emotionLabel(emotion: string | null): string {
 .muted { color: var(--color-text-muted); }
 .muted.small { font-size: var(--font-size-sm); padding: var(--space-2) 0; }
 
+.child-select-mobile {
+  display: none;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(260px, 320px) 1fr;
   gap: var(--space-4);
   align-items: start;
+  min-width: 0;
+}
+
+.layout > * {
+  min-width: 0;
 }
 
 /* ── 좌측 목록 ───────────────────────────────────────────── */
@@ -459,6 +842,16 @@ function emotionLabel(emotion: string | null): string {
   gap: var(--space-2);
 }
 
+.block--timeline {
+  gap: var(--space-4);
+}
+.timeline-section-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
 .timeline-empty {
   padding: var(--space-4);
   background: var(--color-surface-sunken);
@@ -468,7 +861,17 @@ function emotionLabel(emotion: string | null): string {
   font-size: var(--font-size-sm);
 }
 
-/* ── Vertical timeline ──────────────────────────────────── */
+/* ── Vertical timeline (kindergarten-friendly) ─────────── */
+.timeline-wrap {
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  border-radius: 20px;
+  background:
+    linear-gradient(165deg, rgba(255, 248, 240, 0.95) 0%, rgba(255, 252, 250, 0.98) 45%, rgba(240, 249, 255, 0.55) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 8px 28px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(251, 207, 232, 0.45);
+}
 .timeline {
   list-style: none;
   padding: 0;
@@ -478,18 +881,19 @@ function emotionLabel(emotion: string | null): string {
 }
 .timeline__entry {
   display: grid;
-  grid-template-columns: 56px 24px 1fr;
+  grid-template-columns: 58px 28px 1fr;
   align-items: stretch;
   gap: var(--space-3);
   min-height: 96px;
 }
 .timeline__time {
-  padding-top: 18px;
+  padding-top: 20px;
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-muted);
+  color: #9d6b8a;
   text-align: right;
   font-size: var(--font-size-sm);
+  line-height: 1.2;
 }
 .timeline__rail {
   position: relative;
@@ -502,56 +906,165 @@ function emotionLabel(emotion: string | null): string {
   left: 50%;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: var(--color-border-subtle);
-  transform: translateX(-50%);
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.35) 0%,
+    rgba(244, 114, 182, 0.45) 42%,
+    rgba(147, 197, 253, 0.5) 100%
+  );
+  box-shadow: 0 0 12px rgba(244, 114, 182, 0.15);
 }
-/* 첫·끝 항목의 레일은 dot 까지만 그려 깔끔하게 마감 */
-.timeline__entry:first-child .timeline__rail::before { top: 26px; }
-.timeline__entry:last-child .timeline__rail::before { bottom: calc(100% - 32px); }
+.timeline__entry:first-child .timeline__rail::before {
+  top: 28px;
+}
+.timeline__entry:last-child .timeline__rail::before {
+  bottom: calc(100% - 36px);
+}
 .timeline__dot {
   position: relative;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--color-text-muted);
-  margin-top: 22px;
-  border: 3px solid var(--color-surface-base);
-  box-shadow: 0 0 0 1px var(--color-border-subtle);
+  background: linear-gradient(145deg, #fde68a, #fbbf24);
+  margin-top: 24px;
+  border: 3px solid #fffef8;
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.35),
+    0 3px 10px rgba(15, 23, 42, 0.12);
   z-index: 1;
 }
-.timeline__entry--happy .timeline__dot { background: #f59e0b; }
-.timeline__entry--sad .timeline__dot { background: #6b7280; }
+.timeline__entry--happy .timeline__dot {
+  background: linear-gradient(145deg, #fcd34d, #f59e0b);
+  box-shadow:
+    0 0 0 2px rgba(245, 158, 11, 0.4),
+    0 3px 10px rgba(245, 158, 11, 0.25);
+}
+.timeline__entry--sad .timeline__dot {
+  background: linear-gradient(145deg, #e5e7eb, #9ca3af);
+  box-shadow:
+    0 0 0 2px rgba(156, 163, 175, 0.35),
+    0 3px 10px rgba(15, 23, 42, 0.1);
+}
 .timeline__entry--note .timeline__dot {
-  background: var(--color-surface-base);
-  border-color: var(--color-border-strong);
+  background: linear-gradient(145deg, #faf5ff, #e9d5ff);
+  border-color: #fffef8;
+  box-shadow:
+    0 0 0 2px rgba(196, 181, 253, 0.5),
+    0 3px 10px rgba(139, 92, 246, 0.12);
 }
 .timeline__card {
   display: flex;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   margin: var(--space-2) 0;
-  background: var(--color-surface-base);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  border-left: 4px solid rgba(251, 191, 36, 0.65);
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   color: inherit;
 }
+.timeline__entry--happy .timeline__card {
+  border-left-color: rgba(245, 158, 11, 0.85);
+}
+.timeline__entry--sad .timeline__card {
+  border-left-color: rgba(148, 163, 184, 0.9);
+}
+.timeline__entry--note .timeline__card {
+  border-left-color: rgba(167, 139, 250, 0.75);
+}
 .timeline__card--text {
-  background: var(--color-surface-sunken);
-  border-style: dashed;
+  background: rgba(255, 251, 245, 0.92);
+  border-style: solid;
+  border-color: rgba(254, 215, 170, 0.55);
+}
+.timeline__card--editing {
+  flex-direction: column;
+  align-items: stretch;
+  border-color: rgba(251, 146, 60, 0.5);
+  box-shadow:
+    0 4px 20px rgba(251, 146, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.timeline__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+.timeline__edit .timeline__thumb-link {
+  align-self: flex-start;
+}
+.timeline__edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.timeline__edit-err {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-status-danger);
+}
+.timeline__body--editable {
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  outline: none;
+  transition: background var(--motion-base) var(--motion-ease);
+}
+.timeline__body--editable:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+.timeline__body--editable:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.timeline__text-card {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  border-radius: 8px;
+  transition: background var(--motion-base) var(--motion-ease);
+}
+.timeline__text-card:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+.timeline__text-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .timeline__thumb-link {
   display: block;
   flex-shrink: 0;
   text-decoration: none;
   transition: transform var(--motion-base) var(--motion-ease);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
-.timeline__thumb-link:hover { transform: scale(1.02); }
+.timeline__thumb-link:hover {
+  transform: scale(1.03) rotate(-0.5deg);
+}
 .timeline__thumb {
   width: 96px;
   height: 96px;
   object-fit: cover;
-  border-radius: var(--radius-sm);
+  border-radius: 14px;
   background: var(--color-surface-sunken);
   display: block;
 }
@@ -565,12 +1078,15 @@ function emotionLabel(emotion: string | null): string {
 .timeline__text {
   margin: 0;
   font-size: var(--font-size-sm);
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--color-text-primary);
 }
 .timeline__emotion {
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-secondary);
+  color: #b45309;
+}
+.timeline__entry--sad .timeline__emotion {
+  color: #64748b;
 }
 .timeline__meta {
   display: flex;
@@ -581,31 +1097,74 @@ function emotionLabel(emotion: string | null): string {
   align-items: center;
 }
 .timeline__mode {
-  padding: 2px 8px;
-  background: var(--color-surface-sunken);
+  padding: 2px 10px;
+  background: rgba(255, 255, 255, 0.75);
   border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
-.timeline__score { font-variant-numeric: tabular-nums; }
+.timeline__score {
+  font-variant-numeric: tabular-nums;
+}
 
 /* 하루 정리 — 타임라인 아래 한 문장 */
+.summary-wrap {
+  margin-top: var(--space-3);
+}
+
 .summary {
-  margin: var(--space-3) 0 0;
-  padding: var(--space-3);
-  background: var(--color-brand-primary-soft);
-  border-radius: var(--radius-md);
+  margin: 0;
+  padding: var(--space-4);
+  background: linear-gradient(135deg, rgba(255, 237, 213, 0.65), rgba(254, 243, 199, 0.5));
+  border-radius: 16px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  box-shadow: 0 4px 14px rgba(251, 146, 60, 0.08);
   font-size: var(--font-size-sm);
   color: var(--color-text-primary);
-  line-height: 1.5;
+  line-height: 1.55;
+}
+
+.summary--clickable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.summary--clickable:hover {
+  border-color: rgba(251, 146, 60, 0.55);
+  box-shadow: 0 6px 18px rgba(251, 146, 60, 0.12);
+}
+
+.summary--editing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.summary__err {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-status-danger);
 }
 
 /* legacy 평문 보고서 */
 .legacy-report {
   white-space: pre-wrap;
-  padding: var(--space-3);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 16px;
+  border: 1px dashed rgba(203, 213, 225, 0.9);
   font-size: var(--font-size-sm);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* 원본 편집 (접힘) */
@@ -624,6 +1183,7 @@ function emotionLabel(emotion: string | null): string {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   margin-top: var(--space-2);
@@ -642,5 +1202,100 @@ function emotionLabel(emotion: string | null): string {
 }
 .generate-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.clear-btn {
+  background: transparent;
+  color: var(--color-status-danger);
+  border: 1px solid var(--color-border-strong);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  font-family: inherit;
+}
+.clear-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-status-danger) 12%, transparent);
+}
+.clear-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .err { font-size: var(--font-size-xs); color: var(--color-status-danger); }
+
+@media (max-width: 767px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .child-select-mobile {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--space-2);
+  }
+
+  .child-list-desktop {
+    display: none;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .ul {
+    max-height: none;
+  }
+
+  .detail__head {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .timeline-wrap {
+    padding: var(--space-3) var(--space-2);
+    border-radius: 16px;
+  }
+
+  .timeline__entry {
+    grid-template-columns: 46px 22px minmax(0, 1fr);
+    gap: var(--space-2);
+    min-height: 0;
+  }
+
+  .timeline__time {
+    padding-top: 14px;
+    font-size: var(--font-size-xs);
+  }
+
+  .timeline__dot {
+    width: 14px;
+    height: 14px;
+    margin-top: 18px;
+  }
+
+  .timeline__entry:first-child .timeline__rail::before {
+    top: 22px;
+  }
+
+  .timeline__entry:last-child .timeline__rail::before {
+    bottom: calc(100% - 30px);
+  }
+
+  .timeline__card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .timeline__thumb {
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+    aspect-ratio: 1;
+    align-self: flex-start;
+  }
+}
+
+@media (min-width: 768px) {
+  .filters {
+    grid-template-columns: 200px minmax(200px, 1fr);
+  }
+}
 </style>

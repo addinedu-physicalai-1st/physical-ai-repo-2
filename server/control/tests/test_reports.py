@@ -1,4 +1,5 @@
 """보고서 endpoint 테스트."""
+import json
 from datetime import date, datetime, timezone, timedelta
 
 import httpx
@@ -34,9 +35,10 @@ def _install_ai_hub_mock(monkeypatch, *, response_json: dict):
     return state
 
 
-async def test_pending_lists_attended_children_without_reports(
+async def test_pending_lists_children_without_reports(
     teacher_client: AsyncClient, db_session
 ):
+    """등원 여부와 무관하게, 해당 일 보고서가 없으면 pending 에 포함된다."""
     from server.db.models import Attendance, Child
 
     today = date.today()
@@ -50,10 +52,6 @@ async def test_pending_lists_attended_children_without_reports(
         Attendance(child_id=c1.id, date=today, type="IN",
                    time=datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc))
     )
-    db_session.add(
-        Attendance(child_id=c2.id, date=today, type="IN",
-                   time=datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc))
-    )
     await db_session.flush()
 
     response = await teacher_client.get(
@@ -63,6 +61,11 @@ async def test_pending_lists_attended_children_without_reports(
     body = response.json()
     pending_child_ids = {r["child_id"] for r in body}
     assert pending_child_ids == {c1.id, c2.id}
+    by_id = {r["child_id"]: r for r in body}
+    assert by_id[c1.id]["attendance_debug"]["has_check_in"] is True
+    assert by_id[c1.id]["attendance_debug"]["has_check_out"] is False
+    assert by_id[c2.id]["attendance_debug"]["has_check_in"] is False
+    assert by_id[c2.id]["attendance_debug"]["has_check_out"] is False
 
 
 async def test_pending_excludes_children_with_existing_report(
@@ -118,6 +121,11 @@ async def test_get_report_by_child_and_date(teacher_client: AsyncClient, db_sess
     body = response.json()
     assert len(body) == 1
     assert body[0]["content"] == "내용"
+    ad = body[0]["attendance_debug"]
+    assert ad["has_check_in"] is False
+    assert ad["has_check_out"] is False
+    assert ad["check_in_kst"] is None
+    assert ad["check_out_kst"] is None
 
 
 async def test_patch_report_updates_content(teacher_client: AsyncClient, db_session):
@@ -141,6 +149,7 @@ async def test_patch_report_updates_content(teacher_client: AsyncClient, db_sess
     body = response.json()
     assert body["content"] == "수정됨"
     assert body["updated_at"] is not None
+    assert body["attendance_debug"]["has_check_in"] is False
 
 
 async def test_patch_nonexistent_report_returns_404(teacher_client: AsyncClient):
@@ -153,6 +162,47 @@ async def test_patch_report_as_parent_returns_403(parent_client: AsyncClient):
     assert response.status_code == 403
 
 
+async def test_delete_report_removes_row(teacher_client: AsyncClient, db_session):
+    from server.db.models import Child, Report
+    from sqlalchemy import select
+
+    c = Child(
+        name="DelKid",
+        birth_date=date(2021, 1, 1),
+        class_name="햇살반",
+        photo_url=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(c)
+    await db_session.flush()
+    r = Report(
+        child_id=c.id,
+        date=date.today(),
+        content="{}",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(r)
+    await db_session.flush()
+    await db_session.commit()
+    rid = r.id
+
+    response = await teacher_client.delete(f"/api/reports/{rid}")
+    assert response.status_code == 204
+
+    rows = (await db_session.execute(select(Report).where(Report.id == rid))).scalars().all()
+    assert len(rows) == 0
+
+
+async def test_delete_report_not_found_returns_404(teacher_client: AsyncClient):
+    response = await teacher_client.delete("/api/reports/99999")
+    assert response.status_code == 404
+
+
+async def test_delete_report_as_parent_returns_403(parent_client: AsyncClient):
+    response = await parent_client.delete("/api/reports/1")
+    assert response.status_code == 403
+
+
 async def test_generate_report_inserts_new_row(
     teacher_client: AsyncClient, db_session, monkeypatch
 ):
@@ -160,8 +210,14 @@ async def test_generate_report_inserts_new_row(
     from server.db.models import Child, Menu, Photo, PhotoSubject, Report
     from sqlalchemy import select
 
-    c = Child(name="지수", birth_date=date(2021, 1, 1), class_name="햇살반",
-              photo_url=None, created_at=datetime.now(timezone.utc))
+    c = Child(
+        name="박우림",
+        birth_date=date(2021, 1, 1),
+        class_name="햇살반",
+        photo_url=None,
+        created_at=datetime.now(timezone.utc),
+        notes="활동 시 선생님 말에 잘 귀 기울이는 편.",
+    )
     db_session.add(c)
     await db_session.flush()
     today = date(2026, 5, 12)
@@ -194,15 +250,62 @@ async def test_generate_report_inserts_new_row(
     body = response.json()
     assert "OX 퀴즈" in body["content"]
     assert body["child_id"] == c.id
+    assert body["attendance_debug"]["has_check_in"] is False
+    assert body["attendance_debug"]["has_check_out"] is False
 
     rows = (await db_session.execute(select(Report).where(Report.child_id == c.id))).scalars().all()
     assert len(rows) == 1
 
-    # AI Hub 에 보낸 payload 검증 — child_name + KST 시각 + 메뉴 포함
+    # AI Hub 에 보낸 payload 검증 — child_name + KST 시각 + 메뉴 + 특이사항
     sent = mock_state["last_request"].content.decode()
-    assert "지수" in sent
     assert "10:23" in sent
     assert "김밥" in sent
+    sent_payload = json.loads(sent)
+    assert sent_payload.get("child_name") == "우림"
+    assert sent_payload.get("registered_full_name") == "박우림"
+    assert sent_payload.get("class_name") == "햇살반"
+    assert sent_payload.get("birth_date") == "2021-01-01"
+    assert sent_payload.get("child_notes") == "활동 시 선생님 말에 잘 귀 기울이는 편."
+    assert "attendance" in sent_payload
+    assert sent_payload["attendance"]["check_in_kst"] is None
+
+
+async def test_generate_report_attendance_debug_matches_db(
+    teacher_client: AsyncClient, db_session, monkeypatch
+):
+    from server.db.models import Attendance, Child, Menu
+
+    c = Child(
+        name="김출석",
+        birth_date=date(2021, 1, 1),
+        class_name="햇살반",
+        photo_url=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(c)
+    await db_session.flush()
+    day = date(2026, 5, 12)
+    # 09:00 / 15:00 KST
+    t_in = datetime(2026, 5, 12, 0, 0, tzinfo=timezone.utc)
+    t_out = datetime(2026, 5, 12, 6, 0, tzinfo=timezone.utc)
+    db_session.add(Attendance(child_id=c.id, date=day, type="IN", time=t_in))
+    db_session.add(Attendance(child_id=c.id, date=day, type="OUT", time=t_out))
+    db_session.add(Menu(day=12, items=["밥"]))
+    await db_session.flush()
+    await db_session.commit()
+
+    _install_ai_hub_mock(monkeypatch, response_json={"content": "{}"})
+
+    response = await teacher_client.post(
+        "/api/reports/generate",
+        json={"child_id": c.id, "date": day.isoformat()},
+    )
+    assert response.status_code == 200, response.text
+    ad = response.json()["attendance_debug"]
+    assert ad["has_check_in"] is True
+    assert ad["has_check_out"] is True
+    assert ad["check_in_kst"] == "09:00"
+    assert ad["check_out_kst"] == "15:00"
 
 
 async def test_generate_report_upserts_existing(
@@ -358,6 +461,27 @@ async def test_generate_report_backfills_unmapped_photo_classification(
     sent = json.loads(mock_state["last_request"].content.decode())
     assert len(sent["photo_events"]) == 1
     assert sent["photo_events"][0]["emotion"] == "happy"
+
+
+async def test_generate_report_rejects_future_date(teacher_client: AsyncClient, db_session):
+    from server.db.models import Child
+
+    c = Child(
+        name="X",
+        birth_date=date(2021, 1, 1),
+        class_name="햇살반",
+        photo_url=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(c)
+    await db_session.flush()
+    await db_session.commit()
+
+    response = await teacher_client.post(
+        "/api/reports/generate",
+        json={"child_id": c.id, "date": "2099-01-01"},
+    )
+    assert response.status_code == 400
 
 
 async def test_generate_report_rejects_parent(parent_client: AsyncClient):

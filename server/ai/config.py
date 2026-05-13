@@ -12,6 +12,16 @@ class Settings:
     ollama_model: str = "qwen2.5:0.5b"
     # 잡담(chat) 전용 — 의도 분류(ollama_model)보다 크게 둘 수 있음. `ollama pull qwen2.5:3b` 필요.
     ollama_chat_model: str = "qwen2.5:3b"
+    # 일과 보고서 JSON 전용 — 타임라인·규칙 준수에 3b 보다 유리. `ollama pull qwen2.5:7b` 필요.
+    # VRAM 이 빠듯하면 `qwen2.5:3b` 로 낮춰도 됨(잡담과 동일 모델).
+    ollama_report_model: str = "qwen2.5:7b"
+    # 보고서 2차 검수 — 기본은 별도 호출이지만 동일 태그(qwen2.5:7b)를 쓰면 생성과 같은 가중치를 공유.
+    ollama_report_validate_enabled: bool = True
+    ollama_report_validate_model: str = "qwen2.5:7b"
+    ollama_report_validate_timeout_s: float = 90.0
+    ollama_report_validate_num_predict: int = 2048
+    ollama_report_validate_num_ctx: int = 8192
+    ollama_report_validate_temperature: float = 0.12
     ollama_classify_num_predict: int = 28
     ollama_classify_num_ctx: int = 768
     # 생성 상한 — 짧은 JSON 답은 EOS 로 일찍 끝나고, 상한만 너무 크면 최악 지연만 커짐.
@@ -26,6 +36,8 @@ class Settings:
     ollama_chat_top_k: int = 40
     # 읽기 타임아웃 — 실패 시 곧바로 짧은 repair 경로로 넘어가므로 한 번만 길게 잡지 않음.
     ollama_chat_timeout_s: float = 4.15
+    # 일과 보고서 JSON 생성 — 긴 타임라인·큰 num_predict 시 Ollama 지연이 길어질 수 있음.
+    ollama_report_timeout_s: float = 120.0
     # Ollama API: 모델을 메모리에 유지하는 시간 — 매 요청마다 갱신 (기본 5m 보다 길게 두면 재로드 감소)
     ollama_keep_alive: str = "30m"
     # true 이면 Hub 기동 시 백그라운드로 모델 프리로드(첫 발화 체감 단축, Ollama 가 떠 있어야 함)
@@ -55,10 +67,16 @@ EMBED_DIM = 1024
 
 # --- run_server.sh 가 기동 전에 ollama pull 로 보장하는 모델 목록 ---
 # 셸 스크립트가 `python -m server.ai.config` 로 한 줄당 한 모델씩 받아간다.
-REQUIRED_OLLAMA_MODELS: tuple[str, ...] = (
-    settings.ollama_model,
-    settings.ollama_chat_model,
-    EMBED_MODEL,
+REQUIRED_OLLAMA_MODELS: tuple[str, ...] = tuple(
+    dict.fromkeys(
+        (
+            settings.ollama_model,
+            settings.ollama_chat_model,
+            settings.ollama_report_model,
+            settings.ollama_report_validate_model,
+            EMBED_MODEL,
+        )
+    )
 )
 
 

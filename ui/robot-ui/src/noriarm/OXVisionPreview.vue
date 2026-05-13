@@ -17,13 +17,19 @@
  */
 import { Hands, type Results as HandResults } from '@mediapipe/hands';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useEmotionCapture } from '@/composables/useEmotionCapture';
 
 const props = withDefaults(
   defineProps<{
     /** true 일 때만 락인 카운트다운이 진행됨. 질문 phase 동안 true 유지. */
     armed?: boolean;
+    /** 자연 촬영(표정) — 목록의 첫 번째 USB 카메라 스트림에서만 수행. */
+    emotionArmed?: boolean;
+    emotionResetKey?: number;
+    robot?: string;
+    mode?: string;
   }>(),
-  { armed: true },
+  { armed: true, emotionArmed: false, emotionResetKey: 0, robot: 'noriarm', mode: 'ox-quiz' },
 );
 
 const emit = defineEmits<{
@@ -34,6 +40,7 @@ const emit = defineEmits<{
    * 내장 카메라로는 인식 안 함).
    */
   'usb-available': [available: boolean];
+  'emotion-captured': [info: { emotion: 'happy' | 'sad'; score: number; photoId: number; url: string }];
 }>();
 
 const LOCK_DURATION_MS = 1500;
@@ -72,12 +79,53 @@ const currentRegion = ref<'O' | 'X' | null>(null);
 const handDetected = ref<boolean>(false);
 
 const videoRef = ref<HTMLVideoElement | null>(null);
+/** 목록 첫 카메라 ≠ 보드 선택 카메라일 때 표정 전용 스트림 */
+const emotionVideoRef = ref<HTMLVideoElement | null>(null);
+
+const emotionCapture = useEmotionCapture({
+  robot: props.robot,
+  mode: props.mode,
+  enabled: () => props.emotionArmed,
+  onCaptured: (info) => emit('emotion-captured', info),
+});
+
+const {
+  captured: emotionCaptured,
+  flashTick: emotionFlashTick,
+  lastEmotion: emotionLast,
+  faceDetected: emotionFaceDetected,
+  liveHappy: emotionLiveHappy,
+  liveSad: emotionLiveSad,
+  sustainProgress: emotionSustainProgress,
+  uploadError: emotionUploadError,
+  ready: emotionModelReady,
+  inCaptureCooldown: emotionInCaptureCooldown,
+} = emotionCapture;
+
+const EMOTION_SUSTAIN_MAX = 3;
+
+watch(
+  () => props.emotionResetKey,
+  () => emotionCapture.reset(),
+);
+
 const overlayRef = ref<HTMLCanvasElement | null>(null);
 
 let stream: MediaStream | null = null;
+let emotionStream: MediaStream | null = null;
 let captureCanvas: HTMLCanvasElement | null = null;
 let ws: WebSocket | null = null;
 let stopRequested = false;
+
+/** USB 연결 시 mount + devicechange 가 동시에 start/stop 하면 WS 가 CONNECTING 중에 닫혀
+ *  브라우저가 `error` 이벤트만 던짐 — 카메라·WebSocket 생명주기를 한 줄로 직렬화 */
+let visionOpChain: Promise<void> = Promise.resolve();
+
+function queueVisionOp(fn: () => Promise<void>): Promise<void> {
+  const next = visionOpChain.then(fn);
+  visionOpChain = next.catch(() => {});
+  return next;
+}
 let frameCount = 0;
 let lastFpsT = 0;
 let lastInferSentAt = 0;
@@ -101,9 +149,37 @@ const lockProgress = ref<number>(0);
 
 const hasCameras = computed(() => cameras.value.length > 0);
 
-function isUsbCamera(c: MediaDeviceInfo): boolean {
-  // label 이 비어있으면 (권한 미허용) USB 인지 알 수 없음 — 보수적으로 false.
-  return /usb|webcam/i.test(c.label);
+/** 드롭다운 첫 항목 — 자연 촬영(표정) 전용 */
+const firstUsbDeviceId = computed(() => cameras.value[0]?.deviceId ?? '');
+
+const showEmotionPip = computed(
+  () =>
+    props.emotionArmed
+    && hasCameras.value
+    && !!firstUsbDeviceId.value
+    && selectedDeviceId.value !== firstUsbDeviceId.value,
+);
+
+/**
+ * OX 보드용 카메라 후보. 예전에는 label 에 "usb|webcam" 만 인정해서
+ * Linux UVC·브랜드 카메라(라벨에 USB 문자열 없음)가 목록에서 빠졌음.
+ * 내장 카메라 흔한 키워드만 제외하고 나머지 videoinput 은 포함.
+ */
+function isOxCameraCandidate(c: MediaDeviceInfo): boolean {
+  const label = (c.label || '').trim();
+  if (!label) {
+    // 권한 직후 재열거 전·일부 드라이버 — 장치는 있으나 라벨 없음 → 일단 노출
+    return true;
+  }
+  const lower = label.toLowerCase();
+  if (
+    /\b(integrated|built[- ]?in|facetime hd|facetime|iris|fbcam|internal)\b/i.test(lower)
+    || /내장/.test(label)
+    || /\b(hp truevision|hp wide vision|lenovo easycamera|cyberlink|mi webcam)\b/i.test(lower)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 async function listCameras(): Promise<void> {
@@ -122,14 +198,17 @@ async function listCameras(): Promise<void> {
     const all = devs.filter((d) => d.kind === 'videoinput');
     // 노트북 내장 카메라는 OX 보드 인식 정확도가 낮고 사용자가 보드를 들이대기도 어려움.
     // USB 외장 카메라만 노출 — 없으면 패널 자체를 숨김 (부모가 처리).
-    cameras.value = all.filter(isUsbCamera);
+    cameras.value = all.filter(isOxCameraCandidate);
     if (cameras.value.length === 0) {
       emit('usb-available', false);
       return;
     }
     emit('usb-available', true);
-    if (!selectedDeviceId.value) {
-      selectedDeviceId.value = cameras.value[0].deviceId;
+    const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
+    if (!selectedDeviceId.value || !stillValid) {
+      // 표정은 항상 목록 0번 — 보드는 USB 2대 이상이면 1번을 기본(첫 카메라는 얼굴용으로 비움).
+      selectedDeviceId.value =
+        cameras.value.length >= 2 ? cameras.value[1].deviceId : cameras.value[0].deviceId;
       await startStream();
     }
   } catch (e) {
@@ -139,27 +218,73 @@ async function listCameras(): Promise<void> {
 }
 
 async function startStream(): Promise<void> {
-  await stopStream();
-  if (!selectedDeviceId.value) return;
-  error.value = null;
+  return queueVisionOp(async () => {
+    await stopStreamInner();
+    if (!selectedDeviceId.value) {
+      stopRequested = false;
+      return;
+    }
+    error.value = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: selectedDeviceId.value },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      if (videoRef.value) {
+        videoRef.value.srcObject = stream;
+        await videoRef.value.play();
+      }
+      await syncEmotionCamera();
+      startInferLoop();
+      setupHands();
+      startHandsLoop();
+    } catch (e) {
+      error.value = `카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
+      stopRequested = false;
+    }
+  });
+}
+
+async function stopEmotionOnly(): Promise<void> {
+  emotionCapture.detach();
+  if (emotionStream) {
+    emotionStream.getTracks().forEach((t) => t.stop());
+    emotionStream = null;
+  }
+  if (emotionVideoRef.value) emotionVideoRef.value.srcObject = null;
+}
+
+/** 자연 촬영: `cameras[0]` — 부모가 `emotionArmed` 로 켠 경우에만(내장 우상단 사용 시 생략). */
+async function syncEmotionCamera(): Promise<void> {
+  await stopEmotionOnly();
+  if (!props.emotionArmed) return;
+  const emoId = firstUsbDeviceId.value;
+  if (!emoId || !videoRef.value) return;
+  if (emoId === selectedDeviceId.value) {
+    emotionCapture.attach(videoRef.value);
+    return;
+  }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    emotionStream = await navigator.mediaDevices.getUserMedia({
       video: {
-        deviceId: { exact: selectedDeviceId.value },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        deviceId: { exact: emoId },
+        width: { ideal: 640 },
+        height: { ideal: 360 },
       },
       audio: false,
     });
-    if (videoRef.value) {
-      videoRef.value.srcObject = stream;
-      await videoRef.value.play();
+    const ev = emotionVideoRef.value;
+    if (ev) {
+      ev.srcObject = emotionStream;
+      await ev.play();
+      emotionCapture.attach(ev);
     }
-    startInferLoop();
-    setupHands();
-    startHandsLoop();
   } catch (e) {
-    error.value = `카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
+    console.warn('[OXVisionPreview] emotion (first USB) camera failed', e);
   }
 }
 
@@ -225,6 +350,14 @@ function updateLock(): void {
     emit('select', region);
   }
 }
+
+watch(
+  () => props.emotionArmed,
+  (on) => {
+    if (!on) void stopEmotionOnly();
+    else if (stream && videoRef.value) void syncEmotionCamera();
+  },
+);
 
 // armed 가 true 로 켜질 때 (예: 새 질문 시작) lock 상태 리셋 — 같은 답을 다시
 // 선택할 수 있어야 함 (예: 연속 두 문제 답이 모두 'O')
@@ -314,7 +447,7 @@ function stopHandsLoop(): void {
   lockedFiredFor = null;
 }
 
-async function stopStream(): Promise<void> {
+async function stopStreamInner(): Promise<void> {
   stopRequested = true;
   if (pendingSendTimer != null) {
     window.clearTimeout(pendingSendTimer);
@@ -322,6 +455,7 @@ async function stopStream(): Promise<void> {
   }
   closeWs();
   stopHandsLoop();
+  await stopEmotionOnly();
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -331,6 +465,10 @@ async function stopStream(): Promise<void> {
   inferenceMs.value = 0;
   lastInfer = null;
   clearOverlay();
+}
+
+async function stopStream(): Promise<void> {
+  return queueVisionOp(() => stopStreamInner());
 }
 
 function closeWs(): void {
@@ -356,6 +494,7 @@ function startInferLoop(): void {
   lastFpsT = performance.now();
 
   ws.onopen = () => {
+    error.value = null;
     void sendNextFrame();
   };
   ws.onmessage = async (ev) => {
@@ -385,16 +524,21 @@ function startInferLoop(): void {
       void sendNextFrame();
     }
   };
-  ws.onerror = (e) => {
-    error.value = `vision WebSocket 에러: ${(e as Event).type}`;
-  };
-  ws.onclose = () => {
-    if (!stopRequested) {
-      // 비정상 종료면 1초 후 재연결 시도
-      window.setTimeout(() => {
-        if (!stopRequested && stream) startInferLoop();
-      }, 1000);
+  // Chrome 등은 CONNECTING 중 close 시 type 만 "error" 인 이벤트를 줌 — 원인 표시는 onclose code/reason 사용
+  ws.onerror = () => {};
+  ws.onclose = (ev) => {
+    if (stopRequested) return;
+    const benign = ev.code === 1000 || ev.code === 1001;
+    if (!benign) {
+      const hint = ev.reason ? `: ${ev.reason}` : '';
+      error.value = `vision WebSocket 끊김 (${ev.code}${hint}). AI Hub·Control 서버 연결을 확인하세요.`;
     }
+    window.setTimeout(() => {
+      void queueVisionOp(async () => {
+        if (stopRequested || !stream) return;
+        startInferLoop();
+      });
+    }, 1000);
   };
 }
 
@@ -542,8 +686,29 @@ async function rescan(): Promise<void> {
   await listCameras();
 }
 
-onMounted(listCameras);
-onUnmounted(stopStream);
+let deviceChangeDebounce: number | null = null;
+function scheduleListCamerasOnDeviceChange(): void {
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+  }
+  deviceChangeDebounce = window.setTimeout(() => {
+    deviceChangeDebounce = null;
+    void listCameras();
+  }, 400);
+}
+
+onMounted(() => {
+  void listCameras();
+  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+});
+onUnmounted(() => {
+  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+    deviceChangeDebounce = null;
+  }
+  void stopStream();
+});
 </script>
 
 <template>
@@ -556,17 +721,52 @@ onUnmounted(stopStream);
         @change="onChange"
       >
         <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
-        <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
-          {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+        <option v-for="(c, i) in cameras" :key="c.deviceId" :value="c.deviceId">
+          {{ i === 0 ? '📷 표정 · ' : '' }}{{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
         </option>
       </select>
       <button class="rescan" type="button" title="다시 스캔" @click="rescan">↻</button>
     </div>
-    <div class="vision-canvas">
+    <div
+      class="vision-canvas"
+      :class="{ 'is-emotion-captured': emotionCaptured }"
+    >
       <video ref="videoRef" muted playsinline />
       <canvas ref="overlayRef" class="overlay" />
+      <video
+        v-show="showEmotionPip"
+        ref="emotionVideoRef"
+        class="emotion-pip-video"
+        muted
+        playsinline
+      />
+      <div
+        v-if="emotionFlashTick > 0"
+        :key="emotionFlashTick"
+        class="shutter"
+      />
+      <div
+        v-if="emotionLast !== null"
+        class="emotion-tag"
+        :class="`is-${emotionLast}`"
+      >
+        📸 {{ emotionLast === 'happy' ? '활짝!' : '시무룩' }}
+      </div>
       <div v-if="fps > 0" class="hud">
         {{ fps.toFixed(1) }} fps · infer {{ inferenceMs }} ms
+      </div>
+      <div
+        v-if="emotionArmed && !emotionInCaptureCooldown && emotionModelReady"
+        class="emotion-live-hud"
+        :class="{ 'has-face': emotionFaceDetected }"
+      >
+        <template v-if="!emotionFaceDetected">얼굴 찾는 중…</template>
+        <template v-else>
+          웃음 {{ (emotionLiveHappy * 100).toFixed(0) }}% · 슬픔 {{ (emotionLiveSad * 100).toFixed(0) }}%
+          <span v-if="emotionSustainProgress > 0" class="emotion-sustain">
+            · 촬영까지 {{ emotionSustainProgress }}/{{ EMOTION_SUSTAIN_MAX }}
+          </span>
+        </template>
       </div>
       <div
         class="region-badge"
@@ -583,6 +783,7 @@ onUnmounted(stopStream);
         <template v-else>영역 밖</template>
       </div>
     </div>
+    <p v-if="emotionUploadError" class="emotion-upload-err">{{ emotionUploadError }}</p>
     <p v-if="error" class="vision-error">{{ error }}</p>
   </div>
 </template>
@@ -633,6 +834,60 @@ onUnmounted(stopStream);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: box-shadow 0.35s ease;
+}
+.vision-canvas.is-emotion-captured {
+  box-shadow: 0 0 0 3px #f0c042 inset;
+}
+.emotion-pip-video {
+  position: absolute;
+  right: 8px;
+  bottom: 36px;
+  width: 112px;
+  height: 63px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid rgba(240, 192, 66, 0.95);
+  z-index: 3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+.shutter {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  animation: ox-shutter-flash 0.6s ease-out;
+}
+@keyframes ox-shutter-flash {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.emotion-tag {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 4;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: white;
+  pointer-events: none;
+}
+.emotion-tag.is-happy {
+  background: rgba(45, 139, 87, 0.92);
+}
+.emotion-tag.is-sad {
+  background: rgba(193, 69, 69, 0.92);
 }
 .vision-canvas video {
   width: 100%;
@@ -646,8 +901,35 @@ onUnmounted(stopStream);
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 2;
 }
-.vision-canvas .hud {
+.vision-canvas .emotion-live-hud {
+  position: absolute;
+  left: 8px;
+  bottom: 32px;
+  z-index: 4;
+  max-width: calc(100% - 16px);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(30, 45, 58, 0.72);
+  pointer-events: none;
+  line-height: 1.25;
+}
+.emotion-live-hud.has-face {
+  background: rgba(45, 110, 75, 0.78);
+}
+.emotion-sustain {
+  font-weight: 800;
+}
+.emotion-upload-err {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #c14545;
+}
+.hud {
   position: absolute;
   top: 6px;
   left: 6px;

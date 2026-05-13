@@ -13,6 +13,7 @@ class ChildOut(BaseModel):
     class_name: str
     photo_url: str | None = None
     notes: str | None = None
+    given_name: str | None = None
 
 
 class ParentInfoOut(BaseModel):
@@ -39,6 +40,15 @@ class MenuEntryOut(BaseModel):
     items: list[str]
 
 
+class ReportAttendanceDebugOut(BaseModel):
+    """해당 일 `attendance` 테이블 기준 — 보고서 화면·API 디버그용."""
+
+    has_check_in: bool
+    has_check_out: bool
+    check_in_kst: str | None = None
+    check_out_kst: str | None = None
+
+
 class ReportOut(BaseModel):
     id: int
     child_id: int
@@ -46,6 +56,7 @@ class ReportOut(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime | None
+    attendance_debug: ReportAttendanceDebugOut | None = None
 
 
 class PhotoOut(BaseModel):
@@ -70,10 +81,12 @@ class RegisterChildPayload(BaseModel):
     birth_date: DateType
     class_name: str
     notes: str | None = None
+    given_name: str | None = None
 
 
 class ChildPatchPayload(BaseModel):
     notes: str | None = None
+    given_name: str | None = None
 
 
 class ParentPatchPayload(BaseModel):
