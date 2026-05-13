@@ -30,6 +30,8 @@ setup(
             # 재생은 bridge 가 기본 경로지만, CLI 검증 (yaml 파일 한 개를 한 번 재생)
             # 용으로 standalone 노드 한 개 유지.
             'routines_player_node = eduarm.routines_player_node:main',
+            # bringup 직후 양팔 JTC 에 hold-pose 보간 goal 을 보내 시작 jerk 완화.
+            'soft_start_node = eduarm.soft_start_node:main',
         ],
     },
 )
