@@ -18,6 +18,9 @@ from typing import Any
 TOPIC_CMD_VEL = "/gogoping/cmd_vel"
 TOPIC_ODOM = "/gogoping/odom"
 TOPIC_SCAN = "/gogoping/scan"
+TOPIC_SIM_ACTIVE = "/gogoping/sim_active"
+# sim_active 미수신 임계 — 1Hz publish 의 2~3 cycle 분
+SIM_STALE_TIMEOUT_S = 2.5
 
 
 @dataclass
@@ -52,6 +55,7 @@ class RosBridge:
         self._latest_odom: OdomState | None = None
         self._latest_scan: ScanState | None = None
         self._last_cmd_at_s: float | None = None
+        self._sim_active_at_s: float | None = None
         self._ros_ok = False
         self._spin_thread: threading.Thread | None = None
 
@@ -79,6 +83,7 @@ class RosBridge:
         from geometry_msgs.msg import Twist
         from nav_msgs.msg import Odometry
         from sensor_msgs.msg import LaserScan
+        from std_msgs.msg import Bool
 
         if not rclpy.ok():
             rclpy.init()
@@ -90,6 +95,9 @@ class RosBridge:
         )
         node.create_subscription(
             LaserScan, TOPIC_SCAN, self._on_scan, 10,
+        )
+        node.create_subscription(
+            Bool, TOPIC_SIM_ACTIVE, self._on_sim_active, 10,
         )
         executor = SingleThreadedExecutor()
         executor.add_node(node)
@@ -152,6 +160,12 @@ class RosBridge:
         with self._lock:
             self._latest_scan = state
 
+    def _on_sim_active(self, msg) -> None:
+        if not bool(msg.data):
+            return
+        with self._lock:
+            self._sim_active_at_s = time.monotonic()
+
     # ----------------------------------------------------------- public API
 
     def publish_cmd_vel(self, linear: float, angular: float) -> None:
@@ -194,6 +208,14 @@ class RosBridge:
                 "last_cmd_age_ms": last_cmd_age_ms,
             }
 
+    def detect_mode(self) -> str:
+        """/gogoping/sim_active 가 SIM_STALE_TIMEOUT_S 안에 들어왔으면 'sim', 아니면 'real'."""
+        with self._lock:
+            if self._sim_active_at_s is None:
+                return "real"
+            age = time.monotonic() - self._sim_active_at_s
+            return "sim" if age < SIM_STALE_TIMEOUT_S else "real"
+
     def health(self) -> dict:
         """/teleop/health endpoint 용 정보."""
         snap = self.snapshot()
@@ -204,6 +226,7 @@ class RosBridge:
             "last_scan_age_ms":
                 None if snap["scan"] is None else snap["scan"]["age_ms"],
             "ros_ok": snap["ros_ok"],
+            "mode": self.detect_mode(),
         }
 
     def last_cmd_age_s(self) -> float | None:

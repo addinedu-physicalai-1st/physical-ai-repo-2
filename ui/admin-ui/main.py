@@ -33,6 +33,18 @@ from theme import COLORS, ROBOTS, apply_theme
 from widgets import Icon, StatusBadge
 
 
+def _detect_sim_mode() -> bool:
+    """Control Server /teleop/health 의 mode 가 'sim' 인지. 실패 시 False (실물 가정)."""
+    try:
+        import httpx
+        r = httpx.get("http://localhost:8000/teleop/health", timeout=0.5)
+        if r.status_code != 200:
+            return False
+        return r.json().get("mode") == "sim"
+    except Exception:
+        return False
+
+
 class NavButton(QPushButton):
     """체크 가능한 사이드바 네비 버튼. [icon] [name / tagline] 가로 배치."""
 
@@ -241,12 +253,17 @@ class AdminWindow(QMainWindow):
 
         # SR-CAM-004 — 단일 StreamClient 인스턴스 (앱 라이프타임).
         # base_url 은 STREAMING_BASE_URL env 로 override 가능.
-        client_id = get_or_create_client_id()
-        base_url = os.environ.get("STREAMING_BASE_URL", "ws://localhost:8100")
-        self.stream_client = StreamClient(
-            client_id=client_id, base_url=base_url, client_kind="admin",
-        )
-        self.stream_client.start()
+        # SIM 모드면 실물 카메라 송출이 없으므로 StreamClient 를 띄우지 않고
+        # GogoPingDashboard 의 mock CameraView 로 fallback.
+        if _detect_sim_mode():
+            self.stream_client = None
+        else:
+            client_id = get_or_create_client_id()
+            base_url = os.environ.get("STREAMING_BASE_URL", "ws://localhost:8100")
+            self.stream_client = StreamClient(
+                client_id=client_id, base_url=base_url, client_kind="admin",
+            )
+            self.stream_client.start()
 
         root = QWidget()
         root.setObjectName("mainBg")
@@ -286,10 +303,11 @@ class AdminWindow(QMainWindow):
         self.topbar.set_page(key)
 
     def closeEvent(self, ev) -> None:   # noqa: N802
-        try:
-            self.stream_client.stop()
-        except Exception:
-            pass
+        if self.stream_client is not None:
+            try:
+                self.stream_client.stop()
+            except Exception:
+                pass
         super().closeEvent(ev)
 
 

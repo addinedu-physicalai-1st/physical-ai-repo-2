@@ -50,7 +50,20 @@ async def lifespan(app: FastAPI):
     """ROS bridge lifecycle. ROS 환경 미source 시 graceful skip — noriarm 엔드포인트만 503.
 
     Vision (YOLO) 추론은 AI Hub (server/ai/hub.py) 가 담당 — Control Server 는 proxy.
+
+    teleop / noriarm bridge 는 모두 이 안에서 시작·종료한다. `lifespan` 이 지정된
+    FastAPI app 에서는 @app.on_event 데코레이터가 동작하지 않으므로 혼용 금지.
     """
+    try:
+        _teleop_bridge.start()
+    except Exception as e:
+        logger.warning(f"teleop RosBridge 시작 실패: {e}")
+
+    try:
+        await _teleop_hub.start()
+    except Exception as e:
+        logger.warning(f"teleop hub 시작 실패: {e}")
+
     bridge = None
     try:
         from server.control.noriarm.ros_bridge import (
@@ -81,6 +94,14 @@ async def lifespan(app: FastAPI):
 
     if bridge is not None:
         bridge.stop()
+    try:
+        await _teleop_hub.stop()
+    except Exception:
+        pass
+    try:
+        _teleop_bridge.shutdown()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="Pingdergarten Control", version="0.1.0", lifespan=lifespan)
@@ -105,19 +126,9 @@ app.include_router(reports_router.router)
 app.include_router(schedule_router.router)
 
 # teleop (GogoPing keyboard control) — POST /teleop/cmd_vel, WS /teleop/state, GET /teleop/health
+# install_teleop 가 라우터를 부착하고 hub 를 반환한다. 실제 start/stop 은 lifespan 에서.
 _teleop_bridge = RosBridge()
-install_teleop(app, _teleop_bridge)
-
-
-@app.on_event("startup")
-async def _start_teleop_bridge() -> None:
-    # ROS_DOMAIN_ID (201~219) 가 설정되어 있어야 한다.
-    _teleop_bridge.start()
-
-
-@app.on_event("shutdown")
-async def _stop_teleop_bridge() -> None:
-    _teleop_bridge.shutdown()
+_teleop_hub = install_teleop(app, _teleop_bridge)
 
 
 # NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.
