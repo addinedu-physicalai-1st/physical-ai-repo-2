@@ -8,10 +8,11 @@
  * 상태는 useEdupingRecordingWs 한 인스턴스를 부모/형제와 공유 (provide/inject 안 씀 —
  * 단순히 자체 인스턴스). 서버측 단일 state machine 이라 복수 클라이언트가 같은 값 봄.
  */
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useEdupingRecordingWs } from '@/composables/useEdupingRecordingWs';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import WarningModal from '@/common/WarningModal.vue';
+import Icon from '@/common/Icon.vue';
 
 const props = defineProps<{
   kind: 'dance' | 'greeting';
@@ -36,6 +37,34 @@ const countdown = ref<number | null>(null);
 const liveTeleop = ref(false);   // 실물 동기화 토글 — 녹화/재생과 독립적으로 leader→실물 mirror
 const teleopBusy = ref(false);   // 토글 POST 진행 중 잠금
 const playConfirmOpen = ref(false);
+
+// 재생 진행 상태 — 서버가 응답한 duration_s 기준 wall-clock 추정.
+const playStartMs = ref<number | null>(null);
+const playDuration = ref(0);
+const playElapsed = ref(0);
+let progressTimer: number | null = null;
+
+const playProgressPct = computed(() => {
+  if (playDuration.value <= 0) return 0;
+  return Math.min(100, (playElapsed.value / playDuration.value) * 100);
+});
+
+function fmtTime(s: number): string {
+  if (s < 0 || !Number.isFinite(s)) return '0:00';
+  const total = Math.floor(s);
+  const m = Math.floor(total / 60);
+  const r = total % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+function clearProgressTimer(): void {
+  if (progressTimer !== null) {
+    window.clearInterval(progressTimer);
+    progressTimer = null;
+  }
+}
+
+onBeforeUnmount(clearProgressTimer);
 
 const realActive = computed(() => stateWs.realActive.value);
 const leaderActive = computed(() => stateWs.leaderActive.value);
@@ -154,7 +183,30 @@ async function doPlay(): Promise<void> {
   const target = realActive.value ? 'real' : 'sim';
   try {
     const result = await postJson(`${urlPrefix()}/play`, { target });
-    emit('played', { ok: !!result?.ok, duration_s: result?.duration_s ?? 0 });
+    const ok = !!result?.ok;
+    const dur = Number(result?.duration_s ?? 0);
+    if (ok && dur > 0) {
+      clearProgressTimer();
+      playStartMs.value = Date.now();
+      playDuration.value = dur;
+      playElapsed.value = 0;
+      progressTimer = window.setInterval(() => {
+        if (playStartMs.value === null) return;
+        const e = (Date.now() - playStartMs.value) / 1000;
+        if (e >= playDuration.value) {
+          playElapsed.value = playDuration.value;
+          clearProgressTimer();
+          window.setTimeout(() => {
+            playStartMs.value = null;
+            playDuration.value = 0;
+            playElapsed.value = 0;
+          }, 600);
+        } else {
+          playElapsed.value = e;
+        }
+      }, 50);
+    }
+    emit('played', { ok, duration_s: dur });
   } catch {
     /* error in lastError */
   }
@@ -200,38 +252,51 @@ function onPlayConfirmed(): void {
         :disabled="teleopBusy || !leaderActive"
       />
       <span class="teleop-label">
-        {{ teleopBusy ? '⏳ 전환 중…' : (liveTeleop ? '🤖 실물 동기화 ON' : '🤖 실물 동기화 OFF') }}
+        {{ teleopBusy ? '전환 중…' : (liveTeleop ? '실물 동기화 ON' : '실물 동기화 OFF') }}
       </span>
     </label>
 
-    <section class="action-group">
-      <header class="group-title">녹화</header>
-      <button
-        v-if="!isMine"
-        type="button"
-        class="btn btn-block btn-rec"
-        :disabled="props.disabled || inflight || countdown != null || !leaderActive"
-        @click="startRecording"
-      >● 녹화 시작</button>
-      <button
-        v-else
-        type="button"
-        class="btn btn-block btn-stop-save"
-        :disabled="inflight"
-        @click="stopRecording"
-      >■ 중지 · 저장</button>
-    </section>
+    <button
+      v-if="!isMine"
+      type="button"
+      class="btn btn-block btn-rec"
+      :disabled="props.disabled || inflight || countdown != null || !leaderActive"
+      @click="startRecording"
+    >
+      <Icon name="record" :size="14" />
+      녹화 시작
+    </button>
+    <button
+      v-else
+      type="button"
+      class="btn btn-block btn-stop-save"
+      :disabled="inflight"
+      @click="stopRecording"
+    >
+      <Icon name="stop" :size="14" />
+      중지 · 저장
+    </button>
 
-    <section class="action-group">
-      <header class="group-title">재생</header>
-      <button
-        type="button"
-        class="btn btn-block btn-play"
-        :class="{ 'btn-play-real': realActive }"
-        :disabled="props.disabled || inflight || isMine"
-        @click="play"
-      >▶ 재생{{ realActive ? ' (실물)' : '' }}</button>
-    </section>
+    <button
+      type="button"
+      class="btn btn-block btn-play"
+      :class="{ 'btn-play-real': realActive }"
+      :disabled="props.disabled || inflight || isMine || playStartMs !== null"
+      @click="play"
+    >
+      <Icon name="play" :size="14" />
+      재생{{ realActive ? ' (실물)' : '' }}
+    </button>
+
+    <div v-if="playStartMs !== null" class="play-progress">
+      <div class="play-bar">
+        <div class="play-fill" :style="{ width: playProgressPct + '%' }" />
+      </div>
+      <div class="play-times">
+        <span>{{ fmtTime(playElapsed) }}</span>
+        <span class="play-total">{{ fmtTime(playDuration) }}</span>
+      </div>
+    </div>
 
     <div v-if="lastError" class="err">{{ lastError }}</div>
 
@@ -294,19 +359,6 @@ function onPlayConfirmed(): void {
 }
 .status .metric + .metric { margin-left: 8px; }
 
-.action-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.group-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #94a3b8;
-  padding-left: 2px;
-}
 .btn {
   border: none;
   border-radius: 10px;
@@ -324,7 +376,15 @@ function onPlayConfirmed(): void {
 .btn-block {
   width: 100%;
   padding: 14px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
+.btn-rec :deep(.icon) { color: #b91c1c; }
+.btn-stop-save :deep(.icon) { color: #065f46; }
+.btn-play :deep(.icon) { color: #1d4ed8; }
+.btn-play-real :deep(.icon) { color: #b45309; }
 .btn-rec        { background: #fee2e2; color: #b91c1c; }
 .btn-stop-save  { background: #d1fae5; color: #065f46; }
 .btn-play       { background: #dbeafe; color: #1d4ed8; }
@@ -337,6 +397,34 @@ function onPlayConfirmed(): void {
   padding: 6px 10px;
   border-radius: 8px;
 }
+
+.play-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px 2px;
+}
+.play-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.play-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+  border-radius: 999px;
+  transition: width 0.1s linear;
+}
+.play-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+}
+.play-total { color: #94a3b8; }
 
 .teleop-toggle {
   display: flex;
@@ -365,4 +453,10 @@ function onPlayConfirmed(): void {
   accent-color: #f59e0b;
 }
 .teleop-label { flex: 1; }
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 </style>

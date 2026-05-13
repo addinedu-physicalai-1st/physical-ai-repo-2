@@ -12,6 +12,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
+import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
 import RecorderControls from './RecorderControls.vue';
 
@@ -135,12 +136,16 @@ onMounted(refresh);
 <template>
   <div class="dance-mgr">
     <header class="bar">
-      <h2>🎵 율동 등록</h2>
+      <h2>
+        <Icon name="music" :size="20" />
+        율동 등록
+      </h2>
       <button type="button" class="btn-close" @click="close">닫기</button>
     </header>
 
     <div v-if="!stateWs.leaderActive.value" class="leader-warning">
-      ⚠ <strong>리더 디바이스가 연결되어 있지 않습니다.</strong>
+      <Icon name="alert" :size="18" />
+      <strong>리더 디바이스가 연결되어 있지 않습니다.</strong>
       녹화·재생을 사용하려면 리더 디바이스를 먼저 켜주세요 —
       <code>scripts/device-eduping-leader.sh 3</code>
     </div>
@@ -172,14 +177,22 @@ onMounted(refresh);
               :class="{ selected: item.slug === selectedSlug }"
               @click="selectedSlug = item.slug"
             >
-              <div class="item-name">🎵 {{ item.display_name }}</div>
+              <div class="item-name">
+                <Icon name="music" :size="14" />
+                {{ item.display_name }}
+              </div>
               <div class="item-meta">
                 <span class="slug">{{ item.slug }}</span>
                 <span v-if="item.duration_s">{{ item.duration_s.toFixed(1) }}s</span>
                 <span v-if="item.has_song === false" class="warn">곡없음</span>
                 <span v-if="item.has_motion === false" class="warn">모션없음</span>
               </div>
-              <button type="button" class="del" @click.stop="remove(item.slug)">🗑</button>
+              <button
+                type="button"
+                class="del"
+                aria-label="삭제"
+                @click.stop="remove(item.slug)"
+              ><Icon name="trash" :size="16" /></button>
             </li>
             <li v-if="items.length === 0" class="empty">아직 등록된 율동 없음 — 새 율동으로 추가</li>
           </ul>
@@ -246,7 +259,14 @@ onMounted(refresh);
   padding: 14px 24px;
   background: rgba(219, 39, 119, 0.08);
 }
-.bar h2 { margin: 0; font-size: 22px; color: #be185d; }
+.bar h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #be185d;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .leader-warning {
   margin: 12px 24px 0;
   padding: 10px 14px;
@@ -255,6 +275,10 @@ onMounted(refresh);
   border: 1px solid #f59e0b;
   border-radius: 8px;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .leader-warning code {
   background: rgba(0, 0, 0, 0.06);
@@ -324,7 +348,13 @@ onMounted(refresh);
 }
 .item:hover { background: #fdf2f8; }
 .item.selected { border-color: #ec4899; background: #fce7f3; }
-.item-name { font-weight: 600; color: #334155; }
+.item-name {
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .item-meta {
   display: flex;
   gap: 8px;
