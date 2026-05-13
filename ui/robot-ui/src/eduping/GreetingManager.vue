@@ -8,6 +8,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
+import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
 import RecorderControls from './RecorderControls.vue';
 
@@ -22,8 +23,12 @@ interface SlotMeta {
 }
 
 const SLOT_LABELS: Record<SlotId, string> = {
-  morning: '🌅 등원 인사',
-  evening: '🌇 하원 인사',
+  morning: '등원 인사',
+  evening: '하원 인사',
+};
+const SLOT_ICONS: Record<SlotId, string> = {
+  morning: 'sunrise',
+  evening: 'sunset',
 };
 
 const mode = useModeStore();
@@ -78,12 +83,13 @@ onMounted(refresh);
 <template>
   <div class="greeting-mgr">
     <header class="bar">
-      <h2>👋 등하원 인사 설정</h2>
+      <h2>등하원 인사 설정</h2>
       <button type="button" class="btn-close" @click="close">닫기</button>
     </header>
 
     <div v-if="!stateWs.leaderActive.value" class="leader-warning">
-      ⚠ <strong>리더 디바이스가 연결되어 있지 않습니다.</strong>
+      <Icon name="alert" :size="18" />
+      <strong>리더 디바이스가 연결되어 있지 않습니다.</strong>
       녹화·재생을 사용하려면 리더 디바이스를 먼저 켜주세요 —
       <code>scripts/device-eduping-leader.sh 3</code>
     </div>
@@ -103,12 +109,16 @@ onMounted(refresh);
             :class="{ active: selected === slot }"
             @click="selected = slot"
           >
+            <Icon :name="SLOT_ICONS[slot]" :size="16" />
             {{ SLOT_LABELS[slot] }}
           </button>
         </div>
 
         <section class="slot-card">
-          <h3>{{ SLOT_LABELS[selected] }}</h3>
+          <h3>
+            <Icon :name="SLOT_ICONS[selected]" :size="18" />
+            {{ SLOT_LABELS[selected] }}
+          </h3>
 
           <div v-if="loading" class="muted">로딩…</div>
           <div v-else-if="error" class="err">{{ error }}</div>
@@ -160,6 +170,10 @@ onMounted(refresh);
   border: 1px solid #f59e0b;
   border-radius: 8px;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .leader-warning code {
   background: rgba(0, 0, 0, 0.06);
@@ -205,6 +219,10 @@ onMounted(refresh);
   color: #64748b;
   cursor: pointer;
   border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 .tab.active {
   background: white;
@@ -217,7 +235,14 @@ onMounted(refresh);
   padding: 14px;
   border-radius: 12px;
 }
-.slot-card h3 { margin: 0 0 12px 0; font-size: 18px; color: #334155; }
+.slot-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .meta {
   display: grid;
   grid-template-columns: 1fr 1fr;

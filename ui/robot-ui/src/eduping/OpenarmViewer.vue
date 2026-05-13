@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
 import { useEdupingStateWs, type JointSnapshot } from '@/composables/useEdupingStateWs';
+import Icon from '@/common/Icon.vue';
 
 const props = withDefaults(defineProps<{ source?: 'leader' | 'follower' }>(), {
   source: 'leader',
@@ -181,7 +182,10 @@ onBeforeUnmount(() => {
       {{ props.source === 'leader' ? '리더 (입력)' : '팔로워 (출력)' }}
       <span v-if="!stateWs.connected.value" class="dot-disconnected">●</span>
     </div>
-    <div v-if="stateWs.realActive.value" class="real-badge">🤖 실물 연결됨</div>
+    <div v-if="stateWs.realActive.value" class="real-badge">
+      <Icon name="robot" :size="14" />
+      <span>실물 연결됨</span>
+    </div>
   </div>
 </template>
 
@@ -245,5 +249,8 @@ onBeforeUnmount(() => {
   font-weight: 600;
   border: 1px solid #f59e0b;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>
