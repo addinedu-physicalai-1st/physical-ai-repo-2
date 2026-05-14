@@ -14,6 +14,8 @@ find_package(geometry_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Placeholder.msg"
   "srv/SendCommand.srv"
+  "srv/RouteToVertex.srv"
+  "action/NavigateToVertex.action"
   DEPENDENCIES std_msgs geometry_msgs
 )
 
