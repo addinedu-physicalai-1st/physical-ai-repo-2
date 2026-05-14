@@ -29,9 +29,20 @@ export function normalizeWakeText(text: string): string {
 /** wake word 의 alias 가 없을 때, STT 가 비슷한 음으로 잘못 옮긴 케이스를 휴리스틱으로 잡는다. */
 export function wakeHeuristicMatch(compact: string, wakeWord: string): boolean {
   if (!compact) return false;
-  if (wakeWord === '고고핑') return /(고고|꼬꼬)(핑|핀|팽|빙)/.test(compact);
-  if (wakeWord === '에듀핑') return /(에듀|애듀)(핑|핀|팽|빙)/.test(compact);
-  if (wakeWord === '노리암') return /(노리|놀이|노라)(암|아)/.test(compact);
+  // Whisper 가 한국어 단발 발화를 라틴 알파벳으로 옮기는 케이스 (예: "에듀핑" → "eduping", "Eduping")
+  // 도 호출어 성공으로 처리.
+  if (wakeWord === '고고핑') {
+    if (/(고고|꼬꼬)(핑|핀|팽|빙)/.test(compact)) return true;
+    return /(go|kko|ko){1,2}(ping|pin|peng|bing)/.test(compact);
+  }
+  if (wakeWord === '에듀핑') {
+    if (/(에듀|애듀|이듀|에두|애두)(핑|핀|팽|빙|뼁|삥)/.test(compact)) return true;
+    return /e?du(ping|pin|peng|bing)/.test(compact) || /edu\s*ping/.test(compact);
+  }
+  if (wakeWord === '노리암') {
+    if (/(노리|놀이|노라)(암|아)/.test(compact)) return true;
+    return /(no|nor|nol)(ri|li)?(am|a)/.test(compact);
+  }
   return false;
 }
 

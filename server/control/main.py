@@ -26,6 +26,7 @@ from server.control.routers import parents as parents_router
 from server.control.routers import photos as photos_router
 from server.control.routers import reports as reports_router
 from server.control.routers import schedule as schedule_router
+from server.control.routers import voice as voice_router
 from server.control.teleop.ros_bridge import RosBridge
 from server.control.teleop.router import install as install_teleop
 from server.control.waypoints.ros_bridge import WaypointsRosBridge
@@ -59,6 +60,16 @@ async def lifespan(app: FastAPI):
     teleop / noriarm bridge 는 모두 이 안에서 시작·종료한다. `lifespan` 이 지정된
     FastAPI app 에서는 @app.on_event 데코레이터가 동작하지 않으므로 혼용 금지.
     """
+    # STT 모델 백그라운드 warm-up — 첫 요청이 ~30s 걸리는 cold start 회피.
+    # 다운로드 + 로드 실패해도 routing 영향 없음, 첫 요청 시 다시 시도됨.
+    try:
+        from server.ai import stt as _stt_engine
+
+        asyncio.create_task(asyncio.to_thread(_stt_engine._get_model))
+        logger.info("STT 모델 warm-up 시작 (background)")
+    except Exception as e:
+        logger.warning(f"STT warm-up 스케줄 실패: {e}")
+
     try:
         _teleop_bridge.start()
     except Exception as e:
@@ -175,6 +186,7 @@ app.include_router(menu_router.router)
 app.include_router(photos_router.router)
 app.include_router(reports_router.router)
 app.include_router(schedule_router.router)
+app.include_router(voice_router.router)
 
 # teleop (GogoPing keyboard control) — POST /teleop/cmd_vel, WS /teleop/state, GET /teleop/health
 # install_teleop 가 라우터를 부착하고 hub 를 반환한다. 실제 start/stop 은 lifespan 에서.

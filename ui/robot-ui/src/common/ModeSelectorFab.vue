@@ -7,6 +7,7 @@ import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import WarningModal from '@/common/WarningModal.vue';
 import type { ModeTreeNode, ModeTreeGroup } from '@/config/robots';
 import { chromeAccent } from '@/config/colors';
+import { usePhoneViewport } from '@/common/usePhoneViewport';
 
 // eduping 의 이 모드들은 leader 디바이스가 필요 — 진입 전 미리 체크.
 const EDUPING_LEADER_REQUIRED = new Set(['등하원 인사 설정', '율동 등록']);
@@ -22,6 +23,18 @@ const mode = useModeStore();
 const { robot, currentMode } = storeToRefs(mode);
 
 const primary = computed(() => chromeAccent(robot.value.id));
+const isPhone = usePhoneViewport();
+
+/** 모바일: hamburger 토글 상태. 모드 선택 후 자동으로 닫힘. */
+const drawerOpen = ref(false);
+
+function toggleDrawer(): void {
+  drawerOpen.value = !drawerOpen.value;
+}
+
+function closeDrawer(): void {
+  drawerOpen.value = false;
+}
 
 const expanded = ref(new Set<string>());
 
@@ -46,7 +59,10 @@ function toggle(id: string): void {
 }
 
 async function select(id: string): Promise<void> {
-  if (id === currentMode.value) return;
+  if (id === currentMode.value) {
+    closeDrawer();
+    return;
+  }
   // eduping 의 leader-required 모드 — 진입 전 leader 연결 확인.
   if (robot.value.id === 'eduping' && EDUPING_LEADER_REQUIRED.has(id)) {
     if (!edupingStateWs.leaderActive.value) {
@@ -60,6 +76,7 @@ async function select(id: string): Promise<void> {
     }
   }
   mode.setMode(id);
+  closeDrawer();
   try {
     await postModeClick(id, robot.value.id);
   } catch { /* backend 오류는 UI에 영향 없음 */ }
@@ -91,7 +108,118 @@ watch(
 </script>
 
 <template>
-  <nav class="mode-panel" :style="{ '--primary': primary }">
+  <!-- 모바일: hamburger 토글 + 슬라이드 인 drawer -->
+  <template v-if="isPhone">
+    <button
+      class="hamburger"
+      :class="{ open: drawerOpen }"
+      :style="{ '--primary': primary }"
+      :aria-expanded="drawerOpen"
+      aria-label="모드 메뉴"
+      @click="toggleDrawer"
+    >
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+    </button>
+
+    <Transition name="backdrop-fade">
+      <div v-if="drawerOpen" class="backdrop" @click="closeDrawer" />
+    </Transition>
+
+    <Transition name="drawer-slide">
+      <nav
+        v-if="drawerOpen"
+        class="mode-panel drawer"
+        :style="{ '--primary': primary }"
+      >
+        <div class="drawer-header">
+          <span class="drawer-title">모드 선택</span>
+          <button class="drawer-close" aria-label="닫기" @click="closeDrawer">✕</button>
+        </div>
+        <div class="node-list">
+          <template v-for="node in robot.modeTree" :key="nodeId(node)">
+            <button
+              v-if="!isGroup(node)"
+              class="mode-btn"
+              :class="{ active: node === currentMode }"
+              @click="select(node)"
+            >
+              {{ node }}
+            </button>
+            <div v-else class="group-section">
+              <button
+                class="group-btn"
+                :class="{ 'has-active': containsMode(node, currentMode) }"
+                :aria-expanded="expanded.has(node.id)"
+                @click="toggle(node.id)"
+              >
+                <span>{{ node.id }}</span>
+                <span class="chevron" :class="{ open: expanded.has(node.id) }">›</span>
+              </button>
+              <Transition name="dropdown">
+                <div v-show="expanded.has(node.id)" class="sub-list">
+                  <button
+                    v-if="node.selfSelectable !== false"
+                    class="sub-btn self-btn"
+                    :class="{ active: node.id === currentMode }"
+                    @click="select(node.id)"
+                  >
+                    {{ node.id }}
+                  </button>
+                  <template v-for="child in node.children" :key="nodeId(child)">
+                    <button
+                      v-if="!isGroup(child)"
+                      class="sub-btn"
+                      :class="{ active: child === currentMode }"
+                      @click="select(child)"
+                    >
+                      {{ child }}
+                    </button>
+                    <div v-else class="subsub-section">
+                      <button
+                        class="subsub-group-btn"
+                        :class="{ 'has-active': containsMode(child, currentMode) }"
+                        :aria-expanded="expanded.has(child.id)"
+                        @click="toggle(child.id)"
+                      >
+                        <span>{{ child.id }}</span>
+                        <span class="chevron" :class="{ open: expanded.has(child.id) }">›</span>
+                      </button>
+                      <Transition name="dropdown">
+                        <div v-show="expanded.has(child.id)" class="subsub-list">
+                          <button
+                            v-if="child.selfSelectable !== false"
+                            class="subsub-btn self-btn"
+                            :class="{ active: child.id === currentMode }"
+                            @click="select(child.id)"
+                          >
+                            {{ child.id }}
+                          </button>
+                          <button
+                            v-for="sub in child.children"
+                            :key="nodeId(sub)"
+                            class="subsub-btn"
+                            :class="{ active: nodeId(sub) === currentMode }"
+                            @click="select(nodeId(sub))"
+                          >
+                            {{ nodeId(sub) }}
+                          </button>
+                        </div>
+                      </Transition>
+                    </div>
+                  </template>
+                </div>
+              </Transition>
+            </div>
+          </template>
+        </div>
+      </nav>
+    </Transition>
+  </template>
+
+  <!-- Desktop: 항상 보이는 우측 트리 패널 -->
+  <nav v-else class="mode-panel" :style="{ '--primary': primary }">
     <div class="node-list">
       <template v-for="node in robot.modeTree" :key="nodeId(node)">
         <!-- 리프 모드 -->
@@ -201,6 +329,137 @@ watch(
   padding: 20px 10px;
   z-index: 20;
   overflow-y: auto;
+}
+
+/* 모바일 hamburger 토글 — 우상단 floating action button */
+.hamburger {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  z-index: 40;
+  padding: 0;
+  backdrop-filter: blur(6px);
+  -webkit-tap-highlight-color: transparent;
+}
+.hamburger .bar {
+  width: 20px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--primary);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.hamburger.open .bar:nth-child(1) {
+  transform: translateY(7.5px) rotate(45deg);
+}
+.hamburger.open .bar:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.open .bar:nth-child(3) {
+  transform: translateY(-7.5px) rotate(-45deg);
+}
+
+/* drawer backdrop */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 30, 0.45);
+  z-index: 38;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.backdrop-fade-enter-active,
+.backdrop-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.backdrop-fade-enter-from,
+.backdrop-fade-leave-to {
+  opacity: 0;
+}
+
+/* drawer 자체 — 우측에서 슬라이드 */
+.mode-panel.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(78vw, 320px);
+  padding: 12px 10px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 64px); /* hamburger 아래 */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18);
+  z-index: 39;
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+.drawer-header {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: 14px;
+  right: 64px; /* hamburger 자리 비움 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.drawer-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #333;
+  letter-spacing: -0.3px;
+}
+.drawer-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 8px;
+  display: none; /* hamburger 회전 X 로 대체 — 별도 X 버튼 안 보임 */
+}
+
+.drawer-slide-enter-active,
+.drawer-slide-leave-active {
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+.drawer-slide-enter-from,
+.drawer-slide-leave-to {
+  transform: translateX(100%);
+}
+
+/* drawer 안 모드 버튼은 폰 사이즈 — 데스크톱 트리 스타일 그대로 두되 조금 더 큰 탭 영역 */
+.mode-panel.drawer .mode-btn,
+.mode-panel.drawer .group-btn {
+  font-size: 15px;
+  padding: 13px 14px;
+  min-height: 46px;
+}
+.mode-panel.drawer .sub-btn,
+.mode-panel.drawer .subsub-group-btn {
+  font-size: 14px;
+  padding: 11px 12px;
+  min-height: 42px;
+}
+.mode-panel.drawer .subsub-btn {
+  font-size: 13px;
+  padding: 10px 11px;
+  min-height: 38px;
 }
 
 .node-list {

@@ -65,11 +65,17 @@ export const WAKE_WORD_VARIANT_MAP: { variant: string; canonical: string }[] =
     ...c.wakeWordAliases.map((a) => ({ variant: a, canonical: c.wakeWord })),
   ]);
 
+/** URL `?robot=<id>` 우선, 없으면 `VITE_ROBOT`, 둘 다 없으면 'gogoping'. 휴대전화 진입 시 같은 빌드로 로봇 선택. */
 export function getCurrentRobot(): RobotConfig {
-  const id = (import.meta.env.VITE_ROBOT ?? 'gogoping') as RobotId;
-  const config = ROBOT_CONFIGS[id];
+  let id: string | null = null;
+  if (typeof window !== 'undefined') {
+    id = new URLSearchParams(window.location.search).get('robot');
+  }
+  id = id ?? (import.meta.env.VITE_ROBOT as string | undefined) ?? 'gogoping';
+  const config = ROBOT_CONFIGS[id as RobotId];
   if (!config) {
-    throw new Error(`Unknown VITE_ROBOT="${id}". Use eduping | gogoping | noriarm.`);
+    console.warn(`Unknown robot="${id}", falling back to gogoping. Use eduping | gogoping | noriarm.`);
+    return ROBOT_CONFIGS.gogoping;
   }
   return config;
 }
