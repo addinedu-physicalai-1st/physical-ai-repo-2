@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+
+<!--
+  graph_router_node 만 단독 실행 (Nav2 / 로봇 / 시뮬은 별도 launch).
+  사용:
+    ros2 launch gogoping_navigation graph_router.launch.xml
+    ros2 service call /graph_router/route gogoping_msgs/srv/RouteToVertex \
+        "{target_name: '충전소', start: {x: 0.0, y: 0.0, z: 0.0}}"
+-->
+
+<launch>
+  <arg name="waypoints_yaml"
+       default="$(find-pkg-share gogoping_navigation)/config/waypoints.yaml"/>
+  <arg name="lanes_yaml"
+       default="$(find-pkg-share gogoping_navigation)/config/lanes.yaml"/>
+  <arg name="odom_topic" default="/odom"/>
+  <arg name="follow_action" default="/follow_waypoints"/>
+  <arg name="frame_id" default="map"/>
+
+  <node pkg="gogoping_navigation" exec="graph_router_node"
+        name="graph_router" output="screen">
+    <param name="waypoints_yaml" value="$(var waypoints_yaml)"/>
+    <param name="lanes_yaml" value="$(var lanes_yaml)"/>
+    <param name="odom_topic" value="$(var odom_topic)"/>
+    <param name="follow_action" value="$(var follow_action)"/>
+    <param name="frame_id" value="$(var frame_id)"/>
+  </node>
+</launch>
