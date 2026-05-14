@@ -75,7 +75,28 @@ ros2 action send_goal /graph_router/navigate_to_vertex \
 
 server 의 [ros_bridge.py](../../../../server/control/waypoints/ros_bridge.py) 가 ROS service/action client 보유. `route_to(name)` (동기) / `navigate_to_vertex(name, goal_id)` (비동기 + SSE).
 
-### D. Admin UI (PyQt) 사용자 인터랙션
+### D. robot-ui 음성/텍스트 (보조 모드)
+
+[ui/robot-ui/src/composables/useVoiceController.ts](../../../../ui/robot-ui/src/composables/useVoiceController.ts) + [server/ai/hub.py](../../../../server/ai/hub.py)
+
+```
+"고고핑 운동장11로 가"
+   ↓ STT
+robot-ui → POST /api/voice/intent
+   ↓
+server/ai/hub.py 분류기 (_try_goto_vertex)
+   ↓ 응답
+{kind: "goto_vertex", name: "운동장11"}
+   ↓
+robot-ui handler → POST /waypoints/navigate {name: "운동장11"}
+   ↓
+(이하 C 와 동일)
+```
+
+- 보조 모드의 `restrictedVoiceMode` 우회 키워드: `"로 가|로 이동|에 가|로 갑|에 갑|로 갈|에 갈| 가자| 가줘"` 또는 `"복귀|돌아가|돌아와|충전소|충전 ?하러"`
+- vertex name 매칭 실패 시 LLM chat fallback (분류기 내부)
+
+### E. Admin UI (PyQt) 사용자 인터랙션
 
 [ui/admin-ui/widgets/waypoint_map_card.py](../../../../ui/admin-ui/widgets/waypoint_map_card.py)
 

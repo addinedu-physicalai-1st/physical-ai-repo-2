@@ -42,6 +42,12 @@ export default defineConfig(({ mode }) => {
               // (vision 스트리밍 추론 등). HTTP / WS 같은 prefix 공유.
               ws: true,
             },
+            // graph routing — Control 의 waypoints router (prefix /waypoints).
+            // goto_vertex intent 받으면 robot-ui 가 /waypoints/navigate 호출.
+            '/waypoints': {
+              target: controlTarget,
+              changeOrigin: true,
+            },
           },
     },
     // Pure 유틸 (wakeMatcher 등) 만 테스트하므로 jsdom 불필요. globals 도 import 로 명시.

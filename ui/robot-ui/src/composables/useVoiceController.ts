@@ -435,8 +435,15 @@ export function useVoiceController(robot: RobotConfig): {
     allowRestrictedBypassOnce = false;
     const restricted = robot.restrictedVoiceMode === mode.currentMode;
     const hasModeKeyword = robot.modes.some((m) => m && text.includes(m));
-    if (restricted && !bypassRestricted && !isStopIntent(text) && !hasModeKeyword) {
-      // 보조 모드: 정지 의도 외 발화는 의도 분류 건너뛰고 직전 동작 재개 신호
+    // 보조 모드라도 graph routing / 복귀 발화는 통과 — 사용자가 명시적으로 의도한 명령
+    const hasGotoPattern =
+      /(로 가|로 이동|에 가|로 갑|에 갑|로 갈|에 갈| 가자| 가줘)/.test(text);
+    const isReturnIntent = /복귀|돌아가|돌아와|충전소|충전 ?하러/.test(text);
+    if (
+      restricted && !bypassRestricted && !isStopIntent(text) && !hasModeKeyword
+      && !hasGotoPattern && !isReturnIntent
+    ) {
+      // 보조 모드: 위 의도 모두 아님 → 분류기 건너뛰고 직전 동작 재개 신호
       mode.setProximityHalt(false);
       enterCooldown();
       return;
@@ -464,6 +471,41 @@ export function useVoiceController(robot: RobotConfig): {
         pendingEmotion = null;
         mode.currentEmotion = idleEmotion;
 
+        enterCooldown();
+      } else if (response.kind === 'goto_vertex') {
+        // graph routing — Control 의 /waypoints/navigate 호출 (vite proxy → :8000)
+        try {
+          const r = await fetch('/waypoints/navigate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: response.name }),
+          });
+          if (r.ok) {
+            await tts.speak(`${response.name}으로 갈게요`);
+          } else {
+            await tts.speak(`${response.name}을(를) 찾지 못했어요`);
+          }
+        } catch {
+          await tts.speak('지금은 이동할 수 없어요');
+        }
+        enterCooldown();
+      } else if (response.kind === 'sub_command' && response.action === 'return') {
+        // 복귀 = 충전소 vertex 로 graph navigate.
+        // (FSM RETURNING state 통합 시 별도 SendCommand srv 호출로 교체 — 지금은 충전소 직행)
+        try {
+          const r = await fetch('/waypoints/navigate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: '충전소' }),
+          });
+          if (r.ok) {
+            await tts.speak('충전소로 갈게요');
+          } else {
+            await tts.speak('충전소를 찾지 못했어요');
+          }
+        } catch {
+          await tts.speak('지금은 복귀할 수 없어요');
+        }
         enterCooldown();
       } else {
         voice.setRobotReply('');

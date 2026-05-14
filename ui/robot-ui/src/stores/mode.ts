@@ -56,6 +56,10 @@ export const useModeStore = defineStore('mode', () => {
         break;
       case 'sub_command':
         if (response.action === 'stop') proximityHalt.value = true;
+        // 'return' (RETURNING trigger) 은 ROS 측에서 처리. mode store 는 변경 없음.
+        break;
+      case 'goto_vertex':
+        // graph routing 은 useVoiceController 가 별도 fetch 로 처리. mode 변경 없음.
         break;
       case 'chat':
       case 'ignored':

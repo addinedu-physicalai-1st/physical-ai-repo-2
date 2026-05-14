@@ -86,7 +86,13 @@ class ModeChange(BaseModel):
 
 class SubCommand(BaseModel):
     kind: Literal["sub_command"] = "sub_command"
-    action: Literal["stop"]
+    action: Literal["stop", "return"]
+
+
+class GotoVertex(BaseModel):
+    """vertex 이름으로 graph routing 이동 — gogoping 보조 모드 전용."""
+    kind: Literal["goto_vertex"] = "goto_vertex"
+    name: str
 
 
 class Chat(BaseModel):
@@ -120,6 +126,64 @@ def _needs_chat_fallback(user_text: str, reply: str) -> bool:
     if len(r) <= max(8, len(u) + 2) and (u in r or r in u):
         return True
     return False
+
+
+# ── 복귀 ("돌아가" / "복귀" / "충전") ──────────────────────────────────────
+_RETURN_TOKENS = ("복귀", "돌아가", "돌아와", "충전소", "충전하러", "충전 하러")
+
+
+def _is_return_text(text: str) -> bool:
+    """RETURNING state 진입 trigger 발화 매칭."""
+    t = text.strip()
+    if not t:
+        return False
+    return any(tok in t for tok in _RETURN_TOKENS)
+
+
+# ── "X로 가" / "X로 이동해줘" — vertex name 추출 ────────────────────────────
+_GOTO_PATTERNS = (
+    "로 가",
+    "로 이동",
+    "에 가",
+    "로 갑",
+    "에 갑",
+    "로 갈",
+    "에 갈",
+    "로 향",
+    "로 와",
+    "에 와",
+    " 가자",
+    " 가줘",
+    " 가",
+)
+
+
+def _load_vertex_names() -> list[str]:
+    """waypoints.yaml 의 vertex name 목록. yaml read 는 가벼움 (한 번에 < 1ms)."""
+    try:
+        from server.control.waypoints import yaml_store as ys
+        wps, _ = ys.load()
+        return [w.name for w in wps]
+    except Exception:
+        return []
+
+
+def _try_goto_vertex(text: str) -> str | None:
+    """발화에 vertex name + goto 패턴이 모두 있으면 vertex name 반환.
+
+    매칭 우선순위: 더 긴 vertex name 먼저 (예: '운동장11' 이 '운동장' 보다 먼저).
+    """
+    t = text.strip()
+    if not t:
+        return None
+    # goto 패턴이 하나라도 있어야
+    if not any(p in t for p in _GOTO_PATTERNS):
+        return None
+    names = sorted(_load_vertex_names(), key=len, reverse=True)
+    for name in names:
+        if name and name in t:
+            return name
+    return None
 
 
 def _is_gender_question(text: str) -> bool:
@@ -226,6 +290,17 @@ async def voice_intent(req: IntentRequest) -> dict:
     # 정지 의도는 명확하므로 LLM 우회 (비용·latency 절감)
     if _is_stop_text(text):
         return {"kind": "sub_command", "action": "stop"}
+
+    # 복귀 / 충전 (gogoping 만 의미 있음 — 다른 로봇은 ignored)
+    if req.robot == "gogoping" and _is_return_text(text):
+        return {"kind": "sub_command", "action": "return"}
+
+    # vertex 이동 ("X로 가") — gogoping 보조 모드 전용. graph_router 가 처리.
+    # mode_change 매칭 전에 시도 (vertex 이름이 mode 와 겹치지 않으면 안전).
+    if req.robot == "gogoping":
+        vname = _try_goto_vertex(text)
+        if vname is not None:
+            return {"kind": "goto_vertex", "name": vname}
 
     # 점심 메뉴 질문은 DB 직접 조회로 우회 (latency 절감)
     _menu_tokens = ("점심", "메뉴", "급식")

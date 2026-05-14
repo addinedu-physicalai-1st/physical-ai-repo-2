@@ -2,7 +2,8 @@ import type { EmotionId, RobotId } from '@/config/robots';
 
 export type IntentResponse =
   | { kind: 'mode_change'; mode: string }
-  | { kind: 'sub_command'; action: string }
+  | { kind: 'sub_command'; action: 'stop' | 'return' }
+  | { kind: 'goto_vertex'; name: string }
   | { kind: 'chat'; reply: string; emotion: EmotionId }
   | { kind: 'ignored' };
 
