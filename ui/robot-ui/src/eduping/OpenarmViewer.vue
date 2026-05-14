@@ -8,7 +8,7 @@
  * - 백엔드 joint 명 (joint_1..joint_7, gripper) → URDF 명 (openarm_joint1..7,
  *   openarm_finger_joint1) 매핑.
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
@@ -109,6 +109,11 @@ function applyJointState(snap: JointSnapshot | null): void {
 function startAnimation(): void {
   const tick = () => {
     animationId = requestAnimationFrame(tick);
+    // 매 프레임 현재 source 채널을 읽어서 적용. watch 기반 reactivity 가 두 번째 재생부터
+    // 업데이트를 놓치는 경우가 있어 (Vue 3.5 + ref 재할당 + source toggle 조합), render loop
+    // 폴링으로 우회. applyJointState 는 setJointValue idempotent — 같은 값이면 no-op.
+    const snap = props.source === 'follower' ? stateWs.follower.value : stateWs.leader.value;
+    applyJointState(snap);
     controls?.update();
     if (renderer && scene && camera) renderer.render(scene, camera);
   };
@@ -128,12 +133,6 @@ function setupResize(): void {
   });
   resizeObserver.observe(containerRef.value);
 }
-
-watch(
-  () => (props.source === 'follower' ? stateWs.follower.value : stateWs.leader.value),
-  (snap) => applyJointState(snap),
-  { deep: false },
-);
 
 onMounted(() => {
   if (!containerRef.value) return;

@@ -113,6 +113,9 @@ class AttendanceCheckResult(BaseModel):
     type: str
     time: datetime
     already: bool  # 이미 같은 날 같은 type 기록이 있어 중복이면 True
+    # 실물 팔로워 인사 모션 트리거 결과 (신규 기록일 때만 채움; 중복이면 None).
+    # 값 예시: "fired" / "skipped:no_bridge" / "skipped:no_real_arm" / "skipped:routine_missing"
+    arm_status: str | None = None
 
 
 class RegisterParentPayload(BaseModel):
