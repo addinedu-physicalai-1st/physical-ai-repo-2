@@ -15,6 +15,8 @@ FSM 및 Behavior Tree 관련 모든 설계는 [docs/](docs/) 디렉토리에 있
 | [docs/fsm-triggers.md](docs/fsm-triggers.md) | FSM trigger 이름 / kwargs / 전이 다이어그램 |
 | [docs/conventions.md](docs/conventions.md) | `context.py` / behavior DI / `main.py` BT swap 패턴 + 코딩 체크리스트 |
 | [docs/py-trees-spike.md](docs/py-trees-spike.md) | py_trees Parallel + Monitor RUNNING 동작 검증 (30분 spike, 본격 코딩 전 1회) |
+| [docs/graph-routing.md](docs/graph-routing.md) | vertex/lane 그래프 + 다익스트라 — 어디서 어떻게 호출하나 (BT / ROS / REST / Admin UI) |
+| [docs/bt/](docs/bt/) | BT 트리/behavior 별 상세 — `bt/behaviors/<category>.md` (입출력 blackboard·액션) + `bt/trees/<tree>.md` (root composite·trigger 매트릭스). 새 behavior/트리 추가 시 갱신 컨벤션은 [docs/bt/README.md](docs/bt/README.md) 참조 |
 
 ROS 서비스 / 메시지 계약은 `src/gogoping/gogoping_msgs/{srv,msg,action}/` 의 `.srv` / `.msg` 파일이 **곧 spec** — 외부 (UI / Control Server) 와의 인터페이스 변경 시 여기부터.
 
