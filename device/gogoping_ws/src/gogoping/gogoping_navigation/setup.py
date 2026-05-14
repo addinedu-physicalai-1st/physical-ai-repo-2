@@ -47,6 +47,7 @@ setup(
     entry_points={
         'console_scripts': [
             'echo_pose = gogoping_navigation.echo_pose:main',
+            'graph_router_node = gogoping_navigation.graph_router_node:main',
         ],
     },
 )
