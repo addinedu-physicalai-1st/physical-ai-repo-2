@@ -17,7 +17,7 @@ from threading import Lock
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
-from nav2_msgs.action import FollowWaypoints
+from nav2_msgs.action import NavigateThroughPoses
 from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient, ActionServer
 from rclpy.action.server import ServerGoalHandle
@@ -41,9 +41,9 @@ class GraphRouterNode(Node):
             "lanes_yaml", str(share / "config" / "lanes.yaml")
         ).value)
         self._frame_id = self.declare_parameter("frame_id", "map").value
-        self._odom_topic = self.declare_parameter("odom_topic", "/odom").value
+        self._odom_topic = self.declare_parameter("odom_topic", "/gogoping/odom").value
         self._follow_action = self.declare_parameter(
-            "follow_action", "/follow_waypoints"
+            "follow_action", "/navigate_through_poses"
         ).value
 
         self._graph = Graph.from_yaml(wp_path, lanes_path=lanes_path)
@@ -64,7 +64,7 @@ class GraphRouterNode(Node):
             callback_group=cb,
         )
         self._nav_ac: ActionClient = ActionClient(
-            self, FollowWaypoints, self._follow_action, callback_group=cb,
+            self, NavigateThroughPoses, self._follow_action, callback_group=cb,
         )
         self._action_server = ActionServer(
             self,
@@ -165,16 +165,29 @@ class GraphRouterNode(Node):
             result.message = f"nav2 action server '{self._follow_action}' not available"
             return result
 
-        nav_goal = FollowWaypoints.Goal()
+        nav_goal = NavigateThroughPoses.Goal()
         nav_goal.poses = poses
 
         last_idx = 0
 
-        def _on_nav_feedback(fb_msg) -> None:
+        def _on_nav_feedback(_fb_msg) -> None:
+            """NavigateThroughPoses 의 feedback 에는 current_waypoint 없음.
+            odom 으로 sequence 안 nearest vertex 인덱스 추정."""
             nonlocal last_idx
-            idx = int(fb_msg.feedback.current_waypoint)
-            last_idx = idx
-            self._publish_feedback(gh, seq, idx)
+            cur = self._current_xy()
+            if cur is None:
+                return
+            cx, cy = cur
+            best_i, best_d = last_idx, float("inf")
+            for i, name in enumerate(seq):
+                v = self._graph.vertices[name]
+                d = (v.x - cx) ** 2 + (v.y - cy) ** 2
+                if d < best_d:
+                    best_d, best_i = d, i
+            # 단조 증가 — 뒤로 안 감
+            if best_i >= last_idx:
+                last_idx = best_i
+            self._publish_feedback(gh, seq, last_idx)
 
         send_future = self._nav_ac.send_goal_async(
             nav_goal, feedback_callback=_on_nav_feedback
@@ -190,14 +203,14 @@ class GraphRouterNode(Node):
         # 최종 결과 대기
         get_result_future = nav_gh.get_result_async()
         await get_result_future
-        nav_result = get_result_future.result().result
-        # FollowWaypoints.Result: missed_waypoints (uint32[])
-        missed = list(getattr(nav_result, "missed_waypoints", []))
+        wrapper = get_result_future.result()
+        # action_msgs/GoalStatus: 4=SUCCEEDED
+        succeeded = wrapper.status == 4
 
-        if missed:
+        if not succeeded:
             gh.abort()
             result.success = False
-            result.message = f"missed waypoints: {missed}"
+            result.message = f"nav2 status={wrapper.status}"
             result.final_vertex = seq[last_idx] if last_idx < len(seq) else target
             return result
 

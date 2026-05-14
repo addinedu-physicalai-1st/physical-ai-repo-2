@@ -62,6 +62,5 @@ lanes:
   - {from: "놀이방입구2", to: "놀이방7", bidirectional: true}
   - {from: "수면실입구", to: "수면실7", bidirectional: true}
   - {from: "수면실입구", to: "복도7", bidirectional: true}
-  - {from: "놀이방입구2", to: "수면실입구", bidirectional: true}
   - {from: "놀이방입구1", to: "복도2", bidirectional: true}
   - {from: "놀이방입구2", to: "복도6", bidirectional: true}
