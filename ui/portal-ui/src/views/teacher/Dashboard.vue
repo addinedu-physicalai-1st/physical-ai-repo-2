@@ -17,6 +17,40 @@ const menu = ref<MenuEntry | null>(null)
 const pendingReports = ref<Report[]>([])
 const schedule = ref<Record<string, string>>({})
 const loading = ref(true)
+/** 진행 중인 디버그 리셋 — AttendanceGrid 가 버튼 disable 용으로 받음. */
+const resettingKeys = ref<Set<string>>(new Set())
+
+async function onResetAttendance(payload: {
+  childId: number
+  childName: string
+  type: 'IN' | 'OUT'
+}): Promise<void> {
+  const key = `${payload.childId}:${payload.type}`
+  if (resettingKeys.value.has(key)) return
+  resettingKeys.value = new Set([...resettingKeys.value, key])
+  try {
+    await api.delete(
+      `/api/attendance/${payload.childId}?date=${today}&type=${payload.type}`,
+    )
+    // 로컬 records 의 해당 timestamp 만 비워서 즉시 반영 (전체 refetch 불필요).
+    records.value = records.value.map((r) => {
+      if (r.child_id !== payload.childId) return r
+      return payload.type === 'IN'
+        ? { ...r, check_in: null }
+        : { ...r, check_out: null }
+    })
+  } catch (e) {
+    window.alert(
+      `${payload.childName} 어린이의 ${payload.type === 'IN' ? '등원' : '하원'} ` +
+        `리셋에 실패했어요. 잠시 후 다시 시도해 주세요.`,
+    )
+    console.warn('[Dashboard] reset attendance failed', e)
+  } finally {
+    const next = new Set(resettingKeys.value)
+    next.delete(key)
+    resettingKeys.value = next
+  }
+}
 
 // Lunch image state
 const lunchImageUrl = ref<string | null>(null)
@@ -188,7 +222,12 @@ const pendingReportCards = computed(() =>
           <span>반 명단</span>
         </div>
       </template>
-      <AttendanceGrid v-if="records.length" :records="records" />
+      <AttendanceGrid
+        v-if="records.length"
+        :records="records"
+        :resetting-keys="resettingKeys"
+        @reset="onResetAttendance"
+      />
       <BaseEmptyState
         v-else
         icon="users-round"

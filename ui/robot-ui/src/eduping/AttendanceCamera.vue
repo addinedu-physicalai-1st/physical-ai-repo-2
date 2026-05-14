@@ -22,9 +22,25 @@ const videoRef = ref<HTMLVideoElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const status = ref<string>('');
-const lastResult = ref<{ name: string; type: 'IN' | 'OUT'; already: boolean } | null>(
-  null,
-);
+const lastResult = ref<{
+  name: string;
+  type: 'IN' | 'OUT';
+  already: boolean;
+  /** 서버 응답의 arm_status — "fired" 면 표시 안 함, "skipped:..." 면 사유를 한국어로 노출. */
+  armStatus: string | null;
+} | null>(null);
+
+/** 서버의 arm_status 코드(스키마 참조)를 교사용 한국어 메시지로 변환. */
+function armSkipMessage(code: string | null): string | null {
+  if (!code || code === 'fired') return null;
+  if (code === 'skipped:no_bridge') return '팔 인사 생략 — 서버에 로봇 브릿지가 없어요';
+  if (code === 'skipped:no_real_arm') return '팔 인사 생략 — 실물 팔이 연결돼 있지 않아요';
+  if (code === 'skipped:routine_missing:morning') return '팔 인사 생략 — 등원 인사 녹화가 없어요';
+  if (code === 'skipped:routine_missing:evening') return '팔 인사 생략 — 하원 인사 녹화가 없어요';
+  if (code.startsWith('skipped:routine_missing:')) return '팔 인사 생략 — 인사 녹화가 없어요';
+  if (code.startsWith('skipped:')) return `팔 인사 생략 — ${code.slice('skipped:'.length)}`;
+  return null;
+}
 
 let stream: MediaStream | null = null;
 let faceMesh: FaceMesh | null = null;
@@ -60,6 +76,9 @@ interface CheckResult {
   type: 'IN' | 'OUT';
   time: string;
   already: boolean;
+  /** 신규 기록일 때 server 가 실물 팔로워 인사 모션을 trigger 한 결과.
+   *  중복(already=true) 이거나 server 가 구버전이면 null. */
+  arm_status: string | null;
 }
 
 async function setupCamera(): Promise<void> {
@@ -200,6 +219,7 @@ async function runRecognize(): Promise<void> {
       name: checked.child_name,
       type: checked.type,
       already: checked.already,
+      armStatus: checked.arm_status ?? null,
     };
     childCooldowns.set(checked.child_id, Date.now() + COOLDOWN_MS);
     status.value = '';
@@ -274,6 +294,13 @@ onBeforeUnmount(teardown);
           {{ lastResult.type === 'IN' ? '등원했어요!' : '하원했어요!' }}
         </span>
       </div>
+      <p
+        v-if="lastResult && armSkipMessage(lastResult.armStatus)"
+        class="arm-note"
+        role="status"
+      >
+        {{ armSkipMessage(lastResult.armStatus) }}
+      </p>
     </div>
   </div>
 </template>
@@ -351,5 +378,16 @@ onBeforeUnmount(teardown);
 }
 .result strong {
   font-size: 16px;
+}
+.arm-note {
+  margin: 0;
+  padding: 6px 10px;
+  background: #fff4e5;
+  color: #8a4b00;
+  border: 1px solid #f0c98a;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
 }
 </style>

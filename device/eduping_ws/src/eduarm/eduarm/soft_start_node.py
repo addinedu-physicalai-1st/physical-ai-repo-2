@@ -14,6 +14,7 @@ launch 의 TimerAction (delay) 으로 controller spawn 이후 한 번만 실행�
 from __future__ import annotations
 
 import time
+from collections import deque
 
 import rclpy
 from builtin_interfaces.msg import Duration
@@ -28,6 +29,7 @@ RIGHT_NAMES = [f"openarm_right_joint{i}" for i in range(1, 8)]
 LEFT_NAMES = [f"openarm_left_joint{i}" for i in range(1, 8)]
 DEFAULT_RAMP_S = 2.0
 DEFAULT_TIMEOUT_S = 10.0
+DEFAULT_JS_AVG_SAMPLES = 10
 
 
 class SoftStart(Node):
@@ -35,9 +37,11 @@ class SoftStart(Node):
         super().__init__("eduping_soft_start")
         self.declare_parameter("ramp_s", DEFAULT_RAMP_S)
         self.declare_parameter("timeout_s", DEFAULT_TIMEOUT_S)
+        self.declare_parameter("js_avg_samples", DEFAULT_JS_AVG_SAMPLES)
         self._ramp_s = float(self.get_parameter("ramp_s").value)
         self._timeout_s = float(self.get_parameter("timeout_s").value)
-        self._last_js: JointState | None = None
+        self._n_avg = max(1, int(self.get_parameter("js_avg_samples").value))
+        self._js_samples: deque[JointState] = deque(maxlen=self._n_avg)
         self.create_subscription(JointState, "/joint_states", self._on_js, 10)
         self._ac_right = ActionClient(
             self,
@@ -51,23 +55,37 @@ class SoftStart(Node):
         )
 
     def _on_js(self, msg: JointState) -> None:
-        self._last_js = msg
+        self._js_samples.append(msg)
 
     def _wait_for_js(self) -> bool:
         deadline = time.monotonic() + self._timeout_s
-        self.get_logger().info("waiting for /joint_states ...")
-        while rclpy.ok() and self._last_js is None and time.monotonic() < deadline:
-            rclpy.spin_once(self, timeout_sec=0.1)
-        return self._last_js is not None
+        self.get_logger().info(
+            f"waiting for {self._n_avg} /joint_states samples ..."
+        )
+        while (
+            rclpy.ok()
+            and len(self._js_samples) < self._n_avg
+            and time.monotonic() < deadline
+        ):
+            rclpy.spin_once(self, timeout_sec=0.05)
+        return len(self._js_samples) > 0
 
     def _extract(self, names: list[str]) -> list[float] | None:
-        js = self._last_js
-        if js is None:
+        if not self._js_samples:
             return None
-        try:
-            return [float(js.position[js.name.index(n)]) for n in names]
-        except (ValueError, IndexError):
+        accum = [0.0] * len(names)
+        count = 0
+        for js in self._js_samples:
+            try:
+                vals = [float(js.position[js.name.index(n)]) for n in names]
+            except (ValueError, IndexError):
+                continue
+            for i, v in enumerate(vals):
+                accum[i] += v
+            count += 1
+        if count == 0:
             return None
+        return [a / count for a in accum]
 
     def _send_hold(self, side: str, names: list[str], ac: ActionClient) -> None:
         pos = self._extract(names)
@@ -79,18 +97,30 @@ class SoftStart(Node):
         if not ac.wait_for_server(timeout_sec=self._timeout_s):
             self.get_logger().warn(f"{side}: trajectory action server 미가동 — skip")
             return
-        goal = FollowJointTrajectory.Goal()
-        goal.trajectory.joint_names = list(names)
-        pt = JointTrajectoryPoint()
-        pt.positions = pos
+        # quintic 보간 + zero-velocity anchor: t=0 과 t=ramp_s 두 점 모두
+        # 같은 위치 + velocity/acceleration = 0 으로 명시. controller 가 양 끝에서
+        # jerk=0 인 spline 으로 풀어줌.
+        n = len(names)
+        zeros = [0.0] * n
         sec = int(self._ramp_s)
         nsec = int((self._ramp_s - sec) * 1e9)
-        pt.time_from_start = Duration(sec=sec, nanosec=nsec)
-        goal.trajectory.points.append(pt)
+        anchor = JointTrajectoryPoint()
+        anchor.positions = pos
+        anchor.velocities = zeros
+        anchor.accelerations = zeros
+        anchor.time_from_start = Duration(sec=0, nanosec=0)
+        end = JointTrajectoryPoint()
+        end.positions = pos
+        end.velocities = zeros
+        end.accelerations = zeros
+        end.time_from_start = Duration(sec=sec, nanosec=nsec)
+        goal = FollowJointTrajectory.Goal()
+        goal.trajectory.joint_names = list(names)
+        goal.trajectory.points = [anchor, end]
         ac.send_goal_async(goal)
         self.get_logger().info(
             f"{side}: hold-pose goal sent (ramp={self._ramp_s:.2f}s, "
-            f"pose={[round(p, 3) for p in pos]})"
+            f"avg_n={self._n_avg}, pose={[round(p, 3) for p in pos]})"
         )
 
     def run(self) -> None:

@@ -93,6 +93,52 @@ async def test_other_childs_photos_returns_404(
     assert response.status_code == 404
 
 
+async def test_my_child_photos_date_filter_uses_kst_boundary(
+    client: AsyncClient, make_user, db_session
+):
+    """`?date=YYYY-MM-DD` 는 KST 자정 기준으로 필터링한다 (보고서 생성과 동일 경계).
+
+    회귀 방지: 이전엔 `func.date(taken_at)` (세션 TZ=UTC) 로 평가돼 자정~09시 KST
+    사진이 누락됐고, 그 결과 보고서엔 이벤트가 있으나 portal UI 의 photos 캐시는
+    비어 thumbnail 이 안 떴다.
+    """
+    from server.db.models import Child, ParentChild, Photo, PhotoSubject
+
+    parent = await make_user("p@x.com", "test1234", role="parent")
+    child = Child(name="A", birth_date=date(2021, 1, 1), class_name="햇살반",
+                  photo_url=None, created_at=datetime.now(timezone.utc))
+    db_session.add(child)
+    await db_session.flush()
+    db_session.add(ParentChild(parent_id=parent.id, child_id=child.id))
+
+    # 2026-05-14 01:49 KST = 2026-05-13 16:49 UTC
+    # UTC date 로 자르면 '2026-05-13', KST date 로 자르면 '2026-05-14'.
+    kst_2026_05_14_early = datetime(2026, 5, 13, 16, 49, 43, tzinfo=timezone.utc)
+    photo = Photo(child_id=child.id, url="https://picsum.photos/seed/early-kst/400",
+                  taken_at=kst_2026_05_14_early, emotion="happy", mode="ox-quiz")
+    db_session.add(photo)
+    await db_session.flush()
+    db_session.add(PhotoSubject(photo_id=photo.id, child_id=child.id))
+    await db_session.flush()
+
+    await client.post(
+        "/api/auth/cookie/login",
+        data={"username": "p@x.com", "password": "test1234"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+    # 보고서 날짜 (KST) 기준 — 사진이 반환돼야 한다.
+    response = await client.get(f"/api/children/{child.id}/photos?date=2026-05-14")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1, "01:49 KST 사진이 KST 일자 보고서에 매칭돼야 함"
+
+    # UTC 일자(2026-05-13) 로 조회하면 비어 있어야 한다 — 같은 사진이 두 일자에 잡히면 곤란.
+    response_utc = await client.get(f"/api/children/{child.id}/photos?date=2026-05-13")
+    assert response_utc.status_code == 200
+    assert response_utc.json() == []
+
+
 async def test_natural_upload_creates_photo(client: AsyncClient, db_session, tmp_path, monkeypatch):
     """자연 촬영 업로드 — JPEG 받아 디스크 + DB 저장."""
     from server.control import config as config_module
