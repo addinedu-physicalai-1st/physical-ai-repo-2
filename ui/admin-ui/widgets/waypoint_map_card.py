@@ -246,7 +246,7 @@ class MapView(QWidget):
             for w in self._waypoints:
                 p = self._map_to_widget(w["x"], w["y"])
                 is_current = (w["name"] == self._current_name)
-                r = (10 if is_current else 7) * z
+                r = (5 if is_current else 3.5) * z
                 qp.setPen(QPen(QColor("#1A6B8A"), 2 * z))
                 qp.setBrush(QBrush(QColor("#00A86B" if is_current else "#5BB9E0")))
                 qp.drawEllipse(p, r, r)
