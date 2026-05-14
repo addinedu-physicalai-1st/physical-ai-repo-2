@@ -24,6 +24,11 @@ class GotoBody(BaseModel):
     name: str = Field(..., min_length=1)
 
 
+class RouteBody(BaseModel):
+    """다익스트라 경로 조회 / 시작 요청. name 은 목적지 vertex name."""
+    name: str = Field(..., min_length=1)
+
+
 class GotoPoseBody(BaseModel):
     """RViz Nav2 Goal 패턴 — 좌표 직접 지정 (클릭-드래그 인터랙션용).
     yaml 에 저장 안 함, 단발 NavigateToPose 만."""
@@ -52,6 +57,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
                 for w in wps
             ],
             "patrols": patrols,
+            "lanes": ys.load_lanes(),
         }
 
     @router.post("", status_code=201)
@@ -142,6 +148,21 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
                 for m in members
             ],
         }
+
+    @router.post("/route")
+    def route(body: RouteBody) -> dict:
+        """다익스트라 경로 조회 (시각화/디버깅용). 로봇 안 움직임."""
+        result = bridge.route_to(body.name)
+        if not result["success"]:
+            raise HTTPException(404, result["message"])
+        return result
+
+    @router.post("/navigate", status_code=202)
+    def navigate(body: RouteBody) -> dict:
+        """vertex 이름으로 graph routing 시작 — 다익스트라 경로 따라 nav2 위임."""
+        goal_id = uuid4().hex
+        bridge.navigate_to_vertex(body.name, goal_id)
+        return {"goal_id": goal_id, "name": body.name}
 
     @router.post("/cancel")
     def cancel() -> dict:

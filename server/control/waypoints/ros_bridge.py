@@ -14,6 +14,8 @@ TOPIC_PLAN = "/plan"
 TOPIC_INITIAL_POSE = "/initialpose"
 ACTION_NAV_TO_POSE = "/navigate_to_pose"
 ACTION_FOLLOW_WAYPOINTS = "/follow_waypoints"
+SRV_GRAPH_ROUTE = "/graph_router/route"
+ACTION_GRAPH_NAVIGATE = "/graph_router/navigate_to_vertex"
 ODOM_FRESH_S = 1.0
 # 자가 회복 — nav action server 연결 polling 주기
 RECONNECT_INTERVAL_S = 5.0
@@ -54,6 +56,8 @@ class WaypointsRosBridge:
         self._nav_client: Any = None
         self._patrol_client: Any = None
         self._initial_pose_pub: Any = None
+        self._route_client: Any = None
+        self._gr_nav_client: Any = None
         self._sse_listeners: list[Any] = []
         self._tf_buffer: Any = None
         self._tf_listener: Any = None
@@ -104,6 +108,14 @@ class WaypointsRosBridge:
         self._initial_pose_pub = node.create_publisher(
             PoseWithCovarianceStamped, TOPIC_INITIAL_POSE, 10,
         )
+        try:
+            from gogoping_msgs.srv import RouteToVertex
+            from gogoping_msgs.action import NavigateToVertex
+            self._route_client = node.create_client(RouteToVertex, SRV_GRAPH_ROUTE)
+            self._gr_nav_client = ActionClient(node, NavigateToVertex, ACTION_GRAPH_NAVIGATE)
+        except Exception as e:
+            # gogoping_msgs 빌드 안 됐을 수도 — graph routing 만 비활성, 다른 기능은 동작
+            node.get_logger().warn(f"graph router clients unavailable: {e}")
 
         executor = SingleThreadedExecutor()
         executor.add_node(node)
@@ -270,6 +282,48 @@ class WaypointsRosBridge:
         goal.poses = [self._build_pose_stamped(x, y, yaw) for (x, y, yaw) in wps]
         self._send_action(self._patrol_client, goal, goal_id)
 
+    def route_to(
+        self, target_name: str, timeout_s: float = 2.0
+    ) -> dict:
+        """동기 service 호출 — 다익스트라 결과 반환. 로봇 안 움직임."""
+        if self._route_client is None:
+            return {"success": False, "message": "graph_router clients unavailable",
+                    "vertex_sequence": [], "total_distance_m": 0.0}
+        from gogoping_msgs.srv import RouteToVertex
+        req = RouteToVertex.Request()
+        req.target_name = target_name
+        # start (0,0,0) 으로 두면 graph_router_node 가 현재 odom 사용
+        if not self._route_client.wait_for_service(timeout_sec=timeout_s):
+            return {"success": False, "message": "service unavailable",
+                    "vertex_sequence": [], "total_distance_m": 0.0}
+        future = self._route_client.call_async(req)
+        # spin 은 별도 thread — 결과 polling
+        deadline = time.monotonic() + timeout_s
+        while not future.done() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        if not future.done():
+            return {"success": False, "message": "service timeout",
+                    "vertex_sequence": [], "total_distance_m": 0.0}
+        res = future.result()
+        return {
+            "success": bool(res.success),
+            "message": str(res.message),
+            "vertex_sequence": list(res.vertex_sequence),
+            "total_distance_m": float(res.total_distance_m),
+        }
+
+    def navigate_to_vertex(self, target_name: str, goal_id: str) -> None:
+        """graph_router action 호출 → 다익스트라 + nav2 위임. feedback SSE 로 emit."""
+        if self._gr_nav_client is None:
+            self._emit({"type": "goal_status", "goal_id": goal_id,
+                        "status": "rejected", "reason": "graph_router unavailable"})
+            return
+        from gogoping_msgs.action import NavigateToVertex
+        goal = NavigateToVertex.Goal()
+        goal.target_name = target_name
+        self._send_action(self._gr_nav_client, goal, goal_id, name=target_name,
+                          feedback_emit=True)
+
     def cancel_current(self) -> None:
         with self._lock:
             gh = (self._goal or {}).get("_handle")
@@ -348,17 +402,37 @@ class WaypointsRosBridge:
             try: q.put_nowait(event)
             except Exception: pass
 
-    def _send_action(self, client, goal, goal_id: str) -> None:
-        """공통 발송 + status 추적 + SSE emit + 자가 회복 보호."""
+    def _send_action(
+        self, client, goal, goal_id: str,
+        name: str | None = None, feedback_emit: bool = False,
+    ) -> None:
+        """공통 발송 + status 추적 + SSE emit + 자가 회복 보호.
+        feedback_emit=True 면 action 의 feedback 메시지를 SSE 로 중계 (NavigateToVertex 용)."""
         with self._lock:
-            self._goal = {"goal_id": goal_id, "name": None, "status": "pending",
+            self._goal = {"goal_id": goal_id, "name": name, "status": "pending",
                           "_handle": None, "_sent_at": time.monotonic()}
-        self._emit({"type": "goal_status", "goal_id": goal_id, "status": "pending"})
+        self._emit({"type": "goal_status", "goal_id": goal_id, "status": "pending",
+                    "name": name})
 
         if self._node is not None:
             self._node.get_logger().info(f"goal {goal_id} sent")
 
-        future = client.send_goal_async(goal)
+        def _on_fb(fb_msg) -> None:
+            fb = fb_msg.feedback
+            payload = {"type": "route_progress", "goal_id": goal_id}
+            for k in ("current_vertex", "sequence_index", "sequence_total", "progress"):
+                if hasattr(fb, k):
+                    v = getattr(fb, k)
+                    payload[k] = (
+                        float(v) if isinstance(v, float)
+                        else int(v) if isinstance(v, int)
+                        else str(v)
+                    )
+            self._emit(payload)
+
+        future = client.send_goal_async(
+            goal, feedback_callback=_on_fb if feedback_emit else None
+        )
 
         def _on_response(fut) -> None:
             try:

@@ -138,3 +138,16 @@ def get_patrol(patrol_name: str) -> list[Waypoint]:
         raise KeyError(patrol_name)
     by_name = {w.name: w for w in wps}
     return [by_name[m] for m in patrols[patrol_name]]
+
+
+def load_lanes() -> list[dict]:
+    """waypoints.yaml 옆의 lanes.yaml 로드. 없으면 빈 리스트.
+    형식: [{from, to, bidirectional}, ...]"""
+    p = _path().parent / "lanes.yaml"
+    if not p.exists():
+        return []
+    raw = p.read_text(encoding="utf-8").strip()
+    if not raw:
+        return []
+    data = yaml.safe_load(raw) or {}
+    return list(data.get("lanes") or [])
