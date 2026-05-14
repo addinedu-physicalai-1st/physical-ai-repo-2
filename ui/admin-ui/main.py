@@ -145,7 +145,7 @@ class Sidebar(QWidget):
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
         self._buttons: dict[str, NavButton] = {}
-        for i, key in enumerate(("noriarm", "gogoping", "eduping")):
+        for i, key in enumerate(("gogoping", "noriarm", "eduping")):
             meta = ROBOTS[key]
             btn = NavButton(meta["icon"], meta["name"], meta["tagline"],
                             meta["color"])
@@ -295,7 +295,7 @@ class AdminWindow(QMainWindow):
         right_lay.addWidget(self.stack, 1)
         root_lay.addWidget(right, 4)
 
-        self._select("noriarm")
+        self._select("gogoping")
 
     def _select(self, key: str) -> None:
         self.sidebar.select(key)
