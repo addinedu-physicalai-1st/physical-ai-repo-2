@@ -79,6 +79,10 @@ case "$ACTION" in
     tmux respawn-pane -k -t "$SESSION:gazebo" -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_bringup sim.launch.py"
 
+    # window 1: graph-router (vertex 그래프 + 다익스트라 + nav2 위임)
+    tmux new-window -t "$SESSION" -n graph-router -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
+
     # 마우스 + status bar 설정
     tmux set-option -t "$SESSION" -g mouse on
     tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
