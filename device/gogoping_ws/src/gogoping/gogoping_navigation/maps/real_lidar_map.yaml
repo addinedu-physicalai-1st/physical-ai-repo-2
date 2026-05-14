@@ -1,4 +1,4 @@
-image: map.pgm
+image: real_lidar_map.pgm
 mode: trinary
 resolution: 0.050
 origin: [-9.485, -8.342, 0]
