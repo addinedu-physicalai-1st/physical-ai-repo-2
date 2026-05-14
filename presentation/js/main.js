@@ -13,13 +13,17 @@ var SLIDES = [
   '06-flow-arrival.html',
   '07-flow-play.html',
   '08-flow-play-types.html',
-  '09-flow-lunch.html',
-  '10-flow-assist.html',
-  '11-flow-telemedicine.html',
-  '12-flow-departure.html',
-  '13-questions-imitation.html',
-  '14-questions-openarm.html',
-  '15-questions-driving.html',
+  '09-demo-noriarm.html',
+  '10-demo-shop.html',
+  '11-demo-block.html',
+  '12-demo-block2.html',
+  '13-flow-lunch.html',
+  '14-flow-assist.html',
+  '15-flow-telemedicine.html',
+  '16-flow-departure.html',
+  '17-progress.html',
+  '18-repo-structure.html',
+  '19-sprint-timeline.html',
 ];
 
 var SLIDE_TITLES = [
@@ -31,13 +35,17 @@ var SLIDE_TITLES = [
   '등원 — 아침 인사 · 출석',
   '놀이 — 학습 보조 · 자연 촬영',
   '놀이 종류 — 7가지',
+  '노리암 데모',
+  '가게놀이 훈련',
+  '블럭 파괴놀이',
+  '블럭쌓기 — 추가 시연',
   '점심 — 메뉴 관리',
   '보조 — 교사 추종 · 운반',
   '원격 진단 — 의사 원격 진단',
   '하원 — 일일 보고서',
-  '질문 1 — 모방학습',
-  '질문 2 — OpenArm',
-  '질문 3 — 자율주행',
+  '구현 진척도',
+  '레포 구조',
+  '스프린트 타임라인',
 ];
 
 async function loadSlides() {
@@ -78,7 +86,8 @@ async function initPresentation() {
   function forceCenterAlign() {
     var slideHeight = 720;
     document.querySelectorAll('.reveal .slides section').forEach(function (s) {
-      var sectionHeight = s.offsetHeight;
+      s.style.top = '';
+      var sectionHeight = s.scrollHeight;
       var topOffset = (slideHeight - sectionHeight) / 2;
       if (topOffset > 0) s.style.top = topOffset + 'px';
     });
@@ -93,6 +102,7 @@ async function initPresentation() {
     }
     initDraw();
     initImageZoom();
+    initDynamicSlides();
     forceCenterAlign();
 
     var slideNum = document.querySelector('.reveal .slide-number');
@@ -116,6 +126,102 @@ async function initPresentation() {
       v.play().catch(function () {});
     });
   });
+
+  Reveal.on('fragmentshown',  function (e) { handleFragment(e, true); });
+  Reveal.on('fragmenthidden', function (e) { handleFragment(e, false); });
+}
+
+/* ===== Tree / Sprint 동적 하이라이팅 엔진 ===== */
+
+var dynamicScenarios = {};
+
+function registerScenario(slideSelector, config) {
+  dynamicScenarios[slideSelector] = config;
+}
+
+function handleFragment(e, shown) {
+  var slideEl = Reveal.getCurrentSlide();
+  if (!slideEl) return;
+  var slideId = slideEl.getAttribute('data-scenario');
+  if (!slideId || !dynamicScenarios[slideId]) return;
+
+  var sc = dynamicScenarios[slideId];
+  var fragIdx = parseInt(e.fragment.dataset.fragmentIndex);
+  var stepIdx = shown ? fragIdx : Math.max(0, fragIdx - 1);
+
+  applyScenarioStep(slideEl, sc, stepIdx);
+}
+
+function applyScenarioStep(slideEl, sc, stepIdx) {
+  slideEl.querySelectorAll('.tree-node').forEach(function (n) { n.className.baseVal = 'tree-node'; });
+  slideEl.querySelectorAll('.tree-edge').forEach(function (e) { e.className.baseVal = 'tree-edge'; });
+
+  var step = sc.steps[stepIdx];
+  if (!step) return;
+
+  if (step.nodes) {
+    Object.keys(step.nodes).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && step.nodes[id]) el.className.baseVal = 'tree-node ' + step.nodes[id];
+    });
+  }
+  if (step.edges) {
+    Object.keys(step.edges).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && step.edges[id]) el.className.baseVal = 'tree-edge ' + step.edges[id];
+    });
+  }
+
+  var infoEl = slideEl.querySelector('.step-info');
+  if (infoEl && step.info) infoEl.innerHTML = step.info;
+
+  if (step.onEnter) step.onEnter();
+}
+
+function initDynamicSlides() {
+  registerScenario('repo-tree', {
+    steps: [
+      { nodes: { 'rt-root': 'active pulse' }, edges: {},
+        info: '<span class="hl pk">physical-ai-repo-2/</span> — 모노레포. device · server · ui 3개 레이어로 분리.' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'active pulse' },
+        edges: { 'rt-e1': 'active flow' },
+        info: '<span class="hl pk">device/</span> — ROS2 워크스페이스. 고고핑(Nav2, BT, FSM), 노리암(OMX 게임 프레임워크) 패키지.' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'success', 'rt-gogo': 'success', 'rt-nori': 'success', 'rt-nav': 'success', 'rt-modes': 'running', 'rt-bt': 'running', 'rt-fsm': 'running', 'rt-server': 'active pulse' },
+        edges: { 'rt-e1': 'success', 'rt-e2': 'active flow', 'rt-e4': 'success', 'rt-e5': 'success', 'rt-e6': 'success', 'rt-e7': 'running', 'rt-e8': 'running', 'rt-e9': 'running' },
+        info: '<span class="hl pk">server/</span> — AI Hub (Ollama LLM) + Control Service (FastAPI + rclpy). <span class="hl bt">modes/</span> 는 스캐폴드 단계.' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'success', 'rt-server': 'success', 'rt-ai': 'success', 'rt-ctrl': 'success', 'rt-llm': 'success', 'rt-vision': 'success', 'rt-routers': 'success', 'rt-stream': 'success', 'rt-ui': 'active pulse' },
+        edges: { 'rt-e1': 'success', 'rt-e2': 'success', 'rt-e3': 'active flow', 'rt-e10': 'success', 'rt-e11': 'success', 'rt-e12': 'success', 'rt-e13': 'success', 'rt-e14': 'success', 'rt-e15': 'success' },
+        info: '<span class="hl pk">ui/</span> — Robot UI (감정 표현, 음성), Portal UI (교사/보호자), Admin UI (텔레옵).' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'success', 'rt-gogo': 'success', 'rt-nori': 'success', 'rt-nav': 'success', 'rt-modes': 'running', 'rt-bt': 'running', 'rt-fsm': 'running', 'rt-server': 'success', 'rt-ai': 'success', 'rt-ctrl': 'success', 'rt-ui': 'success', 'rt-robotui': 'success', 'rt-portal': 'success', 'rt-admin': 'success' },
+        edges: { 'rt-e1': 'success', 'rt-e2': 'success', 'rt-e3': 'success', 'rt-e4': 'success', 'rt-e5': 'success', 'rt-e6': 'success', 'rt-e7': 'running', 'rt-e8': 'running', 'rt-e9': 'running', 'rt-e10': 'success', 'rt-e11': 'success', 'rt-e16': 'success', 'rt-e17': 'success', 'rt-e18': 'success', 'rt-e19': 'success' },
+        info: '전체 현황: <span class="hl mt">서버 · UI 완성</span>, <span class="hl bt">BT/FSM 스캐폴드</span> → 이번 스프린트에서 구현 진행 중.' },
+    ]
+  });
+
+  registerScenario('sprint-tl', {
+    steps: [
+      { nodes: {}, edges: {},
+        info: '→ 키를 눌러 스프린트 진행을 확인하세요.' },
+      { nodes: {}, edges: {},
+        info: '<span class="hl pk">Sprint 1-2</span> — 주제 선정 + 상세 설계 100% 완료. 아키텍처, 요구사항, 폴더 구조 확정.',
+        onEnter: function() { _animateSprint('sp1-bar', 100, 'sp1-count', '1/1 Done'); _animateSprint('sp2-bar', 100, 'sp2-count', '9/9 Done'); } },
+      { nodes: {}, edges: {},
+        info: '<span class="hl pk">Sprint 3</span> — 스캐폴드 구현 + 기술 조사. BT 설계, OMX 놀이 설계, 키보드 텔레옵 구현.',
+        onEnter: function() { _animateSprint('sp3-bar', 100, 'sp3-count', '9/9 Done'); } },
+      { nodes: {}, edges: {},
+        info: '<span class="hl bt">Sprint 4 (현재)</span> — 구현 week1. Done 5 + QA 2 = <strong>39%</strong>. 고고핑 Nav 태스크 10개 backlog.',
+        onEnter: function() { _animateSprint('sp4-bar', 39, 'sp4-count', '5 Done / 2 QA / 1 WIP / 10 Todo'); } },
+    ]
+  });
+}
+
+function _animateSprint(barId, pct, countId, countText) {
+  var bar = document.getElementById(barId);
+  var label = bar ? bar.querySelector('span') : null;
+  if (bar) bar.style.width = pct + '%';
+  if (label) label.style.opacity = '1';
+  var countEl = document.getElementById(countId);
+  if (countEl && countText) countEl.textContent = countText;
 }
 
 /* ── Demo video toggle ── */
