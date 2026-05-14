@@ -16,8 +16,9 @@ from PyQt5.QtCore import Qt, QTimer, QPointF, QRectF, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QBrush
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import (
-    QAction, QButtonGroup, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QMenu, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
+    QAction, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMenu, QMessageBox, QPushButton, QStackedWidget,
+    QVBoxLayout, QWidget,
 )
 
 DEFAULT_SVG = (pathlib.Path(__file__).resolve().parents[3]
@@ -68,6 +69,7 @@ class MapView(QWidget):
         self._pan_drag_start: QPointF | None = None       # widget px (mouse down 시)
         self._pan_at_drag_start: QPointF | None = None    # 드래그 시작 시점의 self._pan
         self._waypoints: list[dict] = []
+        self._filter: set[str] | None = None   # 검색 필터 (None = 전체)
         self._robot: dict | None = None
         self._plan: list[tuple[float, float]] = []
         self._current_name: str | None = None
@@ -85,6 +87,11 @@ class MapView(QWidget):
 
     def set_waypoints(self, wps: list[dict]) -> None:
         self._waypoints = wps; self.update()
+
+    def set_filter(self, names: set[str] | None) -> None:
+        """None = 전체 표시, set = 해당 name 만 표시 (검색 결과)."""
+        self._filter = names
+        self.update()
 
     def set_display_mode(self, mode: str) -> None:
         """'map' = waypoint 마커 숨김, 'graph' = 마커 표시."""
@@ -244,16 +251,26 @@ class MapView(QWidget):
         if self._display_mode == 'graph':
             z = self._zoom
             for w in self._waypoints:
+                if self._filter is not None and w["name"] not in self._filter:
+                    continue
                 p = self._map_to_widget(w["x"], w["y"])
                 is_current = (w["name"] == self._current_name)
                 r = (5 if is_current else 3.5) * z
                 qp.setPen(QPen(QColor("#1A6B8A"), 2 * z))
                 qp.setBrush(QBrush(QColor("#00A86B" if is_current else "#5BB9E0")))
                 qp.drawEllipse(p, r, r)
-                qp.setPen(QColor("#333"))
-                qp.setFont(QFont("", max(1, int(round(5 * z))), QFont.Bold))
-                qp.drawText(QRectF(p.x() - 40 * z, p.y() + 8 * z, 80 * z, 12 * z),
-                            Qt.AlignCenter, w["name"])
+                # 라벨: zoom 의 sqrt 비례 — 확대해도 천천히 커짐 (인접 충돌 완화)
+                fsize = max(7, int(round(7 * math.sqrt(z))))
+                qp.setFont(QFont("", fsize, QFont.Bold))
+                fm = qp.fontMetrics()
+                tw = fm.horizontalAdvance(w["name"]) + 6
+                th = fm.height() + 2
+                lbl = QRectF(p.x() - tw / 2, p.y() + r + 2, tw, th)
+                qp.setPen(Qt.NoPen)
+                qp.setBrush(QBrush(QColor(255, 255, 255, 210)))
+                qp.drawRoundedRect(lbl, 3, 3)
+                qp.setPen(QColor("#1A1A1A"))
+                qp.drawText(lbl, Qt.AlignCenter, w["name"])
         # 로봇 마커
         if self._robot is not None:
             p = self._map_to_widget(self._robot["x"], self._robot["y"])
@@ -485,10 +502,32 @@ class WaypointMapCard(QFrame):
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_list_context_menu)
+        # graph 모드 사이드: 검색창 + 리스트
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("이름 검색…")
+        self._search.setClearButtonEnabled(True)
+        self._search.textChanged.connect(self._on_search_changed)
+        self._search.setStyleSheet("""
+            QLineEdit {
+                background: #FFFFFF;
+                color: #1A6B8A;
+                border: 1.5px solid #5BB9E0;
+                border-radius: 6px;
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+            QLineEdit:focus { border-color: #1A6B8A; }
+        """)
+        list_container = QWidget()
+        list_box = QVBoxLayout(list_container)
+        list_box.setContentsMargins(0, 0, 0, 0)
+        list_box.setSpacing(4)
+        list_box.addWidget(self._search)
+        list_box.addWidget(self._list)
         # 리스트 자리를 stack 으로 감싸 — map 모드에서도 가로 비율 유지 (빈 placeholder 와 swap)
         self._list_stack = QStackedWidget()
         self._list_stack.setFixedWidth(180)
-        self._list_stack.addWidget(self._list)        # index 0: graph mode
+        self._list_stack.addWidget(list_container)    # index 0: graph mode
         self._list_stack.addWidget(QWidget())         # index 1: map mode (empty)
         body.addWidget(self._map, 1); body.addWidget(self._list_stack)
         layout.addLayout(body)
@@ -508,6 +547,21 @@ class WaypointMapCard(QFrame):
         리스트는 visibility 가 아니라 빈 placeholder 와 swap (가로 비율 유지)."""
         self._map.set_display_mode(mode)
         self._list_stack.setCurrentIndex(0 if mode == 'graph' else 1)
+
+    def _on_search_changed(self, text: str) -> None:
+        """검색어로 사이드 리스트 + MapView 마커 필터."""
+        q = text.strip().lower()
+        # 사이드 리스트: 매칭 안 되는 행 숨김
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            item.setHidden(bool(q) and q not in item.text().lower())
+        # MapView 도 매칭 항목만 표시 (검색어 비어있으면 전체)
+        if not q:
+            self._map.set_filter(None)
+        else:
+            names = {w["name"] for w in self._map._waypoints
+                     if q in w["name"].lower()}
+            self._map.set_filter(names)
 
     def update_robot(self, x: float, y: float, yaw: float) -> None:
         self._map.set_robot(x, y, yaw)
