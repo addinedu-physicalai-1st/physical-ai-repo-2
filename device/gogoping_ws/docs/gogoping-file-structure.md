@@ -67,6 +67,9 @@ device/gogoping_ws/src/gogoping/
         │   │   │   ├── __init__.py
         │   │   │   ├── navigate_to_pose.[py|/]       # Nav2 navigate_to_pose 액션 클라이언트 (target_key 인자)
         │   │   │   │                                 #   Used in: BT_carry_sub, BT_hide_and_seek_sub, BT_return_sub
+        │   │   │   ├── navigate_to_vertex.py         # graph_router NavigateToVertex 액션 호출 (target_vertex_name 인자)
+        │   │   │   │                                 #   다익스트라 lane 따라 이동. 자세한 설계: docs/graph-routing.md
+        │   │   │   │                                 #   Used in: BT_carry_sub (goto), BT_assist_main 의 named-pose 이동
         │   │   │   ├── align_to_dock.[py|/]          # 도킹 정면 정렬 [스켈레톤]
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── approach_dock.[py|/]          # 저속 직진으로 도킹 진입 [스켈레톤]
