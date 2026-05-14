@@ -640,15 +640,10 @@ class WaypointMapCard(QFrame):
             it.setText(("▶ " if stored == name else "") + stored)
 
     def _on_item_clicked(self, item: QListWidgetItem) -> None:
-        import httpx
+        """좌클릭 = graph navigate (다익스트라 → 실제 이동).
+        직접 NavigateToPose (/waypoints/goto) 는 더 이상 안 씀."""
         name = item.data(Qt.UserRole)
-        try:
-            httpx.post(
-                f"{self._control_url}/waypoints/goto",
-                json={"name": name}, timeout=2.0,
-            )
-        except httpx.HTTPError:
-            pass
+        self._on_graph_navigate(name)
 
     def _on_list_context_menu(self, pos) -> None:
         item = self._list.itemAt(pos)
