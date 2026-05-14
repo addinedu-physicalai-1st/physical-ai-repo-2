@@ -10,7 +10,14 @@ from pathlib import Path
 
 import yaml
 
-DEFAULT_PATH = Path("/home/tonyno/pingdergarten/shared/waypoints.yaml")
+# repo root 기준 자동 경로 — 사용자 home 디렉토리 이름과 무관.
+# server/control/waypoints/yaml_store.py → parents[3] = repo root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_PATH = (
+    _REPO_ROOT
+    / "device" / "gogoping_ws" / "src" / "gogoping"
+    / "gogoping_navigation" / "config" / "waypoints.yaml"
+)
 
 
 def _path() -> Path:

@@ -8,6 +8,7 @@ import json
 import math
 import os
 import pathlib
+import re
 import time
 from typing import Any
 
@@ -15,8 +16,8 @@ from PyQt5.QtCore import Qt, QTimer, QPointF, QRectF, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QBrush
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import (
-    QAction, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QMenu, QMessageBox, QVBoxLayout, QWidget,
+    QAction, QButtonGroup, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
 
 DEFAULT_SVG = (pathlib.Path(__file__).resolve().parents[3]
@@ -46,11 +47,24 @@ class MapView(QWidget):
         self.setMinimumSize(QSize(400, 320))
         self.setFocusPolicy(Qt.StrongFocus)            # Esc 키 받을 수 있게
         self.setCursor(Qt.CrossCursor)                  # 맵 위 커서 십자
+        self.setMouseTracking(True)                     # hover 좌표 표시용
         self._svg = QSvgRenderer(str(_svg_path()))
+        # graph 모드 전용 SVG — 영역 라벨 (<text>) 제거. waypoint 이름과 겹치는 것 방지.
+        try:
+            svg_text = pathlib.Path(_svg_path()).read_text(encoding='utf-8')
+            svg_no_label = re.sub(r'<text\b[^>]*>.*?</text>', '', svg_text, flags=re.DOTALL)
+            self._svg_no_label = QSvgRenderer()
+            self._svg_no_label.load(svg_no_label.encode('utf-8'))
+        except OSError:
+            self._svg_no_label = self._svg  # fallback
+        # 표시 모드: 'map' = SVG + 로봇/경로만, 'graph' = + waypoint 마커
+        self._display_mode: str = 'graph'
         self._waypoints: list[dict] = []
         self._robot: dict | None = None
         self._plan: list[tuple[float, float]] = []
         self._current_name: str | None = None
+        # hover 시 화면 좌하단에 (x, y) 표시 — vertex 좌표 측정용
+        self._hover_pos: QPointF | None = None          # widget px (마우스 위치)
         # 드래그 상태 — _drag_mode: "goal" (코랄, NavigateToPose) | "initial" (녹색, /initialpose)
         self._drag_start: QPointF | None = None
         self._drag_current: QPointF | None = None
@@ -63,6 +77,13 @@ class MapView(QWidget):
 
     def set_waypoints(self, wps: list[dict]) -> None:
         self._waypoints = wps; self.update()
+
+    def set_display_mode(self, mode: str) -> None:
+        """'map' = waypoint 마커 숨김, 'graph' = 마커 표시."""
+        if mode not in ('map', 'graph'):
+            return
+        self._display_mode = mode
+        self.update()
 
     def set_robot(self, x: float, y: float, yaw: float) -> None:
         self._robot = {"x": x, "y": y, "yaw": yaw}; self.update()
@@ -99,9 +120,13 @@ class MapView(QWidget):
         self.update()
 
     def mouseMoveEvent(self, e: Any) -> None:
-        if self._drag_start is None:
-            return
-        self._drag_current = QPointF(e.pos())
+        self._hover_pos = QPointF(e.pos())
+        if self._drag_start is not None:
+            self._drag_current = QPointF(e.pos())
+        self.update()
+
+    def leaveEvent(self, _e: Any) -> None:
+        self._hover_pos = None
         self.update()
 
     def mouseReleaseEvent(self, e: Any) -> None:
@@ -144,8 +169,9 @@ class MapView(QWidget):
     def paintEvent(self, _evt: Any) -> None:
         qp = QPainter(self)
         qp.setRenderHint(QPainter.Antialiasing, True)
-        if self._svg.isValid():
-            self._svg.render(qp, QRectF(0, 0, self.width(), self.height()))
+        active_svg = self._svg_no_label if self._display_mode == 'graph' else self._svg
+        if active_svg.isValid():
+            active_svg.render(qp, QRectF(0, 0, self.width(), self.height()))
         # 라이브 경로
         if len(self._plan) >= 2:
             pen = QPen(QColor("#00A86B"), 3, Qt.DashLine)
@@ -155,18 +181,19 @@ class MapView(QWidget):
             for px, py in self._plan[1:]:
                 path.lineTo(self._map_to_widget(px, py))
             qp.drawPath(path)
-        # 웨이포인트 마커
-        for w in self._waypoints:
-            p = self._map_to_widget(w["x"], w["y"])
-            is_current = (w["name"] == self._current_name)
-            r = 10 if is_current else 7
-            qp.setPen(QPen(QColor("#1A6B8A"), 2))
-            qp.setBrush(QBrush(QColor("#00A86B" if is_current else "#5BB9E0")))
-            qp.drawEllipse(p, r, r)
-            qp.setPen(QColor("#333"))
-            qp.setFont(QFont("", 9, QFont.Bold))
-            qp.drawText(QRectF(p.x() - 60, p.y() + 10, 120, 18),
-                        Qt.AlignCenter, w["name"])
+        # 웨이포인트 마커 (graph 모드에서만)
+        if self._display_mode == 'graph':
+            for w in self._waypoints:
+                p = self._map_to_widget(w["x"], w["y"])
+                is_current = (w["name"] == self._current_name)
+                r = 10 if is_current else 7
+                qp.setPen(QPen(QColor("#1A6B8A"), 2))
+                qp.setBrush(QBrush(QColor("#00A86B" if is_current else "#5BB9E0")))
+                qp.drawEllipse(p, r, r)
+                qp.setPen(QColor("#333"))
+                qp.setFont(QFont("", 7, QFont.Bold))
+                qp.drawText(QRectF(p.x() - 40, p.y() + 8, 80, 12),
+                            Qt.AlignCenter, w["name"])
         # 로봇 마커
         if self._robot is not None:
             p = self._map_to_widget(self._robot["x"], self._robot["y"])
@@ -187,6 +214,20 @@ class MapView(QWidget):
                 alpha = 1.0 - elapsed / 0.5
                 self._paint_arrow_at(qp, self._feedback["start"], self._feedback["end"],
                                      alpha, self._feedback.get("mode", "goal"))
+        # hover 좌표 표시 — 좌하단에 (x, y) m
+        if self._hover_pos is not None:
+            mx, my = self._widget_to_map(self._hover_pos.x(), self._hover_pos.y())
+            label = f"x={mx:+.3f}  y={my:+.3f}  m"
+            qp.setFont(QFont("monospace", 10, QFont.Bold))
+            fm = qp.fontMetrics()
+            tw = fm.horizontalAdvance(label) + 12
+            th = fm.height() + 6
+            box = QRectF(8, self.height() - th - 8, tw, th)
+            qp.setPen(Qt.NoPen)
+            qp.setBrush(QBrush(QColor(0, 0, 0, 160)))
+            qp.drawRoundedRect(box, 4, 4)
+            qp.setPen(QColor("#FFFFFF"))
+            qp.drawText(box, Qt.AlignCenter, label)
 
     def _tick_feedback(self) -> None:
         if self._feedback is None:
@@ -323,7 +364,57 @@ class WaypointMapCard(QFrame):
         self._title = QLabel("실내 맵 · 웨이포인트")
         self._status = QLabel("")
         self._status.setStyleSheet("color: #00A86B; font-weight: bold;")
-        header.addWidget(self._title); header.addStretch(1); header.addWidget(self._status)
+        # 모드 토글 — segmented control 스타일 (map / graph map)
+        self._mode_group = QButtonGroup(self)
+        self._mode_group.setExclusive(True)
+        self._btn_map = QPushButton("map")
+        self._btn_graph = QPushButton("graph map")
+        for btn in (self._btn_map, self._btn_graph):
+            btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setFixedHeight(28)
+        self._btn_graph.setChecked(True)
+        self._mode_group.addButton(self._btn_map, 0)
+        self._mode_group.addButton(self._btn_graph, 1)
+        self._btn_map.clicked.connect(lambda: self._map.set_display_mode('map'))
+        self._btn_graph.clicked.connect(lambda: self._map.set_display_mode('graph'))
+        # segmented control: 두 버튼이 한 덩어리, 좌/우 모서리만 둥글게
+        seg_qss = """
+            QPushButton {
+                background: #FFFFFF;
+                color: #1A6B8A;
+                border: 1.5px solid #5BB9E0;
+                padding: 0 14px;
+                font-weight: 600;
+                font-size: 12px;
+            }
+            QPushButton:hover { background: #EAF6FB; }
+            QPushButton:checked {
+                background: #1A6B8A;
+                color: #FFFFFF;
+                border-color: #1A6B8A;
+            }
+        """
+        self._btn_map.setStyleSheet(seg_qss + """
+            QPushButton {
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
+                border-right-width: 0.75px;
+            }
+        """)
+        self._btn_graph.setStyleSheet(seg_qss + """
+            QPushButton {
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+                border-left-width: 0.75px;
+            }
+        """)
+        header.addWidget(self._title)
+        header.addStretch(1)
+        header.addWidget(self._status)
+        header.addSpacing(12)
+        header.addWidget(self._btn_map)
+        header.addWidget(self._btn_graph)
         layout.addLayout(header)
 
         body = QHBoxLayout()
