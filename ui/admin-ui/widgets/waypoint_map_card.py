@@ -17,7 +17,7 @@ from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QBrush
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import (
     QAction, QButtonGroup, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget,
+    QMenu, QMessageBox, QPushButton, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 DEFAULT_SVG = (pathlib.Path(__file__).resolve().parents[3]
@@ -59,6 +59,14 @@ class MapView(QWidget):
             self._svg_no_label = self._svg  # fallback
         # 표시 모드: 'map' = SVG + 로봇/경로만, 'graph' = + waypoint 마커
         self._display_mode: str = 'graph'
+        # zoom/pan — Ctrl + 휠로 줌인/아웃, 마우스 위치 중심
+        self._zoom: float = 1.0
+        self._pan: QPointF = QPointF(0.0, 0.0)
+        self._ZOOM_MIN = 1.0
+        self._ZOOM_MAX = 8.0
+        # 휠 클릭(middle button) 드래그로 pan
+        self._pan_drag_start: QPointF | None = None       # widget px (mouse down 시)
+        self._pan_at_drag_start: QPointF | None = None    # 드래그 시작 시점의 self._pan
         self._waypoints: list[dict] = []
         self._robot: dict | None = None
         self._plan: list[tuple[float, float]] = []
@@ -98,19 +106,57 @@ class MapView(QWidget):
         W = self.width(); H = self.height()
         rx = (mx - self.MAP_ORIGIN[0]) / self.MAP_RES
         ry = self.MAP_SIZE[1] - (my - self.MAP_ORIGIN[1]) / self.MAP_RES
-        return QPointF(rx * W / self.MAP_SIZE[0], ry * H / self.MAP_SIZE[1])
+        # 기준 widget 좌표 (zoom=1, pan=0) 후 zoom/pan 적용
+        bx = rx * W / self.MAP_SIZE[0]
+        by = ry * H / self.MAP_SIZE[1]
+        return QPointF(bx * self._zoom + self._pan.x(),
+                       by * self._zoom + self._pan.y())
 
     def _widget_to_map(self, wx: float, wy: float) -> tuple[float, float]:
         """widget px → map frame (미터, Y-up). _map_to_widget 의 역함수."""
         W = self.width(); H = self.height()
-        rx = wx * self.MAP_SIZE[0] / W
-        ry = wy * self.MAP_SIZE[1] / H
+        # zoom/pan 역변환 → 기준 widget 좌표
+        bx = (wx - self._pan.x()) / self._zoom
+        by = (wy - self._pan.y()) / self._zoom
+        rx = bx * self.MAP_SIZE[0] / W
+        ry = by * self.MAP_SIZE[1] / H
         mx = rx * self.MAP_RES + self.MAP_ORIGIN[0]
         my = self.MAP_ORIGIN[1] + (self.MAP_SIZE[1] - ry) * self.MAP_RES
         return mx, my
 
-    # -------- 클릭-드래그 (좌클릭 = Nav2 Goal / Shift+좌클릭 = 2D Pose Estimate) --------
+    def wheelEvent(self, e: Any) -> None:
+        """Ctrl + 휠 → 마우스 위치 중심 zoom in/out."""
+        if not (e.modifiers() & Qt.ControlModifier):
+            super().wheelEvent(e)
+            return
+        delta = e.angleDelta().y()
+        if delta == 0:
+            return
+        factor = 1.15 if delta > 0 else 1 / 1.15
+        new_zoom = max(self._ZOOM_MIN, min(self._ZOOM_MAX, self._zoom * factor))
+        if new_zoom == self._zoom:
+            e.accept(); return
+        # 마우스 아래의 기준 좌표가 화면에서 안 움직이도록 pan 조정
+        mp = e.pos()
+        base_x = (mp.x() - self._pan.x()) / self._zoom
+        base_y = (mp.y() - self._pan.y()) / self._zoom
+        self._zoom = new_zoom
+        self._pan = QPointF(mp.x() - base_x * new_zoom,
+                            mp.y() - base_y * new_zoom)
+        # zoom 1.0 으로 돌아오면 pan 도 reset (정확히 0 이 되도록)
+        if abs(self._zoom - 1.0) < 1e-6:
+            self._zoom = 1.0
+            self._pan = QPointF(0.0, 0.0)
+        self.update()
+        e.accept()
+
+    # -------- 좌클릭 = Nav2 Goal / Shift+좌클릭 = 2D Pose Estimate / 휠 클릭 pan --------
     def mousePressEvent(self, e: Any) -> None:
+        if e.button() == Qt.MidButton:
+            self._pan_drag_start = QPointF(e.pos())
+            self._pan_at_drag_start = QPointF(self._pan)
+            self.setCursor(Qt.ClosedHandCursor)
+            return
         if e.button() != Qt.LeftButton:
             return
         self._drag_start = QPointF(e.pos())
@@ -121,6 +167,11 @@ class MapView(QWidget):
 
     def mouseMoveEvent(self, e: Any) -> None:
         self._hover_pos = QPointF(e.pos())
+        if self._pan_drag_start is not None and self._pan_at_drag_start is not None:
+            dx = e.pos().x() - self._pan_drag_start.x()
+            dy = e.pos().y() - self._pan_drag_start.y()
+            self._pan = QPointF(self._pan_at_drag_start.x() + dx,
+                                self._pan_at_drag_start.y() + dy)
         if self._drag_start is not None:
             self._drag_current = QPointF(e.pos())
         self.update()
@@ -130,6 +181,11 @@ class MapView(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, e: Any) -> None:
+        if e.button() == Qt.MidButton and self._pan_drag_start is not None:
+            self._pan_drag_start = None
+            self._pan_at_drag_start = None
+            self.setCursor(Qt.CrossCursor)
+            return
         if e.button() != Qt.LeftButton or self._drag_start is None:
             return
         start = self._drag_start
@@ -171,7 +227,10 @@ class MapView(QWidget):
         qp.setRenderHint(QPainter.Antialiasing, True)
         active_svg = self._svg_no_label if self._display_mode == 'graph' else self._svg
         if active_svg.isValid():
-            active_svg.render(qp, QRectF(0, 0, self.width(), self.height()))
+            W = self.width(); H = self.height()
+            target = QRectF(self._pan.x(), self._pan.y(),
+                            W * self._zoom, H * self._zoom)
+            active_svg.render(qp, target)
         # 라이브 경로
         if len(self._plan) >= 2:
             pen = QPen(QColor("#00A86B"), 3, Qt.DashLine)
@@ -181,18 +240,19 @@ class MapView(QWidget):
             for px, py in self._plan[1:]:
                 path.lineTo(self._map_to_widget(px, py))
             qp.drawPath(path)
-        # 웨이포인트 마커 (graph 모드에서만)
+        # 웨이포인트 마커 (graph 모드에서만) — zoom 에 따라 마커/폰트 같이 확대
         if self._display_mode == 'graph':
+            z = self._zoom
             for w in self._waypoints:
                 p = self._map_to_widget(w["x"], w["y"])
                 is_current = (w["name"] == self._current_name)
-                r = 10 if is_current else 7
-                qp.setPen(QPen(QColor("#1A6B8A"), 2))
+                r = (10 if is_current else 7) * z
+                qp.setPen(QPen(QColor("#1A6B8A"), 2 * z))
                 qp.setBrush(QBrush(QColor("#00A86B" if is_current else "#5BB9E0")))
                 qp.drawEllipse(p, r, r)
                 qp.setPen(QColor("#333"))
-                qp.setFont(QFont("", 7, QFont.Bold))
-                qp.drawText(QRectF(p.x() - 40, p.y() + 8, 80, 12),
+                qp.setFont(QFont("", max(1, int(round(5 * z))), QFont.Bold))
+                qp.drawText(QRectF(p.x() - 40 * z, p.y() + 8 * z, 80 * z, 12 * z),
                             Qt.AlignCenter, w["name"])
         # 로봇 마커
         if self._robot is not None:
@@ -376,8 +436,8 @@ class WaypointMapCard(QFrame):
         self._btn_graph.setChecked(True)
         self._mode_group.addButton(self._btn_map, 0)
         self._mode_group.addButton(self._btn_graph, 1)
-        self._btn_map.clicked.connect(lambda: self._map.set_display_mode('map'))
-        self._btn_graph.clicked.connect(lambda: self._map.set_display_mode('graph'))
+        self._btn_map.clicked.connect(lambda: self._set_mode('map'))
+        self._btn_graph.clicked.connect(lambda: self._set_mode('graph'))
         # segmented control: 두 버튼이 한 덩어리, 좌/우 모서리만 둥글게
         seg_qss = """
             QPushButton {
@@ -422,11 +482,15 @@ class WaypointMapCard(QFrame):
         self._map.goal_pose_requested.connect(self._on_goal_pose_requested)
         self._map.initial_pose_requested.connect(self._on_initial_pose_requested)
         self._list = QListWidget()
-        self._list.setFixedWidth(180)
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_list_context_menu)
-        body.addWidget(self._map, 1); body.addWidget(self._list)
+        # 리스트 자리를 stack 으로 감싸 — map 모드에서도 가로 비율 유지 (빈 placeholder 와 swap)
+        self._list_stack = QStackedWidget()
+        self._list_stack.setFixedWidth(180)
+        self._list_stack.addWidget(self._list)        # index 0: graph mode
+        self._list_stack.addWidget(QWidget())         # index 1: map mode (empty)
+        body.addWidget(self._map, 1); body.addWidget(self._list_stack)
         layout.addLayout(body)
 
         # 테스트 접근용
@@ -438,6 +502,12 @@ class WaypointMapCard(QFrame):
         self._sse = _SseThread(f"{control_url}/waypoints/events", self)
         self._sse.event_received.connect(self._dispatcher.handle)
         self._sse.start()
+
+    def _set_mode(self, mode: str) -> None:
+        """map / graph 토글 — MapView 마커 + 사이드 리스트 동시 제어.
+        리스트는 visibility 가 아니라 빈 placeholder 와 swap (가로 비율 유지)."""
+        self._map.set_display_mode(mode)
+        self._list_stack.setCurrentIndex(0 if mode == 'graph' else 1)
 
     def update_robot(self, x: float, y: float, yaw: float) -> None:
         self._map.set_robot(x, y, yaw)
