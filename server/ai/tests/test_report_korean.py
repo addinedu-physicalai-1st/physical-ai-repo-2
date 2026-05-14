@@ -424,6 +424,8 @@ def test_merge_photo_clusters_combines_session_start_end_and_duration() -> None:
     assert "22" in row["text"] or "분" in row["text"]
     assert "OX 퀴즈" in row["text"]
     assert "마무리" in row["text"] or "마치" in row["text"]
+    # photo_ids: 클러스터의 모든 사진을 시각순 배열로 보존 — UI thumbnail strip 용.
+    assert row["photo_ids"] == [1, 2]
 
 
 def test_merge_photo_clusters_strips_ox_spam_outside_photo_window() -> None:
@@ -441,6 +443,21 @@ def test_merge_photo_clusters_strips_ox_spam_outside_photo_window() -> None:
     assert len([e for e in out if "ox-quiz" in e["text"].lower() or "OX 퀴즈" in e["text"]]) == 1
     assert any(e["time"] == "15:00" for e in out)
     assert sum(1 for e in out if e.get("photo_id") is not None) == 1
+    row = next(e for e in out if isinstance(e.get("photo_id"), int))
+    assert row["photo_ids"] == [1, 2]
+
+
+def test_merge_photo_clusters_single_photo_keeps_photo_ids_singleton() -> None:
+    pe = [
+        {"photo_id": 7, "time": "10:00", "robot": "noriarm", "mode": "ox-quiz", "emotion": "happy", "score": "0.9"},
+    ]
+    ev = [
+        {"time": "10:00", "photo_id": 7, "text": "정우의 표정이 기록되었다."},
+    ]
+    out = merge_same_session_photo_clusters_to_single_rows(ev, pe, "정우")
+    row = next(e for e in out if e.get("photo_id") == 7)
+    # 단일 사진도 photo_ids 배열 형태로 일관되게 — UI 가 한 가지 코드패스로 처리.
+    assert row["photo_ids"] == [7]
 
 
 def test_fill_timeline_schedule_gaps_covers_shared_schedule(shared_school_schedule: dict[str, str]) -> None:

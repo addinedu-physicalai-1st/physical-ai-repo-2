@@ -101,6 +101,9 @@ const selectedPhotosById = computed(() => {
 interface ReportEvent {
   time: string // "HH:MM"
   photo_id: number | null
+  /** 같은 세션의 사진을 한 줄로 묶을 때 클러스터의 전체 photo_id 를 시간순으로 보존.
+   *  레거시 보고서(서버 변경 전)는 이 필드가 없으니 photo_id 단일로 fallback. */
+  photo_ids?: number[]
   text: string
 }
 interface ReportTimeline {
@@ -407,6 +410,26 @@ function emotionLabel(emotion: string | null): string {
   return emotion ?? '·'
 }
 
+/** 이벤트의 사진 목록 — `photo_ids` 배열(신규 포맷) 우선, 없으면 단일 `photo_id` 로 fallback.
+ *  selectedPhotosById 에 없는 id 는 (드물게) 누락된 사진이므로 제외. */
+function eventPhotos(ev: ReportEvent): Photo[] {
+  const ids = ev.photo_ids ?? (ev.photo_id != null ? [ev.photo_id] : [])
+  const out: Photo[] = []
+  for (const id of ids) {
+    const p = selectedPhotosById.value.get(id)
+    if (p) out.push(p)
+  }
+  return out
+}
+
+/** 이벤트의 대표 감정 — entry 색 분류용. 대표는 photo_id(서버가 score 최고로 고른 것),
+ *  대표가 없으면 첫 photo_ids 의 감정. */
+function eventPrimaryEmotion(ev: ReportEvent): string {
+  const primaryId = ev.photo_id ?? ev.photo_ids?.[0]
+  if (primaryId == null) return 'unknown'
+  return selectedPhotosById.value.get(primaryId)?.emotion ?? 'unknown'
+}
+
 </script>
 
 <template>
@@ -511,7 +534,9 @@ function emotionLabel(emotion: string | null): string {
                   :key="`${ev.time}-${i}`"
                   class="timeline__entry"
                   :class="[
-                    ev.photo_id ? `timeline__entry--${selectedPhotosById.get(ev.photo_id)?.emotion ?? 'unknown'}` : 'timeline__entry--note',
+                    eventPhotos(ev).length > 0
+                      ? `timeline__entry--${eventPrimaryEmotion(ev)}`
+                      : 'timeline__entry--note',
                   ]"
                 >
                   <div class="timeline__time">{{ ev.time }}</div>
@@ -521,7 +546,8 @@ function emotionLabel(emotion: string | null): string {
                   <div
                     class="timeline__card"
                     :class="{
-                      'timeline__card--text': !ev.photo_id,
+                      'timeline__card--text': eventPhotos(ev).length === 0,
+                      'timeline__card--multi': eventPhotos(ev).length > 1,
                       'timeline__card--editing': editingEventIndex === i,
                     }"
                   >
@@ -531,25 +557,27 @@ function emotionLabel(emotion: string | null): string {
                       @click.stop
                       @keydown.escape.prevent="cancelInlineEdits"
                     >
-                      <template v-if="ev.photo_id && selectedPhotosById.has(ev.photo_id)">
+                      <div v-if="eventPhotos(ev).length > 0" class="timeline__strip">
                         <a
-                          :href="selectedPhotosById.get(ev.photo_id)!.url"
+                          v-for="p in eventPhotos(ev)"
+                          :key="p.id"
+                          :href="p.url"
                           target="_blank"
                           rel="noopener"
                           class="timeline__thumb-link"
                           @click.stop
                         >
                           <img
-                            :src="selectedPhotosById.get(ev.photo_id)!.url"
-                            :alt="emotionLabel(selectedPhotosById.get(ev.photo_id)!.emotion)"
+                            :src="p.url"
+                            :alt="emotionLabel(p.emotion)"
                             class="timeline__thumb"
                             loading="lazy"
                           />
                         </a>
-                      </template>
+                      </div>
                       <BaseTextarea
                         v-model="editingDraft"
-                        :rows="ev.photo_id ? 3 : 4"
+                        :rows="eventPhotos(ev).length > 0 ? 3 : 4"
                         :disabled="timelineSavingIndex === i"
                         autofocus
                         hint="저장하면 이 시간대 문장만 바뀝니다. Esc 로 취소."
@@ -575,21 +603,29 @@ function emotionLabel(emotion: string | null): string {
                       </div>
                       <p v-if="timelineSaveError" class="timeline__edit-err">{{ timelineSaveError }}</p>
                     </div>
-                    <template v-else-if="ev.photo_id && selectedPhotosById.has(ev.photo_id)">
-                      <a
-                        :href="selectedPhotosById.get(ev.photo_id)!.url"
-                        target="_blank"
-                        rel="noopener"
-                        class="timeline__thumb-link"
-                        @click.stop
-                      >
-                        <img
-                          :src="selectedPhotosById.get(ev.photo_id)!.url"
-                          :alt="emotionLabel(selectedPhotosById.get(ev.photo_id)!.emotion)"
-                          class="timeline__thumb"
-                          loading="lazy"
-                        />
-                      </a>
+                    <template v-else-if="eventPhotos(ev).length > 0">
+                      <div class="timeline__strip">
+                        <a
+                          v-for="p in eventPhotos(ev)"
+                          :key="p.id"
+                          :href="p.url"
+                          target="_blank"
+                          rel="noopener"
+                          class="timeline__thumb-link"
+                          :title="`${timeLabel(p.taken_at)} · ${emotionLabel(p.emotion)}`"
+                          @click.stop
+                        >
+                          <img
+                            :src="p.url"
+                            :alt="emotionLabel(p.emotion)"
+                            class="timeline__thumb"
+                            loading="lazy"
+                          />
+                          <span v-if="eventPhotos(ev).length > 1" class="timeline__thumb-time">
+                            {{ timeLabel(p.taken_at) }}
+                          </span>
+                        </a>
+                      </div>
                       <div
                         class="timeline__body timeline__body--editable"
                         role="button"
@@ -600,13 +636,18 @@ function emotionLabel(emotion: string | null): string {
                       >
                         <p class="timeline__text">{{ ev.text }}</p>
                         <div class="timeline__meta">
-                          <span class="timeline__emotion">{{ emotionLabel(selectedPhotosById.get(ev.photo_id)!.emotion) }}</span>
-                          <span v-if="selectedPhotosById.get(ev.photo_id)!.mode" class="timeline__mode">
-                            {{ selectedPhotosById.get(ev.photo_id)!.mode }}
+                          <span v-if="eventPhotos(ev).length > 1" class="timeline__count">
+                            사진 {{ eventPhotos(ev).length }}장
                           </span>
-                          <span class="timeline__score">
-                            강도 {{ ((selectedPhotosById.get(ev.photo_id)!.emotion_score ?? 0) * 100).toFixed(0) }}%
-                          </span>
+                          <template v-else>
+                            <span class="timeline__emotion">{{ emotionLabel(eventPhotos(ev)[0].emotion) }}</span>
+                            <span v-if="eventPhotos(ev)[0].mode" class="timeline__mode">
+                              {{ eventPhotos(ev)[0].mode }}
+                            </span>
+                            <span class="timeline__score">
+                              강도 {{ ((eventPhotos(ev)[0].emotion_score ?? 0) * 100).toFixed(0) }}%
+                            </span>
+                          </template>
                         </div>
                       </div>
                     </template>
@@ -1049,6 +1090,7 @@ section {
   box-shadow: var(--focus-ring);
 }
 .timeline__thumb-link {
+  position: relative;
   display: block;
   flex-shrink: 0;
   text-decoration: none;
@@ -1056,6 +1098,7 @@ section {
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  scroll-snap-align: start;
 }
 .timeline__thumb-link:hover {
   transform: scale(1.03) rotate(-0.5deg);
@@ -1067,6 +1110,54 @@ section {
   border-radius: 14px;
   background: var(--color-surface-sunken);
   display: block;
+}
+/* 다중 사진 strip — 한 줄 가로 스크롤, 모바일에서도 자연스럽게 swipe. */
+.timeline__strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+  margin: 0;
+  /* card 너비를 강제로 차지 — 옆 텍스트 카드의 column-shrink 와 충돌 방지 */
+  min-width: 0;
+}
+.timeline__strip::-webkit-scrollbar {
+  height: 6px;
+}
+.timeline__strip::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+.timeline__thumb-time {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  color: white;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.timeline__count {
+  padding: 2px 10px;
+  background: rgba(244, 114, 182, 0.15);
+  border: 1px solid rgba(244, 114, 182, 0.4);
+  color: #be185d;
+  border-radius: 999px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+}
+/* 다중 사진 카드는 strip 가 가로로 확장될 수 있게 본문을 아래로 배치 */
+.timeline__card--multi {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
 }
 .timeline__body {
   display: flex;
@@ -1284,12 +1375,17 @@ section {
     align-items: stretch;
   }
 
-  .timeline__thumb {
+  /* 모바일 — 단일 사진은 큰 썸네일, 다중 사진은 가로 스크롤 strip 유지. */
+  .timeline__card:not(.timeline__card--multi) .timeline__thumb {
     width: 100%;
     max-width: 200px;
     height: auto;
     aspect-ratio: 1;
     align-self: flex-start;
+  }
+  .timeline__card--multi .timeline__thumb {
+    width: 84px;
+    height: 84px;
   }
 }
 
