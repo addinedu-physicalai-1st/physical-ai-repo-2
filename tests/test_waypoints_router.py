@@ -114,6 +114,27 @@ def test_goto_missing(client):
     assert r.status_code == 404
 
 
+def test_goto_pose_with_coords(client):
+    """RViz Nav2 Goal 패턴 — 좌표 직접 지정으로 NavigateToPose 호출."""
+    c, bridge = client
+    r = c.post("/waypoints/goto-pose", json={"x": 1.5, "y": -2.5, "yaw": 0.78})
+    assert r.status_code == 202
+    body = r.json()
+    assert body["x"] == 1.5 and body["y"] == -2.5 and body["yaw"] == 0.78
+    assert body["name"] == "(click)"
+    assert "goal_id" in body and len(body["goal_id"]) > 8
+    bridge.navigate_to_pose.assert_called_once()
+    args = bridge.navigate_to_pose.call_args.args
+    assert args[0] == 1.5 and args[1] == -2.5 and args[2] == 0.78
+
+
+def test_goto_pose_missing_fields(client):
+    """x/y/yaw 중 하나라도 빠지면 422."""
+    c, _ = client
+    r = c.post("/waypoints/goto-pose", json={"x": 1.0, "y": 2.0})  # yaw 빠짐
+    assert r.status_code == 422
+
+
 def test_patrol_calls_bridge(client, tmp_path):
     c, bridge = client
     bridge.odom_snapshot.return_value = (0, 0, 0)
