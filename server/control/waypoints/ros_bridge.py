@@ -313,11 +313,14 @@ class WaypointsRosBridge:
         }
 
     def navigate_to_vertex(self, target_name: str, goal_id: str) -> None:
-        """graph_router action 호출 → 다익스트라 + nav2 위임. feedback SSE 로 emit."""
+        """graph_router action 호출 → 다익스트라 + nav2 위임. feedback SSE 로 emit.
+        진행 중 goal 이 있으면 먼저 cancel — 새 명령이 이전 명령을 대체."""
         if self._gr_nav_client is None:
             self._emit({"type": "goal_status", "goal_id": goal_id,
                         "status": "rejected", "reason": "graph_router unavailable"})
             return
+        # 이전 goal cancel (best effort, 비동기). 새 goal 즉시 진행.
+        self.cancel_current()
         from gogoping_msgs.action import NavigateToVertex
         goal = NavigateToVertex.Goal()
         goal.target_name = target_name

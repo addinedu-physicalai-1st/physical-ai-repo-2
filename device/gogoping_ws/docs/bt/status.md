@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-15
+마지막 업데이트: 2026-05-15 (task 10 완료)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -115,7 +115,7 @@
 | nav2 stack (실물) | ☐ | laptop launch 미작성 (placeholder) |
 | server REST `/waypoints/route` `/waypoints/navigate` | ✅ | tests/test_waypoints_router.py 통과 |
 | admin UI lanes / route 시각화 | ✅ | graph map 모드 |
-| robot-ui 음성 → goto_vertex | ☐ | task 9, 10 |
+| robot-ui 음성 → goto_vertex | ✅ | "X로 가" / "복귀" 인식 + `/waypoints/navigate` 호출 (보조 모드 우회 통과). 분류기는 [server/ai/hub.py](../../../../server/ai/hub.py) `_try_goto_vertex` / `_is_return_text` |
 
 ---
 
