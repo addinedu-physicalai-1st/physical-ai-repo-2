@@ -74,6 +74,10 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
+    # window 2: graph-router (vertex 그래프 + 다익스트라 + nav2 위임)
+    tmux new-window -t "$SESSION" -n graph-router -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
+
     # 카메라 UDP MJPEG 송출 (SR-CAM-001) 은 bringup 안에 IncludeLaunchDescription 으로 통합됨.
     # → pi.launch.py 가 gogoping_camera/launch/camera_stream.launch.py 호출.
     # → 별도 window 불필요. CONTROL_SERVER_NAME env 는 bringup window 에 전파.
