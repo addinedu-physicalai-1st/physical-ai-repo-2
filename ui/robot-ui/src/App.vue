@@ -18,6 +18,11 @@ import OXQuiz from '@/noriarm/OXQuiz.vue';
 const mode = useModeStore();
 const voice = useVoiceStore();
 const { robot, currentEmotion, currentMode } = storeToRefs(mode);
+const { lastError } = storeToRefs(voice);
+
+function clearVoiceError(): void {
+  voice.setError(null);
+}
 
 const attendanceMode = computed<'IN' | 'OUT' | null>(() => {
   if (robot.value.id !== 'eduping') return null;
@@ -62,6 +67,11 @@ function handleStart(): void {
     <OXQuiz v-if="showOXQuiz" />
     <DanceManager v-if="showDanceManager" />
     <GreetingManager v-if="showGreetingManager" />
+    <Transition name="err-fade">
+      <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
+        ⚠ {{ lastError }}
+      </button>
+    </Transition>
     <StartOverlay v-if="!started" @start="handleStart" />
   </div>
 </template>
@@ -70,6 +80,8 @@ function handleStart(): void {
 .app {
   position: fixed;
   inset: 0;
+  width: 100dvw;
+  height: 100dvh;
   overflow: hidden;
   font-family: -apple-system, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
 }
@@ -101,6 +113,61 @@ function handleStart(): void {
 .bg-noriarm .brand {
   color: rgba(40, 110, 160, 0.7);
 }
+
+.voice-err {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(90vw, 520px);
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.92);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+  z-index: 100;
+}
+.err-fade-enter-active, .err-fade-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.err-fade-enter-from, .err-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .brand {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    left: 12px;
+    font-size: 20px;
+  }
+  .voice-err {
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+}
+
+/* 가로 휴대전화: brand 는 dock 과 겹치므로 숨김, voice-err 는 좁은 화면용 사이즈 */
+@media (pointer: coarse) and (orientation: landscape),
+       (max-height: 500px) and (orientation: landscape) {
+  .brand {
+    display: none;
+  }
+  .voice-err {
+    top: calc(env(safe-area-inset-top, 0px) + 4px);
+    font-size: 10px;
+    padding: 4px 10px;
+    max-width: calc(100vw - 80px); /* 우측 hamburger 만큼 빼고 */
+  }
+}
 </style>
 
 <style>
@@ -110,8 +177,8 @@ body,
 #app {
   margin: 0;
   padding: 0;
-  width: 100%;
-  height: 100%;
+  width: 100dvw;
+  height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
 }

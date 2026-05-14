@@ -48,6 +48,8 @@ export function useVoiceController(robot: RobotConfig): {
   start: () => void;
   stop: () => void;
   processCommand: (text: string) => Promise<void>;
+  /** STT 백엔드 (phone = 서버 STT 의 RMS) 가 노출하는 0~1 audio level. SiriBlob 시각화용. */
+  micLevel: import('vue').Ref<number>;
 } {
   const voice = useVoiceStore();
   const mode = useModeStore();
@@ -419,6 +421,12 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   async function enterDispatching(text: string): Promise<void> {
+    // 모바일 STT 가 가끔 빈/공백 final 을 흘리는데, 서버 schema `text: min_length=1` 위반으로 422.
+    // 잡음일 가능성이 높으므로 cooldown 으로 빠져 다음 발화 대기.
+    if (!text.trim()) {
+      enterCooldown();
+      return;
+    }
     voice.setState('dispatching');
     voice.setLastSpokenText(text);
     voice.setRobotReply('');
@@ -536,7 +544,7 @@ export function useVoiceController(robot: RobotConfig): {
     await enterDispatching(trimmed);
   }
 
-  return { start, stop, processCommand };
+  return { start, stop, processCommand, micLevel: stt.level };
 }
 
 export type VoiceController = ReturnType<typeof useVoiceController>;

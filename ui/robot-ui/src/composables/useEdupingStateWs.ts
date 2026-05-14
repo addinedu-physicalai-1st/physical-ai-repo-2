@@ -31,7 +31,10 @@ export interface UseEdupingStateWs {
   stop: () => void;
 }
 
-const RECONNECT_DELAY_MS = 1500;
+// 첫 재연결은 빠르게, 실패가 반복되면 (서버에 ROS hub 가 안 떠있는 등) 지수 백오프로 늘려서
+// vite proxy 로그가 ECONNRESET 으로 도배되는 것을 막는다. open() 성공 시 리셋.
+const RECONNECT_INITIAL_MS = 1500;
+const RECONNECT_MAX_MS = 30_000;
 
 export function useEdupingStateWs(): UseEdupingStateWs {
   const connected = ref(false);
@@ -49,6 +52,7 @@ export function useEdupingStateWs(): UseEdupingStateWs {
   let ws: WebSocket | null = null;
   let stopRequested = false;
   let reconnectTimer: number | null = null;
+  let reconnectDelayMs = RECONNECT_INITIAL_MS;
 
   function url(): string {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -66,6 +70,7 @@ export function useEdupingStateWs(): UseEdupingStateWs {
     }
     ws.onopen = () => {
       connected.value = true;
+      reconnectDelayMs = RECONNECT_INITIAL_MS;
     };
     ws.onmessage = (ev) => {
       try {
@@ -89,10 +94,12 @@ export function useEdupingStateWs(): UseEdupingStateWs {
 
   function scheduleReconnect(): void {
     if (stopRequested || reconnectTimer != null) return;
+    const delay = reconnectDelayMs;
+    reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_MS);
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, RECONNECT_DELAY_MS);
+    }, delay);
   }
 
   function start(): void {

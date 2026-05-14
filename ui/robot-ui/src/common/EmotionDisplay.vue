@@ -157,6 +157,27 @@ const subtitleTransitionKey = computed(() => {
   padding-bottom: 14vh;
 }
 
+/* 세로 휴대전화: hamburger(우상단) + 하단 BottomDock 만 — pill strip 제거됨 */
+@media ((max-width: 768px) and (orientation: portrait)),
+       ((pointer: coarse) and (orientation: portrait)) {
+  .stage {
+    align-items: center;
+    padding: 64px 8px 160px;
+  }
+}
+
+/* 가로 휴대전화: hamburger drawer (탭하면 우측 슬라이드) → 평소엔 face/dock 만 보임 */
+@media (pointer: coarse) and (orientation: landscape),
+       (max-height: 500px) and (orientation: landscape) {
+  .stage {
+    align-items: center;
+    padding: 6px 8px 80px;
+  }
+  .actor-wrapper {
+    gap: 0;
+  }
+}
+
 .face {
   --accent: #94a3b8;
   position: relative;
@@ -414,6 +435,117 @@ const subtitleTransitionKey = computed(() => {
   margin-top: -18px;
   z-index: 9;
   pointer-events: none;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .face {
+    width: min(86vw, calc(38dvh * 4 / 3));
+    border-radius: 24px;
+    padding: 10px;
+  }
+  .wake-bubble {
+    max-width: min(78vw, 280px);
+    font-size: 15px;
+    padding: 10px 14px;
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .actor-wrapper {
+    gap: 18px;
+  }
+  .subtitle-container {
+    width: min(92vw, 600px);
+  }
+  .subtitle-text {
+    font-size: 1.05rem;
+    padding: 12px 18px;
+    border-radius: 18px;
+  }
+  .user-subtitle-container {
+    width: min(88vw, 520px);
+    margin-top: -10px;
+  }
+  .user-subtitle-text {
+    font-size: 0.9rem;
+    padding: 8px 14px;
+  }
+}
+
+/* 가로 휴대전화: face 더 작게 + 자막/wake-bubble 가시성 확보 */
+@media (pointer: coarse) and (orientation: landscape),
+       (max-height: 500px) and (orientation: landscape) {
+  .face {
+    width: min(36vw, calc(48dvh * 4 / 3));
+    border-radius: 12px;
+    padding: 3px;
+  }
+  .notch { width: 40px; height: 4px; top: 3px; }
+
+  /* wake-bubble — 기본 스타일은 face 위로 떠 있어서 가로폰에서 잘림.
+     중앙 상단 overlay 로 재배치, 자막보다 살짝 아래. */
+  .wake-bubble {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 6px);
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 110px); /* 우측 mode-panel 빼고 */
+    font-size: 13px;
+    font-weight: 800;
+    padding: 7px 14px;
+    border-radius: 14px;
+    border-width: 2px;
+    white-space: nowrap;
+    z-index: 28;
+    animation: none; /* bobbing 끔 — 가로폰 좁은 화면에서 산만 */
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  }
+  /* 화살표 꼬리 제거 (이제 face 옆이 아니라 화면 상단) */
+  .wake-bubble::before,
+  .wake-bubble::after {
+    display: none;
+  }
+
+  /* 자막을 상단 overlay 로 빼서 BottomDock 가림 방지.
+     hamburger (44px + 우측 margin 10px) 만 피하면 됨. */
+  .subtitle-container {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 44px);
+    left: 6px;
+    right: 66px;
+    width: auto;
+    z-index: 25;
+  }
+  .user-subtitle-container {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 82px);
+    left: 6px;
+    right: 66px;
+    width: auto;
+    margin-top: 0;
+    z-index: 24;
+  }
+  .subtitle-text {
+    font-size: 0.95rem;
+    font-weight: 800;
+    padding: 7px 13px;
+    border-radius: 12px;
+    background: rgba(10, 13, 20, 0.92);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  .user-subtitle-text {
+    font-size: 0.78rem;
+    padding: 5px 11px;
+    border-radius: 10px;
+  }
+  .forehead-status {
+    top: 8px;
+    padding: 2px 8px 2px 6px;
+  }
+  .status-label { font-size: 9px; }
+
+  /* actor-wrapper 의 subtitle-container 자식들이 모두 fixed 가 됐으므로 wrapper 의
+     gap 영향 없음. face 가 단독으로 중앙에 자리잡음. */
 }
 
 .subtitle-text {

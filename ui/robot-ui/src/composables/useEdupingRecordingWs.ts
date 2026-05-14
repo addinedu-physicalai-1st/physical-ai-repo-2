@@ -24,7 +24,9 @@ export interface UseEdupingRecordingWs {
   stop: () => void;
 }
 
-const RECONNECT_DELAY_MS = 1500;
+// state WS 와 동일 — 서버 hub 미가용 시 ECONNRESET 으로 로그 도배되는 것을 방지.
+const RECONNECT_INITIAL_MS = 1500;
+const RECONNECT_MAX_MS = 30_000;
 
 export function useEdupingRecordingWs(): UseEdupingRecordingWs {
   const connected = ref(false);
@@ -33,6 +35,7 @@ export function useEdupingRecordingWs(): UseEdupingRecordingWs {
   let ws: WebSocket | null = null;
   let stopRequested = false;
   let reconnectTimer: number | null = null;
+  let reconnectDelayMs = RECONNECT_INITIAL_MS;
 
   function url(): string {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -50,6 +53,7 @@ export function useEdupingRecordingWs(): UseEdupingRecordingWs {
     }
     ws.onopen = () => {
       connected.value = true;
+      reconnectDelayMs = RECONNECT_INITIAL_MS;
     };
     ws.onmessage = (ev) => {
       try {
@@ -70,10 +74,12 @@ export function useEdupingRecordingWs(): UseEdupingRecordingWs {
 
   function scheduleReconnect(): void {
     if (stopRequested || reconnectTimer != null) return;
+    const delay = reconnectDelayMs;
+    reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_MS);
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, RECONNECT_DELAY_MS);
+    }, delay);
   }
 
   function start(): void {

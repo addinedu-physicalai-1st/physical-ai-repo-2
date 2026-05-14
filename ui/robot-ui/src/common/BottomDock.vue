@@ -5,6 +5,7 @@ import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY, VOICE_UI_SESSION_KEY } from '@/composables/voiceControllerKey';
 import { useAudioLevel } from '@/composables/useAudioLevel';
+import { usePhoneViewport } from '@/common/usePhoneViewport';
 import { faceAccent } from '@/config/colors';
 import CommandBar from './CommandBar.vue';
 import SiriBlob from './SiriBlob.vue';
@@ -23,6 +24,10 @@ const ctrl = controller;
 const voiceUiSession = inject(VOICE_UI_SESSION_KEY, ref(false));
 
 const audio = useAudioLevel();
+const isPhone = usePhoneViewport();
+
+/** SiriBlob 에 줄 audio level — phone 은 useServerSTT 의 stream RMS, 데스크톱은 useAudioLevel. */
+const micLevel = computed(() => (isPhone.value ? ctrl.micLevel.value : audio.level.value));
 
 // voiceMode 토글 — STT on/off 전환 (초기 시작은 App.vue handleStart 가 처리)
 watch(voiceMode, (next, prev) => {
@@ -32,9 +37,17 @@ watch(voiceMode, (next, prev) => {
 
 // 마이크(getUserMedia)는 음성 상태마다 켰다 끄면 OS 인디케이터가 깜빡임.
 // 시작 제스처 이후·음성 모드인 동안만 한 스트림 유지, 타이핑 모드로 바꿀 때만 해제.
+//
+// 휴대전화에서는 audio-level 의 두 번째 getUserMedia 가 webkitSpeechRecognition 의 마이크
+// 입력을 굶겨 STT 가 무음으로 동작하지 않는다 (Chrome Android 한정). STT 가 더 중요하므로
+// phone 에서는 시각화 mic stream 생략, 인디케이터 깜빡임은 감수.
 watch(
   [voiceMode, voiceUiSession],
   async ([vm, session]) => {
+    if (isPhone.value) {
+      audio.stop();
+      return;
+    }
     if (vm === 'voice' && session) {
       try {
         await audio.start();
@@ -68,7 +81,7 @@ function switchToText(): void {
       <div v-else key="voice" class="voice-area">
         <div class="anim-slot">
           <DispatchingLoader v-if="showLoader" />
-          <SiriBlob v-else :level="audio.level.value" :state="state" />
+          <SiriBlob v-else :level="micLevel" :state="state" />
           <button class="text-mode-btn" @click="switchToText" aria-label="타이핑 모드로 전환">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="6" width="20" height="12" rx="2" />
@@ -95,6 +108,42 @@ function switchToText(): void {
   z-index: 15;
   width: min(560px, calc(100vw - 200px));
   min-height: 200px;
+}
+
+/* 휴대전화 공통: SiriBlob 자체 크기 축소 (interactive 한 발화 반응은 SiriBlob 의 scale 로 충분히 잘 보임) */
+@media (max-width: 768px), (pointer: coarse) {
+  .dock {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    width: min(96vw, 460px);
+    min-height: 0;
+    gap: 8px;
+  }
+  .anim-slot {
+    width: 76px;
+    height: 76px;
+  }
+  .text-mode-btn {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+/* 가로 휴대전화: 화면이 짧음 — dock 위치는 화면 가운데 그대로 (hamburger drawer 로 modes 가 사라졌으므로) */
+@media (pointer: coarse) and (orientation: landscape),
+       (max-height: 500px) and (orientation: landscape) {
+  .dock {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 2px);
+    width: min(50vw, 260px);
+    gap: 2px;
+  }
+  .anim-slot {
+    width: 56px;
+    height: 56px;
+  }
+  .text-mode-btn {
+    width: 32px;
+    height: 32px;
+  }
 }
 .caption-container {
   display: flex;
