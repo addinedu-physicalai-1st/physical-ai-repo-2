@@ -1,0 +1,82 @@
+<section data-scenario="sprint-tl" style="padding:40px 60px">
+  <p class="font-display text-em-xs" style="letter-spacing:0.2em;color:#FFE5A8">JIRA</p>
+  <h2 class="font-display text-em-lg mt-1">스프린트 타임라인</h2>
+
+  <div style="margin-top:16px">
+    <!-- Sprint 1 -->
+    <div class="flex items-center gap-3 mb-3" style="font-size:0.65em">
+      <div style="width:90px;text-align:right" class="font-display text-inkSoft">Sprint 1</div>
+      <div style="flex:1;position:relative">
+        <div style="height:28px;background:var(--border);border-radius:14px;overflow:hidden">
+          <div class="sprint-bar" id="sp1-bar" style="width:0%;background:linear-gradient(90deg,#F8B4C4,#FFD3DD)">
+            <span id="sp1-label" style="opacity:0">100%</span>
+          </div>
+        </div>
+        <div class="text-em-xs text-inkSoft mt-1">04/22 — 04/23 &middot; 주제 선정 &middot; <span id="sp1-count">-</span></div>
+      </div>
+    </div>
+
+    <!-- Sprint 2 -->
+    <div class="flex items-center gap-3 mb-3" style="font-size:0.65em">
+      <div style="width:90px;text-align:right" class="font-display text-inkSoft">Sprint 2</div>
+      <div style="flex:1;position:relative">
+        <div style="height:28px;background:var(--border);border-radius:14px;overflow:hidden">
+          <div class="sprint-bar" id="sp2-bar" style="width:0%;background:linear-gradient(90deg,#B5E6D8,#D6F2E8)">
+            <span id="sp2-label" style="opacity:0">100%</span>
+          </div>
+        </div>
+        <div class="text-em-xs text-inkSoft mt-1">04/25 — 04/30 &middot; 상세 설계 &middot; <span id="sp2-count">-</span></div>
+      </div>
+    </div>
+
+    <!-- Sprint 3 -->
+    <div class="flex items-center gap-3 mb-3" style="font-size:0.65em">
+      <div style="width:90px;text-align:right" class="font-display text-inkSoft">Sprint 3</div>
+      <div style="flex:1;position:relative">
+        <div style="height:28px;background:var(--border);border-radius:14px;overflow:hidden">
+          <div class="sprint-bar" id="sp3-bar" style="width:0%;background:linear-gradient(90deg,#C9B6E4,#E2D4F0)">
+            <span id="sp3-label" style="opacity:0">100%</span>
+          </div>
+        </div>
+        <div class="text-em-xs text-inkSoft mt-1">05/01 — 05/07 &middot; 스캐폴드 + 작업 할당 &middot; <span id="sp3-count">-</span></div>
+      </div>
+    </div>
+
+    <!-- Sprint 4 (current) -->
+    <div class="flex items-center gap-3 mb-3" style="font-size:0.65em">
+      <div style="width:90px;text-align:right" class="font-display" style="color:#FFE5A8">Sprint 4</div>
+      <div style="flex:1;position:relative">
+        <div style="height:28px;background:var(--border);border-radius:14px;overflow:hidden">
+          <div class="sprint-bar" id="sp4-bar" style="width:0%;background:linear-gradient(90deg,#FFE5A8,#FFF0CC)">
+            <span id="sp4-label" style="opacity:0;color:var(--ink)">39%</span>
+          </div>
+        </div>
+        <div class="text-em-xs mt-1">
+          <span style="color:#FF8A80;font-weight:700">05/08 — 05/14 &middot; 구현 week1 (진행 중)</span>
+          &middot; <span id="sp4-count">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sprint 5 (planned) -->
+    <div class="flex items-center gap-3 mb-3" style="font-size:0.65em">
+      <div style="width:90px;text-align:right" class="font-display text-inkSoft">Sprint 5</div>
+      <div style="flex:1;position:relative">
+        <div style="height:28px;background:var(--border);border-radius:14px;overflow:hidden">
+          <div class="sprint-bar" id="sp5-bar" style="width:0%;background:var(--border)"></div>
+        </div>
+        <div class="text-em-xs text-inkSoft mt-1">05/15 — 05/21 &middot; 구현 week2 (예정)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-info mt-2">
+    <span class="font-display" style="color:#F8B4C4">&rarr;</span> 키를 눌러 스프린트 진행을 확인하세요.
+  </div>
+
+  <span class="fragment" data-fragment-index="1" style="display:none"></span>
+  <span class="fragment" data-fragment-index="2" style="display:none"></span>
+  <span class="fragment" data-fragment-index="3" style="display:none"></span>
+  <span class="fragment" data-fragment-index="4" style="display:none"></span>
+
+</section>

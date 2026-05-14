@@ -1,0 +1,70 @@
+<section style="padding:40px 60px">
+  <p class="font-display text-em-xs" style="letter-spacing:0.2em;color:#B5E6D8">ARCHITECTURE</p>
+  <h2 class="font-display text-em-xl mt-1">시스템 아키텍처</h2>
+
+  <div class="flex gap-3 mt-4">
+    <!-- ROS2 / Device -->
+    <div class="pastel-card" style="flex:1.2;border-top:4px solid #F8B4C4">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="material-icons-round" style="color:#F8B4C4">memory</span>
+        <span class="font-display text-em-sm">Device (ROS2)</span>
+      </div>
+      <div class="text-em-xs text-inkSoft" style="line-height:1.8">
+        <div class="flex items-center gap-1 mb-1"><span class="chip" style="font-size:0.9em;padding:2px 8px">고고핑</span> Nav2 · LiDAR · Camera</div>
+        <div class="flex items-center gap-1 mb-1"><span class="chip chip-lavender" style="font-size:0.9em;padding:2px 8px">노리암</span> OMX Driver · Trajectory</div>
+        <div class="flex items-center gap-1"><span class="chip chip-mint" style="font-size:0.9em;padding:2px 8px">에듀핑</span> OpenArm · InsightFace</div>
+        <div class="mt-2" style="color:#8D6E63;font-size:0.9em">
+          py_trees (BT) · FSM · rclpy
+        </div>
+      </div>
+    </div>
+
+    <!-- Server -->
+    <div class="pastel-card" style="flex:1;border-top:4px solid #C9B6E4">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="material-icons-round" style="color:#C9B6E4">dns</span>
+        <span class="font-display text-em-sm">Server</span>
+      </div>
+      <div class="text-em-xs text-inkSoft" style="line-height:1.8">
+        <div class="mb-1"><strong>Control</strong> — FastAPI + rclpy bridge</div>
+        <div class="mb-1"><strong>AI Hub</strong> — Ollama (Qwen2.5 · Gemma3)</div>
+        <div class="mb-1"><strong>Streaming</strong> — WebSocket 멀티플렉싱</div>
+        <div><strong>Auth</strong> — fastapi-users (쿠키 세션)</div>
+      </div>
+    </div>
+
+    <!-- Data -->
+    <div class="pastel-card" style="flex:0.7;border-top:4px solid #FFE5A8">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="material-icons-round" style="color:#FFE5A8">storage</span>
+        <span class="font-display text-em-sm">Data</span>
+      </div>
+      <div class="text-em-xs text-inkSoft" style="line-height:1.8">
+        <div>PostgreSQL 17</div>
+        <div>pgvector (임베딩)</div>
+        <div>MinIO (사진)</div>
+        <div class="mt-2">Alembic 마이그레이션</div>
+      </div>
+    </div>
+
+    <!-- UI (간략) -->
+    <div class="pastel-card" style="flex:0.7;border-top:4px solid #B5DEFF">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="material-icons-round" style="color:#B5DEFF">devices</span>
+        <span class="font-display text-em-sm">UI</span>
+      </div>
+      <div class="text-em-xs text-inkSoft" style="line-height:1.8">
+        <div>Robot UI (Vue 3) x3</div>
+        <div>Admin UI (PyQt5)</div>
+        <div>Portal UI (Vue 3)</div>
+        <div class="mt-2">Three.js ShaderFace</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-em-2xs text-inkSoft mt-3 text-center">
+    Device ↔ Server: ROS2 bridge (rclpy) &nbsp;&middot;&nbsp;
+    Server ↔ UI: REST + WebSocket &nbsp;&middot;&nbsp;
+    Server ↔ DB: SQLAlchemy async
+  </p>
+</section>

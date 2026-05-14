@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pingdergarten — Pure HTML/CSS Demo</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0A1628;
+      --surface: #112236;
+      --border: #1E3A5A;
+      --text: #E2EEFF;
+      --text-sub: #7BA5C8;
+      --accent: #38BDF8;
+      --purple: #A78BFA;
+      --green: #34D399;
+      --amber: #FBBF24;
+    }
+
+    html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── 슬라이드 ── */
+    .slide {
+      width: 100vw; height: 100vh;
+      scroll-snap-align: start;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 60px 10vw;
+      position: relative;
+      /* dot grid */
+      background-image: radial-gradient(rgba(56,189,248,0.05) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .slide.center { align-items: center; text-align: center; }
+
+    /* ── 타이포 ── */
+    h1 { font-size: clamp(2.5rem, 6vw, 5rem); font-weight: 900; color: #fff; }
+    h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 700; color: #fff; margin-bottom: 12px; }
+    h3 { font-size: 1.05rem; color: var(--accent); margin-bottom: 4px; }
+    p { color: var(--text-sub); font-size: 0.95rem; line-height: 1.6; }
+    .divider { width: 120px; height: 3px; background: rgba(56,189,248,0.5); margin: 16px 0; }
+    .tag {
+      display: inline-block; background: #0E2840; color: var(--accent);
+      padding: 3px 16px; border-radius: 100px; font-size: 0.7rem;
+      font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* ── 카드 ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+    }
+    .card p { font-size: 0.85rem; margin-top: 6px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; width: 100%; }
+
+    /* ── 스크롤 인디케이터 ── */
+    .scroll-hint {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 100; color: var(--text-sub); font-size: 0.75rem;
+      animation: bounce 2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-8px); }
+    }
+
+    /* ── 슬라이드 번호 ── */
+    .slide-counter {
+      position: fixed; bottom: 16px; right: 20px; z-index: 100;
+      background: rgba(10,22,40,0.9); border: 1px solid var(--border);
+      border-radius: 8px; padding: 4px 12px; font-size: 11px; color: #3A5A7A;
+    }
+
+    /* ── 등장 애니메이션 ── */
+    .fade-up {
+      opacity: 0; transform: translateY(40px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── 코드 블록 ── */
+    pre {
+      background: #0D1E33; border: 1px solid var(--border); border-radius: 10px;
+      padding: 20px 24px; overflow-x: auto; font-size: 0.8rem;
+      color: #E2EEFF; line-height: 1.7; width: 100%; max-width: 800px;
+    }
+    code .kw { color: #A78BFA; }
+    code .fn { color: #38BDF8; }
+    code .str { color: #34D399; }
+    code .cm { color: #3A5A7A; }
+  </style>
+</head>
+<body>
+
+<div class="scroll-hint">scroll &darr;</div>
+<div class="slide-counter" id="counter">1 / 5</div>
+
+<!-- ====== 1. 타이틀 ====== -->
+<section class="slide center" id="s1">
+  <span class="tag">Addinedu Physical AI 4th</span>
+  <p style="color:#7BA5C8;margin-bottom:4px">최종 프로젝트 | 팀 사랑의 에듀핑</p>
+  <h1>pingdergarten</h1>
+  <div class="divider" style="margin:12px auto"></div>
+  <p style="font-size:1.1rem">유치원 교육보조로봇 서비스</p>
+</section>
+
+<!-- ====== 2. 로봇 구성 ====== -->
+<section class="slide" id="s2">
+  <span class="tag">ROBOTS</span>
+  <h2>로봇 3대 구성</h2>
+  <div class="divider"></div>
+  <div class="grid-3">
+    <div class="card fade-up">
+      <span class="material-icons-round" style="font-size:2rem;color:var(--accent)">precision_manufacturing</span>
+      <h3>EduPing</h3>
+      <p>OpenArm 듀얼 암<br>등하원 / 율동 / 가게놀이 / 정리정돈</p>
+    </div>
+    <div class="card fade-up" style="transition-delay:0.15s">
+      <span class="material-icons-round" style="font-size:2rem;color:var(--accent)">smart_toy</span>
+      <h3>GogoPing</h3>
+      <p>Vic Pinky 모바일 베이스<br>교사 추종 / 운반 / 숨바꼭질 / 자장가</p>
+    </div>
+    <div class="card fade-up" style="transition-delay:0.3s">
+      <span class="material-icons-round" style="font-size:2rem;color:var(--accent)">construction</span>
+      <h3>NoriArm</h3>
+      <p>OMX 매니퓰레이터<br>블럭쌓기 / 정리</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 3. 아키텍처 ====== -->
+<section class="slide" id="s3">
+  <span class="tag">ARCHITECTURE</span>
+  <h2>시스템 아키텍처</h2>
+  <div class="divider"></div>
+  <div style="display:flex;gap:16px;width:100%">
+    <div class="card fade-up" style="flex:1;border-top:3px solid var(--accent)">
+      <h3>Client</h3>
+      <p>Robot UI (Vue 3 x3)<br>Portal UI (Vue 3)<br>Admin UI (PyQt5)</p>
+    </div>
+    <div class="card fade-up" style="flex:1.2;border-top:3px solid var(--purple);transition-delay:0.15s">
+      <h3 style="color:var(--purple)">Server</h3>
+      <p>Control Service (FastAPI + rclpy)<br>AI Hub (Ollama Qwen2.5 + Gemma3)</p>
+    </div>
+    <div class="card fade-up" style="flex:0.8;border-top:3px solid var(--amber);transition-delay:0.3s">
+      <h3 style="color:var(--amber)">Data</h3>
+      <p>PostgreSQL 17 (pgvector)<br>MinIO</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====== 4. 코드 예시 ====== -->
+<section class="slide" id="s4">
+  <span class="tag">CODE</span>
+  <h2>음성 명령 의도 분류</h2>
+  <div class="divider"></div>
+  <pre class="fade-up"><code><span class="cm"># server/ai/llm.py — Ollama 호출</span>
+<span class="kw">async def</span> <span class="fn">classify_intent</span>(text: <span class="fn">str</span>, robot: <span class="fn">str</span>) -> <span class="fn">dict</span>:
+    system = prompts.classify_system(robot)
+    messages = [
+        {<span class="str">"role"</span>: <span class="str">"system"</span>, <span class="str">"content"</span>: system},
+        {<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: text},
+    ]
+    raw = <span class="kw">await</span> _ollama_chat(
+        messages=messages,
+        num_predict=<span class="fn">60</span>,
+        temperature=<span class="fn">0.1</span>,
+    )
+    <span class="kw">return</span> json.loads(raw)</code></pre>
+</section>
+
+<!-- ====== 5. 감사합니다 ====== -->
+<section class="slide center" id="s5">
+  <h1>감사합니다</h1>
+  <div class="divider" style="margin:12px auto"></div>
+  <p>팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-06-04</p>
+</section>
+
+<script>
+  // 스크롤 기반 fade-up 애니메이션
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) e.target.classList.add('visible');
+    });
+  }, { threshold: 0.3 });
+
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+  // 슬라이드 카운터
+  const slides = document.querySelectorAll('.slide');
+  const counter = document.getElementById('counter');
+  const hint = document.querySelector('.scroll-hint');
+
+  const slideObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const idx = [...slides].indexOf(e.target) + 1;
+        counter.textContent = idx + ' / ' + slides.length;
+        hint.style.opacity = idx === slides.length ? '0' : '1';
+      }
+    });
+  }, { threshold: 0.5 });
+
+  slides.forEach(s => slideObserver.observe(s));
+
+  // 키보드 네비게이션
+  let currentSlide = 0;
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === ' ' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      currentSlide = Math.min(currentSlide + 1, slides.length - 1);
+      slides[currentSlide].scrollIntoView({ behavior: 'smooth' });
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      currentSlide = Math.max(currentSlide - 1, 0);
+      slides[currentSlide].scrollIntoView({ behavior: 'smooth' });
+    } else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pingdergarten — Presentation Framework Demos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: #0A1628; color: #E2EEFF;
+      min-height: 100vh; padding: 60px 40px;
+    }
+    h1 { font-size: 2.2rem; font-weight: 900; margin-bottom: 8px; }
+    .sub { color: #7BA5C8; font-size: 0.9rem; margin-bottom: 40px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 900px; }
+    .card {
+      background: #112236; border: 1px solid #1E3A5A; border-radius: 14px;
+      padding: 28px 32px; text-decoration: none; color: inherit;
+      transition: all 0.2s; position: relative; overflow: hidden;
+    }
+    .card:hover { border-color: #38BDF8; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(56,189,248,0.12); }
+    .card h2 { font-size: 1.2rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .card .num { color: #38BDF8; font-size: 0.75rem; font-weight: 700; margin-bottom: 8px; }
+    .card p { color: #7BA5C8; font-size: 0.82rem; line-height: 1.6; }
+    .card .badge {
+      position: absolute; top: 16px; right: 16px;
+      background: rgba(56,189,248,0.1); color: #38BDF8;
+      padding: 2px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 700;
+    }
+    .pros { color: #34D399; font-size: 0.78rem; margin-top: 12px; }
+    .cons { color: #F87171; font-size: 0.78rem; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Presentation Framework Demos</h1>
+  <p class="sub">4가지 HTML 프레젠테이션 프레임워크 비교 — pingdergarten 테마</p>
+
+  <div class="grid">
+    <a class="card" href="1-revealjs.html">
+      <span class="badge">shoppinkki 사용</span>
+      <div class="num">01</div>
+      <h2>reveal.js</h2>
+      <p>가장 널리 쓰이는 HTML 발표 프레임워크. CDN 한 줄로 시작. 코드 하이라이팅, fragment 애니메이션, 발표자 노트, PDF 내보내기 지원.</p>
+      <div class="pros">+ shoppinkki와 동일 구조, Tailwind 결합 가능, 슬라이드 분할 로딩</div>
+      <div class="cons">- 커스터마이징 시 CSS 오버라이드 필요</div>
+    </a>
+
+    <a class="card" href="2-impressjs.html">
+      <div class="num">02</div>
+      <h2>impress.js</h2>
+      <p>Prezi 스타일 3D 전환 (줌, 회전, 패닝). 슬라이드를 2D/3D 캔버스 위에 자유 배치. 시각적 임팩트 강함.</p>
+      <div class="pros">+ 독특한 전환 효과, 비선형 프레젠테이션 가능</div>
+      <div class="cons">- 콘텐츠 많으면 어지러움, 레이아웃 설계 난이도 높음</div>
+    </a>
+
+    <a class="card" href="3-pure-html.html">
+      <div class="num">03</div>
+      <h2>Pure HTML/CSS/JS</h2>
+      <p>프레임워크 없이 scroll-snap + IntersectionObserver 로 구현. 단일 파일, 의존성 0, 디자인 자유도 최고.</p>
+      <div class="pros">+ 가장 가볍고 완전 커스텀 가능, 오프라인 OK</div>
+      <div class="cons">- 네비게이션/발표자 노트 직접 구현 필요</div>
+    </a>
+
+    <a class="card" href="4-slidev-preview.html">
+      <div class="num">04</div>
+      <h2>Slidev (Preview)</h2>
+      <p>Vue 3 + Vite 기반. Markdown으로 슬라이드 작성, Vue 컴포넌트 직접 삽입 가능. 이 파일은 룩앤필 프리뷰 (실제는 npm init slidev).</p>
+      <div class="pros">+ Markdown 작성, Vue 컴포넌트 삽입, 코드 하이라이팅 최고</div>
+      <div class="cons">- Node.js 필수, 단일 HTML 배포 불가</div>
+    </a>
+  </div>
+</body>
+</html>

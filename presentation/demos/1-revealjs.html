@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pingdergarten — reveal.js Demo</title>
+
+  <!-- Reveal.js CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css" id="theme">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+  <style>
+    /* ── Dark theme override (shoppinkki 스타일) ── */
+    .reveal {
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #E2EEFF;
+      background: #0A1628;
+    }
+    .reveal .controls { color: #38BDF8 !important; }
+    .reveal .slide-background-content {
+      background-color: #0A1628;
+      background-image: radial-gradient(rgba(56,189,248,0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .reveal .slides section {
+      text-align: left;
+      padding: 48px 56px;
+    }
+    .reveal h1, .reveal h2, .reveal h3 { text-transform: none; letter-spacing: -0.01em; }
+    .reveal h2 { color: #fff !important; font-size: 1.6em; }
+    .reveal h3 { color: #38BDF8 !important; font-size: 1.1em; }
+    .reveal .slide-number {
+      background: rgba(10,22,40,0.85) !important; color: #3A5A7A !important;
+      border-radius: 8px !important; padding: 4px 10px !important;
+      font-size: 11px !important; border: 1px solid #1E3A5A !important;
+    }
+    .accent { color: #38BDF8; }
+    .card {
+      background: #112236; border: 1px solid #1E3A5A; border-radius: 12px;
+      padding: 20px 24px; margin: 8px 0;
+    }
+    .card h3 { margin: 0 0 8px; }
+    .card p { margin: 0; color: #7BA5C8; font-size: 0.55em; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .tag {
+      display: inline-block; background: #0E2840; color: #38BDF8;
+      padding: 2px 12px; border-radius: 100px; font-size: 0.4em;
+      font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .divider { width: 120px; height: 3px; background: rgba(56,189,248,0.5); margin: 16px 0; }
+
+    /* title slide */
+    .title-slide { text-align: center !important; justify-content: center !important; }
+    .title-slide h1 { color: #fff; font-size: 3.2em; font-weight: 900; }
+    .title-slide p { color: rgba(226,238,255,0.7); }
+
+    /* fragment animations */
+    .reveal .fragment.highlight-blue.visible { color: #38BDF8; }
+  </style>
+</head>
+<body>
+
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ====== 1. 타이틀 ====== -->
+    <section class="title-slide" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <span class="tag" style="margin-bottom:12px">Addinedu Physical AI 4th</span>
+      <p style="font-size:0.65em;color:#7BA5C8;margin:0">최종 프로젝트 | 팀 사랑의 에듀핑</p>
+      <h1 style="margin:12px 0 8px">pingdergarten</h1>
+      <div class="divider" style="margin:8px auto"></div>
+      <p style="font-size:0.7em;margin:0">유치원 교육보조로봇 서비스</p>
+
+      <aside class="notes">
+        안녕하세요, 팀 사랑의 에듀핑입니다. 저희의 최종 프로젝트 핑더가르텐 발표를 시작하겠습니다.
+      </aside>
+    </section>
+
+    <!-- ====== 2. 로봇 구성 ====== -->
+    <section>
+      <span class="tag">ROBOTS</span>
+      <h2>로봇 3대 구성</h2>
+      <div class="divider"></div>
+      <div class="grid-3">
+        <div class="card fragment" data-fragment-index="1">
+          <span class="material-icons-round accent" style="font-size:1.5em">precision_manufacturing</span>
+          <h3>EduPing</h3>
+          <p>OpenArm 듀얼 암<br>등하원 / 율동 / 가게놀이 / 정리정돈</p>
+        </div>
+        <div class="card fragment" data-fragment-index="2">
+          <span class="material-icons-round accent" style="font-size:1.5em">smart_toy</span>
+          <h3>GogoPing</h3>
+          <p>Vic Pinky 모바일 베이스<br>교사 추종 / 운반 / 숨바꼭질 / 자장가</p>
+        </div>
+        <div class="card fragment" data-fragment-index="3">
+          <span class="material-icons-round accent" style="font-size:1.5em">construction</span>
+          <h3>NoriArm</h3>
+          <p>OMX 매니퓰레이터<br>블럭쌓기 / 정리</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== 3. 시스템 아키텍처 ====== -->
+    <section>
+      <span class="tag">ARCHITECTURE</span>
+      <h2>시스템 아키텍처</h2>
+      <div class="divider"></div>
+      <div style="display:flex;gap:16px;align-items:stretch;font-size:0.55em">
+        <!-- 클라이언트 -->
+        <div class="card" style="flex:1;border-top:3px solid #38BDF8">
+          <h3 style="color:#38BDF8 !important">Client</h3>
+          <p>Robot UI (Vue 3 x3)</p>
+          <p>Portal UI (Vue 3)</p>
+          <p>Admin UI (PyQt5)</p>
+        </div>
+        <!-- 서버 -->
+        <div style="display:flex;flex-direction:column;gap:12px;flex:1.2">
+          <div class="card" style="border-top:3px solid #A78BFA">
+            <h3 style="color:#A78BFA !important">Control Service</h3>
+            <p>FastAPI + rclpy + Auth</p>
+          </div>
+          <div class="card" style="border-top:3px solid #34D399">
+            <h3 style="color:#34D399 !important">AI Hub</h3>
+            <p>Ollama Qwen2.5 + Gemma3</p>
+          </div>
+        </div>
+        <!-- 데이터 -->
+        <div class="card" style="flex:0.8;border-top:3px solid #FBBF24">
+          <h3 style="color:#FBBF24 !important">Data</h3>
+          <p>PostgreSQL 17</p>
+          <p>pgvector</p>
+          <p>MinIO</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== 4. 기술 스택 (코드 하이라이팅) ====== -->
+    <section>
+      <span class="tag">TECH STACK</span>
+      <h2>음성 명령 파이프라인</h2>
+      <div class="divider"></div>
+      <pre><code class="language-python" data-trim data-noescape>
+# AI Hub — 의도 분류
+async def classify_intent(text: str, robot: str) -> dict:
+    system = prompts.classify_system(robot)
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": text},
+    ]
+    raw = await _ollama_chat(
+        messages=messages,
+        num_predict=60,
+        temperature=0.1,
+    )
+    return json.loads(raw)
+      </code></pre>
+    </section>
+
+    <!-- ====== 5. 감사합니다 ====== -->
+    <section class="title-slide" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <h1 style="font-size:2.5em">감사합니다</h1>
+      <div class="divider" style="margin:12px auto"></div>
+      <p style="font-size:0.6em;color:#7BA5C8">팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-06-04</p>
+    </section>
+
+  </div>
+</div>
+
+<!-- Reveal.js + plugins -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    center: false,
+    slideNumber: 'c/t',
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    transition: 'slide',
+    transitionSpeed: 'fast',
+    plugins: [RevealNotes, RevealHighlight],
+    keyboard: {
+      70: function() {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

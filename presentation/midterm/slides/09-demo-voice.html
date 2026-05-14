@@ -1,0 +1,56 @@
+<section style="padding:40px 60px">
+  <p class="font-display text-em-xs" style="letter-spacing:0.2em;color:#C9B6E4">DEMO</p>
+  <h2 class="font-display text-em-lg mt-1">음성 명령 파이프라인</h2>
+
+  <!-- 파이프라인 흐름 -->
+  <div class="flex items-center gap-2 mt-4 mb-4" style="font-size:0.65em">
+    <div class="pastel-card text-center" style="padding:10px 12px;border-top:3px solid #B5DEFF">
+      <span class="material-icons-round" style="color:#B5DEFF;font-size:1.5em">mic</span>
+      <div class="font-display text-em-sm mt-1">음성 입력</div>
+      <div class="text-em-xs text-inkSoft">Web Speech API</div>
+    </div>
+    <span class="material-icons-round" style="color:#FFE0E6;font-size:1.2em">arrow_forward</span>
+    <div class="pastel-card text-center" style="padding:10px 12px;border-top:3px solid #F8B4C4">
+      <span class="material-icons-round" style="color:#F8B4C4;font-size:1.5em">record_voice_over</span>
+      <div class="font-display text-em-sm mt-1">호출어 감지</div>
+      <div class="text-em-xs text-inkSoft">퍼지 매칭</div>
+    </div>
+    <span class="material-icons-round" style="color:#FFE0E6;font-size:1.2em">arrow_forward</span>
+    <div class="pastel-card text-center" style="padding:10px 12px;border-top:3px solid #C9B6E4">
+      <span class="material-icons-round" style="color:#C9B6E4;font-size:1.5em">psychology</span>
+      <div class="font-display text-em-sm mt-1">LLM 의도분류</div>
+      <div class="text-em-xs text-inkSoft">Ollama Qwen2.5</div>
+    </div>
+    <span class="material-icons-round" style="color:#FFE0E6;font-size:1.2em">arrow_forward</span>
+    <div class="pastel-card text-center" style="padding:10px 12px;border-top:3px solid #B5E6D8">
+      <span class="material-icons-round" style="color:#B5E6D8;font-size:1.5em">smart_toy</span>
+      <div class="font-display text-em-sm mt-1">ROS2 Action</div>
+      <div class="text-em-xs text-inkSoft">rclpy bridge</div>
+    </div>
+    <span class="material-icons-round" style="color:#FFE0E6;font-size:1.2em">arrow_forward</span>
+    <div class="pastel-card text-center" style="padding:10px 12px;border-top:3px solid #FFE5A8">
+      <span class="material-icons-round" style="color:#FFE5A8;font-size:1.5em">volume_up</span>
+      <div class="font-display text-em-sm mt-1">TTS 응답</div>
+      <div class="text-em-xs text-inkSoft">Edge Neural</div>
+    </div>
+  </div>
+
+  <!-- 코드 예시 -->
+  <div class="pastel-card" style="padding:16px 20px;font-size:0.6em">
+    <div class="font-display text-em-sm mb-1" style="color:#C9B6E4">server/ai/llm.py</div>
+    <pre style="background:#FFF8F2;border:none;margin:0;padding:0;font-size:1em;color:var(--ink);line-height:1.7"><code class="language-python">async def classify_intent(text: str, robot: str) -> dict:
+    system = prompts.classify_system(robot)
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": text},
+    ]
+    raw = await _ollama_chat(
+        messages=messages, num_predict=60, temperature=0.1,
+    )
+    return json.loads(raw)   # {"mode": "숨바꼭질", "params": {...}}</code></pre>
+  </div>
+
+  <p class="text-em-2xs text-inkSoft mt-2 text-center">
+    예: "고고핑아 숨바꼭질 하자" &rarr; STT &rarr; 호출어 "고고핑" 매칭 &rarr; LLM &rarr; {"mode": "숨바꼭질"} &rarr; BT 진입
+  </p>
+</section>

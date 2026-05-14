@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BT 하이라이팅 — reveal.js</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    .reveal {
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #E2EEFF;
+      background: #0A1628;
+    }
+    .reveal .slide-background-content {
+      background-color: #0A1628;
+      background-image: radial-gradient(rgba(56,189,248,0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .reveal .slides section { text-align: left; padding: 40px 56px; }
+    .reveal h2 { color: #fff !important; text-transform: none; font-size: 1.5em; }
+    .reveal .slide-number {
+      background: rgba(10,22,40,0.85) !important; color: #3A5A7A !important;
+      border-radius: 8px !important; padding: 4px 10px !important;
+      font-size: 11px !important; border: 1px solid #1E3A5A !important;
+    }
+    .tag {
+      display: inline-block; background: #0E2840; color: #38BDF8;
+      padding: 2px 14px; border-radius: 100px; font-size: 0.45em;
+      font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .divider { width: 100px; height: 3px; background: rgba(56,189,248,0.5); margin: 10px 0 20px; }
+
+    /* ===== BT 트리 스타일 ===== */
+    .bt-tree { position: relative; width: 100%; }
+    .bt-tree svg { width: 100%; height: auto; }
+
+    .bt-node {
+      transition: all 0.4s ease;
+    }
+    .bt-node rect, .bt-node circle, .bt-node polygon {
+      transition: fill 0.4s, stroke 0.4s, filter 0.4s;
+    }
+    .bt-node text {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 13px;
+      fill: #7BA5C8;
+      transition: fill 0.4s;
+    }
+
+    /* 기본 상태 */
+    .bt-node rect { fill: #112236; stroke: #1E3A5A; stroke-width: 2; rx: 8; }
+    .bt-node circle { fill: #112236; stroke: #1E3A5A; stroke-width: 2; }
+    .bt-edge { stroke: #1E3A5A; stroke-width: 2; fill: none; transition: stroke 0.4s; }
+
+    /* 활성 상태 — reveal fragment 로 토글 */
+    .bt-node.active rect, .bt-node.active circle {
+      fill: #0E2840; stroke: #38BDF8; stroke-width: 2.5;
+      filter: drop-shadow(0 0 12px rgba(56,189,248,0.4));
+    }
+    .bt-node.active text { fill: #E2EEFF; font-weight: 700; }
+    .bt-edge.active { stroke: #38BDF8; stroke-width: 2.5; }
+
+    /* 성공 */
+    .bt-node.success rect, .bt-node.success circle {
+      fill: #082516; stroke: #34D399; stroke-width: 2.5;
+      filter: drop-shadow(0 0 12px rgba(52,211,153,0.4));
+    }
+    .bt-node.success text { fill: #34D399; font-weight: 700; }
+    .bt-edge.success { stroke: #34D399; stroke-width: 2.5; }
+
+    /* 실패 */
+    .bt-node.fail rect, .bt-node.fail circle {
+      fill: #2D1010; stroke: #F87171; stroke-width: 2.5;
+      filter: drop-shadow(0 0 12px rgba(248,113,113,0.4));
+    }
+    .bt-node.fail text { fill: #F87171; font-weight: 700; }
+
+    /* 실행중 */
+    .bt-node.running rect, .bt-node.running circle {
+      fill: #1A2800; stroke: #FBBF24; stroke-width: 2.5;
+      filter: drop-shadow(0 0 12px rgba(251,191,36,0.4));
+    }
+    .bt-node.running text { fill: #FBBF24; font-weight: 700; }
+    .bt-edge.running { stroke: #FBBF24; stroke-width: 2.5; }
+
+    /* 설명 패널 */
+    .explain-panel {
+      background: #112236; border: 1px solid #1E3A5A; border-radius: 10px;
+      padding: 14px 20px; margin-top: 16px; font-size: 0.55em;
+      color: #7BA5C8; line-height: 1.6;
+    }
+    .explain-panel strong { color: #E2EEFF; }
+    .explain-panel .hl-blue { color: #38BDF8; font-weight: 700; }
+    .explain-panel .hl-green { color: #34D399; font-weight: 700; }
+    .explain-panel .hl-yellow { color: #FBBF24; font-weight: 700; }
+    .explain-panel .hl-red { color: #F87171; font-weight: 700; }
+
+    /* 범례 */
+    .legend {
+      display: flex; gap: 16px; font-size: 0.42em; color: #7BA5C8; margin-top: 10px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%; border: 2px solid;
+    }
+  </style>
+</head>
+<body>
+
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ====== 슬라이드 1: GogoPing 숨바꼭질 BT ====== -->
+    <section>
+      <span class="tag">BEHAVIOR TREE</span>
+      <h2>GogoPing 숨바꼭질 — 실행 흐름</h2>
+      <div class="divider"></div>
+
+      <div class="bt-tree">
+        <svg viewBox="0 0 900 340">
+          <!-- 엣지 (연결선) -->
+          <path class="bt-edge" id="e-root-seq" d="M450,45 L450,75"/>
+          <path class="bt-edge" id="e-seq-move" d="M450,115 L180,155"/>
+          <path class="bt-edge" id="e-seq-reg" d="M450,115 L350,155"/>
+          <path class="bt-edge" id="e-seq-count" d="M450,115 L520,155"/>
+          <path class="bt-edge" id="e-seq-patrol" d="M450,115 L680,155"/>
+          <!-- patrol → fallback -->
+          <path class="bt-edge" id="e-patrol-fb" d="M680,195 L680,235"/>
+          <!-- fallback children -->
+          <path class="bt-edge" id="e-fb-find" d="M680,275 L600,305"/>
+          <path class="bt-edge" id="e-fb-next" d="M680,275 L760,305"/>
+
+          <!-- 루트: Sequence -->
+          <g class="bt-node" id="n-root">
+            <circle cx="450" cy="35" r="22"/>
+            <text x="450" y="40" text-anchor="middle" font-size="15" font-weight="700">→</text>
+          </g>
+
+          <!-- Sequence 자식들 -->
+          <g class="bt-node" id="n-move">
+            <rect x="110" y="155" width="140" height="40"/>
+            <text x="180" y="180" text-anchor="middle">위치 이동</text>
+          </g>
+          <g class="bt-node" id="n-reg">
+            <rect x="275" y="155" width="150" height="40"/>
+            <text x="350" y="180" text-anchor="middle">참가자 확정</text>
+          </g>
+          <g class="bt-node" id="n-count">
+            <rect x="450" y="155" width="140" height="40"/>
+            <text x="520" y="180" text-anchor="middle">카운트다운</text>
+          </g>
+          <g class="bt-node" id="n-patrol">
+            <rect x="610" y="155" width="140" height="40"/>
+            <text x="680" y="180" text-anchor="middle">순찰</text>
+          </g>
+
+          <!-- Fallback (순찰 하위) -->
+          <g class="bt-node" id="n-fb">
+            <circle cx="680" cy="255" r="22"/>
+            <text x="680" y="260" text-anchor="middle" font-size="15" font-weight="700">?</text>
+          </g>
+
+          <!-- Fallback 자식 -->
+          <g class="bt-node" id="n-find">
+            <rect x="530" y="295" width="140" height="40"/>
+            <text x="600" y="320" text-anchor="middle">아이 발견</text>
+          </g>
+          <g class="bt-node" id="n-next">
+            <rect x="690" y="295" width="140" height="40"/>
+            <text x="760" y="320" text-anchor="middle">다음 지점</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="border-color:#38BDF8;background:#0E2840"></div> 실행중 (active)</div>
+        <div class="legend-item"><div class="legend-dot" style="border-color:#34D399;background:#082516"></div> 성공 (success)</div>
+        <div class="legend-item"><div class="legend-dot" style="border-color:#FBBF24;background:#1A2800"></div> running</div>
+        <div class="legend-item"><div class="legend-dot" style="border-color:#F87171;background:#2D1010"></div> 실패 (failure)</div>
+      </div>
+
+      <!-- 설명 패널 — fragment 별로 교체 -->
+      <div class="explain-panel">
+        <span class="fragment fade-out" data-fragment-index="1" style="position:absolute">
+          <strong>→ 키를 눌러</strong> BT 실행 흐름을 따라가 보세요.
+        </span>
+        <span class="fragment fade-in" data-fragment-index="1">
+          <span class="fragment fade-out" data-fragment-index="2" style="position:absolute">
+            <span class="hl-blue">① Root Sequence</span> 시작 — 자식을 왼쪽부터 순차 실행
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="2">
+          <span class="fragment fade-out" data-fragment-index="3" style="position:absolute">
+            <span class="hl-green">② 위치 이동</span> — Nav2로 play_area 이동 → <span class="hl-green">SUCCESS</span>
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="3">
+          <span class="fragment fade-out" data-fragment-index="4" style="position:absolute">
+            <span class="hl-green">③ 참가자 확정</span> — 얼굴 인식으로 최대 5명 등록 → <span class="hl-green">SUCCESS</span>
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="4">
+          <span class="fragment fade-out" data-fragment-index="5" style="position:absolute">
+            <span class="hl-green">④ 카운트다운</span> — 30초 눈 가리기 + 음성 카운트 → <span class="hl-green">SUCCESS</span>
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="5">
+          <span class="fragment fade-out" data-fragment-index="6" style="position:absolute">
+            <span class="hl-yellow">⑤ 순찰</span> — 무작위 patrol 포인트 순회, Fallback 진입
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="6">
+          <span class="fragment fade-out" data-fragment-index="7" style="position:absolute">
+            <span class="hl-red">⑥ 아이 발견 실패</span> → Fallback이 <span class="hl-green">다음 지점</span>으로 이동
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="7">
+          <span class="hl-green">⑦ 아이 발견!</span> — 이름 호명 → 해당 아이 "잡힘" 처리 → 순찰 계속
+        </span>
+      </div>
+
+      <!-- 각 fragment 에서 JS 로 노드 상태 변경 -->
+      <span class="fragment" data-fragment-index="1" style="display:none"></span>
+      <span class="fragment" data-fragment-index="2" style="display:none"></span>
+      <span class="fragment" data-fragment-index="3" style="display:none"></span>
+      <span class="fragment" data-fragment-index="4" style="display:none"></span>
+      <span class="fragment" data-fragment-index="5" style="display:none"></span>
+      <span class="fragment" data-fragment-index="6" style="display:none"></span>
+      <span class="fragment" data-fragment-index="7" style="display:none"></span>
+    </section>
+
+    <!-- ====== 슬라이드 2: FSM ====== -->
+    <section>
+      <span class="tag">STATE MACHINE</span>
+      <h2>GogoPing 보조 모드 — FSM 전환</h2>
+      <div class="divider"></div>
+
+      <div class="bt-tree">
+        <svg viewBox="0 0 900 300">
+          <!-- 엣지 -->
+          <path class="bt-edge" id="f-e1" d="M180,100 L340,100" marker-end="url(#arrow)"/>
+          <path class="bt-edge" id="f-e2" d="M500,100 L650,100" marker-end="url(#arrow)"/>
+          <path class="bt-edge" id="f-e3" d="M730,130 L730,200" marker-end="url(#arrow)"/>
+          <path class="bt-edge" id="f-e4" d="M650,230 L240,230" marker-end="url(#arrow)"/>
+          <path class="bt-edge" id="f-e5" d="M160,200 L160,130" marker-end="url(#arrow)"/>
+          <!-- 추종→Searching -->
+          <path class="bt-edge" id="f-e6" d="M500,130 L450,200" marker-end="url(#arrow)"/>
+          <path class="bt-edge" id="f-e7" d="M390,200 L340,130" marker-end="url(#arrow)"/>
+
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="8" markerHeight="8" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#1E3A5A"/>
+            </marker>
+          </defs>
+
+          <!-- 노드 -->
+          <g class="bt-node" id="f-idle">
+            <rect x="90" y="80" width="140" height="44"/>
+            <text x="160" y="107" text-anchor="middle">대기</text>
+          </g>
+          <g class="bt-node" id="f-confirm">
+            <rect x="350" y="80" width="160" height="44"/>
+            <text x="430" y="107" text-anchor="middle">추종 대상 확인</text>
+          </g>
+          <g class="bt-node" id="f-follow">
+            <rect x="660" y="80" width="140" height="44"/>
+            <text x="730" y="107" text-anchor="middle">추종</text>
+          </g>
+          <g class="bt-node" id="f-search">
+            <rect x="370" y="205" width="150" height="44"/>
+            <text x="445" y="232" text-anchor="middle">Searching</text>
+          </g>
+          <g class="bt-node" id="f-arrive">
+            <rect x="660" y="205" width="140" height="44"/>
+            <text x="730" y="232" text-anchor="middle">도착</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="explain-panel">
+        <span class="fragment fade-out" data-fragment-index="1" style="position:absolute">
+          <strong>→ 키를 눌러</strong> FSM 전환을 따라가세요.
+        </span>
+        <span class="fragment fade-in" data-fragment-index="1">
+          <span class="fragment fade-out" data-fragment-index="2" style="position:absolute">
+            <span class="hl-blue">① 대기</span> — Admin UI "추종 시작" 클릭
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="2">
+          <span class="fragment fade-out" data-fragment-index="3" style="position:absolute">
+            <span class="hl-blue">② 추종 대상 확인</span> — 얼굴 캡처 → 매칭 → "○○선생님 맞아요?"
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="3">
+          <span class="fragment fade-out" data-fragment-index="4" style="position:absolute">
+            <span class="hl-green">③ 추종</span> — Deep SORT + LiDAR 거리 제어로 교사 따라감
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="4">
+          <span class="fragment fade-out" data-fragment-index="5" style="position:absolute">
+            <span class="hl-yellow">④ Searching</span> — 시야 로스트! 회전하며 "선생님?" 호출
+          </span>
+        </span>
+        <span class="fragment fade-in" data-fragment-index="5">
+          <span class="hl-green">⑤ 재발견</span> → 추종 재개 / 타임아웃 → 대기 복귀
+        </span>
+      </div>
+
+      <span class="fragment" data-fragment-index="1" style="display:none"></span>
+      <span class="fragment" data-fragment-index="2" style="display:none"></span>
+      <span class="fragment" data-fragment-index="3" style="display:none"></span>
+      <span class="fragment" data-fragment-index="4" style="display:none"></span>
+      <span class="fragment" data-fragment-index="5" style="display:none"></span>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+// BT 슬라이드 상태 시나리오
+const BT_STEPS = [
+  // step 0: 초기
+  {},
+  // step 1: root active
+  { active: ['n-root', 'e-root-seq'] },
+  // step 2: 위치 이동 성공
+  { active: ['n-root', 'e-root-seq'], success: ['n-move', 'e-seq-move'] },
+  // step 3: 참가자 확정 성공
+  { active: ['n-root', 'e-root-seq'], success: ['n-move', 'e-seq-move', 'n-reg', 'e-seq-reg'] },
+  // step 4: 카운트다운 성공
+  { active: ['n-root', 'e-root-seq'], success: ['n-move', 'e-seq-move', 'n-reg', 'e-seq-reg', 'n-count', 'e-seq-count'] },
+  // step 5: 순찰 running + fallback active
+  { success: ['n-move', 'e-seq-move', 'n-reg', 'e-seq-reg', 'n-count', 'e-seq-count'],
+    running: ['n-root', 'e-root-seq', 'n-patrol', 'e-seq-patrol'],
+    active: ['n-fb', 'e-patrol-fb'] },
+  // step 6: 아이 발견 실패 → 다음 지점
+  { success: ['n-move', 'e-seq-move', 'n-reg', 'e-seq-reg', 'n-count', 'e-seq-count', 'n-next', 'e-fb-next'],
+    running: ['n-root', 'e-root-seq', 'n-patrol', 'e-seq-patrol'],
+    active: ['n-fb', 'e-patrol-fb'],
+    fail: ['n-find', 'e-fb-find'] },
+  // step 7: 아이 발견 성공!
+  { success: ['n-move', 'e-seq-move', 'n-reg', 'e-seq-reg', 'n-count', 'e-seq-count', 'n-find', 'e-fb-find', 'n-fb', 'e-patrol-fb'],
+    running: ['n-root', 'e-root-seq', 'n-patrol', 'e-seq-patrol'] },
+];
+
+// FSM 슬라이드 상태 시나리오
+const FSM_STEPS = [
+  {},
+  { active: ['f-idle'] },
+  { active: ['f-confirm', 'f-e1'] },
+  { active: ['f-follow', 'f-e2'], success: ['f-confirm', 'f-e1'] },
+  { active: ['f-search', 'f-e6'], running: ['f-follow'], success: ['f-confirm', 'f-e1'] },
+  { active: ['f-follow', 'f-e7'], success: ['f-confirm', 'f-e1', 'f-search'] },
+];
+
+function clearAll() {
+  document.querySelectorAll('.bt-node, .bt-edge').forEach(el => {
+    el.classList.remove('active', 'success', 'fail', 'running');
+  });
+}
+
+function applyStep(steps, idx) {
+  clearAll();
+  const s = steps[idx] || {};
+  (s.active || []).forEach(id => document.getElementById(id)?.classList.add('active'));
+  (s.success || []).forEach(id => document.getElementById(id)?.classList.add('success'));
+  (s.fail || []).forEach(id => document.getElementById(id)?.classList.add('fail'));
+  (s.running || []).forEach(id => document.getElementById(id)?.classList.add('running'));
+}
+
+Reveal.initialize({
+  hash: true, center: false, slideNumber: 'c/t',
+  width: 1280, height: 720, margin: 0.04,
+  transition: 'slide', transitionSpeed: 'fast',
+}).then(() => {
+  Reveal.on('fragmentshown', (e) => {
+    const slideIdx = Reveal.getIndices().h;
+    const fragIdx = parseInt(e.fragment.dataset.fragmentIndex);
+    if (slideIdx === 0) applyStep(BT_STEPS, fragIdx);
+    if (slideIdx === 1) applyStep(FSM_STEPS, fragIdx);
+  });
+  Reveal.on('fragmenthidden', (e) => {
+    const slideIdx = Reveal.getIndices().h;
+    const fragIdx = parseInt(e.fragment.dataset.fragmentIndex) - 1;
+    if (slideIdx === 0) applyStep(BT_STEPS, Math.max(0, fragIdx));
+    if (slideIdx === 1) applyStep(FSM_STEPS, Math.max(0, fragIdx));
+  });
+  Reveal.on('slidechanged', () => clearAll());
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pingdergarten — Slidev Style Preview</title>
+
+  <!--
+    Slidev 는 실제로는 npm init slidev 로 프로젝트를 만들고
+    slides.md 파일에 Markdown 으로 작성합니다.
+    이 파일은 Slidev 의 룩앤필을 순수 HTML 로 시뮬레이션한 프리뷰입니다.
+
+    실제 Slidev 시작:
+      npm init slidev@latest pingdergarten-slides
+      cd pingdergarten-slides
+      npm run dev
+  -->
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --border: #333;
+      --text: #e4e4e4;
+      --text-sub: #888;
+      --accent: #42b883;   /* Vue green */
+      --accent2: #35495e;  /* Vue dark */
+      --blue: #38BDF8;
+      --purple: #A78BFA;
+    }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Slidev 레이아웃 시뮬레이션 ── */
+    .slidev-container {
+      width: 100vw; height: 100vh;
+      position: relative; overflow: hidden;
+    }
+
+    .slide {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      padding: 60px 80px;
+      display: flex; flex-direction: column; justify-content: center;
+      opacity: 0; transform: translateX(60px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      pointer-events: none;
+    }
+    .slide.active {
+      opacity: 1; transform: translateX(0); pointer-events: auto;
+    }
+    .slide.center { align-items: center; text-align: center; }
+
+    /* ── 타이포 ── */
+    h1 { font-size: 3.5rem; font-weight: 900; color: #fff; line-height: 1.1; }
+    h2 { font-size: 2rem; font-weight: 700; color: #fff; margin-bottom: 16px; }
+    h3 { font-size: 1.05rem; color: var(--accent); }
+    p { color: var(--text-sub); font-size: 0.95rem; line-height: 1.7; }
+    .accent { color: var(--accent); }
+    .divider { width: 60px; height: 3px; background: var(--accent); margin: 16px 0; }
+    .tag {
+      display: inline-block; background: rgba(66,184,131,0.15); color: var(--accent);
+      padding: 3px 14px; border-radius: 6px; font-size: 0.7rem;
+      font-weight: 700; letter-spacing: 0.08em; margin-bottom: 8px;
+    }
+
+    /* ── Slidev 네비게이션 바 ── */
+    .nav-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      height: 40px; background: rgba(30,30,30,0.95);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; font-size: 12px;
+    }
+    .nav-bar .left { display: flex; align-items: center; gap: 12px; color: var(--text-sub); }
+    .nav-bar .right { display: flex; align-items: center; gap: 8px; }
+    .nav-btn {
+      background: none; border: 1px solid var(--border); border-radius: 4px;
+      color: var(--text-sub); padding: 3px 10px; font-size: 11px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── 프로그레스 바 ── */
+    .progress-bar {
+      position: fixed; top: 0; left: 0; height: 2px; z-index: 200;
+      background: var(--accent); transition: width 0.3s ease;
+    }
+
+    /* ── 카드 (Slidev 스타일) ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 20px 24px;
+    }
+    .card p { font-size: 0.85rem; margin-top: 6px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; }
+    .flex-row { display: flex; gap: 14px; width: 100%; }
+
+    /* ── 코드 블록 (Slidev Shiki 스타일) ── */
+    .code-block {
+      background: #1a1a2e; border: 1px solid var(--border); border-radius: 8px;
+      padding: 24px; font-family: 'Fira Code', monospace; font-size: 0.82rem;
+      line-height: 1.8; overflow-x: auto; position: relative; width: 100%;
+      max-width: 720px;
+    }
+    .code-block .lang-tag {
+      position: absolute; top: 8px; right: 12px; font-size: 0.65rem;
+      color: var(--text-sub); font-family: 'Noto Sans KR', sans-serif;
+    }
+    .code-block .kw { color: #c792ea; }
+    .code-block .fn { color: #82aaff; }
+    .code-block .str { color: #c3e88d; }
+    .code-block .cm { color: #546e7a; }
+    .code-block .num { color: #f78c6c; }
+
+    /* ── Markdown 미리보기 사이드 ── */
+    .md-source {
+      position: fixed; top: 0; right: 0; width: 320px; height: calc(100vh - 40px);
+      background: #1a1a1a; border-left: 1px solid var(--border);
+      padding: 20px; font-family: 'Fira Code', monospace; font-size: 0.7rem;
+      color: #666; line-height: 1.6; overflow-y: auto; z-index: 50;
+      display: none; /* 기본 숨김, M 키로 토글 */
+    }
+    .md-source.visible { display: block; }
+    .md-source .md-h { color: var(--accent); font-weight: 700; }
+    .md-source .md-sep { color: #444; }
+    .md-source .md-code { color: #888; background: #111; padding: 2px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- 프로그레스 바 -->
+<div class="progress-bar" id="progress" style="width:20%"></div>
+
+<div class="slidev-container">
+
+  <!-- ====== 1. 타이틀 ====== -->
+  <div class="slide center active" data-idx="0">
+    <p style="color:var(--accent);font-size:0.85rem;margin-bottom:4px">Addinedu Physical AI 4th</p>
+    <h1>pingdergarten</h1>
+    <div class="divider" style="margin:12px auto"></div>
+    <p style="font-size:1.1rem;color:var(--text)">유치원 교육보조로봇 서비스</p>
+    <p style="margin-top:24px;font-size:0.8rem">팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-06-04</p>
+  </div>
+
+  <!-- ====== 2. 로봇 구성 ====== -->
+  <div class="slide" data-idx="1">
+    <span class="tag">Robots</span>
+    <h2>로봇 3대 구성</h2>
+    <div class="divider"></div>
+    <div class="grid-3" style="margin-top:8px">
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h3>EduPing</h3>
+        <p>OpenArm 듀얼 암<br>등하원 / 율동 / 가게놀이 / 정리정돈</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--blue)">
+        <h3 style="color:var(--blue)">GogoPing</h3>
+        <p>Vic Pinky 모바일 베이스<br>교사 추종 / 운반 / 숨바꼭질</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--purple)">
+        <h3 style="color:var(--purple)">NoriArm</h3>
+        <p>OMX 매니퓰레이터<br>블럭쌓기 / 정리</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 3. 아키텍처 ====== -->
+  <div class="slide" data-idx="2">
+    <span class="tag">Architecture</span>
+    <h2>시스템 아키텍처</h2>
+    <div class="divider"></div>
+    <div class="flex-row" style="margin-top:8px">
+      <div class="card" style="flex:1;border-top:2px solid var(--accent)">
+        <h3>Client</h3>
+        <p>Robot UI (Vue 3 x3)<br>Portal UI (Vue 3)<br>Admin UI (PyQt5)</p>
+      </div>
+      <div class="card" style="flex:1;border-top:2px solid var(--blue)">
+        <h3 style="color:var(--blue)">Server</h3>
+        <p>Control (FastAPI + rclpy)<br>AI Hub (Ollama LLM)</p>
+      </div>
+      <div class="card" style="flex:1;border-top:2px solid var(--purple)">
+        <h3 style="color:var(--purple)">Data</h3>
+        <p>PostgreSQL 17 (pgvector)<br>MinIO</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 4. 코드 ====== -->
+  <div class="slide" data-idx="3">
+    <span class="tag">Code</span>
+    <h2>음성 명령 의도 분류</h2>
+    <div class="divider"></div>
+    <div class="code-block">
+      <span class="lang-tag">python</span>
+<span class="cm"># server/ai/llm.py</span>
+<span class="kw">async def</span> <span class="fn">classify_intent</span>(text: <span class="fn">str</span>, robot: <span class="fn">str</span>) -> <span class="fn">dict</span>:
+    system = prompts.classify_system(robot)
+    messages = [
+        {<span class="str">"role"</span>: <span class="str">"system"</span>, <span class="str">"content"</span>: system},
+        {<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: text},
+    ]
+    raw = <span class="kw">await</span> _ollama_chat(
+        messages=messages,
+        num_predict=<span class="num">60</span>,
+        temperature=<span class="num">0.1</span>,
+    )
+    <span class="kw">return</span> json.loads(raw)
+    </div>
+  </div>
+
+  <!-- ====== 5. 감사합니다 ====== -->
+  <div class="slide center" data-idx="4">
+    <h1 style="font-size:3rem">감사합니다</h1>
+    <div class="divider" style="margin:12px auto"></div>
+    <p>팀 사랑의 에듀핑</p>
+  </div>
+
+</div>
+
+<!-- Markdown 소스 미리보기 (M 키로 토글) -->
+<div class="md-source" id="md-source">
+  <div style="color:var(--accent);font-weight:700;margin-bottom:12px">slides.md</div>
+  <span class="md-sep">---</span><br>
+  <span class="md-h">theme: default</span><br>
+  <span class="md-h">title: pingdergarten</span><br>
+  <span class="md-sep">---</span><br><br>
+  <span class="md-h"># pingdergarten</span><br><br>
+  유치원 교육보조로봇 서비스<br><br>
+  <span class="md-sep">---</span><br><br>
+  <span class="md-h">## 로봇 3대 구성</span><br><br>
+  - **EduPing** — OpenArm<br>
+  - **GogoPing** — Vic Pinky<br>
+  - **NoriArm** — OMX<br><br>
+  <span class="md-sep">---</span><br><br>
+  <span class="md-h">## 시스템 아키텍처</span><br><br>
+  Client | Server | Data<br><br>
+  <span class="md-sep">---</span><br><br>
+  <span class="md-h">## 코드</span><br><br>
+  <span class="md-code">```python</span><br>
+  async def classify_intent(...):<br>
+  &nbsp;&nbsp;...<br>
+  <span class="md-code">```</span><br><br>
+  <span class="md-sep">---</span><br><br>
+  <span class="md-h"># 감사합니다</span><br>
+</div>
+
+<!-- 네비게이션 바 -->
+<nav class="nav-bar">
+  <div class="left">
+    <span style="color:var(--accent);font-weight:700">Slidev</span>
+    <span id="slide-num">1 / 5</span>
+  </div>
+  <div class="right">
+    <button class="nav-btn" onclick="prev()">&larr;</button>
+    <button class="nav-btn" onclick="next()">&rarr;</button>
+    <button class="nav-btn" onclick="toggleMd()">M</button>
+    <button class="nav-btn" onclick="toggleFs()">F</button>
+  </div>
+</nav>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  function goTo(idx) {
+    if (idx < 0 || idx >= total) return;
+    slides[current].classList.remove('active');
+    current = idx;
+    slides[current].classList.add('active');
+    document.getElementById('slide-num').textContent = (current + 1) + ' / ' + total;
+    document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+  }
+
+  function next() { goTo(current + 1); }
+  function prev() { goTo(current - 1); }
+
+  function toggleMd() {
+    document.getElementById('md-source').classList.toggle('visible');
+  }
+
+  function toggleFs() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    else if (e.key === 'm' || e.key === 'M') toggleMd();
+    else if (e.key === 'f' || e.key === 'F') toggleFs();
+  });
+</script>
+
+</body>
+</html>
