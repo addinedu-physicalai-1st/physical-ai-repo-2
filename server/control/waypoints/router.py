@@ -24,6 +24,14 @@ class GotoBody(BaseModel):
     name: str = Field(..., min_length=1)
 
 
+class GotoPoseBody(BaseModel):
+    """RViz Nav2 Goal 패턴 — 좌표 직접 지정 (클릭-드래그 인터랙션용).
+    yaml 에 저장 안 함, 단발 NavigateToPose 만."""
+    x: float
+    y: float
+    yaw: float
+
+
 def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     router = APIRouter(prefix="/waypoints", tags=["waypoints"])
 
@@ -73,6 +81,18 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         goal_id = uuid4().hex
         bridge.navigate_to_pose(wp.x, wp.y, wp.yaw, goal_id)
         return {"goal_id": goal_id, "name": wp.name}
+
+    @router.post("/goto-pose", status_code=202)
+    def goto_pose(body: GotoPoseBody) -> dict:
+        """좌표 직접 지정 Goto — RViz Nav2 Goal 과 동일 패턴.
+        클릭-드래그 인터랙션에서 사용. yaml 저장 안 함."""
+        goal_id = uuid4().hex
+        bridge.navigate_to_pose(body.x, body.y, body.yaw, goal_id)
+        return {
+            "goal_id": goal_id,
+            "name": "(click)",
+            "x": body.x, "y": body.y, "yaw": body.yaw,
+        }
 
     @router.post("/patrol/{patrol_name}", status_code=202)
     def patrol(patrol_name: str) -> dict:
