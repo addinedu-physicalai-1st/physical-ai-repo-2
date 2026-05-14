@@ -32,7 +32,7 @@ def test_get_waypoints_empty(client):
     c, _ = client
     r = c.get("/waypoints")
     assert r.status_code == 200
-    assert r.json() == {"waypoints": [], "patrols": {}}
+    assert r.json() == {"waypoints": [], "patrols": {}, "lanes": []}
 
 
 # ---- Task 11: POST / DELETE ----

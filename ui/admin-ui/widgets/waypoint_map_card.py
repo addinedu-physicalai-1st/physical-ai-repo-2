@@ -70,6 +70,8 @@ class MapView(QWidget):
         self._pan_at_drag_start: QPointF | None = None    # 드래그 시작 시점의 self._pan
         self._waypoints: list[dict] = []
         self._filter: set[str] | None = None   # 검색 필터 (None = 전체)
+        self._lanes: list[dict] = []           # [{from, to, bidirectional}, ...]
+        self._route: list[str] | None = None   # vertex name sequence — 강조선
         self._robot: dict | None = None
         self._plan: list[tuple[float, float]] = []
         self._current_name: str | None = None
@@ -87,6 +89,13 @@ class MapView(QWidget):
 
     def set_waypoints(self, wps: list[dict]) -> None:
         self._waypoints = wps; self.update()
+
+    def set_lanes(self, lanes: list[dict]) -> None:
+        self._lanes = lanes; self.update()
+
+    def set_route(self, vertex_names: list[str] | None) -> None:
+        """다익스트라 결과 강조선. None = 강조 해제."""
+        self._route = vertex_names; self.update()
 
     def set_filter(self, names: set[str] | None) -> None:
         """None = 전체 표시, set = 해당 name 만 표시 (검색 결과)."""
@@ -250,6 +259,27 @@ class MapView(QWidget):
         # 웨이포인트 마커 (graph 모드에서만) — zoom 에 따라 마커/폰트 같이 확대
         if self._display_mode == 'graph':
             z = self._zoom
+            # lanes — 회색 선 (마커보다 먼저 그려서 마커가 위에 오게)
+            wp_by_name = {w["name"]: w for w in self._waypoints}
+            qp.setPen(QPen(QColor(120, 120, 120, 180), 1.5 * z))
+            for ln in self._lanes:
+                a = wp_by_name.get(ln.get("from"))
+                b = wp_by_name.get(ln.get("to"))
+                if not a or not b:
+                    continue
+                pa = self._map_to_widget(a["x"], a["y"])
+                pb = self._map_to_widget(b["x"], b["y"])
+                qp.drawLine(pa, pb)
+            # route 강조 — 굵은 코랄선
+            if self._route and len(self._route) >= 2:
+                qp.setPen(QPen(QColor("#E07B5B"), 4 * z))
+                for n1, n2 in zip(self._route[:-1], self._route[1:]):
+                    a = wp_by_name.get(n1); b = wp_by_name.get(n2)
+                    if not a or not b:
+                        continue
+                    pa = self._map_to_widget(a["x"], a["y"])
+                    pb = self._map_to_widget(b["x"], b["y"])
+                    qp.drawLine(pa, pb)
             for w in self._waypoints:
                 if self._filter is not None and w["name"] not in self._filter:
                     continue
@@ -392,8 +422,16 @@ class _SseDispatcher:
             self.card.update_plan([tuple(p) for p in ev.get("points", [])])
         elif t == "goal_status":
             self.card.update_goal_status(ev.get("name"), ev.get("status"))
+            # 종료 상태면 route 강조 해제
+            if ev.get("status") in ("succeeded", "canceled", "aborted", "rejected"):
+                self.card._map.set_route(None)
         elif t == "waypoints":
             self.card._refresh_list()
+        elif t == "route_progress":
+            # navigate 진행 중 — 현재 통과 vertex 강조 (vertex 마커 색)
+            cur = ev.get("current_vertex")
+            if cur:
+                self.card._map.set_current(cur)
 
 
 class _SseThread(QThread):
@@ -588,6 +626,7 @@ class WaypointMapCard(QFrame):
         except httpx.HTTPError:
             return
         self._map.set_waypoints(data["waypoints"])
+        self._map.set_lanes(data.get("lanes") or [])
         self._list.clear()
         for w in data["waypoints"]:
             it = QListWidgetItem(w["name"])
@@ -617,10 +656,44 @@ class WaypointMapCard(QFrame):
             return
         name = item.data(Qt.UserRole)
         menu = QMenu(self._list)
+        route_act = QAction(f"경로 미리보기: → '{name}'", menu)
+        route_act.triggered.connect(lambda: self._on_preview_route(name))
+        navigate_act = QAction(f"graph navigate → '{name}'", menu)
+        navigate_act.triggered.connect(lambda: self._on_graph_navigate(name))
+        clear_act = QAction("경로 강조 해제", menu)
+        clear_act.triggered.connect(lambda: self._map.set_route(None))
         delete_act = QAction(f"🗑  '{name}' 삭제", menu)
         delete_act.triggered.connect(lambda: self._on_delete(name))
+        menu.addAction(route_act)
+        menu.addAction(navigate_act)
+        menu.addAction(clear_act)
+        menu.addSeparator()
         menu.addAction(delete_act)
         menu.exec_(self._list.viewport().mapToGlobal(pos))
+
+    def _on_preview_route(self, name: str) -> None:
+        """다익스트라 결과만 받아서 강조선 표시 (로봇 안 움직임)."""
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/route",
+                           json={"name": name}, timeout=2.0)
+        except httpx.HTTPError as e:
+            QMessageBox.critical(self, "통신 오류", str(e))
+            return
+        if r.status_code != 200:
+            QMessageBox.warning(self, "경로 없음", r.json().get("detail", r.text))
+            return
+        seq = r.json().get("vertex_sequence") or []
+        self._map.set_route(seq)
+
+    def _on_graph_navigate(self, name: str) -> None:
+        """graph routing 으로 실제 이동 (vertex sequence → nav2 FollowWaypoints)."""
+        import httpx
+        try:
+            httpx.post(f"{self._control_url}/waypoints/navigate",
+                       json={"name": name}, timeout=2.0)
+        except httpx.HTTPError:
+            pass
 
     def _on_delete(self, name: str) -> None:
         import httpx
