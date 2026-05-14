@@ -946,6 +946,19 @@ def _norm_session_token(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (s or "").lower())
 
 
+_ROBOT_KO_DISPLAY = {
+    "eduping": "에듀핑",
+    "gogoping": "고고핑",
+    "noriarm": "노리암",
+}
+
+
+def robot_display_korean(robot: str) -> str:
+    """robot id ("noriarm" 등) 를 한국어 호칭 ("노리암") 으로 — LLM 이 영문 id 를 음역 (예: "노리아르마") 하지 않게."""
+    key = (robot or "").strip().lower()
+    return _ROBOT_KO_DISPLAY.get(key, robot or "")
+
+
 def _mode_display_korean(mode: str) -> str:
     m = _norm_session_token(mode)
     if m in ("oxquiz", "ox-quiz"):
@@ -1124,13 +1137,19 @@ def merge_same_session_photo_clusters_to_single_rows(
     cluster_pids: set[int] = set()
     merged_rows: list[dict[str, Any]] = []
     for cluster in clusters:
-        pids = set()
+        # cluster 는 시각 오름차순 — pids_ordered 도 그 순서를 그대로 보존 (UI 가 시간순 strip 으로 렌더).
+        pids_ordered: list[int] = []
+        seen: set[int] = set()
         for p in cluster:
             try:
-                pids.add(int(p["photo_id"]))
+                pid = int(p["photo_id"])
             except (KeyError, TypeError, ValueError):
                 continue
-        cluster_pids |= pids
+            if pid in seen:
+                continue
+            seen.add(pid)
+            pids_ordered.append(pid)
+        cluster_pids |= seen
         first_t = str(cluster[0]["time"]).strip()
         last_t = str(cluster[-1]["time"]).strip()
         best = max(
@@ -1148,7 +1167,12 @@ def merge_same_session_photo_clusters_to_single_rows(
             tail = f" ({mk})" if mk and mk != "놀이" else ""
             text = f"{poss} 표정이 기록되었다{tail}."
             cap_t = str(best.get("time", first_t)).strip()
-            merged_rows.append({"time": cap_t, "photo_id": best_pid, "text": text})
+            merged_rows.append({
+                "time": cap_t,
+                "photo_id": best_pid,
+                "photo_ids": pids_ordered,
+                "text": text,
+            })
         else:
             try:
                 first_m = _hhmm_to_minutes(first_t)
@@ -1160,7 +1184,12 @@ def merge_same_session_photo_clusters_to_single_rows(
                 f"{topic} {first_t}부터 {last_t}까지 약 {dur}분 동안 {mode_ko}를 "
                 "즐겁게 이어가며 활동을 마치며 행복한 표정으로 마무리했다."
             )
-            merged_rows.append({"time": first_t, "photo_id": best_pid, "text": text})
+            merged_rows.append({
+                "time": first_t,
+                "photo_id": best_pid,
+                "photo_ids": pids_ordered,
+                "text": text,
+            })
 
     def keep_event(ev: dict[str, Any]) -> bool:
         pid = ev.get("photo_id")

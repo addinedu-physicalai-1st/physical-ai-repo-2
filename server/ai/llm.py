@@ -9,7 +9,14 @@ import httpx
 from server.ai import prompts
 from server.ai.config import settings
 from server.ai.emotions import CHAT_EMOTIONS, CHAT_EMOTION_IDS, is_chat_emotion
+from server.ai.report_skeleton import (
+    build_timeline_skeleton,
+    enforce_skeleton_on_events,
+    render_skeleton_for_prompt,
+)
 from server.ai.korean_postprocess import (
+    _mode_display_korean,
+    robot_display_korean,
     collapse_redundant_class_scope_participation_prefixes,
     dedupe_timeline_near_duplicate_texts,
     ensure_canonical_photo_rows,
@@ -326,7 +333,7 @@ async def generate_report(
     has_photos = bool(photo_events)
     photos_block = (
         "\n".join(
-            f"- photo_id={p['photo_id']} · {p['time']} ({p['robot']}/{p['mode']}): {p['emotion']} (강도 {p['score']})"
+            f"- photo_id={p['photo_id']} · {p['time']} (로봇: {robot_display_korean(p['robot'])} / 모드: {_mode_display_korean(p['mode'])}): {p['emotion']} (강도 {p['score']})"
             for p in photo_events
         )
         if has_photos
@@ -354,6 +361,12 @@ async def generate_report(
     )
     anchor_start = use_timeline_start_no_data_anchor(att, infer_presence_from_photos=has_photos)
     anchor_end = use_timeline_end_no_data_anchor(att)
+
+    # 타임라인 골격은 서버가 정한다 — 일과표 슬롯이 spine 이고, 사진 클러스터·등하원 row 가
+    # 슬롯 안에 끼워진다. LLM 은 각 row 의 text 만 채우면 된다.
+    skeleton = build_timeline_skeleton(schedule, photo_events, att)
+    skeleton_block = render_skeleton_for_prompt(skeleton)
+
     scope_user_hint = ""
     no_photo_user_hint = ""
     if not has_photos:
@@ -391,8 +404,22 @@ async def generate_report(
 
     system = (
         "당신은 유치원 교사의 일일 보고서를 한국어로 작성하는 도우미입니다.\n"
+        "**중요 — 타임라인 골격은 사용자 메시지에 이미 정해져 있다**:\n"
+        "  · events 의 row 개수·순서·각 row 의 `time`·`photo_id` 는 입력 골격과 1:1 로 같아야 한다.\n"
+        "  · row 를 추가하거나 삭제하지 말고, 시각을 재배치하지 말 것.\n"
+        "  · 각 row 의 `text` 필드만 작성한다. role 표시([schedule], [photo-cluster], "
+        "[attendance-in/out], [no-data-start/end], [schedule-end])는 출력에 넣지 말고, 의미만 참고.\n"
+        "  · role 이 [no-data-start] 또는 [no-data-end] 인 row 는 정확히 「데이터가 없습니다」 한 문장만 두라.\n"
         "보고서는 시간순 타임라인 형식의 JSON 으로 출력합니다. 각 항목은 events 배열의 한 원소이며,\n"
-        "필드는 time (HH:MM), photo_id (정수 또는 null), text (40자 내외 한 줄 한국어 묘사) 입니다.\n"
+        "필드는 time (HH:MM), photo_id (정수 또는 null), text (보호자가 읽기 풍부한 한국어 1–2 문장, 대략 70–150 자) 입니다.\n"
+        "**짧은 한 줄 금지** — 「오전 간식을 먹었습니다」「교실 활동을 했습니다」처럼 활동명만 붙인 5–15자 한 줄은 보호자가 읽기엔 너무 빈약합니다. "
+        "그 시간대에 호칭이 어떻게 보냈는지 (구체 행동·분위기·친구들과의 상호작용·먹은 메뉴·놀이 종류 등) 두 어 절씩 풀어 1–2 문장으로 쓰세요. "
+        "단, role 이 [no-data-start]/[no-data-end] 인 줄과 [attendance-in]/[attendance-out] 인 줄은 짧고 정형화된 문장으로 두며 (서버가 강제로 교체합니다).\n"
+        "**로봇 이름 음역 금지** — 입력에 영문 id 가 보여도 (예: noriarm, eduping, gogoping) 본문에는 한국어 표기 (노리암 / 에듀핑 / 고고핑) 만 사용. "
+        "「노리아르마」「에듀핑이」 같은 음역·합성 표기 금지. 모드 이름도 ox-quiz → 「OX 퀴즈」 처럼 한국어로 쓰세요.\n"
+        "예시 — 길이·풍부함 기준 (자연스러운 한국어로):\n"
+        "  · 좋음 (약 90자): 「정우는 친구들과 함께 교실에 둘러앉아 색종이로 모양을 만들고, 바깥으로 나가 놀이 기구를 타며 즐겁게 시간을 보냈습니다.」\n"
+        "  · 나쁨 (너무 짧음): 「교실 활동을 했습니다」, 「오전 간식을 먹었습니다」.\n"
         "규칙:\n"
         "1) '오늘 포착된 표정' 입력의 각 항목 (photo_id 있음) 은 events 에 반드시 한 번씩 포함하고, "
         "photo_id 는 입력과 동일한 정수, **time 은 입력 촬영 시각과 정확히 같은 HH:MM 한 줄**에만 둡니다. "
@@ -414,8 +441,8 @@ async def generate_report(
         "반 친구들과 함께한 모습은 「보고서 호칭」이 주어·화자가 되게 쓰고, 반 전체는 필요할 때만 짧게 보조한다. "
         "반 친구들을 가리킬 때는 DB 「반 이름」**전체** 뒤에 공백을 넣고 「아이들」을 붙인다 "
         "(올바름: 「햇님반 아이들」, 「별반 아이들」 / 금지: 「햇님이들」「별이들」처럼 「반」을 빼고 붙이기). "
-        "사진이 없는 시각은 사용자 메시지의 「원 일과표」시간대를 빠짐없이 반영하고, 각 구간은 photo_id=null 한 줄로 짧게 적습니다. "
-        "각 줄은 활동명만 괄호로 붙인 한 마디(예: 「…」활동을 했다)가 아니라, 그 시간대에 무엇을 어떻게 했는지 구체적으로 서술합니다(식사·놀이·쉼 등 동사 중심). "
+        "사진이 없는 시각도 그 시간대 일과를 photo_id=null 한 row 로 **풍부하게** 서술합니다 (한 row 당 1–2 문장, 약 70–150자). "
+        "각 줄은 활동명만 괄호로 붙인 한 마디(예: 「…」활동을 했다)가 아니라, 그 시간대에 무엇을 어떻게 했는지 구체적으로(식사·놀이·쉼·친구들과의 상호작용·메뉴·분위기 등) 서술합니다. "
         "일과표에 없는 활동·시간을 새로 만들지 마세요. "
         "**입력된 점심메뉴 목록은 일과표에서 점심에 해당하는 time 한 줄에만** 괄호로 짧게 넣고, "
         "오전 간식·오후 간식 등 **다른 식사 줄에는 점심 메뉴를 복사·붙여넣기 하지 마세요** "
@@ -472,9 +499,12 @@ async def generate_report(
         f"{att_block}"
         f"{notes_block}"
         f"점심메뉴: {menu_block}\n"
-        "원 일과표 (시간대 — 활동명):\n"
+        "원 일과표 (시간대 — 활동명, 참고용):\n"
         f"{schedule_block}\n"
-        f"오늘 포착된 표정 (photo_id · 시각 · 로봇/모드 · 감정 · 강도):\n{photos_block}\n"
+        "오늘 포착된 표정 (photo_id · 시각 · 로봇/모드 · 감정 · 강도, 참고용):\n"
+        f"{photos_block}\n\n"
+        "**타임라인 골격 (events 의 각 row 와 1:1 대응 — time/photo_id 그대로 유지하고 text 만 작성)**:\n"
+        f"{skeleton_block}\n"
         f"{no_photo_user_hint}"
         f"{scope_user_hint}"
         f"{anchor_hint}\n"
@@ -532,18 +562,19 @@ async def generate_report(
             pid_int = pid
         cleaned_events.append({"time": time_s, "photo_id": pid_int, "text": text_s})
     cleaned_events.sort(key=lambda e: e["time"])
-    cleaned_events = sanitize_photo_event_placements(cleaned_events, photo_events)
-    cleaned_events = ensure_canonical_photo_rows(cleaned_events, photo_events, call)
-    cleaned_events = merge_same_session_photo_clusters_to_single_rows(
-        cleaned_events, photo_events, call
-    )
-    cleaned_events = retain_top_k_photo_timeline(cleaned_events, photo_events, k=1)
-    cleaned_events = merge_attendance_timeline_events(
+    # 골격에 맞춰 즉시 재정렬·검증 — LLM 이 row 를 추가/삭제하거나 시각을 바꿔도 여기서 흡수.
+    cleaned_events = enforce_skeleton_on_events(
+        skeleton,
         cleaned_events,
-        call,
-        attendance,
-        schedule,
+        address_name=call,
+        has_attendance=bool(att.get("check_in_kst") or att.get("check_out_kst")),
     )
+    cleaned_events = sanitize_photo_event_placements(cleaned_events, photo_events)
+    # ensure_canonical_photo_rows, merge_same_session_photo_clusters_to_single_rows,
+    # retain_top_k_photo_timeline, merge_attendance_timeline_events 는 build_timeline_skeleton
+    # 이 이미 처리한다 — 다시 호출하면 LLM 의 풍부한 본문을 짧은 formulaic 문구로 덮어쓰거나
+    # 서버가 만든 등하원 문장을 덮어써서 결과가 빈약해진다.
+    # → 모두 skip. 텍스트 품질 후처리만 이어서 실행한다.
     cleaned_events = dedupe_timeline_near_duplicate_texts(cleaned_events)
     cleaned_events = fill_timeline_schedule_gaps(
         cleaned_events,
@@ -647,6 +678,13 @@ async def generate_report(
         attendance,
     )
     cleaned_events = remove_timeline_raw_emotion_dump_lines(cleaned_events)
+    # 최종 anchor — 텍스트 후처리 단계에서 row 가 추가/삭제됐다면 골격으로 다시 정렬.
+    cleaned_events = enforce_skeleton_on_events(
+        skeleton,
+        cleaned_events,
+        address_name=call,
+        has_attendance=bool(att.get("check_in_kst") or att.get("check_out_kst")),
+    )
 
     if not has_photos:
         for ev in cleaned_events:

@@ -9,7 +9,7 @@ from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.control.auth import current_active_user
@@ -133,7 +133,14 @@ async def list_child_photos(
         .order_by(Photo.taken_at.asc())
     )
     if date:
-        query = query.where(func.date(Photo.taken_at) == date)
+        # KST 기준 하루 — 보고서 생성 (reports.py) 와 동일한 경계로 맞춤.
+        # `func.date(Photo.taken_at)` 은 세션 TZ(보통 UTC)로 평가돼 자정 ±9 시간 사진이 누락됨.
+        day_start_kst = datetime.combine(date, datetime.min.time(), _KST)
+        day_end_kst = day_start_kst + timedelta(days=1)
+        query = query.where(
+            Photo.taken_at >= day_start_kst,
+            Photo.taken_at < day_end_kst,
+        )
 
     rows = (await session.execute(query)).scalars().all()
     return [PhotoOut.model_validate(p, from_attributes=True) for p in rows]
