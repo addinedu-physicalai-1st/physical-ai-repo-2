@@ -31,6 +31,7 @@ class Waypoint:
     x: float
     y: float
     yaw: float
+    id: int | None = None
 
 
 class WaypointStoreError(Exception):
