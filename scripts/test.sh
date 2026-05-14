@@ -79,6 +79,16 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[tests] Graph (vertex 자동 lane + 다익스트라)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest tests/test_graph.py -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[tests] Streaming (UDP camera → WS fan-out)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS

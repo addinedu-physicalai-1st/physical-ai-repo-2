@@ -1,0 +1,12 @@
+# 다익스트라 경로 조회 — graph_router_node 가 노출.
+# 시각화/디버깅용. 실제 이동은 NavigateToVertex.action 사용.
+
+# request
+string target_name      # 목적지 vertex name (waypoints.yaml 의 name)
+geometry_msgs/Point start  # 출발 위치 (보통 현재 로봇 odom). z 무시.
+---
+# response
+bool success
+string message          # 실패 사유 (vertex 없음 / 경로 없음 등)
+string[] vertex_sequence  # 경로 vertex name 시퀀스. 첫 항목은 start 와 가장 가까운 vertex, 마지막은 target_name
+float32 total_distance_m
