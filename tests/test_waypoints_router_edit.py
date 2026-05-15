@@ -91,3 +91,25 @@ def test_undo_empty_408(client):
     ys._RECENT_ADD = None
     r = c.post("/waypoints/undo")
     assert r.status_code == 408
+
+
+# ---- POST /waypoints/snapshot-default + reset ----
+def test_snapshot_and_reset_roundtrip(client):
+    c, _ = client
+    # 현재 상태 (A 노드 1개) 를 default 로 동결
+    r = c.post("/waypoints/snapshot-default")
+    assert r.status_code == 200
+
+    # working 변경
+    c.post("/waypoints/click", json={"name": "Y", "x": 7, "y": 7, "yaw": 0})
+
+    # reset — default 로 복구
+    r = c.post("/waypoints/reset")
+    assert r.status_code == 200
+    assert all(w["name"] != "Y" for w in r.json()["waypoints"])
+
+
+def test_reset_without_default_409(client):
+    c, _ = client
+    r = c.post("/waypoints/reset")
+    assert r.status_code in (404, 409)

@@ -157,6 +157,26 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         reload_result = bridge.reload_graph()
         return _emit_state_after_write(reload_result)
 
+    @router.post("/reset")
+    def reset_route() -> dict:
+        """초기화 — default snapshot 으로 working yaml 덮어쓰기."""
+        _check_nav_idle()
+        try:
+            ys.restore_default()
+            ys.restore_default_lanes()
+        except FileNotFoundError as e:
+            raise HTTPException(409, f"default 부재: {e}")
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
+    @router.post("/snapshot-default")
+    def snapshot_default_route() -> dict:
+        """기본값 갱신 — 현재 working 을 default snapshot 으로 동결."""
+        _check_nav_idle()
+        ys.snapshot_default()
+        ys.snapshot_default_lanes()
+        return {"ok": True}
+
     @router.post("/undo")
     def undo_route() -> dict:
         """가장 최근 add() 1개 되돌림. 노드에 lane 잇혀있으면 409."""
