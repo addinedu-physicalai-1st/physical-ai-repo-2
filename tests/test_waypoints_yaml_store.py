@@ -137,3 +137,21 @@ def test_update_unknown_raises(tmp_yaml):
     ys.save([], {})
     with pytest.raises(KeyError):
         ys.update("Z", 0.0, 0.0, 0.0)
+
+
+# ---- Task 5: undo_last_add (1-step) ----
+def test_undo_last_add_removes_recent(tmp_yaml):
+    _, ys = tmp_yaml
+    ys._RECENT_ADD = None  # 격리
+    ys.add("X", 0.0, 0.0, 0.0)
+    assert len(ys.load()[0]) == 1
+    undone = ys.undo_last_add()
+    assert undone is not None
+    assert undone.name == "X"
+    assert ys.load()[0] == []
+
+
+def test_undo_last_add_returns_none_when_empty(tmp_yaml):
+    _, ys = tmp_yaml
+    ys._RECENT_ADD = None
+    assert ys.undo_last_add() is None
