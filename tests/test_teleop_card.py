@@ -61,7 +61,6 @@ def test_card_has_required_widgets(qtbot, monkeypatch, tmp_path):
         "teleopLinearSlider", "teleopAngularSlider",
         "teleopBtnUp", "teleopBtnDown", "teleopBtnLeft",
         "teleopBtnRight", "teleopBtnStop",
-        "teleopOdomMini", "teleopScanMini",
         "teleopCmdRow",
     ]
     found = {w.objectName() for w in card.findChildren(object)
@@ -228,3 +227,27 @@ def test_focus_out_resets_and_stops(qtbot, monkeypatch, tmp_path):
     card.focusOutEvent(QFocusEvent(QEvent.FocusOut))
     assert calls[-1] == (0.0, 0.0)
     assert not card._keys_down
+
+
+# --------------------------------------------------------------- Task 5
+
+
+def test_on_state_no_longer_touches_scan_or_odom(qtbot, monkeypatch, tmp_path):
+    """TeleopCard.on_state 는 더 이상 scan_view/odom_view 에 접근하지 않는다.
+
+    ODOM/LIDAR 표출은 GogoPingDashboard 의 LidarScanView, OdomCompact 가 담당.
+    """
+    ips = tmp_path / "ips.json"
+    ips.write_text(json.dumps({"vic": {"ip": "1.1.1.1"}}))
+    card, _, _ = _make_card(qtbot, monkeypatch, ips)
+    # scan_view, odom_view 가 더 이상 속성으로 존재하지 않아야 함
+    assert not hasattr(card, "scan_view")
+    assert not hasattr(card, "odom_view")
+    # on_state 호출이 통신 배지 갱신만 하고 예외 없이 통과
+    card.on_state({
+        "odom": {"x": 1.0, "y": 2.0, "yaw": 0.0, "vx": 0.0, "wz": 0.0, "age_ms": 10},
+        "scan": {"angle_min": -3.14, "angle_inc": 0.01, "ranges": [1.0] * 360,
+                 "hz": 12.3, "age_ms": 80},
+        "ros_ok": True,
+        "last_cmd_age_ms": None,
+    })

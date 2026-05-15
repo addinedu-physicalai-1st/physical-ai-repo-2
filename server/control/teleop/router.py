@@ -25,7 +25,7 @@ CMD_TIMEOUT_S = 0.5
 # WS broadcast 주기 (s)
 WS_TICK_S = 0.1
 # scan ranges 다운샘플 길이 (AC #31)
-RESAMPLE_N = 90
+RESAMPLE_N = 360
 # WS 클라이언트 큐 크기 (AC #29)
 QUEUE_MAX = 2
 
@@ -122,16 +122,20 @@ class _Hub:
             try:
                 await asyncio.sleep(WS_TICK_S)
                 snap = self._bridge.snapshot()
+                # spec §5.3: scan dict = {angle_min, angle_inc, ranges (resampled), hz, age_ms}
+                scan_dict = None
+                if snap["scan"] is not None:
+                    scan_dict = {
+                        "angle_min": snap["scan"]["angle_min"],
+                        "angle_inc": snap["scan"]["angle_inc"],
+                        "ranges": _resample(snap["scan"]["ranges"]),
+                        "hz": snap["scan"].get("hz", 0.0),
+                        "age_ms": snap["scan"].get("age_ms", 0),
+                    }
                 payload = {
                     "ts_ms": int(time.time() * 1000),
                     "odom": snap["odom"],
-                    "scan": (
-                        None if snap["scan"] is None else {
-                            "angle_min": snap["scan"]["angle_min"],
-                            "angle_inc": snap["scan"]["angle_inc"],
-                            "ranges": _resample(snap["scan"]["ranges"]),
-                        }
-                    ),
+                    "scan": scan_dict,
                     "ros_ok": snap["ros_ok"],
                     "last_cmd_age_ms": snap["last_cmd_age_ms"],
                 }

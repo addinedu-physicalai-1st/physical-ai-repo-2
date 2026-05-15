@@ -71,6 +71,7 @@ if ! conda run -n jazzy pytest \
   tests/test_teleop_router.py \
   tests/test_teleop_card.py \
   tests/test_ros_bridge_threadsafe.py \
+  tests/test_ros_bridge_scan_hz.py \
   tests/test_teleop_arch_guards.py \
   -v "$@"; then
   EXIT=1
@@ -219,6 +220,20 @@ conda run -n jazzy pytest tests/test_waypoint_map_card_edit.py -v "$@" || {
     EXIT=1
   fi
 }
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[ui/admin-ui] LiDAR scan — 순수 함수 (math 8) + 뷰 스모크 (view 4) + ODOM compact (3)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest \
+  tests/test_lidar_scan_math.py \
+  tests/test_lidar_scan_view.py \
+  tests/test_odom_compact.py \
+  -v "$@"; then
+  EXIT=1
+fi
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo

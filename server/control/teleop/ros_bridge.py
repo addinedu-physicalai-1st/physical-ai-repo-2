@@ -56,6 +56,9 @@ class RosBridge:
         self._latest_scan: ScanState | None = None
         self._last_cmd_at_s: float | None = None
         self._sim_active_at_s: float | None = None
+        # ── scan Hz EMA ──
+        self._last_scan_at_s: float | None = None
+        self._scan_hz: float = 0.0
         self._ros_ok = False
         self._spin_thread: threading.Thread | None = None
 
@@ -150,14 +153,26 @@ class RosBridge:
             self._latest_odom = state
 
     def _on_scan(self, msg) -> None:
+        now = time.monotonic()
         ranges = [float(r) for r in msg.ranges]
         state = ScanState(
             angle_min=float(msg.angle_min),
             angle_inc=float(msg.angle_increment),
             ranges=ranges,
-            received_at_s=time.monotonic(),
+            received_at_s=now,
         )
         with self._lock:
+            # EMA Hz — 두 번째 콜백부터 갱신
+            if self._last_scan_at_s is not None:
+                dt = now - self._last_scan_at_s
+                # dt < 1ms → clock jitter / duplicate callback 으로 보고 무시
+                if dt > 1e-3:
+                    inst_hz = 1.0 / dt
+                    if self._scan_hz == 0.0:
+                        self._scan_hz = inst_hz
+                    else:
+                        self._scan_hz = 0.8 * self._scan_hz + 0.2 * inst_hz
+            self._last_scan_at_s = now
             self._latest_scan = state
 
     def _on_sim_active(self, msg) -> None:
@@ -196,6 +211,7 @@ class RosBridge:
                 scan = {"angle_min": s.angle_min,
                         "angle_inc": s.angle_inc,
                         "ranges": list(s.ranges),
+                        "hz": self._scan_hz,
                         "age_ms": int((now - s.received_at_s) * 1000)}
             last_cmd_age_ms = (
                 None if self._last_cmd_at_s is None

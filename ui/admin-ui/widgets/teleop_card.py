@@ -1,14 +1,13 @@
 """Teleop 카드 — admin-ui 의 GogoPing 디버깅용 직접 조작 도구.
 
 키보드/버튼 입력 → Control Server REST 로 cmd_vel publish.
-WS 로 odom/scan 수신 → 미니뷰 표시.
+WS 로 통신 상태 수신 → 배지 갱신. ODOM/LIDAR 표출은 GogoPingDashboard 담당.
 rclpy 직접 import 금지 (Control Server 경유).
 """
 
 from __future__ import annotations
 
 import json
-import math
 import pathlib
 from typing import Callable
 
@@ -354,209 +353,6 @@ class LiveReadout(QFrame):
 
 
 # --------------------------------------------------------------------------
-# OdomMini — 작은 2D 좌표 + heading
-# --------------------------------------------------------------------------
-
-
-class OdomMini(QWidget):
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self.setObjectName("teleopOdomMini")
-        self.setMinimumHeight(110)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
-        self._x = 0.0
-        self._y = 0.0
-        self._yaw = 0.0
-        self._has = False
-
-    def set_odom(self, x: float, y: float, yaw: float) -> None:
-        self._x, self._y, self._yaw = x, y, yaw
-        self._has = True
-        self.update()
-
-    def paintEvent(self, _evt) -> None:  # noqa: N802
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        rect = QRectF(self.rect()).adjusted(1, 1, -1, -1)
-
-        # 라운드 배경 + 옅은 그라데이션
-        path = QPainterPath()
-        path.addRoundedRect(rect, 12, 12)
-        bg = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        bg.setColorAt(0, QColor(COLORS["bg_alt"]))
-        bg.setColorAt(1, QColor(soften(COLORS["sky"], 0.5)))
-        p.fillPath(path, bg)
-        p.setPen(QPen(QColor(COLORS["border"]), 1))
-        p.drawPath(path)
-
-        cx, cy = rect.center().x(), rect.center().y()
-
-        # 헤더
-        f = QFont(self.font())
-        f.setPointSize(9)
-        f.setBold(True)
-        f.setLetterSpacing(QFont.PercentageSpacing, 130)
-        p.setFont(f)
-        p.setPen(QColor(COLORS["text_muted"]))
-        p.drawText(QRectF(rect.left() + 12, rect.top() + 6, 80, 14),
-                   Qt.AlignVCenter | Qt.AlignLeft, "ODOM")
-
-        # 그리드
-        p.setPen(QPen(QColor(COLORS["border"]), 1, Qt.DotLine))
-        for off in (-40, -20, 0, 20, 40):
-            p.drawLine(QPointF(cx + off, rect.top() + 22),
-                       QPointF(cx + off, rect.bottom() - 6))
-            p.drawLine(QPointF(rect.left() + 8, cy + off),
-                       QPointF(rect.right() - 8, cy + off))
-
-        # 중심 십자
-        p.setPen(QPen(QColor(COLORS["border_strong"]), 1.2))
-        p.drawLine(QPointF(cx - 6, cy), QPointF(cx + 6, cy))
-        p.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
-
-        if not self._has:
-            f.setLetterSpacing(QFont.PercentageSpacing, 100)
-            f.setPointSize(10)
-            f.setBold(False)
-            p.setFont(f)
-            p.setPen(QColor(COLORS["text_muted"]))
-            p.drawText(rect.adjusted(0, 18, 0, 0), Qt.AlignCenter, "데이터 없음")
-            return
-
-        # 로봇 위치 (중앙 고정) + heading 화살표
-        arrow_len = 32
-        ax = cx + arrow_len * math.cos(self._yaw)
-        ay = cy - arrow_len * math.sin(self._yaw)
-        # 화살표 line
-        pen = QPen(QColor(COLORS["primary"]), 3)
-        pen.setCapStyle(Qt.RoundCap)
-        p.setPen(pen)
-        p.drawLine(QPointF(cx, cy), QPointF(ax, ay))
-        # 화살촉
-        head_l = 8
-        ang = self._yaw
-        p.setBrush(QColor(COLORS["primary"]))
-        p.setPen(Qt.NoPen)
-        from PyQt5.QtGui import QPolygonF
-        head = QPolygonF([
-            QPointF(ax, ay),
-            QPointF(ax - head_l * math.cos(ang - 0.5),
-                    ay + head_l * math.sin(ang - 0.5)),
-            QPointF(ax - head_l * math.cos(ang + 0.5),
-                    ay + head_l * math.sin(ang + 0.5)),
-        ])
-        p.drawPolygon(head)
-        # 중심 점
-        p.setBrush(QColor(COLORS["panel"]))
-        p.setPen(QPen(QColor(COLORS["primary"]), 2))
-        p.drawEllipse(QPointF(cx, cy), 5.0, 5.0)
-
-        # 좌표 라벨
-        f.setLetterSpacing(QFont.PercentageSpacing, 100)
-        f.setPointSize(9)
-        f.setBold(False)
-        p.setFont(f)
-        p.setPen(QColor(COLORS["text_soft"]))
-        coord = f"x {self._x:+.2f}  y {self._y:+.2f}"
-        p.drawText(QRectF(rect.left() + 12, rect.bottom() - 22,
-                          rect.width() - 24, 16),
-                   Qt.AlignVCenter | Qt.AlignLeft, coord)
-
-
-# --------------------------------------------------------------------------
-# ScanMini — LiDAR polar plot + range rings
-# --------------------------------------------------------------------------
-
-
-class ScanMini(QWidget):
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self.setObjectName("teleopScanMini")
-        self.setMinimumHeight(110)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
-        self._ranges: list[float] = []
-        self._angle_min = 0.0
-        self._angle_inc = 0.0
-
-    def set_scan(self, angle_min: float, angle_inc: float,
-                 ranges: list[float]) -> None:
-        self._angle_min = angle_min
-        self._angle_inc = angle_inc
-        self._ranges = list(ranges)
-        self.update()
-
-    def paintEvent(self, _evt) -> None:  # noqa: N802
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        rect = QRectF(self.rect()).adjusted(1, 1, -1, -1)
-
-        # 라운드 배경
-        path = QPainterPath()
-        path.addRoundedRect(rect, 12, 12)
-        bg = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        bg.setColorAt(0, QColor(COLORS["bg_alt"]))
-        bg.setColorAt(1, QColor(soften(COLORS["mint"], 0.4)))
-        p.fillPath(path, bg)
-        p.setPen(QPen(QColor(COLORS["border"]), 1))
-        p.drawPath(path)
-
-        # 헤더
-        f = QFont(self.font())
-        f.setPointSize(9)
-        f.setBold(True)
-        f.setLetterSpacing(QFont.PercentageSpacing, 130)
-        p.setFont(f)
-        p.setPen(QColor(COLORS["text_muted"]))
-        p.drawText(QRectF(rect.left() + 12, rect.top() + 6, 80, 14),
-                   Qt.AlignVCenter | Qt.AlignLeft, "LIDAR")
-
-        cx, cy = rect.center().x(), rect.center().y() + 4
-        radius = min(rect.width(), rect.height()) / 2 - 14
-
-        # range rings (1m, 2m, 3m, 4m)
-        max_r = 4.0
-        p.setPen(QPen(QColor(COLORS["border"]), 1, Qt.DotLine))
-        for ring in (1.0, 2.0, 3.0, 4.0):
-            rr = radius * ring / max_r
-            p.drawEllipse(QPointF(cx, cy), rr, rr)
-        # 외곽 진한 링
-        p.setPen(QPen(QColor(COLORS["border_strong"]), 1.2))
-        p.drawEllipse(QPointF(cx, cy), radius, radius)
-        # 십자 축
-        p.setPen(QPen(QColor(COLORS["border"]), 1))
-        p.drawLine(QPointF(cx - radius, cy), QPointF(cx + radius, cy))
-        p.drawLine(QPointF(cx, cy - radius), QPointF(cx, cy + radius))
-
-        if not self._ranges:
-            ff = QFont(self.font())
-            ff.setPointSize(10)
-            p.setFont(ff)
-            p.setPen(QColor(COLORS["text_muted"]))
-            p.drawText(rect.adjusted(0, 22, 0, 0), Qt.AlignCenter, "데이터 없음")
-            return
-
-        # 점들
-        col = QColor(COLORS["sky"])
-        col.setAlpha(220)
-        pen = QPen(col, 2.5)
-        pen.setCapStyle(Qt.RoundCap)
-        p.setPen(pen)
-        for i, r in enumerate(self._ranges):
-            if not math.isfinite(r) or r <= 0:
-                continue
-            r_clip = min(r, max_r)
-            theta = self._angle_min + i * self._angle_inc
-            px = cx + (r_clip / max_r) * radius * math.cos(theta)
-            py = cy - (r_clip / max_r) * radius * math.sin(theta)
-            p.drawPoint(QPointF(px, py))
-
-        # 로봇 표시 (중앙 점)
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(COLORS["primary"]))
-        p.drawEllipse(QPointF(cx, cy), 4, 4)
-
-
-# --------------------------------------------------------------------------
 # TeleopCard
 # --------------------------------------------------------------------------
 
@@ -675,15 +471,6 @@ class TeleopCard(QWidget):
 
         cockpit.addStretch(1)
         main_row.addLayout(cockpit, 3)
-
-        # ── Telemetry: ODOM 위 / LIDAR 아래 (오른쪽 컬럼) ──
-        self.odom_view = OdomMini(self)
-        self.scan_view = ScanMini(self)
-        tele_stack = QVBoxLayout()
-        tele_stack.setSpacing(10)
-        tele_stack.addWidget(self.odom_view, 1)
-        tele_stack.addWidget(self.scan_view, 1)
-        main_row.addLayout(tele_stack, 2)
 
         body.addLayout(main_row)
 
@@ -905,22 +692,11 @@ class TeleopCard(QWidget):
     # --------------------------------------------------- state in (WS)
 
     def on_state(self, msg: dict) -> None:
-        odom = msg.get("odom")
-        if odom:
-            self.odom_view.set_odom(
-                float(odom.get("x", 0.0)),
-                float(odom.get("y", 0.0)),
-                float(odom.get("yaw", 0.0)),
-            )
-        scan = msg.get("scan")
-        if scan and scan.get("ranges"):
-            self.scan_view.set_scan(
-                float(scan.get("angle_min", 0.0)),
-                float(scan.get("angle_inc", 0.0)),
-                list(scan.get("ranges", [])),
-            )
         ros_ok = bool(msg.get("ros_ok", False))
         self._set_comm_badge(ros_ok)
+        mode = msg.get("mode")
+        if mode:
+            self._set_mode_badge(mode)
 
     def on_disconnect(self) -> None:
         self._set_comm_badge(False, label="통신 끊김")
