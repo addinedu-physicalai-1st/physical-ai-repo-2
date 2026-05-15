@@ -404,6 +404,25 @@ def test_on_auto_edge_with_dialog(card, monkeypatch):
     assert called["body"]["replace_existing"] is False
 
 
+def test_sse_active_auto_exits_edit_mode(card, monkeypatch):
+    from widgets.waypoint_map_card import _SseDispatcher
+    from PyQt5.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **kw: None))
+    card._map._edit_mode = True
+    card._map._edit_state = "link_pending"
+    card._map._selected_node = "A"
+    card._btn_edit.setChecked(True)
+
+    d = _SseDispatcher(card)
+    d.handle({"type": "goal_status", "name": "X", "status": "active"})
+
+    assert card._map._edit_mode is False
+    assert card._map._edit_state == "ready"
+    assert card._map._selected_node is None
+    assert card._btn_edit.isChecked() is False
+
+
 def test_toolbar_visibility_follows_edit_mode(card):
     # 처음엔 OFF
     assert all(not b.isVisible() for b in card._edit_toolbar)
