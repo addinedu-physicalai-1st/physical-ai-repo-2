@@ -129,7 +129,6 @@ pingdergarten/
 │   ├── gogoping-controller/src/               # GogoPing 라즈베리파이 + 노트북에서 빌드 (launch 분리)
 │   │   ├── vic_pinky/                         # vendor (git submodule, pinklab-art/vic_pinky)
 │   │   ├── sllidar_ros2/                      # vendor (Slamtec) — RPLiDAR C1 드라이버
-│   │   ├── open_manipulator/                  # vendor (ROBOTIS)
 │   │   ├── py_trees_ros/                      # vendor (splintered-reality) — Behavior Tree
 │   │   ├── py_trees_ros_interfaces/           # vendor — BT 메시지/서비스 정의
 │   │   ├── py_trees_ros_viewer/               # vendor — BT 실시간 시각화

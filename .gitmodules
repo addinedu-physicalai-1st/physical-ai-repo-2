@@ -4,9 +4,6 @@
 [submodule "controller/noriarm-controller/src/open_manipulator"]
 	path = controller/noriarm-controller/src/open_manipulator
 	url = https://github.com/robotis-git/open_manipulator.git
-[submodule "controller/gogoping-controller/src/open_manipulator"]
-	path = controller/gogoping-controller/src/open_manipulator
-	url = https://github.com/robotis-git/open_manipulator.git
 [submodule "controller/gogoping-controller/src/sllidar_ros2"]
 	path = controller/gogoping-controller/src/sllidar_ros2
 	url = https://github.com/Slamtec/sllidar_ros2.git

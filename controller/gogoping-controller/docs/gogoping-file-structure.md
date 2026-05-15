@@ -116,7 +116,7 @@ controller/gogoping-controller/src/gogoping/
         │   │   │
         │   │   └── recovery/
         │   │       ├── __init__.py
-        │   │       ├── stop_all_motors.[py|/]        # cmd_vel = 0 + 로봇팔 정지 (안전 정지)
+        │   │       ├── stop_all_motors.[py|/]        # cmd_vel = 0 (안전 정지)
         │   │       │                                 #   Used in: BT_error_main
         │   │       ├── notify_admin_ui.[py|/]        # WebSocket 으로 에러 alert publish
         │   │       │                                 #   Used in: BT_error_main

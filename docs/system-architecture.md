@@ -13,7 +13,7 @@ last_synced: "2026-05-16T00:57:00"
 | 서비스명 | 하드웨어 |
 | --- | --- |
 | EduPing | OpenArm |
-| GogoPing | Vic Pinky + OMX x 2 |
+| GogoPing | Vic Pinky |
 | NoriArm | OMX |
 
 ## Hardware Architecture
