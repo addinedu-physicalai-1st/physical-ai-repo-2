@@ -3,6 +3,7 @@ import { ref, onBeforeUnmount, watch } from 'vue';
 import { FaceMesh, type Results } from '@mediapipe/face_mesh';
 import { useModeStore } from '@/stores/mode';
 import { useTTS } from '@/composables/useTTS';
+import { pickExternalCamera } from '@/composables/selectExternalCamera';
 
 const props = defineProps<{
   /** 'IN' (등원) or 'OUT' (하원). null 이면 카메라 정지. */
@@ -83,8 +84,19 @@ interface CheckResult {
 
 async function setupCamera(): Promise<void> {
   if (stream) return;
+  // 등하원 출석은 외장 USB 카메라 (예: Alcorlink USB 2.0 Camera) 만 사용한다.
+  // 노트북 내장 카메라는 label 패턴으로 제외 — 외장이 없으면 에러 throw 후
+  // watch 의 catch 가 "카메라 접근 실패" 로 노출 (fail-closed).
+  const external = await pickExternalCamera();
+  if (!external) {
+    throw new Error('외장 USB 카메라가 연결되어 있지 않습니다');
+  }
   stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: 640, height: 480 },
+    video: {
+      deviceId: { exact: external.deviceId },
+      width: { ideal: 640 },
+      height: { ideal: 480 },
+    },
     audio: false,
   });
   if (videoRef.value) {
