@@ -219,12 +219,13 @@ def test_queue_drops_oldest_when_full() -> None:
 # --------------------------------------------------------------- AC #31
 
 
-def test_resample_produces_length_90() -> None:
+def test_resample_produces_length_360() -> None:
     bridge = _mock_bridge()
     bridge._snapshot["scan"] = {
         "angle_min": 0.0,
         "angle_inc": 0.01,
         "ranges": [float(i) for i in range(720)],
+        "hz": 12.3,
         "age_ms": 10,
     }
     app, _ = _make_app(bridge)
@@ -232,11 +233,22 @@ def test_resample_produces_length_90() -> None:
         with client.websocket_connect("/teleop/state") as ws:
             msg = ws.receive_json()
     assert msg["scan"] is not None
-    assert len(msg["scan"]["ranges"]) == 90
+    assert len(msg["scan"]["ranges"]) == 360
+    # hz, age_ms 도 WS payload 에 통과되어야 함 (spec §5.3)
+    assert msg["scan"]["hz"] == 12.3
+    assert msg["scan"]["age_ms"] == 10
 
 
 def test_resample_helper_exact_n() -> None:
-    out = router_mod._resample(list(range(360)))
-    assert len(out) == 90
+    out = router_mod._resample(list(range(720)))
+    assert len(out) == 360
     out2 = router_mod._resample([1.0, 2.0])
-    assert len(out2) == 90  # 짧은 입력도 n 으로 늘림 (반복 sampling)
+    assert len(out2) == 360  # 짧은 입력도 n 으로 늘림 (반복 sampling)
+
+
+def test_resample_helper_fastpath_exact_input() -> None:
+    """입력 길이가 이미 RESAMPLE_N 이면 fast-path 로 그대로 반환."""
+    src = [float(i) for i in range(360)]
+    out = router_mod._resample(src)
+    assert len(out) == 360
+    assert out == src

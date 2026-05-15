@@ -308,7 +308,15 @@ class GogoPingDashboard(QWidget):
 
         outer.addLayout(header_row)
 
-        # ── 카메라 + 맵 가로 1:1 ─────────────────────────
+        from widgets.lidar_scan_view import LidarScanView
+        from widgets.odom_compact import OdomCompact
+
+        # ── 4분면 2×2 grid ──
+        quad = QGridLayout()
+        quad.setHorizontalSpacing(14)
+        quad.setVerticalSpacing(14)
+
+        # 좌상: 카메라
         self.camera_card = Card("전방 카메라")
         if stream_client is not None:
             self.camera = CameraStreamView(
@@ -317,19 +325,22 @@ class GogoPingDashboard(QWidget):
         else:
             self.camera = CameraView()
         self.camera_card.body.addWidget(self.camera, 1)
+        quad.addWidget(self.camera_card, 0, 0)
 
+        # 우상: 실내 맵
         control_url = os.environ.get(
             "PINGDER_CONTROL_URL", "http://localhost:8000",
         )
         self.map_card = WaypointMapCard(control_url=control_url)
-        self.map_card.setMinimumHeight(220)
+        quad.addWidget(self.map_card, 0, 1)
 
-        monitor_row = QHBoxLayout()
-        monitor_row.setSpacing(14)
-        monitor_row.addWidget(self.camera_card, 1)
-        monitor_row.addWidget(self.map_card, 1)
-        outer.addLayout(monitor_row, 6)
+        # 좌하: LiDAR 단독
+        self.lidar_view = LidarScanView()
+        self.lidar_card = Card("LiDAR · 실시간 스캔")
+        self.lidar_card.body.addWidget(self.lidar_view, 1)
+        quad.addWidget(self.lidar_card, 1, 0)
 
+        # 우하: ODOM (위) + Teleop (아래) — 한 셀 안 세로 분할
         from services.teleop_client import TeleopClient
         from widgets.teleop_card import TeleopCard
         self.teleop_client = TeleopClient()
@@ -338,14 +349,65 @@ class GogoPingDashboard(QWidget):
             get_health=self.teleop_client.get_health,
             control_url=control_url,
         )
-        self.teleop_client.connect_state_ws(self.teleop_card.on_state)
 
-        outer.addWidget(self.teleop_card, 5)
+        self.odom_compact = OdomCompact()
+        self.odom_card = Card("ODOM")
+        self.odom_card.body.addWidget(self.odom_compact, 1)
+        self.odom_card.setFixedHeight(120)
+
+        rb_lay = QVBoxLayout()
+        rb_lay.setContentsMargins(0, 0, 0, 0)
+        rb_lay.setSpacing(10)
+        rb_lay.addWidget(self.odom_card, 0)
+        rb_lay.addWidget(self.teleop_card, 1)
+        quad.addLayout(rb_lay, 1, 1)
+
+        quad.setColumnStretch(0, 1)
+        quad.setColumnStretch(1, 1)
+        quad.setRowStretch(0, 1)
+        quad.setRowStretch(1, 1)
+
+        outer.addLayout(quad, 1)
+
+        # WS state 라우팅 — Dashboard 가 단일 수신점
+        self.teleop_client.connect_state_ws(self.on_state)
 
         self._tick = 0
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._on_tick)
         self._timer.start(60)
+
+    def on_state(self, msg: dict) -> None:
+        """WS /teleop/state 단일 수신점. LiDAR/ODOM/Teleop 에 분배."""
+        scan = msg.get("scan") or {}
+        ranges = scan.get("ranges")
+        if ranges is not None:
+            hz = float(scan.get("hz", 0.0))
+            age_ms = int(scan.get("age_ms", 0))
+            self.lidar_view.set_scan(
+                float(scan.get("angle_min", 0.0)),
+                float(scan.get("angle_inc", 0.0)),
+                list(ranges),
+            )
+            self.lidar_view.set_meta(hz, age_ms)
+            if age_ms > 500 or hz <= 0 or not ranges:
+                self.lidar_chip.set_value("—")
+            else:
+                self.lidar_chip.set_value(f"{hz:.1f} Hz")
+        else:
+            self.lidar_chip.set_value("—")
+
+        odom = msg.get("odom") or {}
+        if odom:
+            self.odom_compact.set_odom(
+                float(odom.get("x", 0.0)),
+                float(odom.get("y", 0.0)),
+                float(odom.get("yaw", 0.0)),
+            )
+            self.lidar_view.set_yaw(float(odom.get("yaw", 0.0)))
+
+        # Teleop 카드의 통신 배지 갱신
+        self.teleop_card.on_state(msg)
 
     def _on_tick(self) -> None:
         self._tick += 1

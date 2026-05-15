@@ -115,6 +115,7 @@ last_synced: "2026-05-13T14:08:22"
 | SR-CAR-005 | 자율 주행 | GogoPing 이 RPLiDAR C1 + 자율 주행 으로 사전 SLAM 맵·nav graph 위에서 지정 목적지까지 이동한다. | High |
 | SR-CAR-006 | 도착 알림 | ROS2 액션 결과 콜백이 GogoPing 노트북 스피커 음성 합성 으로 도착을 알린다. Admin UI 는 SR-ADM-001 로봇 상태 위젯 갱신 + SR-ADM-005 도착 알림으로 인지한다. | High |
 | SR-CAR-007 | 운반 후 대기 | GogoPing 이 운반 액션 완료 후 그 자리에서 대기 상태로 전이한다. | Low |
+| SR-CAR-008 | LiDAR 스캔 관제 표출 | Admin UI 가 control server WS `/teleop/state` 로부터 `/gogoping/scan` 폴라 데이터 (≥360 pts, EMA Hz, age_ms) 를 수신해 GogoPing 대시보드 4분면 중 한 칸을 차지하는 풀사이즈 폴라 뷰로 표출한다. 헤더 LiDAR chip 은 실측 Hz 로 갱신, age > 500ms 면 "신호 지연" 으로 표시. 4방향 (앞/뒤/좌/우 ±15°) 거리 통계 십자 배치. 좌표 변환은 ROS REP 103 → Qt top-down (전방 = 화면 위). | Medium |
 | SR-SAF-006 | 추종 거리 유지 | GogoPing 이 RPLiDAR C1 으로 카메라 ReID 가 잠근 방위의 거리를 측정해 거리 변동에 따라 속도·정지를 결정한다. 카메라는 추종 대상 식별, LiDAR 는 거리 측정으로 책임 분담. | High |
 
 #### 단계 머신
