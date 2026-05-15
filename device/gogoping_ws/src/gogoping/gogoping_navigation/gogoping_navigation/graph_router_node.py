@@ -1,7 +1,9 @@
 """Graph Router ROS 노드.
 
 - waypoints.yaml + lanes.yaml 로드 (ament_index 의 share/gogoping_navigation/config)
-- /odom 구독 → 현재 로봇 위치 추적
+- TF map → gogoping/base_link 로 현재 로봇 위치 추적 (map 프레임).
+  odom 토픽은 odom 프레임이라 waypoints 와 좌표계가 안 맞음 → nearest_vertex 가
+  엉뚱한 출발 vertex 를 골라 우회 경로가 생기는 버그가 있었음.
 - service /graph_router/route (RouteToVertex) — 시각화/디버깅용
 - action  /graph_router/navigate_to_vertex (NavigateToVertex)
    → 다익스트라로 vertex sequence 계산
@@ -18,12 +20,14 @@ import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateThroughPoses
-from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient, ActionServer
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.time import Time
+from tf2_ros import Buffer, LookupException, TransformException, TransformListener
 
 from gogoping_msgs.action import NavigateToVertex
 from gogoping_msgs.srv import RouteToVertex
@@ -41,7 +45,9 @@ class GraphRouterNode(Node):
             "lanes_yaml", str(share / "config" / "lanes.yaml")
         ).value)
         self._frame_id = self.declare_parameter("frame_id", "map").value
-        self._odom_topic = self.declare_parameter("odom_topic", "/gogoping/odom").value
+        self._base_frame = self.declare_parameter(
+            "base_frame", "gogoping/base_link"
+        ).value
         self._follow_action = self.declare_parameter(
             "follow_action", "/navigate_through_poses"
         ).value
@@ -52,13 +58,14 @@ class GraphRouterNode(Node):
             f"{len(self._graph.lanes())} lane"
         )
 
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
         self._pose_lock = Lock()
         self._cur_xy: tuple[float, float] | None = None
+        self._last_tf_warn_ns: int = 0
 
         cb = ReentrantCallbackGroup()
-        self.create_subscription(
-            Odometry, self._odom_topic, self._on_odom, 10, callback_group=cb,
-        )
+        self.create_timer(0.1, self._tick_tf, callback_group=cb)
         self.create_service(
             RouteToVertex, "/graph_router/route", self._srv_route,
             callback_group=cb,
@@ -74,12 +81,26 @@ class GraphRouterNode(Node):
             callback_group=cb,
         )
 
-    # ──────── /odom ────────
-    def _on_odom(self, msg: Odometry) -> None:
+    # ──────── TF map → base_link ────────
+    def _tick_tf(self) -> None:
+        try:
+            tf = self._tf_buffer.lookup_transform(
+                self._frame_id, self._base_frame,
+                Time(), timeout=Duration(seconds=0.0),
+            )
+        except (LookupException, TransformException):
+            now_ns = self.get_clock().now().nanoseconds
+            # 5 초마다 1회 경고 (TF 가 아직 안 떠있는 케이스 — 정상)
+            if now_ns - self._last_tf_warn_ns > 5_000_000_000:
+                self._last_tf_warn_ns = now_ns
+                self.get_logger().warn(
+                    f"TF {self._frame_id} → {self._base_frame} 아직 없음"
+                )
+            return
         with self._pose_lock:
             self._cur_xy = (
-                msg.pose.pose.position.x,
-                msg.pose.pose.position.y,
+                tf.transform.translation.x,
+                tf.transform.translation.y,
             )
 
     def _current_xy(self) -> tuple[float, float] | None:
@@ -91,12 +112,12 @@ class GraphRouterNode(Node):
         self, req: RouteToVertex.Request, res: RouteToVertex.Response
     ) -> RouteToVertex.Response:
         target = req.target_name
-        # request.start 가 (0,0,0) 이면 현재 odom 사용
+        # request.start 가 (0,0,0) 이면 TF map → base_link 현재 위치 사용
         if req.start.x == 0.0 and req.start.y == 0.0:
             cur = self._current_xy()
             if cur is None:
                 res.success = False
-                res.message = "no odom yet, pass non-zero start"
+                res.message = "no tf map→base_link yet, pass non-zero start"
                 return res
             sx, sy = cur
         else:
@@ -132,7 +153,7 @@ class GraphRouterNode(Node):
         if cur is None:
             gh.abort()
             result.success = False
-            result.message = "no odom yet"
+            result.message = "no tf map→base_link yet"
             return result
 
         try:

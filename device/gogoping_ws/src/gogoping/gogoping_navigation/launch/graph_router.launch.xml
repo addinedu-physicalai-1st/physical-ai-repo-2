@@ -13,16 +13,16 @@
        default="$(find-pkg-share gogoping_navigation)/config/waypoints.yaml"/>
   <arg name="lanes_yaml"
        default="$(find-pkg-share gogoping_navigation)/config/lanes.yaml"/>
-  <arg name="odom_topic" default="/gogoping/odom"/>
   <arg name="follow_action" default="/navigate_through_poses"/>
   <arg name="frame_id" default="map"/>
+  <arg name="base_frame" default="gogoping/base_link"/>
 
   <node pkg="gogoping_navigation" exec="graph_router_node"
         name="graph_router" output="screen">
     <param name="waypoints_yaml" value="$(var waypoints_yaml)"/>
     <param name="lanes_yaml" value="$(var lanes_yaml)"/>
-    <param name="odom_topic" value="$(var odom_topic)"/>
     <param name="follow_action" value="$(var follow_action)"/>
     <param name="frame_id" value="$(var frame_id)"/>
+    <param name="base_frame" value="$(var base_frame)"/>
   </node>
 </launch>
