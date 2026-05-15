@@ -113,6 +113,23 @@ def add(name: str, x: float, y: float, yaw: float) -> Waypoint:
     return wp
 
 
+def update(name: str, x: float, y: float, yaw: float) -> Waypoint:
+    """노드 좌표/yaw 만 변경. 이름은 그대로. patrol/lane 참조에 영향 없음."""
+    wps, patrols = load()
+    found = None
+    new_list: list[Waypoint] = []
+    for w in wps:
+        if w.name == name:
+            found = Waypoint(name=w.name, x=float(x), y=float(y), yaw=float(yaw), id=w.id)
+            new_list.append(found)
+        else:
+            new_list.append(w)
+    if found is None:
+        raise KeyError(name)
+    save(new_list, patrols)
+    return found
+
+
 def remove(name: str) -> None:
     wps, patrols = load()
     if not any(w.name == name for w in wps):
@@ -176,6 +193,31 @@ def load_lanes() -> list[Lane]:
             bidirectional=bool(entry.get("bidirectional", True)),
         ))
     return out
+
+
+def _lanes_match(a: Lane, from_: str, to: str) -> bool:
+    """양방향 lane 의 어느 방향이든 매칭."""
+    if a.bidirectional:
+        return (a.from_ == from_ and a.to == to) or (a.from_ == to and a.to == from_)
+    return a.from_ == from_ and a.to == to
+
+
+def add_lane(from_: str, to: str, bidirectional: bool = True) -> Lane:
+    existing = load_lanes()
+    for ln in existing:
+        if _lanes_match(ln, from_, to):
+            raise LaneStoreError("lane_exists")
+    new = Lane(from_=from_, to=to, bidirectional=bidirectional)
+    save_lanes([*existing, new])  # save_lanes 의 validate 가 from/to 존재 검증
+    return new
+
+
+def remove_lane(from_: str, to: str) -> None:
+    existing = load_lanes()
+    kept = [ln for ln in existing if not _lanes_match(ln, from_, to)]
+    if len(kept) == len(existing):
+        raise KeyError(f"lane({from_}→{to}) 없음")
+    save_lanes(kept)
 
 
 def save_lanes(lanes: list[Lane]) -> None:
