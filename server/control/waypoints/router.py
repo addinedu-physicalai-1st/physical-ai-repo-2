@@ -53,6 +53,12 @@ class LaneBody(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class AutoEdgeBody(BaseModel):
+    """자동 간선 — 거리 threshold 이하 모든 노드 쌍을 양방향 lane 으로 생성."""
+    threshold: float = Field(..., gt=0)
+    replace_existing: bool = False
+
+
 def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     router = APIRouter(prefix="/waypoints", tags=["waypoints"])
 
@@ -135,6 +141,44 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
             raise HTTPException(404, "lane 없음")
         reload_result = bridge.reload_graph()
         return _emit_state_after_write(reload_result)
+
+    @router.post("/lanes/auto")
+    def auto_edge_route(body: AutoEdgeBody) -> dict:
+        """자동 간선 — 거리 threshold 이하 노드 쌍 일괄 lane 생성.
+        replace_existing=True 면 기존 모두 제거 후 재생성."""
+        _check_nav_idle()
+        from math import hypot
+        wps, _ = ys.load()
+        # 결정론적 쌍 생성 (이름 정렬)
+        pairs: list[tuple[str, str]] = []
+        for i, a in enumerate(wps):
+            for b in wps[i + 1:]:
+                if hypot(a.x - b.x, a.y - b.y) <= body.threshold:
+                    pairs.append(tuple(sorted([a.name, b.name])))
+        if body.replace_existing:
+            for ln in list(ys.load_lanes()):
+                ys.remove_lane(ln.from_, ln.to)
+        existing_keys = {
+            tuple(sorted([ln.from_, ln.to])) for ln in ys.load_lanes()
+        }
+        added = 0
+        skipped = 0
+        for from_, to in pairs:
+            key = tuple(sorted([from_, to]))
+            if key in existing_keys:
+                skipped += 1
+                continue
+            try:
+                ys.add_lane(from_, to)
+                added += 1
+                existing_keys.add(key)
+            except ys.LaneStoreError:
+                skipped += 1
+        reload_result = bridge.reload_graph()
+        payload = _emit_state_after_write(reload_result)
+        payload["added"] = added
+        payload["skipped"] = skipped
+        return payload
 
     @router.delete("/{name}")
     def delete(name: str) -> dict:
