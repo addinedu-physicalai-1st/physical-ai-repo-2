@@ -198,3 +198,65 @@ def test_card_on_lane_delete_calls_endpoint(card, monkeypatch):
     assert called["method"] == "DELETE"
     assert called["url"].endswith("/waypoints/lanes")
     assert called["body"] == {"from": "A", "to": "B"}
+
+
+# ---- Task 24: NODE_DRAG + YAW_PREVIEW ----
+def test_enter_yaw_preview(card):
+    from PyQt5.QtCore import QPointF
+    card._map._edit_mode = True
+    card._map._pressed_node = "A"
+    end_widget = card._map._map_to_widget(2.0, 3.0)
+    card._map._enter_yaw_preview(end_widget)
+    assert card._map._edit_state == "yaw_preview"
+    assert card._map._yaw_preview["name"] == "A"
+    # widget→map 변환이 적용된 좌표
+    assert abs(card._map._yaw_preview["new_x"] - 2.0) < 0.01
+    assert abs(card._map._yaw_preview["new_y"] - 3.0) < 0.01
+
+
+def test_commit_yaw_preview_emits_move(card, qtbot):
+    from PyQt5.QtCore import QPointF
+    card._map._edit_mode = True
+    card._map._edit_state = "yaw_preview"
+    end = card._map._map_to_widget(2.0, 3.0)
+    card._map._yaw_preview = {"name": "A", "new_x": 2.0, "new_y": 3.0, "end_widget": end}
+    # 오른쪽 30px 클릭 → yaw ≈ 0
+    click = QPointF(end.x() + 30, end.y())
+    with qtbot.waitSignal(card._map.node_move_requested, timeout=500) as blocker:
+        card._map._commit_yaw_preview(click)
+    name, x, y, yaw = blocker.args
+    assert name == "A"
+    assert abs(x - 2.0) < 0.01
+    assert abs(y - 3.0) < 0.01
+    assert abs(yaw) < 0.3
+    assert card._map._edit_state == "ready"
+
+
+def test_escape_in_yaw_preview_keeps_yaw(card, qtbot):
+    from PyQt5.QtCore import Qt, QEvent, QPointF
+    from PyQt5.QtGui import QKeyEvent
+    card._map._edit_mode = True
+    card._map._edit_state = "yaw_preview"
+    card._map.set_waypoints([{"name": "A", "x": 0.0, "y": 0.0, "yaw": 1.0}])
+    end = card._map._map_to_widget(2.0, 3.0)
+    card._map._yaw_preview = {"name": "A", "new_x": 2.0, "new_y": 3.0, "end_widget": end}
+    ev = QKeyEvent(QEvent.KeyPress, Qt.Key_Escape, Qt.NoModifier)
+    with qtbot.waitSignal(card._map.node_move_requested, timeout=500) as blocker:
+        card._map.keyPressEvent(ev)
+    _, _, _, yaw = blocker.args
+    assert yaw == 1.0   # 원래 yaw 유지
+
+
+def test_card_on_node_move_calls_patch(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+    def fake_patch(url, json=None, timeout=None):
+        called["url"] = url
+        called["body"] = json
+        return R()
+    monkeypatch.setattr(httpx, "patch", fake_patch)
+    card._on_node_move("A", 1.5, 2.5, 0.7)
+    assert called["url"].endswith("/waypoints/A")
+    assert called["body"]["x"] == 1.5
