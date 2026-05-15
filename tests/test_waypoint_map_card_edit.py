@@ -152,3 +152,49 @@ def test_card_on_lane_create_posts(card, monkeypatch):
     card._on_lane_create("A", "B")
     assert called["url"].endswith("/waypoints/lanes")
     assert called["body"] == {"from": "A", "to": "B"}
+
+
+# ---- Task 23: LANE_SELECTED + Delete 키 ----
+def test_delete_key_emits_lane_delete(card, qtbot):
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QKeyEvent
+    from PyQt5.QtCore import QEvent
+    card._map._edit_mode = True
+    card._map._edit_state = "lane_selected"
+    card._map._selected_lane = ("A", "B")
+    ev = QKeyEvent(QEvent.KeyPress, Qt.Key_Delete, Qt.NoModifier)
+    with qtbot.waitSignal(card._map.lane_delete_requested, timeout=500) as blocker:
+        card._map.keyPressEvent(ev)
+    assert blocker.args == ["A", "B"]
+    assert card._map._edit_state == "ready"
+    assert card._map._selected_lane is None
+
+
+def test_escape_in_edit_resets(card):
+    from PyQt5.QtCore import Qt, QEvent
+    from PyQt5.QtGui import QKeyEvent
+    card._map._edit_mode = True
+    card._map._edit_state = "link_pending"
+    card._map._selected_node = "A"
+    ev = QKeyEvent(QEvent.KeyPress, Qt.Key_Escape, Qt.NoModifier)
+    card._map.keyPressEvent(ev)
+    assert card._map._edit_state == "ready"
+    assert card._map._selected_node is None
+
+
+def test_card_on_lane_delete_calls_endpoint(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+        text = ""
+    def fake_request(method, url, json=None, timeout=None):
+        called["method"] = method
+        called["url"] = url
+        called["body"] = json
+        return R()
+    monkeypatch.setattr(httpx, "request", fake_request)
+    card._on_lane_delete("A", "B")
+    assert called["method"] == "DELETE"
+    assert called["url"].endswith("/waypoints/lanes")
+    assert called["body"] == {"from": "A", "to": "B"}
