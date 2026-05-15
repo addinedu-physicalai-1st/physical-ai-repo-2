@@ -101,6 +101,8 @@ class MapView(QWidget):
         self._selected_lane: tuple[str, str] | None = None
         self._yaw_preview: dict | None = None       # {name, new_x, new_y, end_widget}
         self._hover_target: dict | None = None      # {kind: "node"|"lane", id}
+        # [이동] 메뉴로 진입한 이동 대상 노드 — node_move_picking / _drag 상태에서 사용
+        self._move_target_node: str | None = None
         # 마우스 업 후 짧은 페이드 아웃 피드백
         self._feedback: dict | None = None              # {"start", "end", "started_at", "mode"}
         self._feedback_timer = QTimer(self)
@@ -209,6 +211,16 @@ class MapView(QWidget):
 
         # ───── 편집 모드 분기 ─────
         if self._edit_mode:
+            # NODE_MOVE_PICKING — [이동] 메뉴 선택 후 맵 클릭+드래그 대기
+            # 좌클릭: 클릭 시점 = 새 위치, 드래그 방향 = yaw. release 에서 emit.
+            if self._edit_state == "node_move_picking":
+                self._drag_start = QPointF(e.pos())
+                self._drag_current = QPointF(e.pos())
+                self._drag_mode = "goal"
+                self._edit_state = "node_move_drag"
+                self.setFocus(Qt.MouseFocusReason)
+                self.update()
+                return
             # yaw_preview 상태에서의 클릭 = yaw 확정 (NODE_DRAG 다음 단계)
             if self._edit_state == "yaw_preview":
                 self._commit_yaw_preview(QPointF(e.pos()))
@@ -305,6 +317,24 @@ class MapView(QWidget):
 
         # ───── 편집 모드 release 분기 ─────
         if self._edit_mode:
+            if self._edit_state == "node_move_drag":
+                # [이동] 메뉴 → 클릭+드래그 release → 노드 이동 emit.
+                # 짧은 클릭이면 yaw = 기존값 유지 (좌표만 이동).
+                name = self._move_target_node
+                if name is not None:
+                    mx, my = self._widget_to_map(start.x(), start.y())
+                    if drag_dist >= self.DRAG_MIN_PX:
+                        yaw = math.atan2(-dy_w, dx_w)
+                    else:
+                        wp = next((w for w in self._waypoints
+                                   if w["name"] == name), None)
+                        yaw = float(wp.get("yaw", 0.0)) if wp else 0.0
+                    self.node_move_requested.emit(name, mx, my, yaw)
+                self._move_target_node = None
+                self._selected_node = None
+                self._edit_state = "ready"
+                self.update()
+                return
             if self._edit_state == "node_pressed":
                 if drag_dist < self.DRAG_MIN_PX:
                     # 짧은 클릭 — 기본 모드 (add 모드 아님) 에서는 무동작
@@ -377,6 +407,7 @@ class MapView(QWidget):
                     return
                 # 그 외 편집 상태 — 선택/진행 reset.
                 # add 모드도 ESC 로 해제 (toolbar 버튼 uncheck 는 카드 측에서 처리).
+                # NODE_MOVE_PICKING / _DRAG 도 동일하게 reset (= 이동 취소).
                 if self._edit_state != "ready":
                     self._drag_start = None
                     self._drag_current = None
@@ -384,6 +415,7 @@ class MapView(QWidget):
                     self._selected_lane = None
                     self._pressed_node = None
                     self._yaw_preview = None
+                    self._move_target_node = None
                     self._edit_state = "ready"
                     self.update()
                     return
@@ -999,6 +1031,7 @@ class WaypointMapCard(QFrame):
         self._map._yaw_preview = None
         self._map._pressed_node = None
         self._map._hover_target = None
+        self._map._move_target_node = None
         self._btn_edit.setChecked(False)
         self._btn_add_node.setChecked(False)
         self._btn_add_lane.setChecked(False)
@@ -1029,6 +1062,7 @@ class WaypointMapCard(QFrame):
             self._map._selected_lane = None
             self._map._yaw_preview = None
             self._map._hover_target = None
+            self._map._move_target_node = None
             self._btn_add_node.setChecked(False)
             self._btn_add_lane.setChecked(False)
             self._refresh_edit_toolbar()
@@ -1238,7 +1272,7 @@ class WaypointMapCard(QFrame):
         move_act = QAction(f"🚶  '{name}' 이동", menu)
         delete_act = QAction(f"🗑  '{name}' 삭제", menu)
         rename_act.triggered.connect(lambda: self._on_rename_node(name))
-        move_act.triggered.connect(lambda: self._on_move_node_dialog(name))
+        move_act.triggered.connect(lambda: self._on_move_node_start(name))
         delete_act.triggered.connect(lambda: self._on_delete_node(name))
         menu.addAction(rename_act)
         menu.addAction(move_act)
@@ -1306,49 +1340,18 @@ class WaypointMapCard(QFrame):
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
 
-    def _on_move_node_dialog(self, name: str) -> None:
-        """[이동] 메뉴 → 좌표/방향 입력 dialog. 노드 하이라이트 유지."""
-        from PyQt5.QtWidgets import (QDialog, QDialogButtonBox, QDoubleSpinBox,
-                                     QFormLayout, QVBoxLayout)
-        wp = next((w for w in self._map._waypoints if w["name"] == name), None)
-        if wp is None:
-            return
-        # 하이라이트 — _selected_node 가 코랄 큰 링으로 그려짐
-        prev_selected = self._map._selected_node
-        prev_state = self._map._edit_state
+    def _on_move_node_start(self, name: str) -> None:
+        """[이동] 메뉴 → 맵 위 클릭+드래그로 새 위치/방향 입력 모드 진입.
+        클릭 = 새 위치, 드래그 방향 = yaw. Esc 로 취소."""
+        # 노드 하이라이트 (코랄 큰 링) — _selected_node 가 그림
         self._map._selected_node = name
-        self._map._edit_state = "node_move_dialog"
+        self._map._move_target_node = name
+        self._map._edit_state = "node_move_picking"
+        # 진행 중 잔재 정리
+        self._map._drag_start = None
+        self._map._drag_current = None
+        self._map.setFocus(Qt.MouseFocusReason)
         self._map.update()
-        try:
-            dlg = QDialog(self)
-            dlg.setWindowTitle(f"'{name}' 이동")
-            form = QFormLayout()
-            x_in = QDoubleSpinBox(); x_in.setRange(-1000.0, 1000.0)
-            x_in.setDecimals(3); x_in.setSingleStep(0.1)
-            x_in.setValue(float(wp.get("x", 0.0)))
-            y_in = QDoubleSpinBox(); y_in.setRange(-1000.0, 1000.0)
-            y_in.setDecimals(3); y_in.setSingleStep(0.1)
-            y_in.setValue(float(wp.get("y", 0.0)))
-            yaw_in = QDoubleSpinBox(); yaw_in.setRange(-360.0, 360.0)
-            yaw_in.setDecimals(1); yaw_in.setSingleStep(5.0)
-            yaw_in.setValue(math.degrees(float(wp.get("yaw", 0.0))))
-            yaw_in.setSuffix(" °")
-            form.addRow("x (m)", x_in)
-            form.addRow("y (m)", y_in)
-            form.addRow("방향 yaw", yaw_in)
-            box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-            box.accepted.connect(dlg.accept)
-            box.rejected.connect(dlg.reject)
-            layout = QVBoxLayout(dlg)
-            layout.addLayout(form)
-            layout.addWidget(box)
-            if dlg.exec_() == QDialog.Accepted:
-                self._on_node_move(name, x_in.value(), y_in.value(),
-                                   math.radians(yaw_in.value()))
-        finally:
-            self._map._selected_node = prev_selected
-            self._map._edit_state = prev_state
-            self._map.update()
 
     def _on_node_move(self, name: str, x: float, y: float, yaw: float) -> None:
         """노드 이동 → PATCH /waypoints/{name}."""

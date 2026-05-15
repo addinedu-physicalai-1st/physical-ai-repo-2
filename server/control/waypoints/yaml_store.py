@@ -107,38 +107,63 @@ def save(waypoints: list[Waypoint], patrols: dict[str, list[str]]) -> None:
         raise
 
 
-# 가장 최근에 add() 한 노드 이름 — undo_last_add() 의 단일 step 대상.
-# 모듈 변수 (단일 서버 프로세스 가정). 서버 재시작 시 리셋.
-_RECENT_ADD: str | None = None
+# Multi-step undo — 편집 직전 yaml 상태 스냅샷 stack.
+# router 의 각 mutation endpoint 가 시작 시 push_snapshot() 을 부른다.
+# 서버 재시작 시 리셋 (메모리만, 디스크 저장 X).
+_UNDO_STACK: list[dict] = []
+_UNDO_LIMIT = 50
+
+
+def _capture_state() -> dict:
+    """현재 working yaml 상태 (waypoints + patrols + lanes) 를 dict 로 직렬화."""
+    wps, patrols = load()
+    lanes = load_lanes()
+    return {
+        "waypoints": [asdict(w) for w in wps],
+        "patrols": {k: list(v) for k, v in patrols.items()},
+        "lanes": [
+            {"from_": ln.from_, "to": ln.to, "bidirectional": ln.bidirectional}
+            for ln in lanes
+        ],
+    }
+
+
+def push_snapshot() -> None:
+    """mutation 직전에 호출 — 현재 상태를 undo stack 에 push.
+    stack size 상한 (_UNDO_LIMIT) 초과 시 가장 오래된 항목 drop."""
+    _UNDO_STACK.append(_capture_state())
+    if len(_UNDO_STACK) > _UNDO_LIMIT:
+        del _UNDO_STACK[0:len(_UNDO_STACK) - _UNDO_LIMIT]
+
+
+def undo() -> dict | None:
+    """가장 최근 스냅샷 pop → yaml 복원. stack 비어있으면 None.
+    반환값: 복원에 사용된 snapshot dict (디버깅용)."""
+    if not _UNDO_STACK:
+        return None
+    snap = _UNDO_STACK.pop()
+    wps = [Waypoint(**w) for w in snap["waypoints"]]
+    patrols = {k: list(v) for k, v in snap.get("patrols", {}).items()}
+    lanes = [
+        Lane(from_=e["from_"], to=e["to"],
+             bidirectional=bool(e.get("bidirectional", True)))
+        for e in snap.get("lanes", [])
+    ]
+    # waypoints 먼저 저장 (lanes 의 from/to validate 가 waypoints 를 참조하므로)
+    save(wps, patrols)
+    save_lanes(lanes)
+    return snap
+
+
+def clear_undo_stack() -> None:
+    """test isolation 용 — 모듈 변수 stack 비움."""
+    _UNDO_STACK.clear()
 
 
 def add(name: str, x: float, y: float, yaw: float) -> Waypoint:
-    global _RECENT_ADD
     wps, patrols = load()
     wp = Waypoint(name=name, x=float(x), y=float(y), yaw=float(yaw))
     save([*wps, wp], patrols)
-    _RECENT_ADD = name
-    return wp
-
-
-def undo_last_add() -> Waypoint | None:
-    """가장 최근에 add() 한 노드 1개만 되돌림.
-    - 아무것도 add 안 했거나 이미 undo 후엔 None.
-    - 해당 노드에 lane 이 잇혀있으면 WaypointStoreError('node_has_lanes')."""
-    global _RECENT_ADD
-    if _RECENT_ADD is None:
-        return None
-    name = _RECENT_ADD
-    if any(ln.from_ == name or ln.to == name for ln in load_lanes()):
-        raise WaypointStoreError("node_has_lanes")
-    try:
-        wp = get(name)
-    except KeyError:
-        _RECENT_ADD = None
-        return None
-    wps, patrols = load()
-    save([w for w in wps if w.name != name], patrols)
-    _RECENT_ADD = None
     return wp
 
 

@@ -86,9 +86,9 @@ def test_undo_after_click(client):
 
 def test_undo_empty_408(client):
     c, _ = client
-    # _RECENT_ADD 가 None 인 상태 (fixture 직후)
+    # undo stack 비어있는 상태
     from server.control.waypoints import yaml_store as ys
-    ys._RECENT_ADD = None
+    ys.clear_undo_stack()
     r = c.post("/waypoints/undo")
     assert r.status_code == 408
 

@@ -105,6 +105,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
                 409,
                 "odom 미수신 — 텔레옵으로 로봇을 잠시 움직여주세요",
             )
+        ys.push_snapshot()
         try:
             wp = ys.add(body.name.strip(), *snap)
         except ys.WaypointStoreError as e:
@@ -143,6 +144,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     @router.post("/lanes")
     def add_lane_route(body: LaneBody) -> dict:
         _check_nav_idle()
+        ys.push_snapshot()
         try:
             ys.add_lane(body.from_, body.to)
         except ys.LaneStoreError as e:
@@ -155,6 +157,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     @router.delete("/lanes")
     def remove_lane_route(body: LaneBody) -> dict:
         _check_nav_idle()
+        ys.push_snapshot()
         try:
             ys.remove_lane(body.from_, body.to)
         except KeyError:
@@ -166,6 +169,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     def reset_route() -> dict:
         """초기화 — default snapshot 으로 working yaml 덮어쓰기."""
         _check_nav_idle()
+        ys.push_snapshot()
         try:
             ys.restore_default()
             ys.restore_default_lanes()
@@ -184,14 +188,10 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
 
     @router.post("/undo")
     def undo_route() -> dict:
-        """가장 최근 add() 1개 되돌림. 노드에 lane 잇혀있으면 409."""
+        """multi-step undo — 가장 최근 편집 1단계 되돌림.
+        모든 mutation endpoint 가 직전 상태를 push_snapshot 으로 stack 에 쌓음."""
         _check_nav_idle()
-        try:
-            result = ys.undo_last_add()
-        except ys.WaypointStoreError as e:
-            if "node_has_lanes" in str(e):
-                raise HTTPException(409, "node_has_lanes")
-            raise HTTPException(409, str(e))
+        result = ys.undo()
         if result is None:
             raise HTTPException(408, "nothing_to_undo")
         reload_result = bridge.reload_graph()
@@ -201,6 +201,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     def click_add(body: ClickAddBody) -> dict:
         """좌표 직접 노드 추가 — admin UI 의 빈 곳 드래그 → 이름 팝업 후 호출."""
         _check_nav_idle()
+        ys.push_snapshot()
         try:
             ys.add(body.name.strip(), body.x, body.y, body.yaw)
         except ys.WaypointStoreError as e:
@@ -212,6 +213,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     def rename_node(name: str, body: RenameBody) -> dict:
         """노드 이름 변경 + lanes / patrols 참조 cascade 갱신."""
         _check_nav_idle()
+        ys.push_snapshot()
         try:
             ys.rename(name, body.new_name)
         except KeyError:
@@ -224,6 +226,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     @router.patch("/{name}")
     def move_node(name: str, body: MoveBody) -> dict:
         _check_nav_idle()
+        ys.push_snapshot()
         try:
             ys.update(name, body.x, body.y, body.yaw)
         except KeyError:
@@ -237,6 +240,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         replace_existing=True 면 기존 모두 제거 후 재생성.
         파일 쓰기는 단 한 번 (batch) — 노드 수가 많을 때 timeout 방지."""
         _check_nav_idle()
+        ys.push_snapshot()
         from math import hypot
         wps, _ = ys.load()
         # 결정론적 쌍 생성 (이름 정렬)
@@ -273,6 +277,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
 
     @router.delete("/{name}")
     def delete(name: str) -> dict:
+        ys.push_snapshot()
         try:
             cascaded = ys.remove(name)
         except KeyError:

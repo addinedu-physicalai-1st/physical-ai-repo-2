@@ -139,19 +139,35 @@ def test_update_unknown_raises(tmp_yaml):
         ys.update("Z", 0.0, 0.0, 0.0)
 
 
-# ---- Task 5: undo_last_add (1-step) ----
-def test_undo_last_add_removes_recent(tmp_yaml):
+# ---- multi-step undo (snapshot stack) ----
+def test_undo_restores_previous_state(tmp_yaml):
     _, ys = tmp_yaml
-    ys._RECENT_ADD = None  # 격리
+    ys.clear_undo_stack()
+    ys.save([], {})  # 빈 상태
+    ys.push_snapshot()
     ys.add("X", 0.0, 0.0, 0.0)
     assert len(ys.load()[0]) == 1
-    undone = ys.undo_last_add()
-    assert undone is not None
-    assert undone.name == "X"
+    snap = ys.undo()
+    assert snap is not None
     assert ys.load()[0] == []
 
 
-def test_undo_last_add_returns_none_when_empty(tmp_yaml):
+def test_undo_multi_step(tmp_yaml):
+    """순서 add A → add B → undo → undo 시 빈 상태로 복원."""
     _, ys = tmp_yaml
-    ys._RECENT_ADD = None
-    assert ys.undo_last_add() is None
+    ys.clear_undo_stack()
+    ys.save([], {})
+    ys.push_snapshot(); ys.add("A", 1.0, 0.0, 0.0)
+    ys.push_snapshot(); ys.add("B", 2.0, 0.0, 0.0)
+    assert len(ys.load()[0]) == 2
+    ys.undo()
+    names = [w.name for w in ys.load()[0]]
+    assert names == ["A"]
+    ys.undo()
+    assert ys.load()[0] == []
+
+
+def test_undo_returns_none_when_empty(tmp_yaml):
+    _, ys = tmp_yaml
+    ys.clear_undo_stack()
+    assert ys.undo() is None
