@@ -140,14 +140,69 @@ def get_patrol(patrol_name: str) -> list[Waypoint]:
     return [by_name[m] for m in patrols[patrol_name]]
 
 
-def load_lanes() -> list[dict]:
-    """waypoints.yaml 옆의 lanes.yaml 로드. 없으면 빈 리스트.
-    형식: [{from, to, bidirectional}, ...]"""
-    p = _path().parent / "lanes.yaml"
+@dataclass(frozen=True)
+class Lane:
+    """양방향 (또는 단방향) lane. yaml key `from` 는 파이썬 예약어라 `from_` 으로."""
+    from_: str
+    to: str
+    bidirectional: bool = True
+
+
+class LaneStoreError(Exception):
+    pass
+
+
+def _lanes_path() -> Path:
+    return Path(os.environ.get(
+        "PINGDER_LANES_FILE",
+        str(_path().parent / "lanes.yaml"),
+    ))
+
+
+def load_lanes() -> list[Lane]:
+    """lanes.yaml → list[Lane]. 없으면 빈 리스트."""
+    p = _lanes_path()
     if not p.exists():
         return []
     raw = p.read_text(encoding="utf-8").strip()
     if not raw:
         return []
     data = yaml.safe_load(raw) or {}
-    return list(data.get("lanes") or [])
+    out: list[Lane] = []
+    for entry in data.get("lanes", []) or []:
+        out.append(Lane(
+            from_=entry["from"],
+            to=entry["to"],
+            bidirectional=bool(entry.get("bidirectional", True)),
+        ))
+    return out
+
+
+def save_lanes(lanes: list[Lane]) -> None:
+    """atomic write — tmp → fsync → os.replace().
+    validate: 모든 from/to 가 waypoints.yaml 에 존재해야 함."""
+    wp_names = {w.name for w in load()[0]}
+    for ln in lanes:
+        if ln.from_ not in wp_names:
+            raise LaneStoreError(f"lane.from='{ln.from_}' waypoint 없음")
+        if ln.to not in wp_names:
+            raise LaneStoreError(f"lane.to='{ln.to}' waypoint 없음")
+    data = {"lanes": [
+        {"from": ln.from_, "to": ln.to, "bidirectional": ln.bidirectional}
+        for ln in lanes
+    ]}
+    p = _lanes_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".lanes-", suffix=".tmp", dir=str(p.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, p)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise

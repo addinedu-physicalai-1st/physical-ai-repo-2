@@ -57,7 +57,10 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
                 for w in wps
             ],
             "patrols": patrols,
-            "lanes": ys.load_lanes(),
+            "lanes": [
+                {"from": ln.from_, "to": ln.to, "bidirectional": ln.bidirectional}
+                for ln in ys.load_lanes()
+            ],
         }
 
     @router.post("", status_code=201)
