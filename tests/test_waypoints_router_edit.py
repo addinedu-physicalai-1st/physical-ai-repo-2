@@ -73,3 +73,21 @@ def test_post_click_duplicate_name_409(client):
     r = c.post("/waypoints/click",
                json={"name": "A", "x": 1, "y": 1, "yaw": 0})
     assert r.status_code == 409
+
+
+# ---- POST /waypoints/undo ----
+def test_undo_after_click(client):
+    c, _ = client
+    c.post("/waypoints/click", json={"name": "X", "x": 3, "y": 3, "yaw": 0})
+    r = c.post("/waypoints/undo")
+    assert r.status_code == 200
+    assert all(w["name"] != "X" for w in r.json()["waypoints"])
+
+
+def test_undo_empty_408(client):
+    c, _ = client
+    # _RECENT_ADD 가 None 인 상태 (fixture 직후)
+    from server.control.waypoints import yaml_store as ys
+    ys._RECENT_ADD = None
+    r = c.post("/waypoints/undo")
+    assert r.status_code == 408
