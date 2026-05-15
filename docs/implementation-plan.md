@@ -63,9 +63,7 @@ last_synced: "2026-05-13T14:08:22"
 
 ### 1.1 율동 안내
 
-| S ID | Name | Description | Priority |
-| --- | --- | --- | --- |
-| SR-PLAY-002 | 율동 재생 | EduPing UI 의 동요 리스트 (Robot UI 코드베이스의 정적 `dance_songs.json` — 제목·길이·trajectory ID·mp3 경로 메타) 에서 곡을 선택하면 EduPing UI (브라우저 `<audio>`) 가 `public/audio/` 의 mp3 를 재생하고 EduPing(OpenArm 양팔) 이 EduPing ROS2 패키지 내부에 사전 녹화로 둔 trajectory 를 같은 시점에 재생한다 (Control Server REST 로 trajectory ID 전달 후 동기 시작). | High |
+> 구현 완료 — [implemented.md](implemented.md) 참조
 
 ### 1.4 무궁화꽃이 피었습니다
 
@@ -179,17 +177,7 @@ last_synced: "2026-05-13T14:08:22"
 
 ### 2.7 카메라 영상 스트리밍
 
-> 방식 D — Vic Pinky / EduPing / NoriArm 의 카메라 영상을 커스텀 UDP 로 Control Server 에 송신하고, Control Server 가 WebSocket 으로 fan-out. 코드: [device/gogoping_ws/src/gogoping/gogoping_camera/](../device/gogoping_ws/src/gogoping/gogoping_camera/) (Pi 측 ROS2 패키지), [server/control/streaming/](../server/control/streaming/) (Server 측), [ui/admin-ui/widgets/camera_widget.py](../ui/admin-ui/widgets/camera_widget.py) (Admin UI).
-
-**포트 매핑 컨벤션**: 같은 로봇 패밀리 (901X / 902X / 903X) 안에서 9_DD_R 포맷 (DD=robot_id 01~99, R=role 0~9) — role 0=예약 (websocket, 추후 SR), role 1=Pi→Server 제어 (추후 SR), role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6 (총 7 streams/로봇, 최대 99대 지원). WebSocket 은 8100/TCP `/ws/video-stream` 단일 endpoint 에서 robot_id+stream_id 헤더로 멀티플렉싱. IP 해석은 [shared/machine_ips.json](../shared/machine_ips.json) 활용 (Control Server=`tonyno`, GogoPing=`vic`).
-
-| S ID | Name | Description | Priority |
-| --- | --- | --- | --- |
-| SR-CAM-001 | 카메라 송출 (Pi, default ON) | Vic Pinky 가 ROS2 패키지 `gogoping_camera` 의 `camera_streamer_v4l2` (default, linuxpy 직접) 또는 `camera_streamer` (cv2 fallback) 실행 시 자동으로 USB 웹캠을 MJPEG 640×480 q60 @ 25fps 으로 캡처해 Control Server (port 9013/UDP, primary stream = role 3) 로 28B 헤더 (magic "PING" + version + robot_id + stream_id + frame_seq + ts_ms + jpeg_size + CRC32) + JPEG payload 의 단일 패킷 = 단일 frame 형식으로 항상 송신한다. Control Server 의 수동 STOP 신호 (Pi 측 listener port 9012/UDP = role 2, intent_seq 포함) 수신 시 송출을 중지하고, START 신호 수신 시 재개한다. 자동 트리거 (subscriber 카운트 기반) 는 없음. EduPing/NoriArm 도 동일 프로토콜 (영상 9023/9033, 제어 9022/9032). bringup 통합: `gogoping_bringup/launch/pi.launch.py` 가 `gogoping_camera/launch/camera_stream.launch.py` 를 IncludeLaunchDescription 으로 포함 — `scripts/device-gogoping-pi.sh` 실행 시 자동 시작/종료. 부팅 자동 시작 (systemd) 은 별도 SR. | High |
-| SR-CAM-002 | Control Server 스트리밍 게이트웨이 | Control Server 가 별도 uvicorn 프로세스 (port 8100/TCP) 로 `/ws/video-stream` WebSocket 엔드포인트를 노출한다 (SR-ADM-001 의 `/ws/<channel>` 컨벤션). 로봇별 UDP 수신 스레드가 frame 을 받아 magic/길이/CRC32/frame_seq 4단계 검증 후 asyncio 측 frame hub 에 전달, **subscriber 가 있는 영상만 client 큐(maxsize=1)에 push, 0 명이면 즉시 drop**. fastapi-users 세션 쿠키 핸드셰이크 인증, 30초 heartbeat, drop-oldest 정책. Server 부팅 시 5초간 Pi frame 수신 모니터, 미수신 시 START 1회 송신해 Pi sanity check. | High |
-| SR-CAM-003 | 다중 클라이언트 / 다중 로봇 | Client 가 uuid client_id 로 hello 후 robot 별 subscribe/unsubscribe 메시지로 영상 fan-out 을 토글할 수 있다. 한 client 가 여러 로봇 동시 구독 가능 (multi-subscribe), stream 필드(기본 0=primary)로 로봇당 여러 카메라 선택 가능. subscribe/unsubscribe 는 server 측 fan-out 정책만 변경, Pi 송출에는 영향 없음 (실시간 전환 ~30–50ms). | High |
-| SR-CAM-004 | Admin UI 카메라 위젯 | Admin UI 가 `websockets.sync.client` 기반 WS 클라이언트를 1개 유지하고, GogoPing/NoriArm/EduPing 대시보드 카드 표시·은닉 이벤트에 맞춰 subscribe/unsubscribe 를 송신한다. 받은 바이너리 frame 을 robot_id/stream_id 로 라우팅해 `QLabel` 에 표시. 끊기면 1초 후 자동 재연결 후 활성 구독 자동 복원 ([teleop_client.py](../ui/admin-ui/services/teleop_client.py) 패턴 일치). | High |
-| SR-CAM-005 | 수동 admin 제어 (정비/절전) | Admin UI 또는 Control Server 의 admin 라우터가 명시적 액션으로 특정 Pi 의 송출을 STOP/START 시킬 수 있다 (정비 모드, 야간 절전 등). REST `POST /api/streaming/robots/{robot}/stop` 및 `POST /api/streaming/robots/{robot}/start` (`/api/` prefix 컨벤션). 이 액션은 subscriber 카운트와 무관하게 Pi 의 streaming_enabled 플래그만 토글한다 (intent_seq 단조 증가, 1초 간격 3회 재전송). | Low |
+> 구현 완료 — [implemented.md](implemented.md) 참조
 
 ## 3. NoriArm UI (Robot UI 코드베이스의 `VITE_ROBOT=noriarm` 인스턴스, 교실 OMX)
 
@@ -377,7 +365,6 @@ last_synced: "2026-05-13T14:08:22"
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
 | SR-VOICE-001 | 음성 입력 수신 | 각 로봇 UI (브라우저) 가 호출어 감지 신호 후 마이크 음성을 캡처해 클라이언트 측에서 텍스트로 변환한 뒤 Vite dev server `server.proxy` 를 통해 Control Service `/api/voice/intent` 에 텍스트를 전송한다. Control Service 가 AI Hub (의도 분류 LLM) 호출 후 결과에 따라 ROS2 명령을 publish 한다. | High |
-| SR-VOICE-004 | 잡담 응답 | AI Hub 가 SR-VOICE-003 의도 분류 결과가 mode_change·sub_command 어디에도 해당하지 않을 때 잡담 전용 Ollama 모델 (`ollama_chat_model`, 기본 `qwen2.5:3b`) 으로 한국어 1~2문장 자연어 응답을 생성해 `/api/voice/intent` 응답에 `{kind: "chat", reply: "..."}` 로 돌려주고, 로봇 UI 가 받은 reply 를 SR-VOICE-005 TTS 로 음성 출력한다. 모드·구동기 상태는 변경하지 않는다. 응답 LLM 호출이 실패하면 `{kind: "ignored"}` 로 graceful fallback 한다. | High |
 
 ## 8. 다중 UI 공통
 
@@ -395,7 +382,6 @@ last_synced: "2026-05-13T14:08:22"
 | SR-OPS-001 | 모드 전환 | 호출어 후속 자연어 모드 전환 명령 또는 UI 모드 버튼 클릭이 해당 로봇의 ROS2 latched 토픽 (`/eduping/mode` · `/gogoping/mode` · `/noriarm/mode` 중 하나) 를 발행하고 그 로봇의 노드들이 자기 namespace 의 mode 토픽만 구독해 모드를 적용한다. 로봇 간 모드는 독립적이다. | High |
 | SR-OPS-011 | 모드 내 자연어 명령 | 호출어 후속 자연어 명령을 의도 분류 LLM 으로 현재 모드의 서브 명령 (정지·진행·대상·목적지 등) 으로 라우팅한다. UI 클릭과 동등한 효과. | High |
 | SR-OPS-013 | 보조 모드 음성 입력 제한 | GogoPing 이 보조 모드에 진입한 동안 호출어 인식 시 일시 정지 + 음성 대답하지만, 후속 명령은 정지 의도("정지" / "멈춰" 등) 만 받아 대기 상태로 전이시키고, 그 외 명령(모드 전환·목적지 등)은 무시하고 일시 정지를 해제해 직전 동작을 재개한다. 모드 전환·운반 명령 등은 교사앱 UI 클릭으로만 가능. 음성 출력(안내·도착 알림 등)은 정상. | High |
-| SR-UI-003 | 음성·타이핑 모드 토글 / 음성 시각 피드백 / barge-in | Robot UI 하단 영역이 voice store 의 `voiceMode: 'voice' | 'text'` 토글 상태에 따라 두 가지로 분기된다. ① **text 모드** — 기존 `CommandBar`(입력창 + 전송 버튼) 노출, 호출어 없이 타이핑한 명령을 즉시 dispatch (`useVoiceController.processCommand` 의 wake-word-bypass 경로). STT 는 정지. ② **voice 모드** — STT 가 항상 떠 호출어 대기, `listening`(호출어 감지 후 5초 윈도우) 동안 Siri-like 몽글몽글 애니메이션(`SiriBlob.vue` — 색 블롭 3개를 morphing border-radius + translate keyframe 으로 흐르게 하고, `useAudioLevel` composable 이 `getUserMedia` + `AnalyserNode` 로 마이크 RMS 레벨을 받아 블롭 wrapper 의 transform scale 에 반영) + STT 인식 텍스트 자막(`VoiceCaption.vue`) 표시, `dispatching` 동안 dot wave 로딩(`DispatchingLoader.vue`) + 마지막 발화 자막 표시. 진행 중 호출어가 다시 들리면 `AbortController` 로 in-flight `/api/voice/intent` fetch 를 abort + `tts.cancel()` 후 즉시 새 `wake_detected` 로 전환 (barge-in). `useVoiceController` 의 호출어 매칭 게이트를 `idle` 외 모든 상태로 확장. 모드 토글 버튼은 하단 영역 우측에 마이크/키보드 아이콘으로 노출. | High |
 
 ### 8.3 표정 상시 표시 (모든 로봇 UI)
 
