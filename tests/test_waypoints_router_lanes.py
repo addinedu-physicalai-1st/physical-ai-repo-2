@@ -89,3 +89,42 @@ def test_delete_lane_missing_404(client):
     c, _ = client
     r = c.request("DELETE", "/waypoints/lanes", json={"from": "A", "to": "B"})
     assert r.status_code == 404
+
+
+# ---- POST /waypoints/lanes/auto (자동 간선) ----
+def test_auto_edge_default_replace_false(client):
+    c, _ = client
+    r = c.post("/waypoints/lanes/auto", json={"threshold": 2.0})
+    assert r.status_code == 200
+    body = r.json()
+    # A↔B distance 1.0 < 2.0 — 1쌍 추가
+    assert body["added"] == 1
+    assert body["skipped"] == 0
+    assert len(body["lanes"]) == 1
+
+
+def test_auto_edge_skips_existing(client):
+    c, _ = client
+    c.post("/waypoints/lanes", json={"from": "A", "to": "B"})
+    r = c.post("/waypoints/lanes/auto", json={"threshold": 2.0})
+    assert r.status_code == 200
+    assert r.json()["added"] == 0
+    assert r.json()["skipped"] == 1
+
+
+def test_auto_edge_replace_existing(client):
+    c, _ = client
+    c.post("/waypoints/lanes", json={"from": "A", "to": "B"})
+    r = c.post("/waypoints/lanes/auto",
+               json={"threshold": 2.0, "replace_existing": True})
+    assert r.status_code == 200
+    # replace_existing=True 면 기존 제거 후 재생성 → added=1
+    assert r.json()["added"] == 1
+    assert len(r.json()["lanes"]) == 1
+
+
+def test_auto_edge_nav_active_409(client):
+    c, bridge = client
+    bridge.health.return_value = {"nav_active": True}
+    r = c.post("/waypoints/lanes/auto", json={"threshold": 2.0})
+    assert r.status_code == 409
