@@ -157,6 +157,21 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         reload_result = bridge.reload_graph()
         return _emit_state_after_write(reload_result)
 
+    @router.post("/undo")
+    def undo_route() -> dict:
+        """가장 최근 add() 1개 되돌림. 노드에 lane 잇혀있으면 409."""
+        _check_nav_idle()
+        try:
+            result = ys.undo_last_add()
+        except ys.WaypointStoreError as e:
+            if "node_has_lanes" in str(e):
+                raise HTTPException(409, "node_has_lanes")
+            raise HTTPException(409, str(e))
+        if result is None:
+            raise HTTPException(408, "nothing_to_undo")
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
     @router.post("/click", status_code=201)
     def click_add(body: ClickAddBody) -> dict:
         """좌표 직접 노드 추가 — admin UI 의 빈 곳 드래그 → 이름 팝업 후 호출."""
