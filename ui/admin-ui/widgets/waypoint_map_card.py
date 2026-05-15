@@ -193,6 +193,17 @@ class MapView(QWidget):
             self._pan_at_drag_start = QPointF(self._pan)
             self.setCursor(Qt.ClosedHandCursor)
             return
+        # 편집 모드 우클릭 = 더블클릭과 동일 (노드/간선 context menu)
+        if e.button() == Qt.RightButton and self._edit_mode:
+            target = self._hit_test(QPointF(e.pos()))
+            if target is None:
+                return
+            if target["kind"] == "node":
+                self.node_double_clicked.emit(target["id"])
+            elif target["kind"] == "lane":
+                from_, to = target["id"]
+                self.lane_double_clicked.emit(from_, to)
+            return
         if e.button() != Qt.LeftButton:
             return
 
@@ -223,12 +234,10 @@ class MapView(QWidget):
                 self.setFocus(Qt.MouseFocusReason)
                 self.update()
                 return
-            # 기본 편집 동작 (모드 진입 안 함) — 노드 드래그 이동 / 간선 선택
+            # 기본 편집 동작 — 간선 선택만 (노드 드래그 이동은 더블/우클릭 메뉴로만)
             if target and target["kind"] == "node":
-                self._pressed_node = target["id"]
-                self._drag_start = QPointF(e.pos())
-                self._drag_current = QPointF(e.pos())
-                self._edit_state = "node_pressed"
+                # 노드 좌클릭은 selection 만 — 이동은 더블/우클릭 메뉴 [이동] 으로
+                self._pressed_node = None
             elif target and target["kind"] == "lane":
                 self._selected_lane = target["id"]
                 self._selected_node = None
@@ -867,15 +876,24 @@ class WaypointMapCard(QFrame):
         header.addWidget(self._title)
         header.addStretch(1)
         header.addWidget(self._status)
-        header.addSpacing(12)
-        for b in self._edit_toolbar:
-            header.addWidget(b)
         header.addSpacing(8)
         header.addWidget(self._btn_edit)
         header.addSpacing(8)
         header.addWidget(self._btn_map)
         header.addWidget(self._btn_graph)
         layout.addLayout(header)
+
+        # 편집 모드 toolbar 는 별도 row — 헤더 width 가 옆 카드(카메라 등) 에
+        # 영향 주지 않도록 분리. 편집 모드 ON 일 때만 visible.
+        self._edit_toolbar_row = QHBoxLayout()
+        self._edit_toolbar_row.setContentsMargins(0, 0, 0, 0)
+        for b in self._edit_toolbar:
+            self._edit_toolbar_row.addWidget(b)
+        self._edit_toolbar_row.addStretch(1)
+        self._edit_toolbar_container = QWidget()
+        self._edit_toolbar_container.setLayout(self._edit_toolbar_row)
+        self._edit_toolbar_container.setVisible(False)
+        layout.addWidget(self._edit_toolbar_container)
 
         body = QHBoxLayout()
         self._map = MapView()
@@ -992,9 +1010,12 @@ class WaypointMapCard(QFrame):
         ))
 
     def _refresh_edit_toolbar(self) -> None:
-        """편집 모드 ON/OFF 에 맞춰 툴바 visibility 토글."""
+        """편집 모드 ON/OFF 에 맞춰 툴바 row + 개별 버튼 visibility 토글.
+        row container 를 통째로 숨겨 옆 카드(카메라 등) width 에 영향 안 가게."""
+        on = self._map._edit_mode
         for b in self._edit_toolbar:
-            b.setVisible(self._map._edit_mode)
+            b.setVisible(on)
+        self._edit_toolbar_container.setVisible(on)
 
     def _on_edit_toggle(self) -> None:
         """편집 모드 토글 — 진입 시 health 호출해 nav_active 검사.
@@ -1209,17 +1230,19 @@ class WaypointMapCard(QFrame):
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
 
-    # ─── Task 31: 더블클릭 context menu ───
+    # ─── Task 31: 더블클릭/우클릭 context menu ───
     def _on_node_double_clicked(self, name: str) -> None:
-        """노드 더블클릭 → 메뉴: [이름 변경] [삭제]."""
+        """노드 더블클릭 / 우클릭 → 메뉴: [이름 변경] [이동] [삭제]."""
         menu = QMenu(self)
         rename_act = QAction(f"✏  '{name}' 이름 변경", menu)
+        move_act = QAction(f"🚶  '{name}' 이동", menu)
         delete_act = QAction(f"🗑  '{name}' 삭제", menu)
         rename_act.triggered.connect(lambda: self._on_rename_node(name))
+        move_act.triggered.connect(lambda: self._on_move_node_dialog(name))
         delete_act.triggered.connect(lambda: self._on_delete_node(name))
         menu.addAction(rename_act)
+        menu.addAction(move_act)
         menu.addAction(delete_act)
-        # 마우스 커서 위치에 메뉴 (Cursor 사용 안 함 — Qt 가 알아서)
         from PyQt5.QtGui import QCursor
         menu.exec_(QCursor.pos())
 
@@ -1283,6 +1306,50 @@ class WaypointMapCard(QFrame):
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
 
+    def _on_move_node_dialog(self, name: str) -> None:
+        """[이동] 메뉴 → 좌표/방향 입력 dialog. 노드 하이라이트 유지."""
+        from PyQt5.QtWidgets import (QDialog, QDialogButtonBox, QDoubleSpinBox,
+                                     QFormLayout, QVBoxLayout)
+        wp = next((w for w in self._map._waypoints if w["name"] == name), None)
+        if wp is None:
+            return
+        # 하이라이트 — _selected_node 가 코랄 큰 링으로 그려짐
+        prev_selected = self._map._selected_node
+        prev_state = self._map._edit_state
+        self._map._selected_node = name
+        self._map._edit_state = "node_move_dialog"
+        self._map.update()
+        try:
+            dlg = QDialog(self)
+            dlg.setWindowTitle(f"'{name}' 이동")
+            form = QFormLayout()
+            x_in = QDoubleSpinBox(); x_in.setRange(-1000.0, 1000.0)
+            x_in.setDecimals(3); x_in.setSingleStep(0.1)
+            x_in.setValue(float(wp.get("x", 0.0)))
+            y_in = QDoubleSpinBox(); y_in.setRange(-1000.0, 1000.0)
+            y_in.setDecimals(3); y_in.setSingleStep(0.1)
+            y_in.setValue(float(wp.get("y", 0.0)))
+            yaw_in = QDoubleSpinBox(); yaw_in.setRange(-360.0, 360.0)
+            yaw_in.setDecimals(1); yaw_in.setSingleStep(5.0)
+            yaw_in.setValue(math.degrees(float(wp.get("yaw", 0.0))))
+            yaw_in.setSuffix(" °")
+            form.addRow("x (m)", x_in)
+            form.addRow("y (m)", y_in)
+            form.addRow("방향 yaw", yaw_in)
+            box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            box.accepted.connect(dlg.accept)
+            box.rejected.connect(dlg.reject)
+            layout = QVBoxLayout(dlg)
+            layout.addLayout(form)
+            layout.addWidget(box)
+            if dlg.exec_() == QDialog.Accepted:
+                self._on_node_move(name, x_in.value(), y_in.value(),
+                                   math.radians(yaw_in.value()))
+        finally:
+            self._map._selected_node = prev_selected
+            self._map._edit_state = prev_state
+            self._map.update()
+
     def _on_node_move(self, name: str, x: float, y: float, yaw: float) -> None:
         """노드 이동 → PATCH /waypoints/{name}."""
         import httpx
@@ -1338,24 +1405,7 @@ class WaypointMapCard(QFrame):
     # 자동 간선 dialog 의 안전 범위 (m).
     _AUTO_EDGE_MIN = 0.1
     _AUTO_EDGE_MAX = 50.0
-    _AUTO_EDGE_FALLBACK = 1.5
-
-    def _compute_auto_edge_default(self, wps: list[dict]) -> float:
-        """안전한 default threshold — 노드 간 거리 median.
-        같은 좌표 노드들로 인해 0 이 되면 fallback. [min, max] 로 clamp."""
-        if len(wps) < 2:
-            return self._AUTO_EDGE_FALLBACK
-        dists = []
-        for i, a in enumerate(wps):
-            for b in wps[i + 1:]:
-                dists.append(math.hypot(a["x"] - b["x"], a["y"] - b["y"]))
-        dists.sort()
-        med = dists[len(dists) // 2] if dists else self._AUTO_EDGE_FALLBACK
-        if med < self._AUTO_EDGE_MIN:
-            med = self._AUTO_EDGE_FALLBACK
-        if med > self._AUTO_EDGE_MAX:
-            med = self._AUTO_EDGE_MAX
-        return round(med, 2)
+    _AUTO_EDGE_DEFAULT = 1.5
 
     def _on_auto_edge(self) -> None:
         """[⚡ 자동 간선] — threshold 입력 dialog + replace 선택 → 일괄 lane 생성.
@@ -1366,12 +1416,12 @@ class WaypointMapCard(QFrame):
             if len(wps) < 2:
                 QMessageBox.information(self, "자동 간선", "노드가 2개 이상이어야 해요.")
                 return
-            default_th = self._compute_auto_edge_default(wps)
 
             threshold, ok = QInputDialog.getDouble(
                 self, "자동 간선",
-                f"거리 threshold (m). 기본값 {default_th} = 노드 간 거리 중앙값.",
-                default_th, self._AUTO_EDGE_MIN, self._AUTO_EDGE_MAX, 2,
+                f"거리 threshold (m). 기본값 {self._AUTO_EDGE_DEFAULT}m.",
+                self._AUTO_EDGE_DEFAULT,
+                self._AUTO_EDGE_MIN, self._AUTO_EDGE_MAX, 2,
             )
             if not ok:
                 return

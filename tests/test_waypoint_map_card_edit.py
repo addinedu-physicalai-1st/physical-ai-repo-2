@@ -503,27 +503,6 @@ def test_on_snapshot_default(card, monkeypatch):
     assert called["url"].endswith("/waypoints/snapshot-default")
 
 
-def test_compute_auto_edge_default_handles_zero_distance(card):
-    """노드 두 개가 같은 좌표여서 거리 0 → fallback 으로."""
-    card._map.set_waypoints([
-        {"name": "A", "x": 0.0, "y": 0.0},
-        {"name": "B", "x": 0.0, "y": 0.0},
-    ])
-    th = card._compute_auto_edge_default(card._map._waypoints)
-    assert th >= card._AUTO_EDGE_MIN
-    assert th <= card._AUTO_EDGE_MAX
-
-
-def test_compute_auto_edge_default_clamps_huge(card):
-    """매우 멀리 떨어진 노드 → MAX 로 clamp."""
-    card._map.set_waypoints([
-        {"name": "A", "x": 0.0, "y": 0.0},
-        {"name": "B", "x": 10000.0, "y": 0.0},
-    ])
-    th = card._compute_auto_edge_default(card._map._waypoints)
-    assert th <= card._AUTO_EDGE_MAX
-
-
 def test_on_auto_edge_with_graph_reload_partial_failure(card, monkeypatch):
     """server 가 yaml_saved=true, graph_reloaded=false 응답 → 경고 dialog 만 뜨고 crash 안 함."""
     info_called = {}

@@ -234,7 +234,8 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     @router.post("/lanes/auto")
     def auto_edge_route(body: AutoEdgeBody) -> dict:
         """자동 간선 — 거리 threshold 이하 노드 쌍 일괄 lane 생성.
-        replace_existing=True 면 기존 모두 제거 후 재생성."""
+        replace_existing=True 면 기존 모두 제거 후 재생성.
+        파일 쓰기는 단 한 번 (batch) — 노드 수가 많을 때 timeout 방지."""
         _check_nav_idle()
         from math import hypot
         wps, _ = ys.load()
@@ -244,25 +245,26 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
             for b in wps[i + 1:]:
                 if hypot(a.x - b.x, a.y - b.y) <= body.threshold:
                     pairs.append(tuple(sorted([a.name, b.name])))
-        if body.replace_existing:
-            for ln in list(ys.load_lanes()):
-                ys.remove_lane(ln.from_, ln.to)
+        # 기존 lanes 시작점 — replace_existing 이면 빈 리스트
+        base_lanes = [] if body.replace_existing else list(ys.load_lanes())
         existing_keys = {
-            tuple(sorted([ln.from_, ln.to])) for ln in ys.load_lanes()
+            tuple(sorted([ln.from_, ln.to])) for ln in base_lanes
         }
         added = 0
         skipped = 0
+        final_lanes = list(base_lanes)
         for from_, to in pairs:
             key = tuple(sorted([from_, to]))
             if key in existing_keys:
                 skipped += 1
                 continue
-            try:
-                ys.add_lane(from_, to)
-                added += 1
-                existing_keys.add(key)
-            except ys.LaneStoreError:
-                skipped += 1
+            final_lanes.append(ys.Lane(from_=from_, to=to, bidirectional=True))
+            existing_keys.add(key)
+            added += 1
+        try:
+            ys.save_lanes(final_lanes)
+        except ys.LaneStoreError as e:
+            raise HTTPException(409, str(e))
         reload_result = bridge.reload_graph()
         payload = _emit_state_after_write(reload_result)
         payload["added"] = added
