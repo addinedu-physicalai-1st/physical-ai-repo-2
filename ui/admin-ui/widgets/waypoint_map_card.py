@@ -680,6 +680,9 @@ class _SseDispatcher:
             # 종료 상태면 route 강조 해제
             if ev.get("status") in ("succeeded", "canceled", "aborted", "rejected"):
                 self.card._map.set_route(None)
+            # nav2 가 active 가 되면 편집 모드 자동 이탈 (Task 27)
+            if ev.get("status") in ("active", "pending") and self.card._map._edit_mode:
+                self.card._auto_exit_edit_mode_on_nav_active()
         elif t == "waypoints":
             self.card._refresh_list()
         elif t == "route_progress":
@@ -885,6 +888,24 @@ class WaypointMapCard(QFrame):
             f"QPushButton:disabled {{ color: #B0B0B0; border-color: #D0D0D0; }}"
         )
         return b
+
+    def _auto_exit_edit_mode_on_nav_active(self) -> None:
+        """SSE goal_status: active 수신 → 편집 모드 자동 이탈 + 알림.
+        진행 중 selection / drag / yaw_preview 모두 reset."""
+        self._map._edit_mode = False
+        self._map._edit_state = "ready"
+        self._map._selected_node = None
+        self._map._selected_lane = None
+        self._map._yaw_preview = None
+        self._map._pressed_node = None
+        self._map._hover_target = None
+        self._btn_edit.setChecked(False)
+        self._refresh_edit_toolbar()
+        self._map.update()
+        # 알림 — SSE thread 에서 직접 dialog 띄우면 위험. queued connection 으로.
+        QTimer.singleShot(0, lambda: QMessageBox.information(
+            self, "편집 종료", "이동이 시작되어 편집 모드가 종료되었어요."
+        ))
 
     def _refresh_edit_toolbar(self) -> None:
         """편집 모드 ON/OFF 에 맞춰 툴바 visibility 토글."""
