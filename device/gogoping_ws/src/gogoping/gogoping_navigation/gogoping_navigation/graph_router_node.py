@@ -29,6 +29,8 @@ from rclpy.node import Node
 from rclpy.time import Time
 from tf2_ros import Buffer, LookupException, TransformException, TransformListener
 
+from std_srvs.srv import Trigger
+
 from gogoping_msgs.action import NavigateToVertex
 from gogoping_msgs.srv import RouteToVertex
 from gogoping_navigation.graph import Graph
@@ -52,6 +54,9 @@ class GraphRouterNode(Node):
             "follow_action", "/navigate_through_poses"
         ).value
 
+        # reload_graph 서비스가 동일 경로로 다시 로드할 수 있게 인스턴스에 보관
+        self._wp_path = wp_path
+        self._lanes_path = lanes_path
         self._graph = Graph.from_yaml(wp_path, lanes_path=lanes_path)
         self.get_logger().info(
             f"graph: {len(self._graph.vertices)} vertex, "
@@ -68,6 +73,13 @@ class GraphRouterNode(Node):
         self.create_timer(0.1, self._tick_tf, callback_group=cb)
         self.create_service(
             RouteToVertex, "/graph_router/route", self._srv_route,
+            callback_group=cb,
+        )
+        # admin UI 가 yaml 편집 후 호출 — graph 를 in-place 로 다시 로드.
+        # 진행 중 NavigateThroughPoses 는 이미 발행된 path 그대로 nav2 가 따라가고,
+        # 다음 routing 부터 새 그래프 적용.
+        self.create_service(
+            Trigger, "/graph_router/reload_graph", self._srv_reload_graph,
             callback_group=cb,
         )
         self._nav_ac: ActionClient = ActionClient(
@@ -240,6 +252,24 @@ class GraphRouterNode(Node):
         result.message = ""
         result.final_vertex = target
         return result
+
+    # ──────── service: reload_graph ────────
+    def _srv_reload_graph(
+        self, req: Trigger.Request, res: Trigger.Response
+    ) -> Trigger.Response:
+        try:
+            new_graph = Graph.from_yaml(self._wp_path, lanes_path=self._lanes_path)
+        except Exception as e:
+            res.success = False
+            res.message = f"reload failed: {e}"
+            return res
+        self._graph = new_graph
+        n_v = len(self._graph.vertices)
+        n_l = len(self._graph.lanes())
+        self.get_logger().info(f"graph reloaded: {n_v} vertex, {n_l} lane")
+        res.success = True
+        res.message = f"reloaded — {n_v} vertices, {n_l} lanes"
+        return res
 
     def _publish_feedback(
         self, gh: ServerGoalHandle, seq: list[str], idx: int
