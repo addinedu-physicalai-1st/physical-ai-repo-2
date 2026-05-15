@@ -36,8 +36,10 @@ class MapView(QWidget):
     MAP_SIZE = (881, 720)
     DRAG_MIN_PX = 12          # 이보다 짧은 드래그는 클릭 실수로 간주, goal 무시
 
-    # 마우스 업 시 (x, y, yaw) — Nav2 Goal 요청
+    # 마우스 업 시 (x, y, yaw) — Nav2 Goal 요청 (일반 좌클릭-드래그)
     goal_pose_requested = pyqtSignal(float, float, float)
+    # 마우스 업 시 (x, y, yaw) — AMCL 2D Pose Estimate (Shift+좌클릭-드래그)
+    initial_pose_requested = pyqtSignal(float, float, float)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -49,13 +51,14 @@ class MapView(QWidget):
         self._robot: dict | None = None
         self._plan: list[tuple[float, float]] = []
         self._current_name: str | None = None
-        # Nav2 Goal 드래그 상태
-        self._drag_start: QPointF | None = None         # widget px (mouse down 시)
-        self._drag_current: QPointF | None = None       # widget px (mouse move 중)
-        # 마우스 업 후 짧은 페이드 아웃 피드백 — sent goal 시각 확인용
-        self._feedback: dict | None = None              # {"start", "end", "started_at"}
+        # 드래그 상태 — _drag_mode: "goal" (코랄, NavigateToPose) | "initial" (녹색, /initialpose)
+        self._drag_start: QPointF | None = None
+        self._drag_current: QPointF | None = None
+        self._drag_mode: str = "goal"
+        # 마우스 업 후 짧은 페이드 아웃 피드백
+        self._feedback: dict | None = None              # {"start", "end", "started_at", "mode"}
         self._feedback_timer = QTimer(self)
-        self._feedback_timer.setInterval(30)            # ~33fps
+        self._feedback_timer.setInterval(30)
         self._feedback_timer.timeout.connect(self._tick_feedback)
 
     def set_waypoints(self, wps: list[dict]) -> None:
@@ -85,12 +88,13 @@ class MapView(QWidget):
         my = self.MAP_ORIGIN[1] + (self.MAP_SIZE[1] - ry) * self.MAP_RES
         return mx, my
 
-    # -------- Nav2 Goal 클릭-드래그 --------
+    # -------- 클릭-드래그 (좌클릭 = Nav2 Goal / Shift+좌클릭 = 2D Pose Estimate) --------
     def mousePressEvent(self, e: Any) -> None:
         if e.button() != Qt.LeftButton:
             return
         self._drag_start = QPointF(e.pos())
         self._drag_current = QPointF(e.pos())
+        self._drag_mode = "initial" if (e.modifiers() & Qt.ShiftModifier) else "goal"
         self.setFocus(Qt.MouseFocusReason)
         self.update()
 
@@ -116,11 +120,15 @@ class MapView(QWidget):
         # 시작점 = 목표 위치 (x, y), 드래그 방향 = yaw (raster Y-up → atan2(-dy_w, dx_w))
         mx, my = self._widget_to_map(start.x(), start.y())
         yaw = math.atan2(-dy_w, dx_w)
-        self.goal_pose_requested.emit(mx, my, yaw)
-        # 피드백 — 0.5 초간 화살표 페이드 아웃
+        if self._drag_mode == "initial":
+            self.initial_pose_requested.emit(mx, my, yaw)
+        else:
+            self.goal_pose_requested.emit(mx, my, yaw)
+        # 피드백 — 0.5 초간 화살표 페이드 아웃 (mode 별 색 유지)
         self._feedback = {
             "start": QPointF(start), "end": QPointF(end),
             "started_at": time.monotonic(),
+            "mode": self._drag_mode,
         }
         self._feedback_timer.start()
 
@@ -170,14 +178,15 @@ class MapView(QWidget):
                 QPointF(p.x() + 15 * math.cos(-self._robot["yaw"]),
                         p.y() + 15 * math.sin(-self._robot["yaw"])),
             )
-        # Nav2 Goal 드래그 미리보기 화살표 + 마우스 업 후 피드백
+        # 드래그 미리보기 화살표 (goal=코랄 / initial=녹색) + 마우스 업 후 피드백
         if self._drag_start is not None and self._drag_current is not None:
-            self._paint_arrow_at(qp, self._drag_start, self._drag_current, 1.0)
+            self._paint_arrow_at(qp, self._drag_start, self._drag_current, 1.0, self._drag_mode)
         if self._feedback is not None:
             elapsed = time.monotonic() - self._feedback["started_at"]
             if elapsed < 0.5:
                 alpha = 1.0 - elapsed / 0.5
-                self._paint_arrow_at(qp, self._feedback["start"], self._feedback["end"], alpha)
+                self._paint_arrow_at(qp, self._feedback["start"], self._feedback["end"],
+                                     alpha, self._feedback.get("mode", "goal"))
 
     def _tick_feedback(self) -> None:
         if self._feedback is None:
@@ -189,17 +198,30 @@ class MapView(QWidget):
             self._feedback_timer.stop()
         self.update()
 
-    def _paint_arrow_at(self, qp: QPainter, s: QPointF, e: QPointF, alpha: float) -> None:
-        """공통 코랄 화살표 — drag preview + feedback fade 둘 다 사용.
+    # 화살표 컬러 팔레트 — mode 별 (drag preview + feedback fade 공통 사용)
+    _ARROW_COLORS = {
+        "goal":    {  # 코랄 — Nav2 Goal (로봇이 갈 곳)
+            "fill": (224, 123, 91), "outline": (166, 82, 56), "head": (210, 102, 72),
+        },
+        "initial": {  # 녹색 — 2D Pose Estimate (AMCL 위치 재설정)
+            "fill": (90, 200, 145), "outline": (32, 124, 87), "head": (52, 168, 117),
+        },
+    }
+
+    def _paint_arrow_at(self, qp: QPainter, s: QPointF, e: QPointF,
+                        alpha: float, mode: str = "goal") -> None:
+        """공통 화살표 — drag preview + feedback fade 둘 다 사용.
+        mode: "goal" (코랄) | "initial" (녹색).
         alpha ∈ [0, 1] — 모든 색 채널에 곱해서 fade 구현."""
+        palette = self._ARROW_COLORS.get(mode, self._ARROW_COLORS["goal"])
         a = max(0, min(255, int(255 * alpha)))
         dx = e.x() - s.x()
         dy = e.y() - s.y()
         dist = (dx * dx + dy * dy) ** 0.5
 
-        # 시작 origin 점은 항상 표시 (사용자가 클릭한 자리 명확)
-        qp.setPen(QPen(QColor(166, 82, 56, a), 2))
-        qp.setBrush(QBrush(QColor(224, 123, 91, a)))
+        # 시작 origin 점 (항상 표시)
+        qp.setPen(QPen(QColor(*palette["outline"], a), 2))
+        qp.setBrush(QBrush(QColor(*palette["fill"], a)))
         qp.drawEllipse(s, 5, 5)
 
         if dist < 6:
@@ -218,10 +240,10 @@ class MapView(QWidget):
                     QPointF(shaft_end.x() + 1, shaft_end.y() + 1))
 
         # shaft
-        qp.setPen(QPen(QColor(224, 123, 91, a), 4, Qt.SolidLine, Qt.RoundCap))
+        qp.setPen(QPen(QColor(*palette["fill"], a), 4, Qt.SolidLine, Qt.RoundCap))
         qp.drawLine(s, shaft_end)
 
-        # 화살표 머리 (채워진 둥근 삼각형)
+        # 화살표 머리
         perp_x = -uy
         perp_y = ux
         tip = QPointF(e.x(), e.y())
@@ -233,8 +255,8 @@ class MapView(QWidget):
         head_path.lineTo(base_l)
         head_path.lineTo(base_r)
         head_path.closeSubpath()
-        qp.setPen(QPen(QColor(166, 82, 56, a), 1))
-        qp.setBrush(QBrush(QColor(210, 102, 72, a)))
+        qp.setPen(QPen(QColor(*palette["outline"], a), 1))
+        qp.setBrush(QBrush(QColor(*palette["head"], a)))
         qp.drawPath(head_path)
 
 
@@ -307,6 +329,7 @@ class WaypointMapCard(QFrame):
         body = QHBoxLayout()
         self._map = MapView()
         self._map.goal_pose_requested.connect(self._on_goal_pose_requested)
+        self._map.initial_pose_requested.connect(self._on_initial_pose_requested)
         self._list = QListWidget()
         self._list.setFixedWidth(180)
         self._list.itemClicked.connect(self._on_item_clicked)
@@ -420,6 +443,18 @@ class WaypointMapCard(QFrame):
             )
         except httpx.HTTPError:
             pass  # 사용자 액션 — 실패해도 silent (SSE goal_status 가 결과 알림)
+
+    def _on_initial_pose_requested(self, x: float, y: float, yaw: float) -> None:
+        """MapView 의 Shift+클릭-드래그 → /waypoints/initialpose 호출 (RViz 2D Pose Estimate).
+        AMCL 의 위치 추정을 (x, y, yaw) 근처로 재초기화 — 로봇은 움직이지 않음."""
+        import httpx
+        try:
+            httpx.post(
+                f"{self._control_url}/waypoints/initialpose",
+                json={"x": x, "y": y, "yaw": yaw}, timeout=2.0,
+            )
+        except httpx.HTTPError:
+            pass
 
     def closeEvent(self, e: Any) -> None:
         self._sse.stop()

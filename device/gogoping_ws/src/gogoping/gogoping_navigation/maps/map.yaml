@@ -1,7 +1,10 @@
+# 핑더가든 도면 기반 + real_lidar SLAM 벽 정합 (2026-05-15).
+# 변환: real_lidar 벽을 map.pgm 좌표계로 translation + 회전 후 union (정합 anchor: 출입구 0.425, -5.76).
+# 추가 보정: 출입구 양쪽문 다 열린 상태 = 1.260m 폭 강제 오픈.
 image: map.pgm
 mode: trinary
 resolution: 0.025
-origin: [-11.000, -9.000, 0.000]
+origin: [-11.0, -9.0, 0.000]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196

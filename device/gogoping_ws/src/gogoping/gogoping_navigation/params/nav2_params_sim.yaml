@@ -19,11 +19,14 @@
 amcl:
   ros__parameters:
     use_sim_time: True
-    alpha1: 0.2
-    alpha2: 0.2
-    alpha3: 0.2
-    alpha4: 0.2
-    alpha5: 0.2
+    # ── Motion model (sim 튜닝) ────────────────────────────────────
+    # gazebo odom 노이즈 거의 0 → alpha 낮춰 odom 신뢰 ↑.
+    # 기본 0.2 는 실물용. sim 에선 0.05 가 정확.
+    alpha1: 0.05
+    alpha2: 0.05
+    alpha3: 0.05
+    alpha4: 0.05
+    alpha5: 0.05
     base_frame_id: "gogoping/base_footprint"
     beam_skip_distance: 0.5
     beam_skip_error_threshold: 0.9
@@ -35,25 +38,38 @@ amcl:
     laser_max_range: 100.0
     laser_min_range: -1.0
     laser_model_type: "likelihood_field"
-    max_beams: 60
-    max_particles: 2000
-    min_particles: 500
+    # ── Beams (sim 2차 튜닝) ───────────────────────────────────────
+    # 60 → 180 으로 늘려 라이다 광선 더 많이 사용 → 대칭 환경 disambiguation ↑.
+    max_beams: 180
+    # ── Particle count (sim 튜닝) ──────────────────────────────────
+    # 어려운 환경 (대칭/긴 복도) 대응 위해 늘림.
+    max_particles: 5000
+    min_particles: 1000
     odom_frame_id: "gogoping/odom"
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.0
-    recovery_alpha_slow: 0.0
+    # ── Recovery (sim 2차 튜닝) ────────────────────────────────────
+    # local minimum 에 갇혔을 때 자가 재분포 강화 (0.1 → 0.2).
+    recovery_alpha_fast: 0.2
+    recovery_alpha_slow: 0.001
     resample_interval: 1
     robot_model_type: "nav2_amcl::DifferentialMotionModel"
     save_pose_rate: 0.5
-    sigma_hit: 0.2
+    # ── Sensor model (sim 2차 튜닝) ────────────────────────────────
+    # sigma_hit 0.05 는 너무 엄격해서 작은 노이즈에도 매칭 실패 → local min 갇힘.
+    # 0.1 (10cm) 로 약간 완화하면서, z_hit/z_rand 비율 조정으로 정확 매칭 가중치 ↑.
+    sigma_hit: 0.1
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.2
-    update_min_d: 0.25
-    z_hit: 0.5
+    # ── Update threshold (sim 튜닝) ────────────────────────────────
+    # 더 자주 업데이트 → drift 누적 방지.
+    update_min_a: 0.1
+    update_min_d: 0.1
+    # ── Sensor mixture (sim 2차 튜닝) ──────────────────────────────
+    # z_hit ↑ / z_rand ↓ → 정확 매칭에 가중, 우연 매칭 억제 → 갇힘 회피.
+    z_hit: 0.7
     z_max: 0.05
-    z_rand: 0.5
+    z_rand: 0.3
     z_short: 0.05
     scan_topic: /gogoping/scan
     set_initial_pose: true
@@ -94,51 +110,44 @@ controller_server:
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
-      movement_time_allowance: 10.0
+      movement_time_allowance: 20.0
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.1
+      xy_goal_tolerance: 0.30
+      # yaw 무시 — 도착 후 회전 안 함 (자연스러운 종료)
+      yaw_goal_tolerance: 3.14
+    # RPP — Regulated Pure Pursuit. 좁은 통로 추종 안정성 > DWB sampling.
+    # DWB 가 다양한 trajectory 시뮬레이션 중 잘못 선택해 벽으로 가는 문제 회피.
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
-      debug_trajectory_details: True
-      min_vel_x: 0.0
-      min_vel_y: 0.0
-      max_vel_x: 0.25
-      max_vel_y: 0.0
-      max_vel_theta: 0.5
-      min_speed_xy: 0.0
-      max_speed_xy: 0.25
-      min_speed_theta: 0.0
-      acc_lim_x: 0.8
-      acc_lim_y: 0.0
-      acc_lim_theta: 2.0
-      decel_lim_x: -0.5
-      decel_lim_y: 0.0
-      decel_lim_theta: -2.0
-      vx_samples: 20
-      vy_samples: 5
-      vtheta_samples: 20
-      sim_time: 1.5
-      linear_granularity: 0.05
-      angular_granularity: 0.025
-      transform_tolerance: 0.2
-      xy_goal_tolerance: 0.25
-      trans_stopped_velocity: 0.25
-      short_circuit_trajectory_evaluation: True
-      stateful: True
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.1
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      desired_linear_vel: 0.20
+      lookahead_dist: 1.2
+      min_lookahead_dist: 0.3
+      max_lookahead_dist: 0.9
+      lookahead_time: 1.5
+      rotate_to_heading_angular_vel: 0.5
+      transform_tolerance: 0.1
+      use_velocity_scaled_lookahead_dist: true
+      min_approach_linear_velocity: 0.05
+      approach_velocity_scaling_dist: 0.6
+      # 충돌 예측 비활성화 — 새 map (real_lidar 통합) 의 wall 노이즈로 자꾸 멈춤 방지
+      use_collision_detection: false
+      max_allowed_time_to_collision_up_to_carrot: 3.0
+      # 곡률 + 비용 기반 속도 조절 — 코너에서 자동 감속
+      use_regulated_linear_velocity_scaling: true
+      use_cost_regulated_linear_velocity_scaling: true
+      regulated_linear_scaling_min_radius: 0.4
+      regulated_linear_scaling_min_speed: 0.05
+      # ⚠ Vic Pinky 제원상 제자리 회전 금지 (캐스터 휠 제약) — 항상 직진+회전 동시
+      use_rotate_to_heading: false
+      rotate_to_heading_min_angle: 3.14
+      max_angular_accel: 1.5
+      allow_reversing: false
+      max_robot_pose_search_dist: 10.0
+      cost_scaling_dist: 0.3
+      cost_scaling_gain: 1.0
+      inflation_cost_scaling_factor: 2.5
 
 
 local_costmap:
@@ -153,12 +162,16 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05
-      footprint: '[[0.35, -0.30], [0.35, 0.30], [-0.35, 0.30], [-0.35, -0.30]]'
+      # Vic Pinky 실측 (docs/robots/vic-pinky.md):
+      #   본체 길이 0.6 m, 본체 폭 0.4 m, 휠 간격 0.475 m + 휠 두께 0.05 m = 휠 외측 0.525 m
+      # 반치수: x ±0.30 (길이/2), y ±0.2625 (휠 외측 폭/2)
+      footprint: '[[0.30, -0.2625], [0.30, 0.2625], [-0.30, 0.2625], [-0.30, -0.2625]]'
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.7
+        cost_scaling_factor: 4.0
+        # LOCAL: 좁은 문 (0.885m) 통과 가능 위해 작게
+        inflation_radius: 0.18
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -192,7 +205,10 @@ global_costmap:
       global_frame: map
       robot_base_frame: gogoping/base_footprint
       use_sim_time: True
-      footprint: '[[0.35, -0.30], [0.35, 0.30], [-0.35, 0.30], [-0.35, -0.30]]'
+      # Vic Pinky 실측 (docs/robots/vic-pinky.md):
+      #   본체 길이 0.6 m, 본체 폭 0.4 m, 휠 간격 0.475 m + 휠 두께 0.05 m = 휠 외측 0.525 m
+      # 반치수: x ±0.30 (길이/2), y ±0.2625 (휠 외측 폭/2)
+      footprint: '[[0.30, -0.2625], [0.30, 0.2625], [-0.30, 0.2625], [-0.30, -0.2625]]'
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
@@ -215,8 +231,9 @@ global_costmap:
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.6
+        cost_scaling_factor: 4.0
+        # GLOBAL: 크게 → planner 가 통로 중앙으로 path 그리도록
+        inflation_radius: 0.35
       always_send_full_costmap: True
 
 map_server:

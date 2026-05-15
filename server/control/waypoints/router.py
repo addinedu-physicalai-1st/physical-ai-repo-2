@@ -32,6 +32,14 @@ class GotoPoseBody(BaseModel):
     yaw: float
 
 
+class InitialPoseBody(BaseModel):
+    """RViz 2D Pose Estimate 패턴 — AMCL 위치 추정 재초기화.
+    로봇은 이동하지 않음. AMCL 파티클이 이 좌표 근처로 재샘플링됨."""
+    x: float
+    y: float
+    yaw: float
+
+
 def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     router = APIRouter(prefix="/waypoints", tags=["waypoints"])
 
@@ -93,6 +101,13 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
             "name": "(click)",
             "x": body.x, "y": body.y, "yaw": body.yaw,
         }
+
+    @router.post("/initialpose", status_code=202)
+    def initial_pose(body: InitialPoseBody) -> dict:
+        """AMCL 위치 추정 재초기화 — RViz 2D Pose Estimate 와 동일 패턴.
+        admin-ui 의 Shift+클릭-드래그 인터랙션에서 사용. 로봇 이동 없음."""
+        bridge.set_initial_pose(body.x, body.y, body.yaw)
+        return {"x": body.x, "y": body.y, "yaw": body.yaw}
 
     @router.post("/patrol/{patrol_name}", status_code=202)
     def patrol(patrol_name: str) -> dict:
