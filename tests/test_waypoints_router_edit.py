@@ -115,6 +115,29 @@ def test_reset_without_default_409(client):
     assert r.status_code in (404, 409)
 
 
+# ---- PATCH /waypoints/{name}/rename ----
+def test_rename_node(client):
+    c, _ = client
+    r = c.patch("/waypoints/A/rename", json={"new_name": "Z"})
+    assert r.status_code == 200
+    body = r.json()
+    assert any(w["name"] == "Z" for w in body["waypoints"])
+    assert all(w["name"] != "A" for w in body["waypoints"])
+
+
+def test_rename_unknown_404(client):
+    c, _ = client
+    r = c.patch("/waypoints/Unknown/rename", json={"new_name": "X"})
+    assert r.status_code == 404
+
+
+def test_rename_nav_active_409(client):
+    c, bridge = client
+    bridge.health.return_value = {"nav_active": True}
+    r = c.patch("/waypoints/A/rename", json={"new_name": "X"})
+    assert r.status_code == 409
+
+
 # ---- GET /waypoints/health 의 nav_active 노출 ----
 def test_health_includes_nav_active_field(client):
     c, bridge = client

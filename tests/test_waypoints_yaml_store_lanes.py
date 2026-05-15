@@ -172,3 +172,54 @@ def test_restore_default_missing_raises(tmp_path, monkeypatch):
     monkeypatch.setenv("PINGDER_WAYPOINTS_DEFAULT_FILE", str(tmp_path / "absent.yaml"))
     with pytest.raises(FileNotFoundError):
         ys.restore_default()
+
+
+# ---- Task 31: rename + lane/patrol cascade ----
+def test_rename_cascades_lanes(tmp_path, monkeypatch):
+    from server.control.waypoints import yaml_store as ys
+    wp = tmp_path / "waypoints.yaml"
+    wp.write_text(
+        "waypoints:\n"
+        "  - {id: 1, name: A, x: 0.0, y: 0.0, yaw: 0.0}\n"
+        "  - {id: 2, name: B, x: 1.0, y: 0.0, yaw: 0.0}\n"
+        "patrols: {}\n", encoding="utf-8",
+    )
+    lanes = tmp_path / "lanes.yaml"
+    lanes.write_text("lanes:\n  - {from: A, to: B, bidirectional: true}\n", encoding="utf-8")
+    monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))
+    monkeypatch.setenv("PINGDER_LANES_FILE", str(lanes))
+
+    renamed = ys.rename("A", "A2")
+    assert renamed.name == "A2"
+    # waypoint 이름이 바뀜
+    names = [w.name for w in ys.load()[0]]
+    assert "A2" in names and "A" not in names
+    # lane 의 from 도 cascade
+    L = ys.load_lanes()
+    assert any(ln.from_ == "A2" and ln.to == "B" for ln in L)
+
+
+def test_rename_duplicate_raises(tmp_path, monkeypatch):
+    from server.control.waypoints import yaml_store as ys
+    wp = tmp_path / "waypoints.yaml"
+    wp.write_text(
+        "waypoints:\n"
+        "  - {id: 1, name: A, x: 0.0, y: 0.0, yaw: 0.0}\n"
+        "  - {id: 2, name: B, x: 1.0, y: 0.0, yaw: 0.0}\n"
+        "patrols: {}\n", encoding="utf-8",
+    )
+    lanes = tmp_path / "lanes.yaml"
+    lanes.write_text("lanes: []\n", encoding="utf-8")
+    monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))
+    monkeypatch.setenv("PINGDER_LANES_FILE", str(lanes))
+    with pytest.raises(ys.WaypointStoreError):
+        ys.rename("A", "B")
+
+
+def test_rename_unknown_raises_keyerror(tmp_path, monkeypatch):
+    from server.control.waypoints import yaml_store as ys
+    wp = tmp_path / "waypoints.yaml"
+    wp.write_text("waypoints: []\npatrols: {}\n", encoding="utf-8")
+    monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))
+    with pytest.raises(KeyError):
+        ys.rename("Z", "X")
