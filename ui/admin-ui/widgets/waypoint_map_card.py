@@ -794,10 +794,26 @@ class WaypointMapCard(QFrame):
         )
         self._btn_edit.clicked.connect(self._on_edit_toggle)
 
+        # 편집 모드 툴바 — ON 일 때만 visible
+        self._btn_undo = self._make_edit_button("↶ 취소", "#5BB9E0")
+        self._btn_auto = self._make_edit_button("⚡ 자동 간선", "#5BB9E0")
+        self._btn_reset = self._make_edit_button("⟲ 초기화", "#E07B5B")
+        self._btn_snapshot = self._make_edit_button("💾 기본값 갱신", "#1A6B8A")
+        self._btn_undo.clicked.connect(self._on_undo)
+        self._btn_auto.clicked.connect(self._on_auto_edge)
+        self._btn_reset.clicked.connect(self._on_reset)
+        self._btn_snapshot.clicked.connect(self._on_snapshot_default)
+        self._edit_toolbar = [self._btn_undo, self._btn_auto, self._btn_reset, self._btn_snapshot]
+        for b in self._edit_toolbar:
+            b.setVisible(False)
+
         header.addWidget(self._title)
         header.addStretch(1)
         header.addWidget(self._status)
         header.addSpacing(12)
+        for b in self._edit_toolbar:
+            header.addWidget(b)
+        header.addSpacing(8)
         header.addWidget(self._btn_edit)
         header.addSpacing(8)
         header.addWidget(self._btn_map)
@@ -857,6 +873,24 @@ class WaypointMapCard(QFrame):
         self._sse.event_received.connect(self._dispatcher.handle)
         self._sse.start()
 
+    def _make_edit_button(self, text: str, accent: str) -> QPushButton:
+        b = QPushButton(text)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setFixedHeight(28)
+        b.setStyleSheet(
+            f"QPushButton {{ background: #FFFFFF; color: {accent}; "
+            f"border: 1.5px solid {accent}; border-radius: 8px; "
+            f"padding: 0 10px; font-weight: 600; font-size: 12px; }}"
+            f"QPushButton:hover {{ background: {accent}; color: white; }}"
+            f"QPushButton:disabled {{ color: #B0B0B0; border-color: #D0D0D0; }}"
+        )
+        return b
+
+    def _refresh_edit_toolbar(self) -> None:
+        """편집 모드 ON/OFF 에 맞춰 툴바 visibility 토글."""
+        for b in self._edit_toolbar:
+            b.setVisible(self._map._edit_mode)
+
     def _on_edit_toggle(self) -> None:
         """편집 모드 토글 — 진입 시 health 호출해 nav_active 검사.
         nav2 이동 중이면 진입 거부 + 토스트."""
@@ -869,6 +903,7 @@ class WaypointMapCard(QFrame):
             self._map._selected_lane = None
             self._map._yaw_preview = None
             self._map._hover_target = None
+            self._refresh_edit_toolbar()
             self._map.update()
             return
         try:
@@ -882,6 +917,7 @@ class WaypointMapCard(QFrame):
             self._btn_edit.setChecked(False)
             return
         self._map._edit_mode = True
+        self._refresh_edit_toolbar()
         self._map.update()
 
     def _set_mode(self, mode: str) -> None:
@@ -1092,6 +1128,108 @@ class WaypointMapCard(QFrame):
                            timeout=2.0)
             if r.status_code == 409:
                 QMessageBox.warning(self, "이름 중복", "이미 같은 이름의 노드가 있어요.")
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    # ─── 편집 모드 헤더 툴바 핸들러 (Task 26) ───
+    def _on_undo(self) -> None:
+        """[↶ 취소] — 가장 최근 추가한 노드 한 개만 제거."""
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/undo", timeout=2.0)
+            if r.status_code == 408:
+                QMessageBox.information(self, "취소", "되돌릴 작업이 없어요.")
+            elif r.status_code == 409:
+                QMessageBox.warning(self, "취소 불가",
+                                    "이 노드에 이미 간선이 잇혀 있어요. 간선 먼저 끊으세요.")
+            elif r.status_code != 200:
+                QMessageBox.warning(self, "취소 실패", r.text)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_auto_edge(self) -> None:
+        """[⚡ 자동 간선] — threshold 입력 dialog + replace 선택 → 일괄 lane 생성."""
+        from PyQt5.QtWidgets import QInputDialog
+        wps = self._map._waypoints
+        if len(wps) < 2:
+            QMessageBox.information(self, "자동 간선", "노드가 2개 이상이어야 해요.")
+            return
+        # threshold 기본값 = 노드 간 평균 거리의 median
+        dists = []
+        for i, a in enumerate(wps):
+            for b in wps[i + 1:]:
+                dists.append(math.hypot(a["x"] - b["x"], a["y"] - b["y"]))
+        dists.sort()
+        default_th = round(dists[len(dists) // 2], 2) if dists else 1.5
+
+        threshold, ok = QInputDialog.getDouble(
+            self, "자동 간선",
+            f"거리 threshold (m). 기본값 {default_th} = 노드 간 거리 중앙값.",
+            default_th, 0.01, 99.0, 2,
+        )
+        if not ok:
+            return
+        replace = QMessageBox.question(
+            self, "자동 간선",
+            "기존 간선을 모두 교체할까요?\n예: 기존 제거 후 새로 생성\n아니오: 기존 보존 + 새 쌍만 추가",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        ) == QMessageBox.Yes
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/lanes/auto",
+                           json={"threshold": threshold, "replace_existing": replace},
+                           timeout=10.0)
+            if r.status_code == 200:
+                body = r.json()
+                QMessageBox.information(
+                    self, "자동 간선",
+                    f"추가: {body.get('added', 0)}개 / 건너뜀: {body.get('skipped', 0)}개",
+                )
+            else:
+                QMessageBox.warning(self, "자동 간선 실패", r.text)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_reset(self) -> None:
+        """[⟲ 초기화] — default snapshot 으로 working 덮어쓰기."""
+        reply = QMessageBox.question(
+            self, "초기화",
+            "편집 결과를 버리고 기본값으로 복구합니다.\n되돌릴 수 없어요. 계속할까요?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/reset", timeout=5.0)
+            if r.status_code == 409:
+                QMessageBox.warning(self, "초기화 불가",
+                                    "기본값 파일이 없어요. [기본값 갱신] 으로 먼저 만드세요.")
+            elif r.status_code != 200:
+                QMessageBox.warning(self, "초기화 실패", r.text)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_snapshot_default(self) -> None:
+        """[💾 기본값 갱신] — 현재 working 을 default snapshot 으로 동결."""
+        wps_count = len(self._map._waypoints)
+        lanes_count = len(self._map._lanes)
+        reply = QMessageBox.question(
+            self, "기본값 갱신",
+            f"현재 노드 {wps_count}개 / 간선 {lanes_count}개를 기본값으로 동결합니다.\n"
+            "이후 [⟲ 초기화] 누르면 이 상태로 복구돼요. 계속할까요?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/snapshot-default",
+                           timeout=5.0)
+            if r.status_code == 200:
+                QMessageBox.information(self, "기본값 갱신", "현재 상태가 기본값으로 저장됐어요.")
+            else:
+                QMessageBox.warning(self, "기본값 갱신 실패", r.text)
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
 
