@@ -195,6 +195,11 @@ class MapView(QWidget):
 
     def mouseMoveEvent(self, e: Any) -> None:
         self._hover_pos = QPointF(e.pos())
+        # 편집 모드 hover — 노드/간선 위 시각 강조
+        if self._edit_mode:
+            new_hover = self._hit_test(QPointF(e.pos()))
+            if new_hover != self._hover_target:
+                self._hover_target = new_hover
         if self._pan_drag_start is not None and self._pan_at_drag_start is not None:
             dx = e.pos().x() - self._pan_drag_start.x()
             dy = e.pos().y() - self._pan_drag_start.y()
@@ -312,9 +317,9 @@ class MapView(QWidget):
         # 웨이포인트 마커 (graph 모드에서만) — zoom 에 따라 마커/폰트 같이 확대
         if self._display_mode == 'graph':
             z = self._zoom
-            # lanes — 회색 선 (마커보다 먼저 그려서 마커가 위에 오게)
+            # lanes — 회색 선 (마커보다 먼저 그려서 마커가 위에 오게).
+            # 편집 모드 hover/selected lane 은 굵게 강조.
             wp_by_name = {w["name"]: w for w in self._waypoints}
-            qp.setPen(QPen(QColor(120, 120, 120, 180), 1.5 * z))
             for ln in self._lanes:
                 a = wp_by_name.get(ln.get("from"))
                 b = wp_by_name.get(ln.get("to"))
@@ -322,6 +327,18 @@ class MapView(QWidget):
                     continue
                 pa = self._map_to_widget(a["x"], a["y"])
                 pb = self._map_to_widget(b["x"], b["y"])
+                lane_id = (ln["from"], ln["to"])
+                lane_id_rev = (ln["to"], ln["from"])
+                is_selected = self._edit_mode and self._selected_lane in (lane_id, lane_id_rev)
+                is_hover = (self._edit_mode and self._hover_target
+                            and self._hover_target.get("kind") == "lane"
+                            and self._hover_target.get("id") in (lane_id, lane_id_rev))
+                if is_selected:
+                    qp.setPen(QPen(QColor("#E07B5B"), 4 * z))  # 코랄, 선택 lane (Delete 대상)
+                elif is_hover:
+                    qp.setPen(QPen(QColor(30, 30, 30), 3 * z))  # 진한 회색, hover
+                else:
+                    qp.setPen(QPen(QColor(120, 120, 120, 180), 1.5 * z))
                 qp.drawLine(pa, pb)
             # route 강조 — 굵은 코랄선
             if self._route and len(self._route) >= 2:
@@ -338,9 +355,34 @@ class MapView(QWidget):
                     continue
                 p = self._map_to_widget(w["x"], w["y"])
                 is_current = (w["name"] == self._current_name)
-                r = (5 if is_current else 3.5) * z
-                qp.setPen(QPen(QColor("#1A6B8A"), 2 * z))
-                qp.setBrush(QBrush(QColor("#00A86B" if is_current else "#5BB9E0")))
+                # 편집 모드 — hover / 선택 노드 (link_pending 1차) 강조
+                is_hover_node = (self._edit_mode and self._hover_target
+                                 and self._hover_target.get("kind") == "node"
+                                 and self._hover_target.get("id") == w["name"])
+                is_selected_node = (self._edit_mode
+                                    and self._selected_node == w["name"])
+                if is_selected_node:
+                    r = 7 * z   # 큰 링
+                    border_color = "#E07B5B"   # 코랄 — 1차 선택 시그널
+                    border_width = 3 * z
+                    fill_color = "#FFD9CC"
+                elif is_hover_node:
+                    r = 5 * z
+                    border_color = "#0D4F66"   # 진한 파랑
+                    border_width = 3 * z
+                    fill_color = "#A8D8E8"
+                elif is_current:
+                    r = 5 * z
+                    border_color = "#1A6B8A"
+                    border_width = 2 * z
+                    fill_color = "#00A86B"
+                else:
+                    r = 3.5 * z
+                    border_color = "#1A6B8A"
+                    border_width = 2 * z
+                    fill_color = "#5BB9E0"
+                qp.setPen(QPen(QColor(border_color), border_width))
+                qp.setBrush(QBrush(QColor(fill_color)))
                 qp.drawEllipse(p, r, r)
                 # 라벨: zoom 의 sqrt 비례 — 확대해도 천천히 커짐 (인접 충돌 완화)
                 fsize = max(7, int(round(7 * math.sqrt(z))))
