@@ -227,12 +227,17 @@ class MapView(QWidget):
             return
         # ─────────────────────────
 
-        # 평소 모드: Shift+드래그 (initialpose) 만 지원 — 빈 좌클릭/드래그는 무동작.
-        if not (e.modifiers() & Qt.ShiftModifier):
+        # 평소 모드:
+        #   - map 모드: 빈 좌클릭-드래그 → Nav2 Goal (기존 동작, 복구)
+        #   - graph 모드: 빈 좌클릭-드래그 → 무동작 (편집 모드만 의미 있음)
+        #   - Shift+드래그 → AMCL initialpose (양쪽 모드 동일)
+        is_shift = bool(e.modifiers() & Qt.ShiftModifier)
+        if not is_shift and self._display_mode != 'map':
+            # graph 모드 평소 좌클릭 — 무동작
             return
         self._drag_start = QPointF(e.pos())
         self._drag_current = QPointF(e.pos())
-        self._drag_mode = "initial"
+        self._drag_mode = "initial" if is_shift else "goal"
         self.setFocus(Qt.MouseFocusReason)
         self.update()
 
@@ -300,7 +305,9 @@ class MapView(QWidget):
         yaw = math.atan2(-dy_w, dx_w)
         if self._drag_mode == "initial":
             self.initial_pose_requested.emit(mx, my, yaw)
-        # else (goal): 평소 모드 빈 곳 좌클릭은 "무동작" 으로 결정됨 (편집 기능 PR 에서 변경)
+        else:
+            # map 모드 평소 좌클릭-드래그 → Nav2 Goal (graph 모드면 press 단계에서 차단됨)
+            self.goal_pose_requested.emit(mx, my, yaw)
         # 피드백 — 0.5 초간 화살표 페이드 아웃 (mode 별 색 유지)
         self._feedback = {
             "start": QPointF(start), "end": QPointF(end),

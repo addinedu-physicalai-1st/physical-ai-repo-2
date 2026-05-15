@@ -60,6 +60,34 @@ def test_edit_mode_refuses_when_nav_active(card, monkeypatch):
     assert card._btn_edit.isChecked() is False
 
 
+def test_map_mode_left_click_emits_goal(card, qtbot):
+    """평소 (편집 OFF) + map 모드: 빈 곳 드래그 → goal_pose_requested."""
+    from PyQt5.QtCore import QPointF, Qt, QEvent
+    from PyQt5.QtGui import QMouseEvent
+    card._map._display_mode = 'map'
+    card._map._edit_mode = False
+    start = QPointF(100, 100)
+    end = QPointF(150, 100)
+    press = QMouseEvent(QEvent.MouseButtonPress, start, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    release = QMouseEvent(QEvent.MouseButtonRelease, end, Qt.LeftButton, Qt.NoButton, Qt.NoModifier)
+    card._map.mousePressEvent(press)
+    with qtbot.waitSignal(card._map.goal_pose_requested, timeout=500):
+        card._map.mouseReleaseEvent(release)
+
+
+def test_graph_mode_left_click_no_action(card, qtbot):
+    """평소 (편집 OFF) + graph 모드: 빈 곳 드래그 → 무동작 (signal 안 뜸)."""
+    from PyQt5.QtCore import QPointF, Qt, QEvent
+    from PyQt5.QtGui import QMouseEvent
+    card._map._display_mode = 'graph'
+    card._map._edit_mode = False
+    start = QPointF(100, 100)
+    press = QMouseEvent(QEvent.MouseButtonPress, start, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+    card._map.mousePressEvent(press)
+    # drag_start 가 세팅되지 않음 → release 시 emit 안 됨
+    assert card._map._drag_start is None
+
+
 def test_edit_mode_off_resets_state(card, monkeypatch):
     card._map._edit_mode = True
     card._map._edit_state = "link_pending"
