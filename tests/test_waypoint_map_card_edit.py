@@ -135,35 +135,63 @@ def test_hit_test_empty_returns_none(card):
     assert target is None
 
 
-# ---- Task 22: LINK_PENDING (간선 잇기 — 노드 2회 클릭) ----
+# ---- Task 22/32+33: ADD_LANE 모드 — 노드 2회 클릭 ----
 def test_short_click_on_node_enters_link_pending(card):
+    """ADD_LANE 모드 진입 후 노드 클릭 — 1차 선택."""
     card._map._edit_mode = True
-    card._map._edit_state = "node_pressed"
-    card._map._pressed_node = "A"
+    card._map._edit_state = "add_lane_mode"
     card._map._handle_node_short_click("A")
     assert card._map._edit_state == "link_pending"
     assert card._map._selected_node == "A"
 
 
 def test_second_node_click_emits_lane_create(card, qtbot):
+    """ADD_LANE 모드 1차 선택 후 다른 노드 클릭 → lane 생성. 모드는 유지 (연속)."""
     card._map._edit_mode = True
     card._map._selected_node = "A"
     card._map._edit_state = "link_pending"
-    card._map._pressed_node = "B"
     with qtbot.waitSignal(card._map.lane_create_requested, timeout=500) as blocker:
         card._map._handle_node_short_click("B")
     assert blocker.args == ["A", "B"]
-    assert card._map._edit_state == "ready"
+    assert card._map._edit_state == "add_lane_mode"   # 연속 잇기 위해 모드 유지
     assert card._map._selected_node is None
 
 
 def test_same_node_click_cancels(card):
+    """같은 노드 다시 클릭 → 1차 선택 취소, ADD_LANE 모드 유지."""
     card._map._edit_mode = True
     card._map._selected_node = "A"
     card._map._edit_state = "link_pending"
     card._map._handle_node_short_click("A")
     assert card._map._selected_node is None
+    assert card._map._edit_state == "add_lane_mode"
+
+
+# ---- Task 32: [+ 노드 생성] 버튼 ----
+def test_add_node_button_enters_mode(card):
+    card._map._edit_mode = True
+    card._btn_add_node.setChecked(True)
+    card._on_toggle_add_node()
+    assert card._map._edit_state == "add_node_mode"
+
+
+def test_add_node_button_toggle_off(card):
+    card._map._edit_mode = True
+    card._map._edit_state = "add_node_mode"
+    card._btn_add_node.setChecked(False)
+    card._on_toggle_add_node()
     assert card._map._edit_state == "ready"
+
+
+def test_add_lane_button_exclusive_with_node(card):
+    """ADD_NODE 모드에서 [+ 간선 연결] 누르면 ADD_NODE 해제 + ADD_LANE 진입."""
+    card._map._edit_mode = True
+    card._btn_add_node.setChecked(True)
+    card._on_toggle_add_node()
+    card._btn_add_lane.setChecked(True)
+    card._on_toggle_add_lane()
+    assert card._btn_add_node.isChecked() is False
+    assert card._map._edit_state == "add_lane_mode"
 
 
 def test_card_on_lane_create_posts(card, monkeypatch):

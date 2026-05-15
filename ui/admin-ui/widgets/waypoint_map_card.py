@@ -203,6 +203,27 @@ class MapView(QWidget):
                 self._commit_yaw_preview(QPointF(e.pos()))
                 return
             target = self._hit_test(QPointF(e.pos()))
+            # ADD_LANE 모드 — 노드 두 번 클릭으로 lane 생성
+            if self._edit_state in ("add_lane_mode", "link_pending"):
+                if target and target["kind"] == "node":
+                    self._handle_node_short_click(target["id"])
+                else:
+                    # 빈 곳/간선 클릭 → ADD_LANE 모드는 그대로 유지 (다음 노드 대기)
+                    pass
+                self.update()
+                return
+            # ADD_NODE 모드 — 빈 곳 드래그 시작
+            if self._edit_state == "add_node_mode":
+                # 노드 위 클릭은 무시 (빈 곳에서만 드래그 가능)
+                if target is None:
+                    self._pressed_node = None
+                    self._drag_start = QPointF(e.pos())
+                    self._drag_current = QPointF(e.pos())
+                    self._edit_state = "add_drag"
+                self.setFocus(Qt.MouseFocusReason)
+                self.update()
+                return
+            # 기본 편집 동작 (모드 진입 안 함) — 노드 드래그 이동 / 간선 선택
             if target and target["kind"] == "node":
                 self._pressed_node = target["id"]
                 self._drag_start = QPointF(e.pos())
@@ -212,16 +233,12 @@ class MapView(QWidget):
                 self._selected_lane = target["id"]
                 self._selected_node = None
                 self._edit_state = "lane_selected"
-                self.update()
             else:
-                # 빈 곳 — empty_pressed (drag>=12px 면 add_drag)
+                # 빈 곳 — selection 해제
                 self._pressed_node = None
-                self._drag_start = QPointF(e.pos())
-                self._drag_current = QPointF(e.pos())
-                self._edit_state = "empty_pressed"
-                # 빈 곳 클릭 = link_pending 도 취소
-                if self._selected_node is not None:
-                    self._selected_node = None
+                self._selected_lane = None
+                if self._edit_state == "lane_selected":
+                    self._edit_state = "ready"
             self.setFocus(Qt.MouseFocusReason)
             self.update()
             return
@@ -281,17 +298,20 @@ class MapView(QWidget):
         if self._edit_mode:
             if self._edit_state == "node_pressed":
                 if drag_dist < self.DRAG_MIN_PX:
-                    # 짧은 클릭 → LINK_PENDING (간선 잇기)
-                    self._handle_node_short_click(self._pressed_node)
+                    # 짧은 클릭 — 기본 모드 (add 모드 아님) 에서는 무동작
+                    # (간선 잇기는 [+ 간선 연결] 모드 진입 후에만 동작)
+                    self._edit_state = "ready"
+                    self._pressed_node = None
                 else:
-                    # 드래그 → YAW_PREVIEW 진입 (Task 24 에서 처리)
+                    # 드래그 → YAW_PREVIEW 진입 (NODE_DRAG)
                     self._enter_yaw_preview(end)
-            elif self._edit_state == "empty_pressed":
+            elif self._edit_state == "add_drag":
                 if drag_dist >= self.DRAG_MIN_PX:
-                    # 빈 곳 드래그 → 노드 추가 (Task 25)
+                    # add_drag → 이름 팝업 트리거
                     self.add_drag_release_requested.emit(start, end)
-                # 짧은 클릭은 무동작
-                self._edit_state = "ready"
+                # 짧은 클릭은 무동작 — 모드는 유지
+                # 팝업 결과에 따라 ready 로 돌아갈지 결정 (card 측에서)
+                self._edit_state = "add_node_mode"
             self.update()
             return
         # ─────────────────────────────────
@@ -346,7 +366,8 @@ class MapView(QWidget):
                     self._edit_state = "ready"
                     self.update()
                     return
-                # 그 외 편집 상태 — 선택/진행 reset
+                # 그 외 편집 상태 — 선택/진행 reset.
+                # add 모드도 ESC 로 해제 (toolbar 버튼 uncheck 는 카드 측에서 처리).
                 if self._edit_state != "ready":
                     self._drag_start = None
                     self._drag_current = None
@@ -368,28 +389,23 @@ class MapView(QWidget):
 
     # ─── 편집 모드 상태머신 helpers ───
     def _handle_node_short_click(self, name: str | None) -> None:
-        """노드 위 짧은 클릭 (< 12px drag) — LINK_PENDING 진입 또는 lane 생성 emit."""
+        """ADD_LANE 모드에서 노드 클릭 — 1차 선택 → 다른 노드 클릭 시 lane 생성.
+        ADD_LANE 모드 진입 후에만 호출된다 (mousePressEvent 에서 분기)."""
         if name is None:
-            self._edit_state = "ready"
             return
-        if self._edit_state == "node_pressed" and self._selected_node is None:
-            # 1차 선택
+        if self._selected_node is None:
+            # 1차 노드 선택
             self._selected_node = name
             self._edit_state = "link_pending"
-            self._selected_lane = None
         elif self._selected_node == name:
-            # 같은 노드 또 클릭 → 취소
+            # 같은 노드 → 1차 선택 취소, ADD_LANE 모드는 유지
             self._selected_node = None
-            self._edit_state = "ready"
-        elif self._selected_node is not None:
-            # 다른 노드 → lane 생성 emit
+            self._edit_state = "add_lane_mode"
+        else:
+            # 다른 노드 → lane 생성 emit. 모드는 ADD_LANE 유지 (연속 잇기 가능)
             self.lane_create_requested.emit(self._selected_node, name)
             self._selected_node = None
-            self._edit_state = "ready"
-        else:
-            # LINK_PENDING 아닌데 노드 클릭 — 1차 선택 진입
-            self._selected_node = name
-            self._edit_state = "link_pending"
+            self._edit_state = "add_lane_mode"
         self._pressed_node = None
 
     def _enter_yaw_preview(self, end_widget: QPointF) -> None:
@@ -805,6 +821,12 @@ class WaypointMapCard(QFrame):
         self._btn_edit.clicked.connect(self._on_edit_toggle)
 
         # 편집 모드 툴바 — ON 일 때만 visible
+        self._btn_add_node = self._make_edit_button("+ 노드 생성", "#00A86B")
+        self._btn_add_lane = self._make_edit_button("+ 간선 연결", "#00A86B")
+        self._btn_add_node.setCheckable(True)   # 모드 진입 토글
+        self._btn_add_lane.setCheckable(True)
+        self._btn_add_node.clicked.connect(self._on_toggle_add_node)
+        self._btn_add_lane.clicked.connect(self._on_toggle_add_lane)
         self._btn_undo = self._make_edit_button("↶ 취소", "#5BB9E0")
         self._btn_auto = self._make_edit_button("⚡ 자동 간선", "#5BB9E0")
         self._btn_reset = self._make_edit_button("⟲ 초기화", "#E07B5B")
@@ -813,7 +835,10 @@ class WaypointMapCard(QFrame):
         self._btn_auto.clicked.connect(self._on_auto_edge)
         self._btn_reset.clicked.connect(self._on_reset)
         self._btn_snapshot.clicked.connect(self._on_snapshot_default)
-        self._edit_toolbar = [self._btn_undo, self._btn_auto, self._btn_reset, self._btn_snapshot]
+        self._edit_toolbar = [
+            self._btn_add_node, self._btn_add_lane,
+            self._btn_undo, self._btn_auto, self._btn_reset, self._btn_snapshot,
+        ]
         for b in self._edit_toolbar:
             b.setVisible(False)
 
@@ -883,6 +908,32 @@ class WaypointMapCard(QFrame):
         self._sse.event_received.connect(self._dispatcher.handle)
         self._sse.start()
 
+    def _on_toggle_add_node(self) -> None:
+        """[+ 노드 생성] 토글 — ADD_NODE 모드 진입/이탈.
+        다른 모드 (ADD_LANE) 와 상호배타."""
+        if self._btn_add_node.isChecked():
+            self._btn_add_lane.setChecked(False)
+            self._map._edit_state = "add_node_mode"
+            self._map._selected_node = None
+            self._map._selected_lane = None
+        else:
+            if self._map._edit_state in ("add_node_mode", "add_drag"):
+                self._map._edit_state = "ready"
+        self._map.update()
+
+    def _on_toggle_add_lane(self) -> None:
+        """[+ 간선 연결] 토글 — ADD_LANE 모드 진입/이탈."""
+        if self._btn_add_lane.isChecked():
+            self._btn_add_node.setChecked(False)
+            self._map._edit_state = "add_lane_mode"
+            self._map._selected_node = None
+            self._map._selected_lane = None
+        else:
+            if self._map._edit_state in ("add_lane_mode", "link_pending"):
+                self._map._edit_state = "ready"
+                self._map._selected_node = None
+        self._map.update()
+
     def _make_edit_button(self, text: str, accent: str) -> QPushButton:
         b = QPushButton(text)
         b.setCursor(Qt.PointingHandCursor)
@@ -898,7 +949,7 @@ class WaypointMapCard(QFrame):
 
     def _auto_exit_edit_mode_on_nav_active(self) -> None:
         """SSE goal_status: active 수신 → 편집 모드 자동 이탈 + 알림.
-        진행 중 selection / drag / yaw_preview 모두 reset."""
+        진행 중 selection / drag / yaw_preview / add 모드 모두 reset."""
         self._map._edit_mode = False
         self._map._edit_state = "ready"
         self._map._selected_node = None
@@ -907,6 +958,8 @@ class WaypointMapCard(QFrame):
         self._map._pressed_node = None
         self._map._hover_target = None
         self._btn_edit.setChecked(False)
+        self._btn_add_node.setChecked(False)
+        self._btn_add_lane.setChecked(False)
         self._refresh_edit_toolbar()
         self._map.update()
         # 알림 — SSE thread 에서 직접 dialog 띄우면 위험. queued connection 으로.
@@ -931,6 +984,8 @@ class WaypointMapCard(QFrame):
             self._map._selected_lane = None
             self._map._yaw_preview = None
             self._map._hover_target = None
+            self._btn_add_node.setChecked(False)
+            self._btn_add_lane.setChecked(False)
             self._refresh_edit_toolbar()
             self._map.update()
             return
@@ -1140,7 +1195,8 @@ class WaypointMapCard(QFrame):
             QMessageBox.warning(self, "통신 오류", str(e))
 
     def _on_add_drag_release(self, start_widget: QPointF, end_widget: QPointF) -> None:
-        """빈 곳 드래그 release → 이름 팝업 → POST /waypoints/click."""
+        """빈 곳 드래그 release → 이름 팝업 → POST /waypoints/click.
+        성공 시 ADD_NODE 모드 자동 해제 (한 번 추가하면 모드 빠짐 — 실수 방지)."""
         from PyQt5.QtWidgets import QInputDialog
         mx, my = self._map._widget_to_map(start_widget.x(), start_widget.y())
         dx = end_widget.x() - start_widget.x()
@@ -1156,8 +1212,14 @@ class WaypointMapCard(QFrame):
                            timeout=2.0)
             if r.status_code == 409:
                 QMessageBox.warning(self, "이름 중복", "이미 같은 이름의 노드가 있어요.")
+                return
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
+            return
+        # 성공 — ADD_NODE 모드 해제
+        self._btn_add_node.setChecked(False)
+        self._map._edit_state = "ready"
+        self._map.update()
 
     # ─── 편집 모드 헤더 툴바 핸들러 (Task 26) ───
     def _on_undo(self) -> None:
