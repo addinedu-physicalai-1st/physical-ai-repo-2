@@ -120,3 +120,20 @@ def test_get_patrol_resolves(tmp_yaml):
     )
     members = ys.get_patrol("p1")
     assert [m.name for m in members] == ["a", "b"]
+
+
+# ---- Task 3: update (노드 이동) ----
+def test_update_moves_existing_waypoint(tmp_yaml):
+    _, ys = tmp_yaml
+    ys.save([ys.Waypoint("A", 0.0, 0.0, 0.0)], {})
+    updated = ys.update("A", 3.0, 4.0, 1.57)
+    assert updated.x == 3.0 and updated.y == 4.0 and updated.yaw == 1.57
+    reloaded = ys.get("A")
+    assert reloaded.x == 3.0
+
+
+def test_update_unknown_raises(tmp_yaml):
+    _, ys = tmp_yaml
+    ys.save([], {})
+    with pytest.raises(KeyError):
+        ys.update("Z", 0.0, 0.0, 0.0)
