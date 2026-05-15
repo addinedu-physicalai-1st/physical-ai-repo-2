@@ -69,3 +69,39 @@ def test_edit_mode_off_resets_state(card, monkeypatch):
     assert card._map._edit_mode is False
     assert card._map._edit_state == "ready"
     assert card._map._selected_node is None
+
+
+# ---- Task 20: hit_test (node + lane) ----
+def test_hit_test_node(card):
+    from PyQt5.QtCore import QPointF
+    card._map.set_waypoints([{"name": "A", "x": 0.0, "y": 0.0}])
+    p = card._map._map_to_widget(0.0, 0.0)
+    target = card._map._hit_test(p)
+    assert target is not None
+    assert target["kind"] == "node"
+    assert target["id"] == "A"
+
+
+def test_hit_test_lane_midpoint(card):
+    from PyQt5.QtCore import QPointF
+    # widget size 가 작아 노드 간격이 너무 좁으면 midpoint 가 양쪽 노드 hit 반경 안
+    # 들어와 lane 보다 node 가 잡힌다. 5m 떨어뜨려 안전 마진 확보.
+    card._map.set_waypoints([
+        {"name": "A", "x": 0.0, "y": 0.0},
+        {"name": "B", "x": 5.0, "y": 0.0},
+    ])
+    card._map.set_lanes([{"from": "A", "to": "B", "bidirectional": True}])
+    pa = card._map._map_to_widget(0.0, 0.0)
+    pb = card._map._map_to_widget(5.0, 0.0)
+    mid = QPointF((pa.x() + pb.x()) / 2, (pa.y() + pb.y()) / 2)
+    target = card._map._hit_test(mid)
+    assert target is not None
+    assert target["kind"] == "lane"
+    assert target["id"] == ("A", "B")
+
+
+def test_hit_test_empty_returns_none(card):
+    from PyQt5.QtCore import QPointF
+    card._map.set_waypoints([{"name": "A", "x": 0.0, "y": 0.0}])
+    target = card._map._hit_test(QPointF(99999, 99999))
+    assert target is None
