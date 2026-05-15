@@ -1237,48 +1237,78 @@ class WaypointMapCard(QFrame):
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
 
-    def _on_auto_edge(self) -> None:
-        """[⚡ 자동 간선] — threshold 입력 dialog + replace 선택 → 일괄 lane 생성."""
-        from PyQt5.QtWidgets import QInputDialog
-        wps = self._map._waypoints
+    # 자동 간선 dialog 의 안전 범위 (m).
+    _AUTO_EDGE_MIN = 0.1
+    _AUTO_EDGE_MAX = 50.0
+    _AUTO_EDGE_FALLBACK = 1.5
+
+    def _compute_auto_edge_default(self, wps: list[dict]) -> float:
+        """안전한 default threshold — 노드 간 거리 median.
+        같은 좌표 노드들로 인해 0 이 되면 fallback. [min, max] 로 clamp."""
         if len(wps) < 2:
-            QMessageBox.information(self, "자동 간선", "노드가 2개 이상이어야 해요.")
-            return
-        # threshold 기본값 = 노드 간 평균 거리의 median
+            return self._AUTO_EDGE_FALLBACK
         dists = []
         for i, a in enumerate(wps):
             for b in wps[i + 1:]:
                 dists.append(math.hypot(a["x"] - b["x"], a["y"] - b["y"]))
         dists.sort()
-        default_th = round(dists[len(dists) // 2], 2) if dists else 1.5
+        med = dists[len(dists) // 2] if dists else self._AUTO_EDGE_FALLBACK
+        if med < self._AUTO_EDGE_MIN:
+            med = self._AUTO_EDGE_FALLBACK
+        if med > self._AUTO_EDGE_MAX:
+            med = self._AUTO_EDGE_MAX
+        return round(med, 2)
 
-        threshold, ok = QInputDialog.getDouble(
-            self, "자동 간선",
-            f"거리 threshold (m). 기본값 {default_th} = 노드 간 거리 중앙값.",
-            default_th, 0.01, 99.0, 2,
-        )
-        if not ok:
-            return
-        replace = QMessageBox.question(
-            self, "자동 간선",
-            "기존 간선을 모두 교체할까요?\n예: 기존 제거 후 새로 생성\n아니오: 기존 보존 + 새 쌍만 추가",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
-        ) == QMessageBox.Yes
-        import httpx
+    def _on_auto_edge(self) -> None:
+        """[⚡ 자동 간선] — threshold 입력 dialog + replace 선택 → 일괄 lane 생성.
+        모든 단계에서 예외를 잡아 admin UI 가 죽지 않도록 한다."""
+        from PyQt5.QtWidgets import QInputDialog
         try:
-            r = httpx.post(f"{self._control_url}/waypoints/lanes/auto",
-                           json={"threshold": threshold, "replace_existing": replace},
-                           timeout=10.0)
+            wps = self._map._waypoints
+            if len(wps) < 2:
+                QMessageBox.information(self, "자동 간선", "노드가 2개 이상이어야 해요.")
+                return
+            default_th = self._compute_auto_edge_default(wps)
+
+            threshold, ok = QInputDialog.getDouble(
+                self, "자동 간선",
+                f"거리 threshold (m). 기본값 {default_th} = 노드 간 거리 중앙값.",
+                default_th, self._AUTO_EDGE_MIN, self._AUTO_EDGE_MAX, 2,
+            )
+            if not ok:
+                return
+            replace = QMessageBox.question(
+                self, "자동 간선",
+                "기존 간선을 모두 교체할까요?\n예: 기존 제거 후 새로 생성\n아니오: 기존 보존 + 새 쌍만 추가",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            ) == QMessageBox.Yes
+            import httpx
+            try:
+                r = httpx.post(f"{self._control_url}/waypoints/lanes/auto",
+                               json={"threshold": threshold, "replace_existing": replace},
+                               timeout=10.0)
+            except httpx.HTTPError as e:
+                QMessageBox.warning(self, "통신 오류", str(e))
+                return
             if r.status_code == 200:
                 body = r.json()
+                added = body.get('added', 0)
+                skipped = body.get('skipped', 0)
+                # reload_graph 부분 실패 (server 가 yaml 은 썼지만 ROS reload 못 함)
+                # — UI 에 표시
+                extra = ""
+                if body.get('graph_reloaded') is False:
+                    extra = f"\n\n⚠ 실시간 반영 실패 — graph_router_node 재시작 필요:\n{body.get('detail', '')}"
                 QMessageBox.information(
                     self, "자동 간선",
-                    f"추가: {body.get('added', 0)}개 / 건너뜀: {body.get('skipped', 0)}개",
+                    f"추가: {added}개 / 건너뜀: {skipped}개{extra}",
                 )
             else:
-                QMessageBox.warning(self, "자동 간선 실패", r.text)
-        except httpx.HTTPError as e:
-            QMessageBox.warning(self, "통신 오류", str(e))
+                QMessageBox.warning(self, "자동 간선 실패",
+                                    f"HTTP {r.status_code}: {r.text[:300]}")
+        except Exception as e:
+            # 예상치 못한 예외도 dialog 로 — admin UI crash 방지
+            QMessageBox.critical(self, "자동 간선 오류", f"{type(e).__name__}: {e}")
 
     def _on_reset(self) -> None:
         """[⟲ 초기화] — default snapshot 으로 working 덮어쓰기."""
