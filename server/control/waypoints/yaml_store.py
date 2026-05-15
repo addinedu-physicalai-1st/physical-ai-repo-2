@@ -142,6 +142,46 @@ def undo_last_add() -> Waypoint | None:
     return wp
 
 
+def rename(old: str, new: str) -> Waypoint:
+    """노드 이름 변경 + lanes / patrols 참조 cascade 갱신.
+    new 가 이미 다른 노드의 이름이면 WaypointStoreError."""
+    new = new.strip()
+    if not new:
+        raise WaypointStoreError("new name is empty")
+    wps, patrols = load()
+    if old == new:
+        # no-op 이지만 노드 존재 확인은 함
+        return get(old)
+    names = {w.name for w in wps}
+    if old not in names:
+        raise KeyError(old)
+    if new in names:
+        raise WaypointStoreError(f"이미 같은 이름의 노드가 있어요: '{new}'")
+    new_list = [
+        Waypoint(name=new if w.name == old else w.name, x=w.x, y=w.y, yaw=w.yaw, id=w.id)
+        for w in wps
+    ]
+    # patrols cascade — old 가 들어가있던 자리를 new 로
+    new_patrols = {
+        p: [new if m == old else m for m in members]
+        for p, members in patrols.items()
+    }
+    save(new_list, new_patrols)
+    # lanes cascade — from/to 갱신
+    existing_lanes = load_lanes()
+    updated_lanes = [
+        Lane(
+            from_=new if ln.from_ == old else ln.from_,
+            to=new if ln.to == old else ln.to,
+            bidirectional=ln.bidirectional,
+        )
+        for ln in existing_lanes
+    ]
+    if updated_lanes != existing_lanes:
+        save_lanes(updated_lanes)
+    return next(w for w in new_list if w.name == new)
+
+
 def update(name: str, x: float, y: float, yaw: float) -> Waypoint:
     """노드 좌표/yaw 만 변경. 이름은 그대로. patrol/lane 참조에 영향 없음."""
     wps, patrols = load()

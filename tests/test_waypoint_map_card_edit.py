@@ -183,6 +183,77 @@ def test_add_node_button_toggle_off(card):
     assert card._map._edit_state == "ready"
 
 
+# ---- Task 31: 더블클릭 메뉴 + rename ----
+def test_rename_node_calls_patch(card, monkeypatch):
+    called = {}
+    import httpx
+    from PyQt5.QtWidgets import QInputDialog
+    monkeypatch.setattr(QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("새이름", True)))
+    class R:
+        status_code = 200
+        text = ""
+    def fake_patch(url, json=None, timeout=None):
+        called["url"] = url
+        called["body"] = json
+        return R()
+    monkeypatch.setattr(httpx, "patch", fake_patch)
+    card._on_rename_node("A")
+    assert called["url"].endswith("/waypoints/A/rename")
+    assert called["body"] == {"new_name": "새이름"}
+
+
+def test_rename_node_cancel_no_call(card, monkeypatch):
+    called = {}
+    import httpx
+    from PyQt5.QtWidgets import QInputDialog
+    monkeypatch.setattr(QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("", False)))
+    def fake_patch(*a, **kw):
+        called["called"] = True
+        class R: status_code = 200
+        return R()
+    monkeypatch.setattr(httpx, "patch", fake_patch)
+    card._on_rename_node("A")
+    assert called == {}
+
+
+def test_delete_node_with_confirm(card, monkeypatch):
+    called = {}
+    import httpx
+    from PyQt5.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.Yes))
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **kw: None))
+    class R:
+        status_code = 200
+        text = ""
+        headers = {"content-type": "application/json"}
+        def json(self): return {"ok": True, "cascaded_lanes": [{"from": "A", "to": "B"}]}
+    def fake_delete(url, timeout=None):
+        called["url"] = url
+        return R()
+    monkeypatch.setattr(httpx, "delete", fake_delete)
+    card._on_delete_node("A")
+    assert called["url"].endswith("/waypoints/A")
+
+
+def test_delete_node_cancel_no_call(card, monkeypatch):
+    called = {}
+    import httpx
+    from PyQt5.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.No))
+    def fake_delete(*a, **kw):
+        called["called"] = True
+        class R: status_code = 200
+        return R()
+    monkeypatch.setattr(httpx, "delete", fake_delete)
+    card._on_delete_node("A")
+    assert called == {}
+
+
 def test_add_lane_button_exclusive_with_node(card):
     """ADD_NODE 모드에서 [+ 간선 연결] 누르면 ADD_NODE 해제 + ADD_LANE 진입."""
     card._map._edit_mode = True

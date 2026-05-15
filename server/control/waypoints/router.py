@@ -74,6 +74,11 @@ class ClickAddBody(BaseModel):
     yaw: float
 
 
+class RenameBody(BaseModel):
+    """노드 이름 변경 — PATCH /waypoints/{name}/rename."""
+    new_name: str = Field(..., min_length=1, max_length=40)
+
+
 def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     router = APIRouter(prefix="/waypoints", tags=["waypoints"])
 
@@ -198,6 +203,19 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         _check_nav_idle()
         try:
             ys.add(body.name.strip(), body.x, body.y, body.yaw)
+        except ys.WaypointStoreError as e:
+            raise HTTPException(409, str(e))
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
+    @router.patch("/{name}/rename")
+    def rename_node(name: str, body: RenameBody) -> dict:
+        """노드 이름 변경 + lanes / patrols 참조 cascade 갱신."""
+        _check_nav_idle()
+        try:
+            ys.rename(name, body.new_name)
+        except KeyError:
+            raise HTTPException(404, f"'{name}' 없음")
         except ys.WaypointStoreError as e:
             raise HTTPException(409, str(e))
         reload_result = bridge.reload_graph()

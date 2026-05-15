@@ -438,6 +438,28 @@ class MapView(QWidget):
         self._pressed_node = None
         self._edit_state = "ready"
 
+    # 편집 모드 더블클릭 — 노드/간선 context menu 요청 signal
+    # 카드 측에서 QMenu 띄움 (MapView 는 통신 로직 안 가짐)
+    node_double_clicked = pyqtSignal(str)              # name
+    lane_double_clicked = pyqtSignal(str, str)         # from, to
+
+    def mouseDoubleClickEvent(self, e: Any) -> None:
+        """편집 모드에서만 동작 — 노드/간선 hit 시 signal emit.
+        평소 모드는 기존 동작 유지 (super)."""
+        if not self._edit_mode:
+            super().mouseDoubleClickEvent(e)
+            return
+        if e.button() != Qt.LeftButton:
+            return
+        target = self._hit_test(QPointF(e.pos()))
+        if target is None:
+            return
+        if target["kind"] == "node":
+            self.node_double_clicked.emit(target["id"])
+        elif target["kind"] == "lane":
+            from_, to = target["id"]
+            self.lane_double_clicked.emit(from_, to)
+
     # ─── 편집 모드 hit-test (노드 + 간선) ───
     def _hit_test(self, p: QPointF) -> dict | None:
         """widget 좌표 p 가 노드/간선 위인지 판정.
@@ -864,6 +886,8 @@ class WaypointMapCard(QFrame):
         self._map.lane_delete_requested.connect(self._on_lane_delete)
         self._map.node_move_requested.connect(self._on_node_move)
         self._map.add_drag_release_requested.connect(self._on_add_drag_release)
+        self._map.node_double_clicked.connect(self._on_node_double_clicked)
+        self._map.lane_double_clicked.connect(self._on_lane_double_clicked)
         self._list = QListWidget()
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -1182,6 +1206,80 @@ class WaypointMapCard(QFrame):
         try:
             httpx.request("DELETE", f"{self._control_url}/waypoints/lanes",
                           json={"from": from_, "to": to}, timeout=2.0)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    # ─── Task 31: 더블클릭 context menu ───
+    def _on_node_double_clicked(self, name: str) -> None:
+        """노드 더블클릭 → 메뉴: [이름 변경] [삭제]."""
+        menu = QMenu(self)
+        rename_act = QAction(f"✏  '{name}' 이름 변경", menu)
+        delete_act = QAction(f"🗑  '{name}' 삭제", menu)
+        rename_act.triggered.connect(lambda: self._on_rename_node(name))
+        delete_act.triggered.connect(lambda: self._on_delete_node(name))
+        menu.addAction(rename_act)
+        menu.addAction(delete_act)
+        # 마우스 커서 위치에 메뉴 (Cursor 사용 안 함 — Qt 가 알아서)
+        from PyQt5.QtGui import QCursor
+        menu.exec_(QCursor.pos())
+
+    def _on_lane_double_clicked(self, from_: str, to: str) -> None:
+        """간선 더블클릭 → 메뉴: [삭제]."""
+        menu = QMenu(self)
+        delete_act = QAction(f"🗑  '{from_} ↔ {to}' 끊기", menu)
+        delete_act.triggered.connect(lambda: self._on_lane_delete(from_, to))
+        menu.addAction(delete_act)
+        from PyQt5.QtGui import QCursor
+        menu.exec_(QCursor.pos())
+
+    def _on_rename_node(self, name: str) -> None:
+        """이름 입력 prompt → PATCH /waypoints/{name}/rename."""
+        from PyQt5.QtWidgets import QInputDialog
+        new_name, ok = QInputDialog.getText(self, "이름 변경",
+                                            f"'{name}' 의 새 이름:", text=name)
+        if not ok or not new_name.strip() or new_name.strip() == name:
+            return
+        import httpx
+        try:
+            r = httpx.patch(f"{self._control_url}/waypoints/{name}/rename",
+                            json={"new_name": new_name.strip()}, timeout=2.0)
+            if r.status_code == 409:
+                QMessageBox.warning(self, "이름 중복",
+                                    "이미 같은 이름의 노드가 있어요.")
+            elif r.status_code != 200:
+                QMessageBox.warning(self, "이름 변경 실패",
+                                    f"HTTP {r.status_code}: {r.text[:200]}")
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_delete_node(self, name: str) -> None:
+        """삭제 확인 → DELETE /waypoints/{name}.
+        cascade lane 정보가 응답에 있으면 표시."""
+        reply = QMessageBox.question(
+            self, "노드 삭제",
+            f"'{name}' 을 삭제할까요?\n연결된 간선도 함께 제거돼요.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        import httpx
+        try:
+            r = httpx.delete(f"{self._control_url}/waypoints/{name}", timeout=2.0)
+            if r.status_code == 404:
+                return   # 이미 없음 — silent
+            if r.status_code == 409:
+                QMessageBox.warning(self, "삭제 불가", r.json().get("detail", r.text))
+                return
+            if r.status_code != 200:
+                QMessageBox.warning(self, "삭제 실패", r.text)
+                return
+            body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+            cascaded = body.get("cascaded_lanes", [])
+            if cascaded:
+                QMessageBox.information(
+                    self, "삭제 완료",
+                    f"노드 + 연결된 간선 {len(cascaded)}개 제거됨.",
+                )
         except httpx.HTTPError as e:
             QMessageBox.warning(self, "통신 오류", str(e))
 
