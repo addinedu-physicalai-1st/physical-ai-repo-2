@@ -432,6 +432,60 @@ def test_on_snapshot_default(card, monkeypatch):
     assert called["url"].endswith("/waypoints/snapshot-default")
 
 
+def test_compute_auto_edge_default_handles_zero_distance(card):
+    """노드 두 개가 같은 좌표여서 거리 0 → fallback 으로."""
+    card._map.set_waypoints([
+        {"name": "A", "x": 0.0, "y": 0.0},
+        {"name": "B", "x": 0.0, "y": 0.0},
+    ])
+    th = card._compute_auto_edge_default(card._map._waypoints)
+    assert th >= card._AUTO_EDGE_MIN
+    assert th <= card._AUTO_EDGE_MAX
+
+
+def test_compute_auto_edge_default_clamps_huge(card):
+    """매우 멀리 떨어진 노드 → MAX 로 clamp."""
+    card._map.set_waypoints([
+        {"name": "A", "x": 0.0, "y": 0.0},
+        {"name": "B", "x": 10000.0, "y": 0.0},
+    ])
+    th = card._compute_auto_edge_default(card._map._waypoints)
+    assert th <= card._AUTO_EDGE_MAX
+
+
+def test_on_auto_edge_with_graph_reload_partial_failure(card, monkeypatch):
+    """server 가 yaml_saved=true, graph_reloaded=false 응답 → 경고 dialog 만 뜨고 crash 안 함."""
+    info_called = {}
+    import httpx
+    from PyQt5.QtWidgets import QInputDialog, QMessageBox
+    monkeypatch.setattr(QInputDialog, "getDouble",
+                        staticmethod(lambda *a, **kw: (1.5, True)))
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.No))
+    def fake_info(*a, **kw):
+        # QMessageBox.information(parent, title, text, ...) — text 는 3번째 positional
+        if len(a) >= 3:
+            info_called["msg"] = a[2]
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(fake_info))
+
+    class R:
+        status_code = 200
+        def json(self): return {
+            "added": 3, "skipped": 0,
+            "yaml_saved": True, "graph_reloaded": False,
+            "detail": "reload_graph service unavailable",
+        }
+    monkeypatch.setattr(httpx, "post", lambda *a, **kw: R())
+    card._map.set_waypoints([
+        {"name": "A", "x": 0.0, "y": 0.0},
+        {"name": "B", "x": 1.0, "y": 0.0},
+    ])
+    # crash 없이 끝나야
+    card._on_auto_edge()
+    # 부분 실패 메시지에 "실시간 반영 실패" 포함
+    assert "실시간 반영 실패" in info_called.get("msg", "")
+
+
 def test_on_auto_edge_with_dialog(card, monkeypatch):
     called = {}
     import httpx
