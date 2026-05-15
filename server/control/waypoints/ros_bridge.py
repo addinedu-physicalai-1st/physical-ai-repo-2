@@ -15,6 +15,7 @@ TOPIC_INITIAL_POSE = "/initialpose"
 ACTION_NAV_TO_POSE = "/navigate_to_pose"
 ACTION_FOLLOW_WAYPOINTS = "/follow_waypoints"
 SRV_GRAPH_ROUTE = "/graph_router/route"
+SRV_GRAPH_RELOAD = "/graph_router/reload_graph"
 ACTION_GRAPH_NAVIGATE = "/graph_router/navigate_to_vertex"
 ODOM_FRESH_S = 1.0
 # 자가 회복 — nav action server 연결 polling 주기
@@ -58,6 +59,7 @@ class WaypointsRosBridge:
         self._initial_pose_pub: Any = None
         self._route_client: Any = None
         self._gr_nav_client: Any = None
+        self._reload_client: Any = None
         self._sse_listeners: list[Any] = []
         self._tf_buffer: Any = None
         self._tf_listener: Any = None
@@ -380,13 +382,40 @@ class WaypointsRosBridge:
                 None if self._plan is None
                 else int((time.monotonic() - self._plan.received_at_s) * 1000)
             )
+            # nav_active — 진행 중인 goal 이 있으면 True (편집 모드 게이팅용).
+            cur_status = (self._goal or {}).get("status") if self._goal else None
+            nav_active = cur_status in ("pending", "active")
             return {
                 "ros_domain_id": int(os.environ.get("ROS_DOMAIN_ID", "0")),
                 "ros_ok": self._ros_ok,
                 "nav_action_available": self._nav_available,
+                "nav_active": nav_active,
                 "odom_age_ms": odom_age,
                 "plan_age_ms": plan_age,
             }
+
+    def reload_graph(self, timeout_s: float = 3.0) -> dict:
+        """`/graph_router/reload_graph` (std_srvs/Trigger) 동기 호출.
+        rclpy 미시작 / 서비스 미가용 / timeout 시 success=False 반환 (예외 X).
+        admin UI 의 yaml 편집 후 후처리로 router 가 호출."""
+        if self._node is None:
+            return {"success": False, "message": "rclpy not started"}
+        try:
+            from std_srvs.srv import Trigger
+        except ImportError as e:
+            return {"success": False, "message": f"std_srvs unavailable: {e}"}
+        if self._reload_client is None:
+            self._reload_client = self._node.create_client(Trigger, SRV_GRAPH_RELOAD)
+        if not self._reload_client.wait_for_service(timeout_sec=1.0):
+            return {"success": False, "message": "reload_graph service unavailable"}
+        future = self._reload_client.call_async(Trigger.Request())
+        deadline = time.monotonic() + timeout_s
+        while not future.done() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        if not future.done():
+            return {"success": False, "message": "reload_graph timeout"}
+        res = future.result()
+        return {"success": bool(res.success), "message": str(res.message)}
 
     # ---------- SSE listener 관리 ----------
     def register_listener(self, q: Any) -> None:
