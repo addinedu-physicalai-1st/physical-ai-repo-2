@@ -28,7 +28,7 @@ def fake_yaml(tmp_path, monkeypatch):
 
 
 def test_load_lanes_returns_lane_objects(fake_yaml):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     lanes = ys.load_lanes()
     assert len(lanes) == 1
     assert isinstance(lanes[0], ys.Lane)
@@ -38,7 +38,7 @@ def test_load_lanes_returns_lane_objects(fake_yaml):
 
 
 def test_save_lanes_atomic_write(fake_yaml, tmp_path):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     new = [ys.Lane(from_="B", to="A", bidirectional=True)]
     ys.save_lanes(new)
     reloaded = ys.load_lanes()
@@ -50,14 +50,14 @@ def test_save_lanes_atomic_write(fake_yaml, tmp_path):
 
 
 def test_save_lanes_validates_unknown_waypoint(fake_yaml):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     bad = [ys.Lane(from_="A", to="Z", bidirectional=True)]
     with pytest.raises(ys.LaneStoreError):
         ys.save_lanes(bad)
 
 
 def test_add_lane_new_pair(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text(
         "waypoints:\n"
@@ -76,7 +76,7 @@ def test_add_lane_new_pair(tmp_path, monkeypatch):
 
 
 def test_add_lane_raises_lane_exists(fake_yaml):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     # fake_yaml fixture 가 이미 A↔B 양방향 lane 을 가짐
     with pytest.raises(ys.LaneStoreError, match="lane_exists"):
         ys.add_lane("B", "A")
@@ -85,26 +85,26 @@ def test_add_lane_raises_lane_exists(fake_yaml):
 
 
 def test_add_lane_unknown_waypoint(fake_yaml):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     with pytest.raises(ys.LaneStoreError):
         ys.add_lane("A", "Z")
 
 
 def test_remove_lane_bidirectional_either_direction(fake_yaml):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     # 양방향 A↔B 있으므로 B→A 입력해도 매칭
     ys.remove_lane("B", "A")
     assert ys.load_lanes() == []
 
 
 def test_remove_lane_missing_raises_keyerror(fake_yaml):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     with pytest.raises(KeyError):
         ys.remove_lane("A", "Z")
 
 
 def test_remove_cascades_lanes(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text(
         "waypoints:\n"
@@ -133,7 +133,7 @@ def test_remove_cascades_lanes(tmp_path, monkeypatch):
 
 # ---- Task 6: default snapshot ----
 def test_snapshot_and_restore_default_roundtrip(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text(
         "waypoints:\n"
@@ -165,7 +165,7 @@ def test_snapshot_and_restore_default_roundtrip(tmp_path, monkeypatch):
 
 
 def test_restore_default_missing_raises(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text("waypoints: []\npatrols: {}\n", encoding="utf-8")
     monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))
@@ -176,7 +176,7 @@ def test_restore_default_missing_raises(tmp_path, monkeypatch):
 
 # ---- Task 31: rename + lane/patrol cascade ----
 def test_rename_cascades_lanes(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text(
         "waypoints:\n"
@@ -200,7 +200,7 @@ def test_rename_cascades_lanes(tmp_path, monkeypatch):
 
 
 def test_rename_duplicate_raises(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text(
         "waypoints:\n"
@@ -217,7 +217,7 @@ def test_rename_duplicate_raises(tmp_path, monkeypatch):
 
 
 def test_rename_unknown_raises_keyerror(tmp_path, monkeypatch):
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     wp = tmp_path / "waypoints.yaml"
     wp.write_text("waypoints: []\npatrols: {}\n", encoding="utf-8")
     monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))

@@ -1,5 +1,5 @@
 {
-  "$schema_note": "백엔드(server/ai/robots.py) ↔ 프론트(ui/robot-ui/src/config/robots.ts) 가 공유하는 로봇/모드 정의. 양쪽 다 이 파일을 읽음.",
+  "$schema_note": "백엔드(service/ai-service/ai_service/robots.py) ↔ 프론트(service/web-service/robot-web/src/config/robots.ts) 가 공유하는 로봇/모드 정의. 양쪽 다 이 파일을 읽음.",
   "robots": [
     {
       "id": "eduping",

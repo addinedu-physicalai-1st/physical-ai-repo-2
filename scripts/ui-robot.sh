@@ -24,7 +24,7 @@ case "$ROBOT" in
 esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$REPO_ROOT/ui/robot-ui"
+APP_DIR="$REPO_ROOT/service/web-service/robot-web"
 
 if [[ ! -d "$APP_DIR/node_modules" ]]; then
   echo "[ui-robot] node_modules 없음 — npm install 실행"

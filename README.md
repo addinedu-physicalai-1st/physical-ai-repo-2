@@ -14,9 +14,9 @@ Addinedu 최종 프로젝트 | 팀 사랑의 에듀핑 | 2026-04-23 ~ 2026-06-04
 
 | 디렉터리 | 역할 |
 |---|---|
-| `server/ai` | AI Hub — 음성 명령 의도 분류·잡담·보고서 (Ollama: `qwen2.5:0.5b` 분류 / `qwen2.5:3b` 잡담 / `qwen2.5:7b` 보고서, `bge-m3` 임베딩) |
-| `server/control` | Control Service — REST/WS 게이트웨이, ROS2 브리지 |
-| `ui/robot-ui` | 교사용 웹 UI (Vue 3) |
+| `service/ai-service` | AI Hub — 음성 명령 의도 분류·잡담·보고서 (Ollama: `qwen2.5:0.5b` 분류 / `qwen2.5:3b` 잡담 / `qwen2.5:7b` 보고서, `bge-m3` 임베딩) |
+| `service/control-service` | Control Service — REST/WS 게이트웨이, ROS2 브리지 |
+| `service/web-service/robot-web` | 교사용 웹 UI (Vue 3) |
 
 ## 시작하기
 
@@ -71,7 +71,7 @@ pip install -e .
 
 #### 2) Ollama 모델 pull
 
-AI Hub 가 사용하는 모델을 미리 받는다 (기본값은 [`server/ai/config.py`](server/ai/config.py) `Settings` 와 동일):
+AI Hub 가 사용하는 모델을 미리 받는다 (기본값은 [`service/ai-service/ai_service/config.py`](service/ai-service/ai_service/config.py) `Settings` 와 동일):
 
 ```bash
 ollama serve &              # 데몬이 떠있지 않은 경우
@@ -81,15 +81,15 @@ ollama pull qwen2.5:7b      # 일과 보고서 JSON 생성
 ollama pull bge-m3          # RAG 임베딩
 ```
 
-호스트·모델 태그는 **`server/ai/config.py` 의 `Settings` 를 직접 수정**한다 (해당 모듈은 런타임 `.env` 로 덮어쓰지 않음). Ollama 데몬을 다른 머신에 두는 경우에만 그쪽 `OLLAMA_HOST` 를 Ollama CLI/서비스 설정으로 맞춘다.
+호스트·모델 태그는 **`service/ai-service/ai_service/config.py` 의 `Settings` 를 직접 수정**한다 (해당 모듈은 런타임 `.env` 로 덮어쓰지 않음). Ollama 데몬을 다른 머신에 두는 경우에만 그쪽 `OLLAMA_HOST` 를 Ollama CLI/서비스 설정으로 맞춘다.
 
 #### 3) UI 의존성 (선택)
 
 UI 를 실행할 때만 필요. `scripts/ui-robot.sh` / `scripts/ui-portal.sh` 가 최초 1회 자동으로 `npm install` 을 돌리지만, 미리 받아두려면:
 
 ```bash
-(cd ui/robot-ui  && npm install)
-(cd ui/portal-ui && npm install)
+(cd service/web-service/robot-web  && npm install)
+(cd service/web-service/portal-web && npm install)
 ```
 
 #### 4) `.env` 생성

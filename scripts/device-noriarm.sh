@@ -18,7 +18,7 @@
 # 의존:
 #   - tmux
 #   - /opt/ros/jazzy 설치
-#   - device/noriarm_ws/ 에서 colcon build 완료 (install/setup.bash 존재)
+#   - controller/noriarm-controller/ 에서 colcon build 완료 (install/setup.bash 존재)
 #   - /dev/omx_follower (udev rule 또는 PORT env 로 override 가능)
 #   - 호출 셸의 ROS_DOMAIN_ID 그대로 사용 (export 안 함)
 #
@@ -29,7 +29,7 @@ set -euo pipefail
 
 SESSION="noriarm-device"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WS_DIR="$REPO_ROOT/device/noriarm_ws"
+WS_DIR="$REPO_ROOT/controller/noriarm-controller"
 ACTION="${1:-up}"
 PORT="${PORT:-/dev/omx_follower}"
 # bringup 부팅 시 자동 init→home 시퀀스 (initial_positions.yaml 의 step1→step2).

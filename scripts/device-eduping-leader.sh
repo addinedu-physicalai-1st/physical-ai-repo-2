@@ -19,7 +19,7 @@
 #     scripts/device-eduping-leader.sh           # symlink 없을 때
 #
 # 의존:
-#   - tmux, /opt/ros/jazzy, device/eduping_ws/ 빌드 완료
+#   - tmux, /opt/ros/jazzy, controller/eduping-controller/ 빌드 완료
 #   - conda env 'pdg' 활성화 (feetech-servo-sdk 가 거기 있음). 미활성이면 안내 후 중단.
 #   - lerobot calibration JSON: ~/.cache/huggingface/lerobot/calibration/teleoperators/openarm_mini/my_mini_leader_arm.json
 #   - udev 심볼릭 (권장): /dev/op_mini_right, /dev/op_mini_left
@@ -27,7 +27,7 @@ set -euo pipefail
 
 SESSION="eduping-leader"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WS_DIR="$REPO_ROOT/device/eduping_ws"
+WS_DIR="$REPO_ROOT/controller/eduping-controller"
 ACTION="${1:-}"
 PORT_RIGHT="${PORT_RIGHT:-/dev/op_mini_right}"
 PORT_LEFT="${PORT_LEFT:-/dev/op_mini_left}"
@@ -54,7 +54,7 @@ require_env() {
   fi
   if [[ ! -f "$WS_SETUP" ]]; then
     log "colcon build 결과가 없습니다 ($WS_SETUP 없음)" >&2
-    log "  device/eduping_ws/ 에서 빌드 후 재실행." >&2
+    log "  controller/eduping-controller/ 에서 빌드 후 재실행." >&2
     exit 1
   fi
   if [[ "${CONDA_DEFAULT_ENV:-}" != "pdg" ]]; then

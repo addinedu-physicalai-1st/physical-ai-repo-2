@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from server.control.streaming.frame_hub import FrameHub
-from server.control.streaming.protocol import VideoPacket
+from control_service.streaming.frame_hub import FrameHub
+from control_service.streaming.protocol import VideoPacket
 
 
 @dataclass

@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from server.control.teleop.ros_bridge import RosBridge
+from control_service.teleop.ros_bridge import RosBridge
 
 
 def _fake_scan(ranges: list[float] | None = None):

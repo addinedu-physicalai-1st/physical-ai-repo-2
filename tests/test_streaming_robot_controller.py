@@ -1,4 +1,4 @@
-"""server/control/streaming/robot_controller.py 단위 테스트.
+"""service/control-service/control_service/streaming/robot_controller.py 단위 테스트.
 
 PLAN §3.6, §5.2, SR-CAM-005.
 
@@ -12,14 +12,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from server.control.streaming import config as scfg
-from server.control.streaming.protocol import (
+from control_service.streaming import config as scfg
+from control_service.streaming.protocol import (
     ACTION_START,
     ACTION_STOP,
     CTRL_HEADER_FMT,
     MAGIC_CTRL,
 )
-from server.control.streaming.robot_controller import RobotController
+from control_service.streaming.robot_controller import RobotController
 
 
 @pytest.fixture

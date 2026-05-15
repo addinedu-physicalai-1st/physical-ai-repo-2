@@ -5,15 +5,15 @@ __pycache__
 node_modules/
 *.tsbuildinfo
 dist/
-server/storage/
+db/storage/
 .playwright-mcp
 .claude
-device/gogoping_ws/build/
-device/gogoping_ws/install/
-device/gogoping_ws/log/
-device/noriarm_ws/build/
-device/noriarm_ws/install/
-device/noriarm_ws/log/
+controller/gogoping-controller/build/
+controller/gogoping-controller/install/
+controller/gogoping-controller/log/
+controller/noriarm-controller/build/
+controller/noriarm-controller/install/
+controller/noriarm-controller/log/
 shared/machine_ips.json
 shared/waypoints.yaml
 COLCON_IGNORE
@@ -27,5 +27,5 @@ docs/superpowers/*
 !docs/superpowers/specs/**
 
 # 모델 가중치 — ultralytics 가 첫 실행 시 자동 다운로드
-server/ai/models/*.pt
-server/ai/models/*.onnx
+service/ai-service/ai_service/models/*.pt
+service/ai-service/ai_service/models/*.onnx

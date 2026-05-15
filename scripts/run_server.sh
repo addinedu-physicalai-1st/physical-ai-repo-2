@@ -81,12 +81,12 @@ case "$ACTION" in
 
     # alembic upgrade head — 첫 실행 시 스키마 생성, 이미 최신이면 no-op
     echo "[run_server] alembic upgrade head ($ENV_DESC)"
-    if ! eval "$(wrap_cmd alembic -c server/db/alembic.ini upgrade head)"; then
+    if ! eval "$(wrap_cmd alembic -c db/control-db/control_db/alembic.ini upgrade head)"; then
       echo "[run_server] ⚠ alembic 마이그레이션 실패 — 'scripts/db-seed.sh' 로 수동 확인" >&2
       exit 1
     fi
 
-    # Ollama 점검 — 데몬 응답 확인 + 필수 모델 자동 pull. 모델 목록은 server/ai/config.py
+    # Ollama 점검 — 데몬 응답 확인 + 필수 모델 자동 pull. 모델 목록은 service/ai-service/ai_service/config.py
     # 의 REQUIRED_OLLAMA_MODELS 가 단일 source-of-truth.
     # 모델 존재 확인은 `ollama show` 로 한다 — `bge-m3` 와 `bge-m3:latest` 처럼 태그
     # 생략/명시를 동일하게 처리하므로 `ollama list` 파싱보다 안전.
@@ -99,7 +99,7 @@ case "$ACTION" in
       exit 1
     fi
     echo "[run_server] 필수 ollama 모델 점검 ($ENV_DESC)"
-    mapfile -t REQUIRED_MODELS < <(eval "$(wrap_cmd python -m server.ai.config)")
+    mapfile -t REQUIRED_MODELS < <(eval "$(wrap_cmd python -m ai_service.config)")
     for m in "${REQUIRED_MODELS[@]}"; do
       if ollama show "$m" &>/dev/null; then
         echo "  ✓ $m"
@@ -144,17 +144,17 @@ case "$ACTION" in
 
     # window 2: ai-hub :8001
     tmux new-window -t "$SESSION" -n ai-hub -c "$REPO_ROOT" \
-      "$(wrap_cmd uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload)"
+      "$(wrap_cmd uvicorn ai_service.hub:app --host 0.0.0.0 --port 8001 --reload)"
 
     # window 3: control :8000 — NoriArm + Eduping(OpenArm) + Gogoping 통합용 ROS 환경.
     # ROS jazzy → repo root install overlay (eduarm, gogoping_msgs 등 전체) → noriarm_framework PYTHONPATH 순서.
-    NORIARM_FRAMEWORK_PATH="$REPO_ROOT/device/noriarm_ws/src/noriarm_framework"
+    NORIARM_FRAMEWORK_PATH="$REPO_ROOT/controller/noriarm-controller/src/noriarm_framework"
     ROS_SETUP="/opt/ros/jazzy/setup.bash"
     ROOT_WS_SETUP="$REPO_ROOT/install/setup.bash"
     # --reload-exclude '*/ros_bridge.py': rclpy 노드를 들고있는 4개 bridge 파일은
     # 자동 reload 제외 (uvicorn worker 재시작 시 rclpy 자원 정리가 깨끗하지 않아 wedge 발생).
     # 해당 파일 수정 시에는 control window 에서 Ctrl+C 후 수동 재실행 필요.
-    CONTROL_CMD="$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
+    CONTROL_CMD="$(wrap_cmd uvicorn control_service.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
 
     # repo root 워크스페이스 빌드 안 되어있으면 커스텀 msg/srv (eduarm, gogoping_msgs 등) 미적재 → 일부 API 거절.
     if [[ ! -f "$ROOT_WS_SETUP" ]]; then
@@ -167,7 +167,7 @@ case "$ACTION" in
 
     # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
-      "$(wrap_cmd uvicorn server.control.streaming.app:app --host 0.0.0.0 --port 8100 --reload)"
+      "$(wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 --reload)"
 
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
     tmux set-option -t "$SESSION" -g mouse on

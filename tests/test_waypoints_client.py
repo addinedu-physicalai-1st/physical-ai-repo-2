@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 # 모듈 경로 PYTHONPATH 추가
 _GOGOPING_MODES = (Path(__file__).resolve().parents[1]
-                   / "device/gogoping_ws/src/gogoping/gogoping_modes")
+                   / "controller/gogoping-controller/src/gogoping/gogoping_modes")
 sys.path.insert(0, str(_GOGOPING_MODES))
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from server.control.waypoints.ros_bridge import WaypointsRosBridge
+from control_service.waypoints.ros_bridge import WaypointsRosBridge
 
 
 def test_start_requires_ros_domain_id(monkeypatch):

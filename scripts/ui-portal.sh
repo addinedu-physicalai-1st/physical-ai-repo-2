@@ -5,7 +5,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$REPO_ROOT/ui/portal-ui"
+APP_DIR="$REPO_ROOT/service/web-service/portal-web"
 
 if [[ ! -d "$APP_DIR/node_modules" ]]; then
   echo "[ui-portal] node_modules 없음 — npm install 실행"

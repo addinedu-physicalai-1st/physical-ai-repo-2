@@ -45,7 +45,7 @@ case "$MODE" in
   2)
     echo "[db-seed] 모드: 전체 초기화"
     echo "[db-seed] alembic downgrade base ($ENV_DESC)"
-    run_in_env alembic -c server/db/alembic.ini downgrade base
+    run_in_env alembic -c db/control-db/control_db/alembic.ini downgrade base
     ;;
   *)
     echo "[db-seed] 잘못된 입력입니다. 1 또는 2를 입력하세요." >&2
@@ -54,9 +54,9 @@ case "$MODE" in
 esac
 
 echo "[db-seed] alembic upgrade head ($ENV_DESC)"
-run_in_env alembic -c server/db/alembic.ini upgrade head
+run_in_env alembic -c db/control-db/control_db/alembic.ini upgrade head
 
 echo "[db-seed] seed 데이터 INSERT"
-run_in_env python -m server.db.seed
+run_in_env python -m control_db.seed
 
 echo "[db-seed] 완료"

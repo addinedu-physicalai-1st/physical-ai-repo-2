@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$REPO_ROOT/ui/admin-ui"
+APP_DIR="$REPO_ROOT/app/admin-app"
 CONDA_BASES=("$HOME/miniforge3" "$HOME/miniconda3" "$HOME/anaconda3" "/opt/homebrew/Caskroom/miniforge/base")
 
 # 주어진 conda env 이름의 python 경로 반환 (없으면 빈 문자열)

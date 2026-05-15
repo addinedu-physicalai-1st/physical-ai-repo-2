@@ -1,6 +1,6 @@
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]
-    / "device/gogoping_ws/src/gogoping/gogoping_navigation/scripts"))
+    / "controller/gogoping-controller/src/gogoping/gogoping_navigation/scripts"))
 
 import pytest
 import utils_geo as ug

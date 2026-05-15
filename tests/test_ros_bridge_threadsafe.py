@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from server.control.teleop.ros_bridge import RosBridge
+from control_service.teleop.ros_bridge import RosBridge
 
 
 # --------------------------------------------------------------- AC #24
@@ -25,7 +25,7 @@ def test_concurrent_publish_and_snapshot_no_race() -> None:
     b._pub = MagicMock()  # rclpy.Publisher 대체
     # geometry_msgs.msg.Twist import 가 publish_cmd_vel 안에서 일어남 — mock 환경에서는
     # 실제 import 가 동작하지 않을 수 있으니 monkey patch 한다.
-    import server.control.teleop.ros_bridge as mod
+    import control_service.teleop.ros_bridge as mod
     real_publish = mod.RosBridge.publish_cmd_vel
 
     def safe_publish(self, lin: float, ang: float) -> None:
@@ -68,7 +68,7 @@ def test_concurrent_publish_and_snapshot_no_race() -> None:
 
 def test_lock_protects_state_mutations() -> None:
     """소스 grep — latest_state / publish 갱신이 with self._lock 안에 있다."""
-    src = Path("server/control/teleop/ros_bridge.py").read_text(encoding="utf-8")
+    src = Path("service/control-service/control_service/teleop/ros_bridge.py").read_text(encoding="utf-8")
     # 모든 self._latest_*  /  self._last_cmd_at_s  대입은 with self._lock: 블록 다음 줄들에
     # 위치해야 한다. 단순화: 각 대입 직전 (앞 20줄) 에 'with self._lock:' 가 있는지 본다.
     target_writes = [
@@ -96,7 +96,7 @@ def test_rclpy_spin_only_in_one_function() -> None:
 
     Thread(target=_spin, daemon=True) 가 정확히 1 곳.
     """
-    src = Path("server/control/teleop/ros_bridge.py").read_text(encoding="utf-8")
+    src = Path("service/control-service/control_service/teleop/ros_bridge.py").read_text(encoding="utf-8")
     # spin() 호출 횟수
     spin_calls = re.findall(r"\.spin\(\)", src)
     assert len(spin_calls) == 1, f"expected 1 spin() call, got {len(spin_calls)}"
@@ -115,7 +115,7 @@ def test_router_does_not_call_rclpy_directly() -> None:
     """
     import ast
 
-    src = Path("server/control/teleop/router.py").read_text(encoding="utf-8")
+    src = Path("service/control-service/control_service/teleop/router.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
 
     for node in ast.walk(tree):

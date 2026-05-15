@@ -7,7 +7,7 @@ import pytest
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]
-                      / "device" / "gogoping_ws" / "src" / "gogoping"
+                      / "controller" / "gogoping-controller" / "src" / "gogoping"
                       / "gogoping_navigation"))
 from gogoping_navigation.graph import (  # noqa: E402
     DEFAULT_LANE_THRESHOLD_M,
@@ -18,7 +18,7 @@ from gogoping_navigation.graph import (  # noqa: E402
 
 
 WAYPOINTS_YAML = (Path(__file__).resolve().parents[1]
-                  / "device" / "gogoping_ws" / "src" / "gogoping"
+                  / "controller" / "gogoping-controller" / "src" / "gogoping"
                   / "gogoping_navigation" / "config" / "waypoints.yaml")
 
 

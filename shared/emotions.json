@@ -1,5 +1,5 @@
 {
-  "$schema_note": "백엔드(server/ai/emotions.py) ↔ 프론트(ui/robot-ui/src/config/emotions.ts) 가 공유하는 감정 정의. id 는 EmotionId 와 1:1 매칭.",
+  "$schema_note": "백엔드(service/ai-service/ai_service/emotions.py) ↔ 프론트(service/web-service/robot-web/src/config/emotions.ts) 가 공유하는 감정 정의. id 는 EmotionId 와 1:1 매칭.",
   "emotions": [
     {
       "id": "basic",

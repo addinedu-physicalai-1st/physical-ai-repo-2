@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from server.control.waypoints.router import install
+from control_service.waypoints.router import install
 
 
 @pytest.fixture
@@ -12,9 +12,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(tmp_path / "wp.yaml"))
     # yaml_store 모듈 reload (env var 반영)
     import importlib
-    import server.control.waypoints.yaml_store as ys_mod
+    import control_service.waypoints.yaml_store as ys_mod
     importlib.reload(ys_mod)
-    import server.control.waypoints.router as rt
+    import control_service.waypoints.router as rt
     importlib.reload(rt)
 
     app = FastAPI()

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # 프로젝트 전체 테스트 진입점 — 새 테스트 모듈 추가 시 이 파일에 기록한다.
 #
-# [server/ai]
+# [ai-service]
 #   1) Hub HTTP 응답 + context 등 — Ollama 불필요 (`-m "not ollama"`)
 #   2) Ollama 마커 (`-m ollama`) — 로컬 11434 있을 때만 실행 (없으면 스킵)
-# [server/control] postgres 필요
+# [control-service] postgres 필요
 # [tests] Teleop / Streaming — 트리 루트 tests/
-# [ui/portal-ui] Vitest — node_modules 필요
+# [portal-web] Vitest — node_modules 필요
 #
 # 사용법:
 #   bash scripts/test.sh               # 전체
 #   bash scripts/test.sh --tb=short    # 추가 pytest 인자 전달
 #   bash scripts/test.sh -k gogoping
 #
-# server/ai·control·루트 tests 는 conda env `jazzy` 로 실행한다.
+# ai-service · control-service · 루트 tests 는 conda env `jazzy` 로 실행한다.
 #
 # ⏱ 아래에 찍히는 시간은 각 **테스트 스위트 벽시계 실행 시간**이지,
 #   실제 음성→LLM→TTS 응답 지연(레이턴시)이 아님.
@@ -26,21 +26,21 @@ EXIT=0
 SCRIPT_START=$SECONDS
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/ai] Hub 응답 + 컨텍스트 (Ollama 불필요)"
+echo "[ai-service] Hub 응답 + 컨텍스트 (Ollama 불필요)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
-if ! conda run -n jazzy pytest server/ai/tests/ -m "not ollama" -v "$@"; then
+if ! conda run -n jazzy pytest service/ai-service/ai_service/tests/ -m "not ollama" -v "$@"; then
   EXIT=1
 fi
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/ai] Ollama 통합 (generate_chat, classify_intent)"
+echo "[ai-service] Ollama 통합 (generate_chat, classify_intent)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if curl -sf http://localhost:11434/api/tags >/dev/null; then
-  if ! conda run -n jazzy pytest server/ai/tests/ -m ollama -v "$@"; then
+  if ! conda run -n jazzy pytest service/ai-service/ai_service/tests/ -m ollama -v "$@"; then
     EXIT=1
   fi
 else
@@ -50,11 +50,11 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/control] FastAPI + DB"
+echo "[control-service] FastAPI + DB"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if pg_isready -h localhost -p 5432 -U pingder &>/dev/null; then
-  if ! conda run -n jazzy pytest server/control/tests/ -v "$@"; then
+  if ! conda run -n jazzy pytest service/control-service/control_service/tests/ -v "$@"; then
     EXIT=1
   fi
 else
@@ -64,7 +64,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[tests] Teleop (admin-ui ↔ control-server)"
+echo "[tests] Teleop (admin-app ↔ control-service)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest \
@@ -106,10 +106,10 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[device/noriarm_ws/noriarm_framework] 매니페스트 + 정책 + trajectory 단위 테스트"
+echo "[noriarm-controller/noriarm_framework] 매니페스트 + 정책 + trajectory 단위 테스트"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
-NORIARM_FRAMEWORK_DIR="$REPO_ROOT/device/noriarm_ws/src/noriarm_framework"
+NORIARM_FRAMEWORK_DIR="$REPO_ROOT/controller/noriarm-controller/src/noriarm_framework"
 (cd "$NORIARM_FRAMEWORK_DIR" && PYTHONPATH=. pytest test/test_manifest.py test/test_policy.py test/test_trajectory.py -v) || EXIT=1
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
@@ -125,7 +125,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/control] yaml_store — waypoints.yaml CRUD"
+echo "[control-service] yaml_store — waypoints.yaml CRUD"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest tests/test_waypoints_yaml_store.py -v "$@"; then
@@ -135,7 +135,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/control] yaml_store — lanes.yaml + default snapshot"
+echo "[control-service] yaml_store — lanes.yaml + default snapshot"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest tests/test_waypoints_yaml_store_lanes.py -v "$@"; then
@@ -145,7 +145,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/control] waypoints ros_bridge (non-ros tests only — ROS 통합은 @pytest.mark.ros)"
+echo "[control-service] waypoints ros_bridge (non-ros tests only — ROS 통합은 @pytest.mark.ros)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest tests/test_waypoints_ros_bridge.py -m "not ros" -v "$@"; then
@@ -155,7 +155,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/control] waypoints router — REST + SSE"
+echo "[control-service] waypoints router — REST + SSE"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest tests/test_waypoints_router.py -v "$@"; then
@@ -165,7 +165,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[server/control] router — nav graph editor endpoints"
+echo "[control-service] router — nav graph editor endpoints"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest \
@@ -188,7 +188,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[ui/admin-ui] waypoint map card — pytest-qt 필요 (없으면 자동 skip)"
+echo "[admin-app] waypoint map card — pytest-qt 필요 (없으면 자동 skip)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 # pytest exit 5 = no tests collected (pytest-qt 미설치 시 importorskip 으로 전체 skip)
@@ -207,7 +207,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[ui/admin-ui] waypoint map card — nav graph editor"
+echo "[admin-app] waypoint map card — nav graph editor"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 conda run -n jazzy pytest tests/test_waypoint_map_card_edit.py -v "$@" || {
@@ -224,7 +224,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[ui/admin-ui] LiDAR scan — 순수 함수 (math 8) + 뷰 스모크 (view 4) + ODOM compact (3)"
+echo "[admin-app] LiDAR scan — 순수 함수 (math 8) + 뷰 스모크 (view 4) + ODOM compact (3)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest \
@@ -238,27 +238,27 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[ui/portal-ui] Vitest"
+echo "[portal-web] Vitest"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
-PORTAL_DIR="$REPO_ROOT/ui/portal-ui"
+PORTAL_DIR="$REPO_ROOT/service/web-service/portal-web"
 if [[ -d "$PORTAL_DIR/node_modules" ]]; then
   (cd "$PORTAL_DIR" && npm run test -- --run) || EXIT=1
 else
-  echo "  스킵: node_modules 없음 — ui/portal-ui 에서 npm install 후 재시도"
+  echo "  스킵: node_modules 없음 — service/web-service/portal-web 에서 npm install 후 재시도"
 fi
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[ui/robot-ui] Vitest (wakeMatcher 등 순수 유틸)"
+echo "[robot-web] Vitest (wakeMatcher 등 순수 유틸)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
-ROBOT_DIR="$REPO_ROOT/ui/robot-ui"
+ROBOT_DIR="$REPO_ROOT/service/web-service/robot-web"
 if [[ -d "$ROBOT_DIR/node_modules" ]]; then
   (cd "$ROBOT_DIR" && npm run test -- --run) || EXIT=1
 else
-  echo "  스킵: node_modules 없음 — ui/robot-ui 에서 npm install 후 재시도"
+  echo "  스킵: node_modules 없음 — service/web-service/robot-web 에서 npm install 후 재시도"
 fi
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 

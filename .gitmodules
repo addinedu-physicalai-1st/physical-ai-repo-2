@@ -1,42 +1,48 @@
-[submodule "device/gogoping_ws/src/vic_pinky"]
-	path = device/gogoping_ws/src/vic_pinky
+[submodule "controller/gogoping-controller/src/vic_pinky"]
+	path = controller/gogoping-controller/src/vic_pinky
 	url = https://github.com/pinklab-art/vic_pinky.git
-[submodule "device/noriarm_ws/src/open_manipulator"]
-	path = device/noriarm_ws/src/open_manipulator
+[submodule "controller/noriarm-controller/src/open_manipulator"]
+	path = controller/noriarm-controller/src/open_manipulator
 	url = https://github.com/robotis-git/open_manipulator.git
-[submodule "device/gogoping_ws/src/py_trees_ros"]
-	path = device/gogoping_ws/src/py_trees_ros
+[submodule "controller/gogoping-controller/src/open_manipulator"]
+	path = controller/gogoping-controller/src/open_manipulator
+	url = https://github.com/robotis-git/open_manipulator.git
+[submodule "controller/gogoping-controller/src/sllidar_ros2"]
+	path = controller/gogoping-controller/src/sllidar_ros2
+	url = https://github.com/Slamtec/sllidar_ros2.git
+[submodule "controller/gogoping-controller/src/py_trees_ros"]
+	path = controller/gogoping-controller/src/py_trees_ros
 	url = https://github.com/splintered-reality/py_trees_ros.git
 	branch = devel
-[submodule "device/gogoping_ws/src/py_trees_ros_interfaces"]
-	path = device/gogoping_ws/src/py_trees_ros_interfaces
+[submodule "controller/gogoping-controller/src/py_trees_ros_interfaces"]
+	path = controller/gogoping-controller/src/py_trees_ros_interfaces
 	url = https://github.com/splintered-reality/py_trees_ros_interfaces.git
 	branch = devel
-[submodule "device/gogoping_ws/src/py_trees_ros_viewer"]
-	path = device/gogoping_ws/src/py_trees_ros_viewer
+[submodule "controller/gogoping-controller/src/py_trees_ros_viewer"]
+	path = controller/gogoping-controller/src/py_trees_ros_viewer
 	url = https://github.com/splintered-reality/py_trees_ros_viewer.git
 	branch = devel
-[submodule "device/noriarm_ws/src/DynamixelSDK"]
-	path = device/noriarm_ws/src/DynamixelSDK
+[submodule "controller/noriarm-controller/src/DynamixelSDK"]
+	path = controller/noriarm-controller/src/DynamixelSDK
 	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
 	branch = jazzy
-[submodule "device/noriarm_ws/src/dynamixel_interfaces"]
-	path = device/noriarm_ws/src/dynamixel_interfaces
+[submodule "controller/noriarm-controller/src/dynamixel_interfaces"]
+	path = controller/noriarm-controller/src/dynamixel_interfaces
 	url = https://github.com/ROBOTIS-GIT/dynamixel_interfaces.git
 	branch = jazzy
-[submodule "device/noriarm_ws/src/dynamixel_hardware_interface"]
-	path = device/noriarm_ws/src/dynamixel_hardware_interface
+[submodule "controller/noriarm-controller/src/dynamixel_hardware_interface"]
+	path = controller/noriarm-controller/src/dynamixel_hardware_interface
 	url = https://github.com/ROBOTIS-GIT/dynamixel_hardware_interface.git
 	branch = jazzy
-[submodule "device/eduping_ws/src/openarm_can"]
-	path = device/eduping_ws/src/openarm_can
+[submodule "controller/eduping-controller/src/openarm_can"]
+	path = controller/eduping-controller/src/openarm_can
 	url = https://github.com/enactic/openarm_can
-[submodule "device/eduping_ws/src/openarm_description"]
-	path = device/eduping_ws/src/openarm_description
+[submodule "controller/eduping-controller/src/openarm_description"]
+	path = controller/eduping-controller/src/openarm_description
 	url = https://github.com/enactic/openarm_description
-[submodule "device/eduping_ws/src/openarm_ros2"]
-	path = device/eduping_ws/src/openarm_ros2
+[submodule "controller/eduping-controller/src/openarm_ros2"]
+	path = controller/eduping-controller/src/openarm_ros2
 	url = https://github.com/enactic/openarm_ros2
-[submodule "device/eduping_ws/src/openarm_teleop"]
-	path = device/eduping_ws/src/openarm_teleop
+[submodule "controller/eduping-controller/src/openarm_teleop"]
+	path = controller/eduping-controller/src/openarm_teleop
 	url = https://github.com/enactic/openarm_teleop

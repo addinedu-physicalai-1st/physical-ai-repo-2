@@ -9,7 +9,7 @@ def tmp_yaml(tmp_path, monkeypatch):
     p = tmp_path / "waypoints.yaml"
     monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(p))
     import importlib
-    import server.control.waypoints.yaml_store as ys
+    import control_service.waypoints.yaml_store as ys
     importlib.reload(ys)
     return p, ys
 

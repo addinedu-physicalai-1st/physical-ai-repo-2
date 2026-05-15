@@ -8,7 +8,7 @@ pytest.importorskip("PyQt5")
 @pytest.fixture
 def card(qtbot, tmp_path, monkeypatch):
     import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui/admin-ui"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app/admin-app"))
     svg = tmp_path / "admin_map.svg"
     svg.write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 881 720" '

@@ -18,7 +18,7 @@
 #   RIGHT_CAN=can0 LEFT_CAN=can1 ARM_TYPE=v10 scripts/device-eduping.sh 3
 #
 # 의존:
-#   - tmux, /opt/ros/jazzy, device/eduping_ws/ 빌드 완료
+#   - tmux, /opt/ros/jazzy, controller/eduping-controller/ 빌드 완료
 #   - PEAK CAN 드라이버 + can0(right)/can1(left) up
 #   - 같은 env (pdg) 에 lerobot 설치
 #   - 호출 셸의 ROS_DOMAIN_ID 그대로 사용
@@ -26,7 +26,7 @@ set -euo pipefail
 
 SESSION="eduping-device"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WS_DIR="$REPO_ROOT/device/eduping_ws"
+WS_DIR="$REPO_ROOT/controller/eduping-controller"
 ACTION="${1:-}"
 ARM_TYPE="${ARM_TYPE:-v10}"
 RIGHT_CAN="${RIGHT_CAN:-can0}"
@@ -50,7 +50,7 @@ require_env() {
   fi
   if [[ ! -f "$WS_SETUP" ]]; then
     log "colcon build 결과가 없습니다 ($WS_SETUP 없음)" >&2
-    log "  device/eduping_ws/ 에서 빌드 후 재실행." >&2
+    log "  controller/eduping-controller/ 에서 빌드 후 재실행." >&2
     exit 1
   fi
 }
@@ -189,7 +189,7 @@ stage_bringup() {
   require_env
 
   # eduarm 의 wrapper launch — upstream openarm.bimanual 을 IncludeLaunchDescription 으로
-  # 그대로 부르되 RViz 만 TimerAction 으로 죽임 (robot-ui 의 three.js 가 시각화 담당).
+  # 그대로 부르되 RViz 만 TimerAction 으로 죽임 (robot-web 의 three.js 가 시각화 담당).
   BRINGUP_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
     ros2 launch eduarm follower_bimanual.launch.py \
       arm_type:=$ARM_TYPE hardware_type:=$HARDWARE_TYPE \

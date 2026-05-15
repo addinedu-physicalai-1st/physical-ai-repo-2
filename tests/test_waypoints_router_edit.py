@@ -24,9 +24,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("PINGDER_WAYPOINTS_DEFAULT_FILE", str(tmp_path / "wp.default.yaml"))
     monkeypatch.setenv("PINGDER_LANES_DEFAULT_FILE", str(tmp_path / "lanes.default.yaml"))
 
-    import server.control.waypoints.yaml_store as ys_mod
+    import control_service.waypoints.yaml_store as ys_mod
     importlib.reload(ys_mod)
-    import server.control.waypoints.router as rt
+    import control_service.waypoints.router as rt
     importlib.reload(rt)
 
     app = FastAPI()
@@ -87,7 +87,7 @@ def test_undo_after_click(client):
 def test_undo_empty_408(client):
     c, _ = client
     # undo stack 비어있는 상태
-    from server.control.waypoints import yaml_store as ys
+    from control_service.waypoints import yaml_store as ys
     ys.clear_undo_stack()
     r = c.post("/waypoints/undo")
     assert r.status_code == 408

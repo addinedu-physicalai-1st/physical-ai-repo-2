@@ -62,7 +62,7 @@ asyncio_default_test_loop_scope = "session"
 asyncio_default_fixture_loop_scope = "session"
 
 [tool.setuptools.packages.find]
-include = ["server*"]
+where = ["service/control-service", "service/ai-service", "db/control-db"]
 
 [build-system]
 requires = ["setuptools>=68"]

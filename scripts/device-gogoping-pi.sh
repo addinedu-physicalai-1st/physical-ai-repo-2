@@ -23,7 +23,7 @@
 # 환경변수 (bringup 안 카메라 송출 노드에 전파):
 #   CONTROL_SERVER_NAME  shared/machine_ips.json 의 hostname (기본 'tonyno')
 #   기타 인자 — pi.launch.py 가 gogoping_camera launch 를 include 함.
-#   상세: device/gogoping_ws/src/gogoping/gogoping_camera/CLAUDE.md
+#   상세: controller/gogoping-controller/src/gogoping/gogoping_camera/CLAUDE.md
 #
 # 단축키 (tmux):
 #   - 마우스로 하단 status bar 의 window 이름 클릭 → 전환

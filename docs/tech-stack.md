@@ -11,11 +11,11 @@
 | Educator UI | Python 3.11 + PyQt5 + requests (`Session()` cookie jar) + websocket-client + cv2/QCamera — 데스크톱 앱 | 교사 운영용 데스크톱 앱. Control Service REST + WebSocket (`/ws/robot-state` 로 로봇 상태 실시간 수신, SR-OPS-019) 경유. rclpy 직접 호출 안 함. fastapi-users 의 HttpOnly 쿠키 인증을 `requests.Session()` 으로 유지하고 같은 쿠키를 WebSocket handshake 헤더로 전달. 사진 binary 는 Control Server 의 FastAPI StaticFiles URL 을 `requests.get(url)` 로 직접 GET. 카메라 캡처 (등록 15장) 는 cv2 또는 QCamera, 지도 위젯 (SLAM 맵 + nav graph) 은 QGraphicsView + QPixmap |
 | Robot UI | Vue 3 + Vite dev server (Chromium kiosk) + Pinia + Web Speech API (STT/TTS) + three.js (셰이더 표정) — **단일 코드베이스**, 각 로봇 노트북에서 `VITE_ROBOT=eduping/gogoping/noriarm` env 로 분기 인스턴스 실행. `server.proxy` 로 `/api/*` → Control Service | 공통 composables/components (~50%): 호출어 감지·STT·TTS·표정 (three.js 셰이더 — `ShaderFace.vue`)·모드 셀렉터·자연어 명령 디스패처·인접 정지 표시기. 로봇별 모드 화면 (~50%) 은 `defineAsyncComponent` 로 분기 인스턴스에서만 lazy load. GogoPing 지도 위젯 (Canvas + PGM/PNG 맵 + nav graph 좌표 오버레이) 은 GogoPing 인스턴스에서만 활성. 자연 촬영은 ROS2 노드가 단독 처리하므로 UI 미관여. Nginx 미사용 (개발 전용) |
 | AI Server | Python 3.11 + FastAPI + httpx + (얼굴 인식) + (LLM SDK) | Vision · Intent · LLM 라우팅 (STT/TTS 는 브라우저 UI 의 Web Speech API 가 처리하므로 서버에 없음), api 프로세스 (의도 분류 동기) + worker 프로세스 (`ai_job` 큐 폴링), 단일 코드베이스, 재시작 시 `running → pending` 일괄 reset |
-| LLM | Ollama + 로컬 GGUF (호스트 네이티브 — 컨테이너 미사용) | **구현 기준** [`server/ai/config.py`](../server/ai/config.py) `Settings`: 의도 분류 `qwen2.5:0.5b`, 잡담 `qwen2.5:3b`, 일과 보고서 `qwen2.5:7b` (`ollama_report_model`), RAG 임베딩 `bge-m3`. 원격 LLM (Gemini 등) 미사용 — fallback 없음. 호스트·모델명은 해당 dataclass 기본값을 코드에서 바꿈(현재 Python 설정은 `.env` 로 덮어쓰지 않음). Ollama 데몬을 LAN 에 바인딩해 쓰는 것은 별개(`ollama serve` 바인드 등). |
+| LLM | Ollama + 로컬 GGUF (호스트 네이티브 — 컨테이너 미사용) | **구현 기준** [`service/ai-service/ai_service/config.py`](../service/ai-service/ai_service/config.py) `Settings`: 의도 분류 `qwen2.5:0.5b`, 잡담 `qwen2.5:3b`, 일과 보고서 `qwen2.5:7b` (`ollama_report_model`), RAG 임베딩 `bge-m3`. 원격 LLM (Gemini 등) 미사용 — fallback 없음. 호스트·모델명은 해당 dataclass 기본값을 코드에서 바꿈(현재 Python 설정은 `.env` 로 덮어쓰지 않음). Ollama 데몬을 LAN 에 바인딩해 쓰는 것은 별개(`ollama serve` 바인드 등). |
 | DB | PostgreSQL 15 | Control 도메인 + ai_job 테이블 공유 |
-| Object Storage | 로컬 디스크 (`server/storage/`) + FastAPI `StaticFiles` 마운트 | 사진 binary. 추후 오브젝트 스토리지 도입 시 어댑터로 교체 |
+| Object Storage | 로컬 디스크 (`db/storage/`) + FastAPI `StaticFiles` 마운트 | 사진 binary. 추후 오브젝트 스토리지 도입 시 어댑터로 교체 |
 | Inter-service | Browser → Vite dev server `server.proxy` → Control Service (브라우저 입장 same-origin), Control → AI: HTTP POST `/jobs`, AI Hub / AI Worker → Ollama: HTTP `:11434` (호스트 네이티브, 컨테이너에서는 `host.docker.internal:11434` 또는 호스트 IP), Control / AI Server 가 공유 SQLAlchemy 모델 패키지 (예: `pingdergarten_models/`) 로 동일 PostgreSQL 접근 | Redis 미사용 |
-| 개발/배포 환경 | Docker Compose (control / ai / postgres) + 호스트 Ollama + 각 노트북에서 `vite dev` 실행: parent-ui (1개, Vue 3) + robot-ui (3개 인스턴스, Vue 3, `VITE_ROBOT=eduping/gogoping/noriarm` env 분기로 같은 코드베이스 실행) + 교사 PC 에서 `python -m educator_app` (PyQt5) — 노트북 16GB / RTX 3060 가능. 학습용 RTX 5090 데스크탑 별도 | 발표 시연 환경 전용 (Flask·Nginx·rosbridge 미사용). Ollama 에 **qwen2.5:0.5b + qwen2.5:3b + qwen2.5:7b + bge-m3** 로드 (호스트 네이티브). 로봇 UI STT 는 브라우저 Web Speech — 서버 Whisper 미사용. |
+| 개발/배포 환경 | Docker Compose (control / ai / postgres) + 호스트 Ollama + 각 노트북에서 `vite dev` 실행: portal-web (1개, Vue 3) + robot-web (3개 인스턴스, Vue 3, `VITE_ROBOT=eduping/gogoping/noriarm` env 분기로 같은 코드베이스 실행) + 교사 PC 에서 `admin-app (PyQt5) — 노트북 16GB / RTX 3060 가능. 학습용 RTX 5090 데스크탑 별도 | 발표 시연 환경 전용 (Flask·Nginx·rosbridge 미사용). Ollama 에 **qwen2.5:0.5b + qwen2.5:3b + qwen2.5:7b + bge-m3** 로드 (호스트 네이티브). robot-web STT 는 브라우저 Web Speech — 서버 Whisper 미사용. |
 
 ## 2. 추상 동사 → 구현체 매핑
 
@@ -60,6 +60,6 @@ vendor 패키지는 두 가지 방식으로 통합:
 
 | 로봇 | vendor 의존성 | 통합 방식 | 자체 패키지 |
 | --- | --- | --- | --- |
-| GogoPing | `vicpinky_bringup` / `_description` / `_navigation` (모터 드라이버·RPLiDAR·SLAM·Nav2, pinklab-art/vic_pinky) | git submodule (`device/gogoping_ws/src/vic_pinky`, v1.0.0) | `gogoping_*` — 모드·운반·놀이·자연 촬영 등 응용 노드 |
+| GogoPing | `vicpinky_bringup` / `_description` / `_navigation` (모터 드라이버·RPLiDAR·SLAM·Nav2, pinklab-art/vic_pinky) | git submodule (`controller/gogoping-controller/src/vic_pinky`, v1.0.0) | `gogoping_*` — 모드·운반·놀이·자연 촬영 등 응용 노드 |
 | EduPing | OpenArm SDK | TBD — 출처/통합 방식 정보 보완 후 채움 | `eduping_*` — 모드·등하원·놀이·정리정돈·자연 촬영 등 응용 노드. 환영·작별 trajectory 는 OpenArm 으로 재생 |
-| NoriArm | `open_manipulator` (ROBOTIS — robotis-git/open_manipulator) | git submodule (`device/noriarm/src/open_manipulator`) | `noriarm_*` — 블럭쌓기·정리 응용 노드 |
+| NoriArm | `open_manipulator` (ROBOTIS — robotis-git/open_manipulator) | git submodule (`controller/noriarm-controller/src/open_manipulator`) | `noriarm_*` — 블럭쌓기·정리 응용 노드 |

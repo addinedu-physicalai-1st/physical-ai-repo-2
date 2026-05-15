@@ -1,4 +1,4 @@
-"""server/control/streaming/protocol.py 단위 테스트.
+"""service/control-service/control_service/streaming/protocol.py 단위 테스트.
 
 PLAN §5.1, §5.2, §5.3 명세 검증.
 """
@@ -10,7 +10,7 @@ import zlib
 
 import pytest
 
-from server.control.streaming.protocol import (
+from control_service.streaming.protocol import (
     ACTION_START,
     ACTION_STOP,
     CTRL_HEADER_FMT,

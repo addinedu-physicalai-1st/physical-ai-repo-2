@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # (filename, dest_dir) — filename 은 ultralytics 의 GitHub assets 저장소 기준 basename
 MODELS: list[tuple[str, Path]] = [
-    ("yolov8s-worldv2.pt", REPO_ROOT / "server" / "ai" / "models"),
+    ("yolov8s-worldv2.pt", REPO_ROOT / "service" / "ai-service" / "ai_service" / "models"),
 ]
 
 

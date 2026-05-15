@@ -29,9 +29,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("PINGDER_WAYPOINTS_DEFAULT_FILE", str(wp_def))
     monkeypatch.setenv("PINGDER_LANES_DEFAULT_FILE", str(lanes_def))
 
-    import server.control.waypoints.yaml_store as ys_mod
+    import control_service.waypoints.yaml_store as ys_mod
     importlib.reload(ys_mod)
-    import server.control.waypoints.router as rt
+    import control_service.waypoints.router as rt
     importlib.reload(rt)
 
     app = FastAPI()

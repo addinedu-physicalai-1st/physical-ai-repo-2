@@ -1,4 +1,4 @@
-"""server/control/streaming/ws_router.py 통합 테스트.
+"""service/control-service/control_service/streaming/ws_router.py 통합 테스트.
 
 PLAN §3.1, §3.3, §3.4, §5.3, SR-CAM-002, SR-CAM-003.
 
@@ -16,16 +16,16 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from server.control.streaming import config as scfg
-from server.control.streaming.client_registry import ClientRegistry
-from server.control.streaming.frame_hub import FrameHub
-from server.control.streaming.protocol import (
+from control_service.streaming import config as scfg
+from control_service.streaming.client_registry import ClientRegistry
+from control_service.streaming.frame_hub import FrameHub
+from control_service.streaming.protocol import (
     VideoPacket,
     WS_FRAME_HEADER_FMT,
     WS_FRAME_HEADER_SIZE,
     WS_MSG_VIDEO_FRAME,
 )
-from server.control.streaming.ws_router import make_ws_router
+from control_service.streaming.ws_router import make_ws_router
 
 
 # 모든 테스트에서 dev 모드 (auth bypass)

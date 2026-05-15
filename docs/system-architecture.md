@@ -2,8 +2,8 @@
 confluence_page_id: "41189416"
 confluence_url: "https://woolimi.atlassian.net/wiki/spaces/FN/pages/41189416/System+Architecture"
 title: "System Architecture"
-confluence_version: 48
-last_synced: "2026-05-04T16:58:23"
+confluence_version: 59
+last_synced: "2026-05-16T00:57:00"
 ---
 
 # System Architecture
@@ -13,7 +13,7 @@ last_synced: "2026-05-04T16:58:23"
 | 서비스명 | 하드웨어 |
 | --- | --- |
 | EduPing | OpenArm |
-| GogoPing | Vic Pinky |
+| GogoPing | Vic Pinky + OMX x 2 |
 | NoriArm | OMX |
 
 ## Hardware Architecture

@@ -1,5 +1,5 @@
 {
-  "$schema_note": "NoriArm OX 퀴즈 문제 풀. UI(ui/robot-ui/src/noriarm/OXQuiz.vue) 가 매 라운드 3문제를 랜덤으로 뽑아 출제한다. 유아 (만 5세) 수준 상식.",
+  "$schema_note": "NoriArm OX 퀴즈 문제 풀. UI(service/web-service/robot-web/src/noriarm/OXQuiz.vue) 가 매 라운드 3문제를 랜덤으로 뽑아 출제한다. 유아 (만 5세) 수준 상식.",
   "questions": [
     {
       "id": "ox-001",

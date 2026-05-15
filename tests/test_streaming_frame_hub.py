@@ -1,4 +1,4 @@
-"""server/control/streaming/frame_hub.py 단위 테스트.
+"""service/control-service/control_service/streaming/frame_hub.py 단위 테스트.
 
 PLAN §1.5 (server-side filter), §6 (drop-oldest), §3.4 (multi-subscribe).
 """
@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from server.control.streaming.frame_hub import FrameHub
-from server.control.streaming.protocol import VideoPacket
+from control_service.streaming.frame_hub import FrameHub
+from control_service.streaming.protocol import VideoPacket
 
 
 def _make_packet(robot_id: int = 1, stream_id: int = 0, seq: int = 0) -> VideoPacket:

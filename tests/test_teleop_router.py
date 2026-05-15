@@ -1,4 +1,4 @@
-"""server/control/teleop/router.py + ros_bridge.py 단위 테스트.
+"""service/control-service/control_service/teleop/router.py + ros_bridge.py 단위 테스트.
 
 ros_bridge 는 Mock 으로 대체 — rclpy 미동작 환경에서도 테스트 가능.
 AC #9, #10, #11, #12, #13, #25, #26, #28, #29, #30, #31 검증.
@@ -18,8 +18,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from server.control.teleop import router as router_mod
-from server.control.teleop.ros_bridge import (
+from control_service.teleop import router as router_mod
+from control_service.teleop.ros_bridge import (
     TOPIC_CMD_VEL,
     TOPIC_ODOM,
     TOPIC_SCAN,
@@ -169,7 +169,7 @@ def test_topic_names_are_namespaced() -> None:
 
 def test_subscriber_callbacks_have_no_async_or_send() -> None:
     """subscriber 콜백 본문에 await / Queue.put / WebSocket.send 없음."""
-    src = Path("server/control/teleop/ros_bridge.py").read_text(encoding="utf-8")
+    src = Path("service/control-service/control_service/teleop/ros_bridge.py").read_text(encoding="utf-8")
     # _on_odom 와 _on_scan 함수 본문 추출 (다음 def 이전까지)
     for fn in ("_on_odom", "_on_scan"):
         m = re.search(
@@ -186,7 +186,7 @@ def test_subscriber_callbacks_have_no_async_or_send() -> None:
 
 
 def test_router_uses_asyncio_queue_maxsize_2() -> None:
-    src = Path("server/control/teleop/router.py").read_text(encoding="utf-8")
+    src = Path("service/control-service/control_service/teleop/router.py").read_text(encoding="utf-8")
     assert "asyncio.Queue(maxsize=2)" in src or "QUEUE_MAX = 2" in src
     # 실제 사용 확인
     assert "maxsize=QUEUE_MAX" in src or "maxsize=2" in src

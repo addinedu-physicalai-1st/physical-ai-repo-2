@@ -9,8 +9,8 @@
 
 현재 graph routing 은 다음 yaml 두 개로 정의된다:
 
-- `device/gogoping_ws/src/gogoping/gogoping_navigation/config/waypoints.yaml` — vertex
-- `device/gogoping_ws/src/gogoping/gogoping_navigation/config/lanes.yaml` — lane (양방향 표준)
+- `controller/gogoping-controller/src/gogoping/gogoping_navigation/config/waypoints.yaml` — vertex
+- `controller/gogoping-controller/src/gogoping/gogoping_navigation/config/lanes.yaml` — lane (양방향 표준)
 
 편집은 텍스트 에디터로 수동, 적용은 `graph_router_node` 재시작 필요. UI 에서 빠르게 그래프를 다듬으면서 즉시 검증하는 흐름을 만든다.
 
@@ -44,7 +44,7 @@
 
 | 결정 | 내용 |
 |---|---|
-| A. 데이터 모듈 | lanes 도 `server/control/waypoints/yaml_store.py` 안에 함수 추가. 별도 모듈 분리 X |
+| A. 데이터 모듈 | lanes 도 `service/control-service/control_service/waypoints/yaml_store.py` 안에 함수 추가. 별도 모듈 분리 X |
 | B. default snapshot | yaml 옆 sibling 파일 (`waypoints.default.yaml`, `lanes.default.yaml`). git 에 같이 commit |
 | C. 편집 UI 위치 | `WaypointMapCard` 에 헤더 툴바로 확장. 새 화면 안 만듦. graph 모드일 때만 툴바 표시 |
 | D. 그래프 동기화 | 편집 후 즉시 yaml write + `graph_router_node.reload_graph` ROS service 자동 호출 — node 재시작 불필요 |
@@ -56,7 +56,7 @@
 ### 파일 레이아웃
 
 ```
-device/gogoping_ws/src/gogoping/gogoping_navigation/config/
+controller/gogoping-controller/src/gogoping/gogoping_navigation/config/
 ├── waypoints.yaml             # working copy
 ├── waypoints.default.yaml     # default snapshot (NEW)
 ├── lanes.yaml                 # working copy
@@ -365,7 +365,7 @@ pytest tests/test_waypoint_map_card_edit.py
 - 다중 admin UI 동시 편집 (CRDT / 락)
 - 자동 간선의 **벽 통과 검사 (LoS)** — 맵 raster 스캔 필요해 복잡. v2
 - 노드 추가 시 자동 lane 연결 (kNN / nearest auto-link)
-- robot-ui 등 다른 클라이언트에서의 그래프 편집
+- robot-web 등 다른 클라이언트에서의 그래프 편집
 
 ## 후속 SR 후보 (지금 안 함, 메모만)
 
@@ -378,14 +378,14 @@ pytest tests/test_waypoint_map_card_edit.py
 
 | 파일 | 변경 종류 |
 |---|---|
-| `server/control/waypoints/yaml_store.py` | 확장 (lanes / update / undo / default snapshot) |
-| `server/control/waypoints/router.py` | 신규 endpoint 9개 + health 확장 |
-| `server/control/waypoints/ros_bridge.py` | `reload_graph` 서비스 클라이언트 + `nav_active` 노출 |
-| `device/gogoping_ws/src/gogoping/gogoping_navigation/gogoping_navigation/graph_router_node.py` | `reload_graph` 서비스 추가 |
-| `device/gogoping_ws/src/gogoping/gogoping_navigation/gogoping_navigation/graph.py` | `auto_edge(threshold)` 함수 추가 (순수 함수) |
-| `device/gogoping_ws/src/gogoping/gogoping_navigation/config/waypoints.default.yaml` | 신규 (working 복사본) |
-| `device/gogoping_ws/src/gogoping/gogoping_navigation/config/lanes.default.yaml` | 신규 (working 복사본) |
-| `ui/admin-ui/widgets/waypoint_map_card.py` | 대규모 확장 — 편집 모드 토글, 상태머신, hover, hit-test, 신규 헤더 툴바, 이름 팝업, 확인 dialog |
+| `service/control-service/control_service/waypoints/yaml_store.py` | 확장 (lanes / update / undo / default snapshot) |
+| `service/control-service/control_service/waypoints/router.py` | 신규 endpoint 9개 + health 확장 |
+| `service/control-service/control_service/waypoints/ros_bridge.py` | `reload_graph` 서비스 클라이언트 + `nav_active` 노출 |
+| `controller/gogoping-controller/src/gogoping/gogoping_navigation/gogoping_navigation/graph_router_node.py` | `reload_graph` 서비스 추가 |
+| `controller/gogoping-controller/src/gogoping/gogoping_navigation/gogoping_navigation/graph.py` | `auto_edge(threshold)` 함수 추가 (순수 함수) |
+| `controller/gogoping-controller/src/gogoping/gogoping_navigation/config/waypoints.default.yaml` | 신규 (working 복사본) |
+| `controller/gogoping-controller/src/gogoping/gogoping_navigation/config/lanes.default.yaml` | 신규 (working 복사본) |
+| `app/admin-app/widgets/waypoint_map_card.py` | 대규모 확장 — 편집 모드 토글, 상태머신, hover, hit-test, 신규 헤더 툴바, 이름 팝업, 확인 dialog |
 | `tests/test_yaml_store_lanes.py` | 신규 |
 | `tests/test_yaml_store_node_edit.py` | 신규 |
 | `tests/test_graph_auto_edge.py` | 신규 |
