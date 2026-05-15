@@ -35,6 +35,31 @@ class GraphError(Exception):
     pass
 
 
+def auto_edge(
+    vertices: list[Vertex],
+    threshold: float,
+) -> list[tuple[str, str, bool]]:
+    """거리 threshold 이하 모든 노드 쌍 → 양방향 lane.
+
+    반환: ``[(from_name, to_name, bidirectional=True), ...]``. 대칭 쌍은 한 번만,
+    이름 알파벳순 정렬해 결정론적 결과를 보장한다.
+
+    Pure 함수 — Graph 인스턴스 / 파일 IO 없음. UI 의 [⚡ 자동 간선] 또는 server
+    router 의 ``/waypoints/lanes/auto`` 에서 호출.
+    """
+    out: list[tuple[str, str, bool]] = []
+    for i, a in enumerate(vertices):
+        for b in vertices[i + 1:]:
+            dx = a.x - b.x
+            dy = a.y - b.y
+            if (dx * dx + dy * dy) ** 0.5 <= threshold:
+                if a.name < b.name:
+                    out.append((a.name, b.name, True))
+                else:
+                    out.append((b.name, a.name, True))
+    return out
+
+
 class OccupancyCheck:
     """map.pgm + map.yaml 기반 두 점 사이 직선 점유 검사.
     Nav2 occupancy grid 와 동일 좌표계 (origin, resolution)."""
