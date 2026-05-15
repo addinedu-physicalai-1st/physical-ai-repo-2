@@ -138,3 +138,38 @@ def test_from_real_yaml():
     assert path[0] == "출입구1"
     assert path[-1] == "운동장22"
     assert len(path) >= 3   # 최소 한 vertex 거쳐야
+
+
+# ---- Task 7: auto_edge 순수 함수 ----
+def test_auto_edge_distance_threshold():
+    from gogoping_navigation.graph import auto_edge, Vertex
+    verts = [
+        Vertex(name="A", x=0.0, y=0.0),
+        Vertex(name="B", x=1.0, y=0.0),
+        Vertex(name="C", x=0.0, y=1.0),
+        Vertex(name="D", x=1.0, y=1.0),
+    ]
+    lanes = auto_edge(verts, threshold=1.0)
+    pairs = {tuple(sorted([a, b])) for a, b, _bidir in lanes}
+    assert pairs == {("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")}
+
+
+def test_auto_edge_threshold_excludes_diagonals():
+    from gogoping_navigation.graph import auto_edge, Vertex
+    verts = [
+        Vertex(name="A", x=0.0, y=0.0),
+        Vertex(name="B", x=1.0, y=1.0),
+    ]
+    # 거리 sqrt(2) ≈ 1.414
+    assert auto_edge(verts, threshold=1.5) != []
+    assert auto_edge(verts, threshold=1.0) == []
+
+
+def test_auto_edge_dedupes_pairs():
+    from gogoping_navigation.graph import auto_edge, Vertex
+    verts = [
+        Vertex(name="A", x=0.0, y=0.0),
+        Vertex(name="B", x=0.5, y=0.0),
+    ]
+    lanes = auto_edge(verts, threshold=1.0)
+    assert len(lanes) == 1   # A↔B 한 번만
