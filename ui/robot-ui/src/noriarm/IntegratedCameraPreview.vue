@@ -1,9 +1,13 @@
 <script setup lang="ts">
 /**
- * 노트북 내장 카메라 라이브 프리뷰 + 자연 촬영.
+ * OX 퀴즈 우상단 표정 미리보기.
  *
- * 브라우저 `videoinput` 목록의 **첫 번째** 카메라(enumerate 순)로 표정 촬영.
- * OX 퀴즈에서 USB 보드 카메라가 있어도 우상단에 같이 띄워 내장만 표정에 쓴다.
+ * 외장 USB 카메라 (예: Alcorlink USB 2.0 Camera) 를 사용한다. 노트북 내장 카메라는
+ * label 필터로 제외한다 — `selectExternalCamera` 의 `pickExternalCamera`.
+ *
+ * 외장 카메라가 1대뿐이면 OXVisionPreview (좌하단 보드 인식) 와 같은 물리 카메라를
+ * 공유한다. Chrome 은 동일 deviceId 에 대한 두 번째 getUserMedia 를 내부적으로
+ * 같은 track 으로 재사용하므로 두 video element 모두 정상 렌더된다.
  *
  * 자연 촬영: `useEmotionCapture` 가 video stream 위에서 5fps 추론, happy/sad 임계 초과 시
  * 프레임을 Control Server 로 업로드한다. 연속 촬영은 쿨다운(약 2.8초) 간격으로 허용한다.
@@ -11,6 +15,7 @@
  */
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
+import { pickExternalCamera } from '@/composables/selectExternalCamera';
 
 const props = defineProps<{
   /** 검출 활성. OX 퀴즈 진행 phase 일 때만 true. */
@@ -23,6 +28,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** 외장 USB 카메라 가용 여부 (이벤트 이름은 호환을 위해 유지). */
   'integrated-available': [available: boolean];
   captured: [info: { emotion: 'happy' | 'sad'; score: number; photoId: number; url: string }];
 }>();
@@ -44,24 +50,14 @@ const EMOTION_SUSTAIN_MAX = 3;
 async function start(): Promise<void> {
   error.value = null;
   try {
-    if (!(await navigator.mediaDevices.enumerateDevices()).some((d) => d.label)) {
-      try {
-        const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
-        tmp.getTracks().forEach((t) => t.stop());
-      } catch {
-        /* 권한 거부해도 enumerate 는 동작 (label 빈 채로) */
-      }
-    }
-    const devs = await navigator.mediaDevices.enumerateDevices();
-    const videos = devs.filter((d) => d.kind === 'videoinput');
-    const first = videos[0];
-    if (!first) {
+    const external = await pickExternalCamera();
+    if (!external) {
       emit('integrated-available', false);
       return;
     }
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        deviceId: { exact: first.deviceId },
+        deviceId: { exact: external.deviceId },
         width: { ideal: 640 },
         height: { ideal: 360 },
       },
@@ -74,7 +70,7 @@ async function start(): Promise<void> {
     }
     emit('integrated-available', true);
   } catch (e) {
-    error.value = `내장 카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
+    error.value = `외장 카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
     emit('integrated-available', false);
   }
 }
