@@ -37,6 +37,8 @@ class MapView(QWidget):
     MAP_RES = 0.025
     MAP_SIZE = (881, 720)
     DRAG_MIN_PX = 12          # 이보다 짧은 드래그는 클릭 실수로 간주, goal 무시
+    NODE_HIT_PX = 16          # 편집 모드 노드 hit 반경 (widget px)
+    LANE_HIT_PX = 8           # 편집 모드 lane hit perpendicular 거리 (widget px)
 
     # 마우스 업 시 (x, y, yaw) — Nav2 Goal 요청 (일반 좌클릭-드래그)
     goal_pose_requested = pyqtSignal(float, float, float)
@@ -247,6 +249,47 @@ class MapView(QWidget):
             self.update()
             return
         super().keyPressEvent(e)
+
+    # ─── 편집 모드 hit-test (노드 + 간선) ───
+    def _hit_test(self, p: QPointF) -> dict | None:
+        """widget 좌표 p 가 노드/간선 위인지 판정.
+        반환: {"kind": "node", "id": name} 또는 {"kind": "lane", "id": (from, to)},
+              아무것도 안 잡히면 None. 노드 우선 (겹치면 노드)."""
+        # 노드 — 거리 < NODE_HIT_PX
+        for w in self._waypoints:
+            wp_pt = self._map_to_widget(w["x"], w["y"])
+            dx = p.x() - wp_pt.x()
+            dy = p.y() - wp_pt.y()
+            if (dx * dx + dy * dy) ** 0.5 < self.NODE_HIT_PX:
+                return {"kind": "node", "id": w["name"]}
+        # 간선 — 선분과 perpendicular distance, 양 끝 사이에 투영점이 있을 때만
+        wp_by_name = {w["name"]: w for w in self._waypoints}
+        for ln in self._lanes:
+            a = wp_by_name.get(ln.get("from"))
+            b = wp_by_name.get(ln.get("to"))
+            if not a or not b:
+                continue
+            pa = self._map_to_widget(a["x"], a["y"])
+            pb = self._map_to_widget(b["x"], b["y"])
+            d = self._point_seg_distance(p, pa, pb)
+            if d is not None and d < self.LANE_HIT_PX:
+                return {"kind": "lane", "id": (ln["from"], ln["to"])}
+        return None
+
+    def _point_seg_distance(self, p: QPointF, a: QPointF, b: QPointF) -> float | None:
+        """점 p 와 선분 a-b 의 거리. 투영점이 선분 안에 있을 때만 값, 밖이면 None."""
+        ax, ay = a.x(), a.y()
+        bx, by = b.x(), b.y()
+        dx, dy = bx - ax, by - ay
+        seg_sq = dx * dx + dy * dy
+        if seg_sq < 1e-9:
+            return None
+        t = ((p.x() - ax) * dx + (p.y() - ay) * dy) / seg_sq
+        if t < 0 or t > 1:
+            return None
+        px = ax + t * dx
+        py = ay + t * dy
+        return ((p.x() - px) ** 2 + (p.y() - py) ** 2) ** 0.5
 
     def paintEvent(self, _evt: Any) -> None:
         qp = QPainter(self)
