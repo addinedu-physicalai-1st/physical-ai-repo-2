@@ -44,6 +44,14 @@ class MapView(QWidget):
     goal_pose_requested = pyqtSignal(float, float, float)
     # 마우스 업 시 (x, y, yaw) — AMCL 2D Pose Estimate (Shift+좌클릭-드래그)
     initial_pose_requested = pyqtSignal(float, float, float)
+    # 편집 모드 — 노드 두 번 클릭으로 lane 생성 (from, to)
+    lane_create_requested = pyqtSignal(str, str)
+    # 편집 모드 — Delete 키로 lane 끊기 (from, to)
+    lane_delete_requested = pyqtSignal(str, str)
+    # 편집 모드 — 노드 드래그 release 후 yaw 확정 (name, x, y, yaw)
+    node_move_requested = pyqtSignal(str, float, float, float)
+    # 편집 모드 — 빈 곳 드래그 release → 이름 입력 팝업 트리거 (start_widget, end_widget)
+    add_drag_release_requested = pyqtSignal(QPointF, QPointF)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -187,9 +195,44 @@ class MapView(QWidget):
             return
         if e.button() != Qt.LeftButton:
             return
+
+        # ───── 편집 모드 분기 ─────
+        if self._edit_mode:
+            # yaw_preview 상태에서의 클릭 = yaw 확정 (NODE_DRAG 다음 단계)
+            if self._edit_state == "yaw_preview":
+                self._commit_yaw_preview(QPointF(e.pos()))
+                return
+            target = self._hit_test(QPointF(e.pos()))
+            if target and target["kind"] == "node":
+                self._pressed_node = target["id"]
+                self._drag_start = QPointF(e.pos())
+                self._drag_current = QPointF(e.pos())
+                self._edit_state = "node_pressed"
+            elif target and target["kind"] == "lane":
+                self._selected_lane = target["id"]
+                self._selected_node = None
+                self._edit_state = "lane_selected"
+                self.update()
+            else:
+                # 빈 곳 — empty_pressed (drag>=12px 면 add_drag)
+                self._pressed_node = None
+                self._drag_start = QPointF(e.pos())
+                self._drag_current = QPointF(e.pos())
+                self._edit_state = "empty_pressed"
+                # 빈 곳 클릭 = link_pending 도 취소
+                if self._selected_node is not None:
+                    self._selected_node = None
+            self.setFocus(Qt.MouseFocusReason)
+            self.update()
+            return
+        # ─────────────────────────
+
+        # 평소 모드: Shift+드래그 (initialpose) 만 지원 — 빈 좌클릭/드래그는 무동작.
+        if not (e.modifiers() & Qt.ShiftModifier):
+            return
         self._drag_start = QPointF(e.pos())
         self._drag_current = QPointF(e.pos())
-        self._drag_mode = "initial" if (e.modifiers() & Qt.ShiftModifier) else "goal"
+        self._drag_mode = "initial"
         self.setFocus(Qt.MouseFocusReason)
         self.update()
 
@@ -225,19 +268,39 @@ class MapView(QWidget):
         end = QPointF(e.pos())
         self._drag_start = None
         self._drag_current = None
-        self.update()
-        # 너무 짧은 드래그 = 실수 클릭, 무시
         dx_w = end.x() - start.x()
         dy_w = end.y() - start.y()
-        if (dx_w * dx_w + dy_w * dy_w) ** 0.5 < self.DRAG_MIN_PX:
+        drag_dist = (dx_w * dx_w + dy_w * dy_w) ** 0.5
+
+        # ───── 편집 모드 release 분기 ─────
+        if self._edit_mode:
+            if self._edit_state == "node_pressed":
+                if drag_dist < self.DRAG_MIN_PX:
+                    # 짧은 클릭 → LINK_PENDING (간선 잇기)
+                    self._handle_node_short_click(self._pressed_node)
+                else:
+                    # 드래그 → YAW_PREVIEW 진입 (Task 24 에서 처리)
+                    self._enter_yaw_preview(end)
+            elif self._edit_state == "empty_pressed":
+                if drag_dist >= self.DRAG_MIN_PX:
+                    # 빈 곳 드래그 → 노드 추가 (Task 25)
+                    self.add_drag_release_requested.emit(start, end)
+                # 짧은 클릭은 무동작
+                self._edit_state = "ready"
+            self.update()
             return
-        # 시작점 = 목표 위치 (x, y), 드래그 방향 = yaw (raster Y-up → atan2(-dy_w, dx_w))
+        # ─────────────────────────────────
+
+        self.update()
+        # 평소 모드 — 너무 짧은 드래그 = 실수 클릭, 무시
+        if drag_dist < self.DRAG_MIN_PX:
+            return
+        # 시작점 = 목표 위치 (x, y), 드래그 방향 = yaw
         mx, my = self._widget_to_map(start.x(), start.y())
         yaw = math.atan2(-dy_w, dx_w)
         if self._drag_mode == "initial":
             self.initial_pose_requested.emit(mx, my, yaw)
-        else:
-            self.goal_pose_requested.emit(mx, my, yaw)
+        # else (goal): 평소 모드 빈 곳 좌클릭은 "무동작" 으로 결정됨 (편집 기능 PR 에서 변경)
         # 피드백 — 0.5 초간 화살표 페이드 아웃 (mode 별 색 유지)
         self._feedback = {
             "start": QPointF(start), "end": QPointF(end),
@@ -254,6 +317,62 @@ class MapView(QWidget):
             self.update()
             return
         super().keyPressEvent(e)
+
+    # ─── 편집 모드 상태머신 helpers ───
+    def _handle_node_short_click(self, name: str | None) -> None:
+        """노드 위 짧은 클릭 (< 12px drag) — LINK_PENDING 진입 또는 lane 생성 emit."""
+        if name is None:
+            self._edit_state = "ready"
+            return
+        if self._edit_state == "node_pressed" and self._selected_node is None:
+            # 1차 선택
+            self._selected_node = name
+            self._edit_state = "link_pending"
+            self._selected_lane = None
+        elif self._selected_node == name:
+            # 같은 노드 또 클릭 → 취소
+            self._selected_node = None
+            self._edit_state = "ready"
+        elif self._selected_node is not None:
+            # 다른 노드 → lane 생성 emit
+            self.lane_create_requested.emit(self._selected_node, name)
+            self._selected_node = None
+            self._edit_state = "ready"
+        else:
+            # LINK_PENDING 아닌데 노드 클릭 — 1차 선택 진입
+            self._selected_node = name
+            self._edit_state = "link_pending"
+        self._pressed_node = None
+
+    def _enter_yaw_preview(self, end_widget: QPointF) -> None:
+        """노드 드래그 release — yaw_preview 상태로 (Task 24)."""
+        mx, my = self._widget_to_map(end_widget.x(), end_widget.y())
+        self._yaw_preview = {
+            "name": self._pressed_node,
+            "new_x": mx,
+            "new_y": my,
+            "end_widget": QPointF(end_widget),
+        }
+        self._edit_state = "yaw_preview"
+
+    def _commit_yaw_preview(self, click_widget: QPointF) -> None:
+        """yaw_preview 단계 클릭 → yaw 확정 emit (Task 24)."""
+        if self._yaw_preview is None:
+            self._edit_state = "ready"
+            return
+        end = self._yaw_preview["end_widget"]
+        dx = click_widget.x() - end.x()
+        dy = click_widget.y() - end.y()
+        yaw = math.atan2(-dy, dx) if (dx * dx + dy * dy) ** 0.5 > 1.0 else 0.0
+        self.node_move_requested.emit(
+            self._yaw_preview["name"],
+            float(self._yaw_preview["new_x"]),
+            float(self._yaw_preview["new_y"]),
+            float(yaw),
+        )
+        self._yaw_preview = None
+        self._pressed_node = None
+        self._edit_state = "ready"
 
     # ─── 편집 모드 hit-test (노드 + 간선) ───
     def _hit_test(self, p: QPointF) -> dict | None:
@@ -648,6 +767,11 @@ class WaypointMapCard(QFrame):
         self._map = MapView()
         self._map.goal_pose_requested.connect(self._on_goal_pose_requested)
         self._map.initial_pose_requested.connect(self._on_initial_pose_requested)
+        # 편집 모드 — Task 22+
+        self._map.lane_create_requested.connect(self._on_lane_create)
+        self._map.lane_delete_requested.connect(self._on_lane_delete)
+        self._map.node_move_requested.connect(self._on_node_move)
+        self._map.add_drag_release_requested.connect(self._on_add_drag_release)
         self._list = QListWidget()
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -877,6 +1001,58 @@ class WaypointMapCard(QFrame):
             )
         except httpx.HTTPError:
             pass
+
+    # ─── 편집 모드 endpoint 핸들러 (Task 22+) ───
+    def _on_lane_create(self, from_: str, to: str) -> None:
+        """노드 2 클릭 → POST /waypoints/lanes."""
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/lanes",
+                           json={"from": from_, "to": to}, timeout=2.0)
+            if r.status_code == 409:
+                return   # 이미 있음 — 잘못 누른 거니 무음
+            if r.status_code != 200:
+                QMessageBox.warning(self, "간선 생성 실패", r.text)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_lane_delete(self, from_: str, to: str) -> None:
+        """Delete 키 → DELETE /waypoints/lanes."""
+        import httpx
+        try:
+            httpx.request("DELETE", f"{self._control_url}/waypoints/lanes",
+                          json={"from": from_, "to": to}, timeout=2.0)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_node_move(self, name: str, x: float, y: float, yaw: float) -> None:
+        """노드 이동 → PATCH /waypoints/{name}."""
+        import httpx
+        try:
+            httpx.patch(f"{self._control_url}/waypoints/{name}",
+                        json={"x": x, "y": y, "yaw": yaw}, timeout=2.0)
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
+
+    def _on_add_drag_release(self, start_widget: QPointF, end_widget: QPointF) -> None:
+        """빈 곳 드래그 release → 이름 팝업 → POST /waypoints/click."""
+        from PyQt5.QtWidgets import QInputDialog
+        mx, my = self._map._widget_to_map(start_widget.x(), start_widget.y())
+        dx = end_widget.x() - start_widget.x()
+        dy = end_widget.y() - start_widget.y()
+        yaw = math.atan2(-dy, dx) if (dx * dx + dy * dy) ** 0.5 > 1.0 else 0.0
+        name, ok = QInputDialog.getText(self, "노드 추가", "이름:")
+        if not ok or not name.strip():
+            return
+        import httpx
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/click",
+                           json={"name": name.strip(), "x": mx, "y": my, "yaw": yaw},
+                           timeout=2.0)
+            if r.status_code == 409:
+                QMessageBox.warning(self, "이름 중복", "이미 같은 이름의 노드가 있어요.")
+        except httpx.HTTPError as e:
+            QMessageBox.warning(self, "통신 오류", str(e))
 
     def closeEvent(self, e: Any) -> None:
         self._sse.stop()
