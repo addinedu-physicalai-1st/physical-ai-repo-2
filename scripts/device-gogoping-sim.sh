@@ -83,6 +83,11 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n graph-router -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
 
+    # window 2: rviz (map / TF / AMCL / costmap / plan 시각화)
+    RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
+    tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
+
     # 마우스 + status bar 설정
     tmux set-option -t "$SESSION" -g mouse on
     tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
@@ -106,12 +111,14 @@ case "$ACTION" in
     # gz sim 의 server·gui 자식은 tmux SIGHUP 으로 회수되지 않아 명시 정리. SIGTERM → SIGKILL.
     _patterns=(
       "ros2 launch gogoping_bringup sim"
+      "ros2 launch gogoping_navigation graph_router"
       "gz sim"
       "ruby .*gz sim"
       "parameter_bridge"
       "ros_gz_image"
       "robot_state_publisher"
       "sim_status_publisher"
+      "rviz2"
     )
     for p in "${_patterns[@]}"; do
       pkill -TERM -f "$p" 2>/dev/null || true
