@@ -308,3 +308,108 @@ def test_add_drag_cancel_no_post(card, monkeypatch):
     end = QPointF(130, 100)
     card._on_add_drag_release(start, end)
     assert called == {}   # 호출 안 됨
+
+
+# ---- Task 26: 헤더 툴바 ----
+def test_on_undo_calls_endpoint(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+    def fake_post(url, json=None, timeout=None):
+        called["url"] = url
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+    card._on_undo()
+    assert called["url"].endswith("/waypoints/undo")
+
+
+def test_on_reset_with_confirm(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+    def fake_post(url, json=None, timeout=None):
+        called["url"] = url
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+    from PyQt5.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.Yes))
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **kw: None))
+    card._on_reset()
+    assert called["url"].endswith("/waypoints/reset")
+
+
+def test_on_reset_cancel_skips(card, monkeypatch):
+    called = {}
+    import httpx
+    def fake_post(*a, **kw):
+        called["called"] = True
+        class R:
+            status_code = 200
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+    from PyQt5.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.No))
+    card._on_reset()
+    assert called == {}
+
+
+def test_on_snapshot_default(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+    def fake_post(url, json=None, timeout=None):
+        called["url"] = url
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+    from PyQt5.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.Yes))
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **kw: None))
+    card._on_snapshot_default()
+    assert called["url"].endswith("/waypoints/snapshot-default")
+
+
+def test_on_auto_edge_with_dialog(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+        def json(self): return {"added": 1, "skipped": 0}
+    def fake_post(url, json=None, timeout=None):
+        called["url"] = url
+        called["body"] = json
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+    from PyQt5.QtWidgets import QInputDialog, QMessageBox
+    monkeypatch.setattr(QInputDialog, "getDouble",
+                        staticmethod(lambda *a, **kw: (1.5, True)))
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **kw: QMessageBox.No))   # replace = No
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **kw: None))
+    card._map.set_waypoints([
+        {"name": "A", "x": 0.0, "y": 0.0},
+        {"name": "B", "x": 1.0, "y": 0.0},
+    ])
+    card._on_auto_edge()
+    assert called["url"].endswith("/waypoints/lanes/auto")
+    assert called["body"]["threshold"] == 1.5
+    assert called["body"]["replace_existing"] is False
+
+
+def test_toolbar_visibility_follows_edit_mode(card):
+    # 처음엔 OFF
+    assert all(not b.isVisible() for b in card._edit_toolbar)
+    card._map._edit_mode = True
+    card._refresh_edit_toolbar()
+    card.show()  # widget 실제 표시 필요
+    for b in card._edit_toolbar:
+        # show 호출 안 했으면 isVisible False — 다만 비활성화는 isVisibleTo 로
+        assert b.isVisibleTo(card)
