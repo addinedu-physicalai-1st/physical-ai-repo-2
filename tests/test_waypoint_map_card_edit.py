@@ -260,3 +260,51 @@ def test_card_on_node_move_calls_patch(card, monkeypatch):
     card._on_node_move("A", 1.5, 2.5, 0.7)
     assert called["url"].endswith("/waypoints/A")
     assert called["body"]["x"] == 1.5
+
+
+# ---- Task 25: ADD_DRAG (이름 팝업) ----
+def test_add_drag_release_calls_click_endpoint(card, monkeypatch):
+    from PyQt5.QtCore import QPointF
+    from PyQt5.QtWidgets import QInputDialog
+    # 이름 입력 팝업 stub
+    monkeypatch.setattr(QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("새노드", True)))
+    called = {}
+    import httpx
+    class R:
+        status_code = 201
+    def fake_post(url, json=None, timeout=None):
+        called["url"] = url
+        called["body"] = json
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    start = card._map._map_to_widget(1.0, 2.0)
+    end = QPointF(start.x() + 30, start.y())   # yaw ≈ 0
+    card._on_add_drag_release(start, end)
+
+    assert called["url"].endswith("/waypoints/click")
+    assert called["body"]["name"] == "새노드"
+    assert abs(called["body"]["x"] - 1.0) < 0.05
+    assert abs(called["body"]["y"] - 2.0) < 0.05
+
+
+def test_add_drag_cancel_no_post(card, monkeypatch):
+    from PyQt5.QtCore import QPointF
+    from PyQt5.QtWidgets import QInputDialog
+    # 사용자가 cancel
+    monkeypatch.setattr(QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("", False)))
+    called = {}
+    import httpx
+    def fake_post(*a, **kw):
+        called["called"] = True
+        class R:
+            status_code = 201
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    start = QPointF(100, 100)
+    end = QPointF(130, 100)
+    card._on_add_drag_release(start, end)
+    assert called == {}   # 호출 안 됨
