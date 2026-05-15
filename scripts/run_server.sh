@@ -151,7 +151,10 @@ case "$ACTION" in
     NORIARM_FRAMEWORK_PATH="$REPO_ROOT/device/noriarm_ws/src/noriarm_framework"
     ROS_SETUP="/opt/ros/jazzy/setup.bash"
     EDUPING_WS_SETUP="$REPO_ROOT/device/eduping_ws/install/setup.bash"
-    CONTROL_CMD="$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload)"
+    # --reload-exclude '*/ros_bridge.py': rclpy 노드를 들고있는 4개 bridge 파일은
+    # 자동 reload 제외 (uvicorn worker 재시작 시 rclpy 자원 정리가 깨끗하지 않아 wedge 발생).
+    # 해당 파일 수정 시에는 control window 에서 Ctrl+C 후 수동 재실행 필요.
+    CONTROL_CMD="$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
 
     # eduping_ws 빌드 안 되어있으면 /api/eduping/* 503 — 안내만 (block 하지 않음).
     if [[ ! -f "$EDUPING_WS_SETUP" ]]; then
