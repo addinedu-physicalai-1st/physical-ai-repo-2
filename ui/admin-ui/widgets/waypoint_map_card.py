@@ -310,6 +310,47 @@ class MapView(QWidget):
         self._feedback_timer.start()
 
     def keyPressEvent(self, e: Any) -> None:
+        # ── 편집 모드 ──
+        if self._edit_mode:
+            if e.key() == Qt.Key_Delete and self._edit_state == "lane_selected":
+                # 선택된 lane 끊기
+                if self._selected_lane is not None:
+                    from_, to = self._selected_lane
+                    self.lane_delete_requested.emit(from_, to)
+                self._selected_lane = None
+                self._edit_state = "ready"
+                self.update()
+                return
+            if e.key() == Qt.Key_Escape:
+                # yaw_preview 의 ESC = yaw 유지·위치만 적용
+                if self._edit_state == "yaw_preview" and self._yaw_preview is not None:
+                    # 원래 노드의 yaw 유지
+                    wp_by_name = {w["name"]: w for w in self._waypoints}
+                    cur = wp_by_name.get(self._yaw_preview["name"])
+                    keep_yaw = float(cur.get("yaw", 0.0)) if cur else 0.0
+                    self.node_move_requested.emit(
+                        self._yaw_preview["name"],
+                        float(self._yaw_preview["new_x"]),
+                        float(self._yaw_preview["new_y"]),
+                        keep_yaw,
+                    )
+                    self._yaw_preview = None
+                    self._pressed_node = None
+                    self._edit_state = "ready"
+                    self.update()
+                    return
+                # 그 외 편집 상태 — 선택/진행 reset
+                if self._edit_state != "ready":
+                    self._drag_start = None
+                    self._drag_current = None
+                    self._selected_node = None
+                    self._selected_lane = None
+                    self._pressed_node = None
+                    self._yaw_preview = None
+                    self._edit_state = "ready"
+                    self.update()
+                    return
+        # ── 평소 모드 ──
         if e.key() == Qt.Key_Escape and self._drag_start is not None:
             # 진행중 드래그 취소
             self._drag_start = None
