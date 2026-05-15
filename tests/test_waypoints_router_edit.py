@@ -113,3 +113,13 @@ def test_reset_without_default_409(client):
     c, _ = client
     r = c.post("/waypoints/reset")
     assert r.status_code in (404, 409)
+
+
+# ---- GET /waypoints/health 의 nav_active 노출 ----
+def test_health_includes_nav_active_field(client):
+    c, bridge = client
+    bridge.health.return_value = {"nav_active": True, "ros_ok": True}
+    r = c.get("/waypoints/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["nav_active"] is True
