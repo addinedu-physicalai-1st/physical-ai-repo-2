@@ -146,24 +146,24 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n ai-hub -c "$REPO_ROOT" \
       "$(wrap_cmd uvicorn server.ai.hub:app --host 0.0.0.0 --port 8001 --reload)"
 
-    # window 3: control :8000 — NoriArm + Eduping(OpenArm) 통합용 ROS 환경.
-    # ROS jazzy → eduping_ws install (eduarm 등) → noriarm_framework PYTHONPATH 순서.
+    # window 3: control :8000 — NoriArm + Eduping(OpenArm) + Gogoping 통합용 ROS 환경.
+    # ROS jazzy → repo root install overlay (eduarm, gogoping_msgs 등 전체) → noriarm_framework PYTHONPATH 순서.
     NORIARM_FRAMEWORK_PATH="$REPO_ROOT/device/noriarm_ws/src/noriarm_framework"
     ROS_SETUP="/opt/ros/jazzy/setup.bash"
-    EDUPING_WS_SETUP="$REPO_ROOT/device/eduping_ws/install/setup.bash"
+    ROOT_WS_SETUP="$REPO_ROOT/install/setup.bash"
     # --reload-exclude '*/ros_bridge.py': rclpy 노드를 들고있는 4개 bridge 파일은
     # 자동 reload 제외 (uvicorn worker 재시작 시 rclpy 자원 정리가 깨끗하지 않아 wedge 발생).
     # 해당 파일 수정 시에는 control window 에서 Ctrl+C 후 수동 재실행 필요.
     CONTROL_CMD="$(wrap_cmd uvicorn server.control.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
 
-    # eduping_ws 빌드 안 되어있으면 /api/eduping/* 503 — 안내만 (block 하지 않음).
-    if [[ ! -f "$EDUPING_WS_SETUP" ]]; then
-      echo "[run_server] ⚠ eduping_ws 빌드 결과 없음 — /api/eduping/* 는 503 으로 응답합니다." >&2
-      echo "[run_server]   device/eduping_ws/ 에서 빌드 후 'scripts/run_server.sh down && scripts/run_server.sh' 로 재실행." >&2
+    # repo root 워크스페이스 빌드 안 되어있으면 커스텀 msg/srv (eduarm, gogoping_msgs 등) 미적재 → 일부 API 거절.
+    if [[ ! -f "$ROOT_WS_SETUP" ]]; then
+      echo "[run_server] ⚠ repo root 워크스페이스 빌드 결과 없음 ($ROOT_WS_SETUP) — /api/eduping/*, graph routing 등 일부 기능이 거절됩니다." >&2
+      echo "[run_server]   cd $REPO_ROOT && colcon build --symlink-install 후 'scripts/run_server.sh down && scripts/run_server.sh' 로 재실행." >&2
     fi
 
     tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
-      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; [ -f $EDUPING_WS_SETUP ] && source $EDUPING_WS_SETUP; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
+      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; [ -f $ROOT_WS_SETUP ] && source $ROOT_WS_SETUP; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
 
     # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
