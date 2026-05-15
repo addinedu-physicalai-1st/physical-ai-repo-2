@@ -105,3 +105,50 @@ def test_hit_test_empty_returns_none(card):
     card._map.set_waypoints([{"name": "A", "x": 0.0, "y": 0.0}])
     target = card._map._hit_test(QPointF(99999, 99999))
     assert target is None
+
+
+# ---- Task 22: LINK_PENDING (간선 잇기 — 노드 2회 클릭) ----
+def test_short_click_on_node_enters_link_pending(card):
+    card._map._edit_mode = True
+    card._map._edit_state = "node_pressed"
+    card._map._pressed_node = "A"
+    card._map._handle_node_short_click("A")
+    assert card._map._edit_state == "link_pending"
+    assert card._map._selected_node == "A"
+
+
+def test_second_node_click_emits_lane_create(card, qtbot):
+    card._map._edit_mode = True
+    card._map._selected_node = "A"
+    card._map._edit_state = "link_pending"
+    card._map._pressed_node = "B"
+    with qtbot.waitSignal(card._map.lane_create_requested, timeout=500) as blocker:
+        card._map._handle_node_short_click("B")
+    assert blocker.args == ["A", "B"]
+    assert card._map._edit_state == "ready"
+    assert card._map._selected_node is None
+
+
+def test_same_node_click_cancels(card):
+    card._map._edit_mode = True
+    card._map._selected_node = "A"
+    card._map._edit_state = "link_pending"
+    card._map._handle_node_short_click("A")
+    assert card._map._selected_node is None
+    assert card._map._edit_state == "ready"
+
+
+def test_card_on_lane_create_posts(card, monkeypatch):
+    called = {}
+    import httpx
+    class R:
+        status_code = 200
+        text = ""
+    def fake_post(url, json=None, timeout=None):
+        called["url"] = url
+        called["body"] = json
+        return R()
+    monkeypatch.setattr(httpx, "post", fake_post)
+    card._on_lane_create("A", "B")
+    assert called["url"].endswith("/waypoints/lanes")
+    assert called["body"] == {"from": "A", "to": "B"}
