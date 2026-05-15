@@ -72,3 +72,20 @@ def test_post_lane_nav_active_409(client):
     bridge.health.return_value = {"nav_active": True}
     r = c.post("/waypoints/lanes", json={"from": "A", "to": "B"})
     assert r.status_code == 409
+
+
+# ---- DELETE /waypoints/lanes (간선 끊기) ----
+def test_delete_lane_removes_and_reloads(client):
+    c, bridge = client
+    c.post("/waypoints/lanes", json={"from": "A", "to": "B"})
+    bridge.reload_graph.reset_mock()
+    r = c.request("DELETE", "/waypoints/lanes", json={"from": "B", "to": "A"})
+    assert r.status_code == 200
+    assert r.json()["lanes"] == []
+    bridge.reload_graph.assert_called_once()
+
+
+def test_delete_lane_missing_404(client):
+    c, _ = client
+    r = c.request("DELETE", "/waypoints/lanes", json={"from": "A", "to": "B"})
+    assert r.status_code == 404

@@ -86,6 +86,56 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         bridge._emit({"type": "waypoints", "reason": "created"})
         return {"name": wp.name, "x": wp.x, "y": wp.y, "yaw": wp.yaw}
 
+    # ────────── nav graph editor (Task 10+) ──────────
+    # 주의: 아래 lane/* endpoint 는 `@router.delete("/{name}")` 의 path parameter
+    # 매칭에 잡히지 않게 그것보다 위에서 등록한다 (FastAPI 는 등록 순서대로 매칭).
+
+    def _check_nav_idle() -> None:
+        """nav2 active 면 409 nav_busy. UI 우회 방지용 백엔드 검증."""
+        h = bridge.health()
+        if h.get("nav_active"):
+            raise HTTPException(409, "nav_busy")
+
+    def _emit_state_after_write(reload_result: dict | None = None) -> dict:
+        """write 후 표준 응답 — yaml 새 상태 동봉 + SSE broadcast.
+        reload_result.success 가 False 면 yaml_saved/graph_reloaded 명시."""
+        wps, _ = ys.load()
+        lanes = ys.load_lanes()
+        bridge._emit({"type": "waypoints", "reason": "updated"})
+        payload = {
+            "ok": True,
+            "waypoints": [{"name": w.name, "x": w.x, "y": w.y, "yaw": w.yaw} for w in wps],
+            "lanes": [{"from": ln.from_, "to": ln.to, "bidirectional": ln.bidirectional}
+                      for ln in lanes],
+        }
+        if reload_result is not None and not reload_result.get("success", True):
+            payload["yaml_saved"] = True
+            payload["graph_reloaded"] = False
+            payload["detail"] = reload_result.get("message", "")
+        return payload
+
+    @router.post("/lanes")
+    def add_lane_route(body: LaneBody) -> dict:
+        _check_nav_idle()
+        try:
+            ys.add_lane(body.from_, body.to)
+        except ys.LaneStoreError as e:
+            if "lane_exists" in str(e):
+                raise HTTPException(409, "lane_exists")
+            raise HTTPException(400, str(e))
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
+    @router.delete("/lanes")
+    def remove_lane_route(body: LaneBody) -> dict:
+        _check_nav_idle()
+        try:
+            ys.remove_lane(body.from_, body.to)
+        except KeyError:
+            raise HTTPException(404, "lane 없음")
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
     @router.delete("/{name}")
     def delete(name: str) -> dict:
         try:
@@ -224,42 +274,5 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
                 bridge.unregister_listener(q)
 
         return StreamingResponse(gen(), media_type="text/event-stream")
-
-    # ────────── nav graph editor — Task 10+ ──────────
-    def _check_nav_idle() -> None:
-        """nav2 active 면 409 nav_busy. UI 만 막으면 우회 가능해서 백엔드 단에서도 검증."""
-        h = bridge.health()
-        if h.get("nav_active"):
-            raise HTTPException(409, "nav_busy")
-
-    def _emit_state_after_write(reload_result: dict | None = None) -> dict:
-        """write 후 표준 응답 — yaml 새 상태 동봉 + SSE broadcast.
-        reload_result.success 가 False 면 207 partial 의 정보도 함께 표시."""
-        wps, _ = ys.load()
-        lanes = ys.load_lanes()
-        bridge._emit({"type": "waypoints", "reason": "updated"})
-        payload = {
-            "ok": True,
-            "waypoints": [{"name": w.name, "x": w.x, "y": w.y, "yaw": w.yaw} for w in wps],
-            "lanes": [{"from": ln.from_, "to": ln.to, "bidirectional": ln.bidirectional}
-                      for ln in lanes],
-        }
-        if reload_result is not None and not reload_result.get("success", True):
-            payload["yaml_saved"] = True
-            payload["graph_reloaded"] = False
-            payload["detail"] = reload_result.get("message", "")
-        return payload
-
-    @router.post("/lanes")
-    def add_lane_route(body: LaneBody) -> dict:
-        _check_nav_idle()
-        try:
-            ys.add_lane(body.from_, body.to)
-        except ys.LaneStoreError as e:
-            if "lane_exists" in str(e):
-                raise HTTPException(409, "lane_exists")
-            raise HTTPException(400, str(e))
-        reload_result = bridge.reload_graph()
-        return _emit_state_after_write(reload_result)
 
     app.include_router(router)
