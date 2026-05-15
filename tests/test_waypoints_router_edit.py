@@ -57,3 +57,19 @@ def test_patch_nav_active_409(client):
     bridge.health.return_value = {"nav_active": True}
     r = c.patch("/waypoints/A", json={"x": 1, "y": 1, "yaw": 0})
     assert r.status_code == 409
+
+
+# ---- POST /waypoints/click ----
+def test_post_click_adds_node(client):
+    c, _ = client
+    r = c.post("/waypoints/click",
+               json={"name": "X", "x": 3.0, "y": 4.0, "yaw": 1.0})
+    assert r.status_code == 201
+    assert any(w["name"] == "X" for w in r.json()["waypoints"])
+
+
+def test_post_click_duplicate_name_409(client):
+    c, _ = client
+    r = c.post("/waypoints/click",
+               json={"name": "A", "x": 1, "y": 1, "yaw": 0})
+    assert r.status_code == 409
