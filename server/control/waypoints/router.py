@@ -157,6 +157,17 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         reload_result = bridge.reload_graph()
         return _emit_state_after_write(reload_result)
 
+    @router.post("/click", status_code=201)
+    def click_add(body: ClickAddBody) -> dict:
+        """좌표 직접 노드 추가 — admin UI 의 빈 곳 드래그 → 이름 팝업 후 호출."""
+        _check_nav_idle()
+        try:
+            ys.add(body.name.strip(), body.x, body.y, body.yaw)
+        except ys.WaypointStoreError as e:
+            raise HTTPException(409, str(e))
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
     @router.patch("/{name}")
     def move_node(name: str, body: MoveBody) -> dict:
         _check_nav_idle()
