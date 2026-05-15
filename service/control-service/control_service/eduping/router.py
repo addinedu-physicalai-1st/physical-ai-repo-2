@@ -4,6 +4,7 @@ REST:
   GET    /api/eduping/health
   GET    /api/eduping/dance
   POST   /api/eduping/dance                          (multipart: song + display_name + slug)
+  GET    /api/eduping/dance/{slug}/song               업로드된 곡 파일 스트리밍 (<audio> 용)
   DELETE /api/eduping/dance/{slug}
   POST   /api/eduping/dance/{slug}/record/start
   POST   /api/eduping/dance/{slug}/record/stop       {save: bool}
@@ -20,7 +21,7 @@ WS:
 teleop 의 `_Hub` 패턴 (asyncio.Queue per client, drop-oldest, daemon broadcaster) 을
 WS hub 두 개에 복제. 추후 3 번째 케이스 생기면 service/control-service/control_service/_common 으로 추출 예정.
 
-오디오 (곡) 재생은 다음 PR — 본 라우터는 모션 / 메타까지만.
+오디오 (곡) 는 GET /dance/{slug}/song 으로 스트리밍 — UI 의 <audio> 가 직접 재생.
 """
 from __future__ import annotations
 
@@ -45,6 +46,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from control_service.eduping.ros_bridge import (
@@ -203,6 +205,25 @@ async def create_dance(
         "song_bytes": written,
         "song_path": str(song_path),
     }
+
+
+@router.get("/dance/{slug}/song")
+async def get_dance_song(req: Request, slug: str) -> FileResponse:
+    """업로드된 곡 파일을 그대로 스트리밍. UI 의 <audio> 가 직접 받아 재생."""
+    bridge = _bridge(req)
+    if not SLUG_RE.match(slug):
+        raise HTTPException(400, "invalid slug")
+    from eduarm.routines_io import dance_song_path
+
+    path = dance_song_path(bridge.routines_root, slug)
+    if path is None or not path.exists():
+        raise HTTPException(404, f"song for {slug!r} not found")
+    media_type = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".m4a": "audio/mp4",
+    }.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media_type, filename=path.name)
 
 
 @router.delete("/dance/{slug}")

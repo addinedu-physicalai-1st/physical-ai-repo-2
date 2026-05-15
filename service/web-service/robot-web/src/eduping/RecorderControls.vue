@@ -24,6 +24,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'recorded', payload: { frame_count: number; duration_s: number }): void;
   (e: 'played', payload: { ok: boolean; duration_s: number }): void;
+  /** 곡을 처음부터 재생해 달라는 신호 — 녹화 시작 / 모션 재생 시작과 동시에. */
+  (e: 'song-play'): void;
+  /** 곡을 멈춰 달라는 신호 — 녹화 중지·저장 시. */
+  (e: 'song-stop'): void;
 }>();
 
 const recWs = useEdupingRecordingWs();
@@ -152,6 +156,7 @@ async function startRecording(): Promise<void> {
   countdown.value = null;
   try {
     await postJson(`${urlPrefix()}/record/start`);
+    emit('song-play');
   } catch {
     /* error in lastError already */
   }
@@ -161,6 +166,7 @@ async function stopRecording(): Promise<void> {
   if (inflight.value) return;
   try {
     const result = await postJson(`${urlPrefix()}/record/stop`, { save: true });
+    emit('song-stop');
     emit('recorded', {
       frame_count: result?.frame_count ?? 0,
       duration_s: result?.duration_s ?? 0,
@@ -185,6 +191,9 @@ async function doPlay(): Promise<void> {
     const result = await postJson(`${urlPrefix()}/play`, { target });
     const ok = !!result?.ok;
     const dur = Number(result?.duration_s ?? 0);
+    if (ok) {
+      emit('song-play');
+    }
     if (ok && dur > 0) {
       clearProgressTimer();
       playStartMs.value = Date.now();

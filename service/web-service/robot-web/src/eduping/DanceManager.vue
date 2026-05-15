@@ -43,6 +43,21 @@ const newError = ref('');
 const newSubmitting = ref(false);
 
 const selected = computed(() => items.value.find((i) => i.slug === selectedSlug.value));
+const songPlayer = ref<HTMLAudioElement | null>(null);
+
+function playSongFromStart(): void {
+  const el = songPlayer.value;
+  if (!el) return;
+  el.currentTime = 0;
+  void el.play().catch(() => {/* autoplay 차단 시 무음 fail */});
+}
+
+function stopSong(): void {
+  const el = songPlayer.value;
+  if (!el) return;
+  el.pause();
+  el.currentTime = 0;
+}
 
 // 재생 중 viewer 를 follower 채널로 일시 전환.
 const isPlaying = ref(false);
@@ -228,11 +243,22 @@ onMounted(refresh);
             <strong>{{ selected.display_name }}</strong>
             <span v-if="selected.recorded_at" class="muted small">{{ selected.recorded_at }}</span>
           </div>
+          <audio
+            v-if="selected.has_song !== false"
+            ref="songPlayer"
+            :key="selected.slug"
+            :src="`/api/eduping/dance/${encodeURIComponent(selected.slug)}/song`"
+            controls
+            preload="metadata"
+            class="song-player"
+          />
           <RecorderControls
             kind="dance"
             :name="selected.slug"
             @recorded="refresh"
             @played="onPlayed"
+            @song-play="playSongFromStart"
+            @song-stop="stopSong"
           />
         </section>
         <section v-else class="recorder-section muted">
@@ -419,6 +445,10 @@ onMounted(refresh);
   margin-bottom: 8px;
 }
 .selected-meta strong { font-size: 15px; color: #334155; }
+.song-player {
+  width: 100%;
+  margin-bottom: 10px;
+}
 .muted { color: #94a3b8; }
 .small { font-size: 12px; }
 .err {
