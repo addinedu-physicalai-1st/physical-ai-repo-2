@@ -59,6 +59,21 @@ class AutoEdgeBody(BaseModel):
     replace_existing: bool = False
 
 
+class MoveBody(BaseModel):
+    """노드 이동 — PATCH /waypoints/{name}."""
+    x: float
+    y: float
+    yaw: float
+
+
+class ClickAddBody(BaseModel):
+    """좌표 직접 노드 추가 — POST /waypoints/click."""
+    name: str = Field(..., min_length=1, max_length=40)
+    x: float
+    y: float
+    yaw: float
+
+
 def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     router = APIRouter(prefix="/waypoints", tags=["waypoints"])
 
@@ -139,6 +154,16 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
             ys.remove_lane(body.from_, body.to)
         except KeyError:
             raise HTTPException(404, "lane 없음")
+        reload_result = bridge.reload_graph()
+        return _emit_state_after_write(reload_result)
+
+    @router.patch("/{name}")
+    def move_node(name: str, body: MoveBody) -> dict:
+        _check_nav_idle()
+        try:
+            ys.update(name, body.x, body.y, body.yaw)
+        except KeyError:
+            raise HTTPException(404, f"'{name}' 없음")
         reload_result = bridge.reload_graph()
         return _emit_state_after_write(reload_result)
 
