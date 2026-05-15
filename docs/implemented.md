@@ -36,6 +36,14 @@
 | --- | --- | --- | --- | --- | --- |
 | SR-UI-001 | 표정 상시 표시 | 각 로봇 UI 가 표정 (basic·hello·happy·fun·interest·bored·sad·angry·sleep) 을 현재 모드·이벤트에 따라 디스플레이에 상시 표시한다. three.js 셰이더로 눈·눈썹·입 파라미터를 합성. | High | `ui/robot-ui/src/common/EmotionDisplay.vue`, `ui/robot-ui/src/common/ShaderFace.vue` | 2026-05-04 |
 
+## 4. Admin UI (PyQt5 데스크톱 앱, 로봇 관제)
+
+### 4.5 nav graph 편집
+
+| S ID | Name | Description | Priority | 구현 위치 | 완료일 |
+| --- | --- | --- | --- | --- | --- |
+| SR-ADM-006 | nav graph 편집 UI | Admin UI 가 SLAM 맵 + nav graph 위에서 노드/간선을 시각적으로 편집한다. 편집 모드 토글 시 노드 추가 (좌클릭-드래그 화살표 + 이름 팝업), 노드 이동 (드래그 → 화살표 미리보기 → 클릭), 1-step undo, 간선 잇기 (노드 2회 클릭) / 끊기 (간선 클릭 + Delete), 거리 threshold 기반 자동 간선, 기본값 snapshot 으로 초기화/갱신을 제공한다. 호버 하이라이트로 클릭 타겟 시각화. 변경은 yaml atomic write + graph_router reload 로 즉시 적용. nav2 이동 중에는 편집 모드 진입 차단 + 자동 이탈. | High | `ui/admin-ui/widgets/waypoint_map_card.py`, `server/control/waypoints/router.py`, `server/control/waypoints/yaml_store.py`, `server/control/waypoints/ros_bridge.py`, `device/gogoping_ws/src/gogoping/gogoping_navigation/gogoping_navigation/graph_router_node.py`, `device/gogoping_ws/src/gogoping/gogoping_navigation/gogoping_navigation/graph.py`, `device/gogoping_ws/src/gogoping/gogoping_navigation/config/waypoints.default.yaml`, `device/gogoping_ws/src/gogoping/gogoping_navigation/config/lanes.default.yaml` | 2026-05-15 |
+
 ## 5. Portal Web (학부모·교사 공용 웹앱)
 
 ### 5.1 교사 — 등록
