@@ -130,7 +130,9 @@ def update(name: str, x: float, y: float, yaw: float) -> Waypoint:
     return found
 
 
-def remove(name: str) -> None:
+def remove(name: str) -> list["Lane"]:
+    """노드 + 해당 노드 참여 lane cascade 제거.
+    반환: 함께 제거된 lane 목록 (UI 가 confirm dialog 에 표시용)."""
     wps, patrols = load()
     if not any(w.name == name for w in wps):
         raise KeyError(name)
@@ -139,7 +141,13 @@ def remove(name: str) -> None:
             raise WaypointStoreError(
                 f"'{name}' 은 patrol '{pname}' 에서 사용 중 — 먼저 patrol 에서 빼주세요"
             )
+    existing_lanes = load_lanes()
+    cascaded = [ln for ln in existing_lanes if ln.from_ == name or ln.to == name]
+    kept_lanes = [ln for ln in existing_lanes if ln.from_ != name and ln.to != name]
+    # lanes 먼저 저장 — validate 의 from/to 검증은 노드 삭제 전이라 통과
+    save_lanes(kept_lanes)
     save([w for w in wps if w.name != name], patrols)
+    return cascaded
 
 
 def get(name: str) -> Waypoint:

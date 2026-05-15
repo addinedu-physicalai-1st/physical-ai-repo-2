@@ -81,13 +81,18 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
     @router.delete("/{name}")
     def delete(name: str) -> dict:
         try:
-            ys.remove(name)
+            cascaded = ys.remove(name)
         except KeyError:
             raise HTTPException(404, f"'{name}' 없음")
         except ys.WaypointStoreError as e:
             raise HTTPException(409, str(e))
         bridge._emit({"type": "waypoints", "reason": "deleted"})
-        return {"ok": True}
+        return {
+            "ok": True,
+            "cascaded_lanes": [
+                {"from": ln.from_, "to": ln.to} for ln in cascaded
+            ],
+        }
 
     @router.post("/goto", status_code=202)
     def goto(body: GotoBody) -> dict:
