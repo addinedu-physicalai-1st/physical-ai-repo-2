@@ -106,10 +106,38 @@ def save(waypoints: list[Waypoint], patrols: dict[str, list[str]]) -> None:
         raise
 
 
+# 가장 최근에 add() 한 노드 이름 — undo_last_add() 의 단일 step 대상.
+# 모듈 변수 (단일 서버 프로세스 가정). 서버 재시작 시 리셋.
+_RECENT_ADD: str | None = None
+
+
 def add(name: str, x: float, y: float, yaw: float) -> Waypoint:
+    global _RECENT_ADD
     wps, patrols = load()
     wp = Waypoint(name=name, x=float(x), y=float(y), yaw=float(yaw))
     save([*wps, wp], patrols)
+    _RECENT_ADD = name
+    return wp
+
+
+def undo_last_add() -> Waypoint | None:
+    """가장 최근에 add() 한 노드 1개만 되돌림.
+    - 아무것도 add 안 했거나 이미 undo 후엔 None.
+    - 해당 노드에 lane 이 잇혀있으면 WaypointStoreError('node_has_lanes')."""
+    global _RECENT_ADD
+    if _RECENT_ADD is None:
+        return None
+    name = _RECENT_ADD
+    if any(ln.from_ == name or ln.to == name for ln in load_lanes()):
+        raise WaypointStoreError("node_has_lanes")
+    try:
+        wp = get(name)
+    except KeyError:
+        _RECENT_ADD = None
+        return None
+    wps, patrols = load()
+    save([w for w in wps if w.name != name], patrols)
+    _RECENT_ADD = None
     return wp
 
 
