@@ -81,6 +81,16 @@ class MapView(QWidget):
         self._drag_start: QPointF | None = None
         self._drag_current: QPointF | None = None
         self._drag_mode: str = "goal"
+        # 편집 모드 상태머신 — Task 19+ (편집 모드 ON 일 때만 활성)
+        # state: "ready" → ("node_pressed"|"empty_pressed"|"node_drag"|"add_drag"
+        #                  | "yaw_preview" | "link_pending" | "lane_selected")
+        self._edit_mode: bool = False
+        self._edit_state: str = "ready"
+        self._pressed_node: str | None = None      # mousePress 시점 잡힌 노드
+        self._selected_node: str | None = None      # LINK_PENDING 의 1차 노드
+        self._selected_lane: tuple[str, str] | None = None
+        self._yaw_preview: dict | None = None       # {name, new_x, new_y, end_widget}
+        self._hover_target: dict | None = None      # {kind: "node"|"lane", id}
         # 마우스 업 후 짧은 페이드 아웃 피드백
         self._feedback: dict | None = None              # {"start", "end", "started_at", "mode"}
         self._feedback_timer = QTimer(self)
@@ -524,10 +534,27 @@ class WaypointMapCard(QFrame):
                 border-left-width: 0.75px;
             }
         """)
+        # 편집 모드 토글 — graph 모드 한정. nav2 idle 일 때만 진입 가능.
+        self._btn_edit = QPushButton("✏ 편집 모드")
+        self._btn_edit.setCheckable(True)
+        self._btn_edit.setCursor(Qt.PointingHandCursor)
+        self._btn_edit.setFixedHeight(28)
+        self._btn_edit.setStyleSheet(
+            "QPushButton { background: #FFFFFF; color: #1A6B8A; "
+            "border: 1.5px solid #5BB9E0; border-radius: 8px; "
+            "padding: 0 14px; font-weight: 600; font-size: 12px; }"
+            "QPushButton:hover { background: #EAF6FB; }"
+            "QPushButton:checked { background: #E07B5B; color: #FFFFFF; "
+            "border-color: #E07B5B; }"
+        )
+        self._btn_edit.clicked.connect(self._on_edit_toggle)
+
         header.addWidget(self._title)
         header.addStretch(1)
         header.addWidget(self._status)
         header.addSpacing(12)
+        header.addWidget(self._btn_edit)
+        header.addSpacing(8)
         header.addWidget(self._btn_map)
         header.addWidget(self._btn_graph)
         layout.addLayout(header)
@@ -579,6 +606,33 @@ class WaypointMapCard(QFrame):
         self._sse = _SseThread(f"{control_url}/waypoints/events", self)
         self._sse.event_received.connect(self._dispatcher.handle)
         self._sse.start()
+
+    def _on_edit_toggle(self) -> None:
+        """편집 모드 토글 — 진입 시 health 호출해 nav_active 검사.
+        nav2 이동 중이면 진입 거부 + 토스트."""
+        import httpx
+        if not self._btn_edit.isChecked():
+            # OFF
+            self._map._edit_mode = False
+            self._map._edit_state = "ready"
+            self._map._selected_node = None
+            self._map._selected_lane = None
+            self._map._yaw_preview = None
+            self._map._hover_target = None
+            self._map.update()
+            return
+        try:
+            r = httpx.get(f"{self._control_url}/waypoints/health", timeout=2.0)
+            nav_active = bool(r.json().get("nav_active", False)) if r.status_code == 200 else False
+        except httpx.HTTPError:
+            nav_active = False
+        if nav_active:
+            QMessageBox.information(self, "편집 불가",
+                                    "이동 중에는 편집할 수 없어요. 도착 후 다시 시도하세요.")
+            self._btn_edit.setChecked(False)
+            return
+        self._map._edit_mode = True
+        self._map.update()
 
     def _set_mode(self, mode: str) -> None:
         """map / graph 토글 — MapView 마커 + 사이드 리스트 동시 제어.
