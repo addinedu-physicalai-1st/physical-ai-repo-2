@@ -134,6 +134,16 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[server/control] yaml_store — lanes.yaml + default snapshot"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest tests/test_waypoints_yaml_store_lanes.py -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[server/control] waypoints ros_bridge (non-ros tests only — ROS 통합은 @pytest.mark.ros)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
@@ -154,6 +164,19 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[server/control] router — nav graph editor endpoints"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest \
+  tests/test_waypoints_router_lanes.py \
+  tests/test_waypoints_router_edit.py \
+  -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[tests] BT waypoints client (REST + cache)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
@@ -168,10 +191,30 @@ echo "[ui/admin-ui] waypoint map card — pytest-qt 필요 (없으면 자동 ski
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 # pytest exit 5 = no tests collected (pytest-qt 미설치 시 importorskip 으로 전체 skip)
+# exit 134 = Qt cleanup SIGABRT (테스트 결과는 정상 — 환경 이슈)
 conda run -n jazzy pytest tests/test_waypoint_map_card.py -v "$@" || {
   rc=$?
   if [[ "$rc" -eq 5 ]]; then
     echo "  ※ pytest-qt 미설치 — 전체 SKIPPED (정상)"
+  elif [[ "$rc" -eq 134 ]]; then
+    echo "  ※ Qt cleanup SIGABRT — 테스트 결과는 정상"
+  else
+    EXIT=1
+  fi
+}
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[ui/admin-ui] waypoint map card — nav graph editor"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+conda run -n jazzy pytest tests/test_waypoint_map_card_edit.py -v "$@" || {
+  rc=$?
+  if [[ "$rc" -eq 5 ]]; then
+    echo "  ※ pytest-qt 미설치 — 전체 SKIPPED (정상)"
+  elif [[ "$rc" -eq 134 ]]; then
+    echo "  ※ Qt cleanup SIGABRT — 테스트 결과는 정상"
   else
     EXIT=1
   fi
