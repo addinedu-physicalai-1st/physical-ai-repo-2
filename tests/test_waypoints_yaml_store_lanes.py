@@ -129,3 +129,46 @@ def test_remove_cascades_lanes(tmp_path, monkeypatch):
     remaining = ys.load_lanes()
     assert len(remaining) == 1
     assert remaining[0].from_ == "A" and remaining[0].to == "C"
+
+
+# ---- Task 6: default snapshot ----
+def test_snapshot_and_restore_default_roundtrip(tmp_path, monkeypatch):
+    from server.control.waypoints import yaml_store as ys
+    wp = tmp_path / "waypoints.yaml"
+    wp.write_text(
+        "waypoints:\n"
+        "  - {id: 1, name: A, x: 0.0, y: 0.0, yaw: 0.0}\n"
+        "patrols: {}\n", encoding="utf-8",
+    )
+    wp_def = tmp_path / "waypoints.default.yaml"
+    lanes = tmp_path / "lanes.yaml"
+    lanes.write_text("lanes: []\n", encoding="utf-8")
+    lanes_def = tmp_path / "lanes.default.yaml"
+
+    monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))
+    monkeypatch.setenv("PINGDER_WAYPOINTS_DEFAULT_FILE", str(wp_def))
+    monkeypatch.setenv("PINGDER_LANES_FILE", str(lanes))
+    monkeypatch.setenv("PINGDER_LANES_DEFAULT_FILE", str(lanes_def))
+
+    ys.snapshot_default()
+    ys.snapshot_default_lanes()
+    assert wp_def.exists() and lanes_def.exists()
+
+    # working 변경
+    ys.add("Z", 9.0, 9.0, 0.0)
+    assert len(ys.load()[0]) == 2
+
+    # 초기화 — default 로 복구
+    ys.restore_default()
+    assert len(ys.load()[0]) == 1
+    assert ys.load()[0][0].name == "A"
+
+
+def test_restore_default_missing_raises(tmp_path, monkeypatch):
+    from server.control.waypoints import yaml_store as ys
+    wp = tmp_path / "waypoints.yaml"
+    wp.write_text("waypoints: []\npatrols: {}\n", encoding="utf-8")
+    monkeypatch.setenv("PINGDER_WAYPOINTS_FILE", str(wp))
+    monkeypatch.setenv("PINGDER_WAYPOINTS_DEFAULT_FILE", str(tmp_path / "absent.yaml"))
+    with pytest.raises(FileNotFoundError):
+        ys.restore_default()

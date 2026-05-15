@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import os
+import shutil
 import tempfile
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -229,6 +230,58 @@ def load_lanes() -> list[Lane]:
             bidirectional=bool(entry.get("bidirectional", True)),
         ))
     return out
+
+
+def _default_path() -> Path:
+    return Path(os.environ.get(
+        "PINGDER_WAYPOINTS_DEFAULT_FILE",
+        str(_path().parent / "waypoints.default.yaml"),
+    ))
+
+
+def _lanes_default_path() -> Path:
+    return Path(os.environ.get(
+        "PINGDER_LANES_DEFAULT_FILE",
+        str(_lanes_path().parent / "lanes.default.yaml"),
+    ))
+
+
+def snapshot_default() -> None:
+    """working waypoints.yaml → waypoints.default.yaml."""
+    src = _path()
+    dst = _default_path()
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
+
+
+def restore_default() -> int:
+    """waypoints.default.yaml → working. 반환: 노드 개수."""
+    src = _default_path()
+    if not src.exists():
+        raise FileNotFoundError(f"{src} 없음 — 먼저 snapshot_default() 호출 필요")
+    dst = _path()
+    shutil.copyfile(src, dst)
+    return len(load()[0])
+
+
+def snapshot_default_lanes() -> None:
+    """working lanes.yaml → lanes.default.yaml."""
+    src = _lanes_path()
+    if not src.exists():
+        save_lanes([])   # 빈 working 도 동결 가능하게 빈 파일 생성
+    dst = _lanes_default_path()
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
+
+
+def restore_default_lanes() -> int:
+    """lanes.default.yaml → working. 반환: lane 개수."""
+    src = _lanes_default_path()
+    if not src.exists():
+        raise FileNotFoundError(f"{src} 없음")
+    dst = _lanes_path()
+    shutil.copyfile(src, dst)
+    return len(load_lanes())
 
 
 def _lanes_match(a: Lane, from_: str, to: str) -> bool:
