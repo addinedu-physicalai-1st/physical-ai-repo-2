@@ -12,6 +12,8 @@
 #   on_state_change 콜백 정상 발화 → main.py 의 BT swap 자동.
 
 string target_state     # STATES 8개 중 하나
+string sub_task         # 옵션 — "carry"/"follow"/"lullaby" (ASSIST), "hideseek" (PLAY), "" (none).
+                        # 비어있지 않으면 force_state 전에 blackboard 의 assist_task / play_task 세팅.
 ---
 bool accepted           # state 가 유효한 STATES 일 때 True. 같은 state 재요청도 True (no-op)
-string reason           # accepted=false 시: "invalid_state"
+string reason           # accepted=false 시: "invalid_state" / "invalid_sub_task"

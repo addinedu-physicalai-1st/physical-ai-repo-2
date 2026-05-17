@@ -296,7 +296,7 @@ class AdminWindow(QMainWindow):
         right_lay.setSpacing(0)
         self.topbar = TopBar()
         right_lay.addWidget(self.topbar)
-        
+
         self.stack = QStackedWidget()
         self.pages: dict[str, QWidget] = {
             "noriarm":  NoriArmDashboard(),
@@ -315,12 +315,21 @@ class AdminWindow(QMainWindow):
         self.state_client = StateClient(base_url=control_url)
         self.state_client.connect(self.topbar.bt_state.update_snapshot)
 
+        # 디버그 패널 (BTStateInline 우측) → state_client.post_force_state
+        self.topbar.bt_state.debug_panel.force_state_requested.connect(
+            lambda state, sub: self.state_client.post_force_state(
+                state, sub_task=sub,
+                on_result=self.topbar.bt_state.debug_panel.set_last_result,
+            )
+        )
+
         self._select("gogoping")
 
     def _select(self, key: str) -> None:
         self.sidebar.select(key)
         self.stack.setCurrentWidget(self.pages[key])
         self.topbar.set_page(key)
+        # 디버그 패널은 BTStateInline 안에 있어서 set_page(key) 가 함께 토글
 
     def closeEvent(self, ev) -> None:   # noqa: N802
         if self.stream_client is not None:

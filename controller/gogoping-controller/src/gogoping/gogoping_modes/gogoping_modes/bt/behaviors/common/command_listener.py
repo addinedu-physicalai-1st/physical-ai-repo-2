@@ -1,11 +1,11 @@
-"""CommandListener — UI 의 SetGoal.srv 요청을 받아 reconciler 호출.
+"""CommandListener — UI 의 SetGoal / ForceState 서비스 요청을 받아 처리.
 
 ## 책임
 
-1. ``gogoping_msgs/srv/SetGoal`` 서비스 서버 1개 생성 (상대 path ``"set_goal"`` —
-   node namespace ``"gogoping"`` 이 prefix → 실제 ``/gogoping/set_goal``).
-2. 서비스 콜백에서 ``goal_reconciler.reconcile()`` 호출.
-3. reconcile 결과를 ``SetGoal.Response`` 로 변환해 클라이언트에 응답.
+1. ``gogoping_msgs/srv/SetGoal`` 서비스 서버 — 정상 mode 클릭 (UI 의 robot-web 메뉴).
+   ``goal_reconciler.reconcile()`` 호출해 적절한 FSM trigger 발화.
+2. ``gogoping_msgs/srv/ForceState`` 서비스 서버 — 디버그 강제 state 전이 (admin UI 의
+   debug_state_bar). ``fsm.force_state(target)`` 직접 호출 — transition 규칙 우회.
 
 ## py_trees behavior 측면
 
@@ -49,22 +49,26 @@ class CommandListener(py_trees.behaviour.Behaviour):
     blackboard 권한은 ``goal_reconciler`` 가 받는 mock 호환 wrapper 를 거쳐 등록.
     """
 
-    SERVICE_NAME = "set_goal"  # 상대 path — node namespace 가 /gogoping 으로 prefix
+    SERVICE_NAME = "set_goal"           # 상대 path — node namespace 가 /gogoping 으로 prefix
+    FORCE_STATE_SERVICE_NAME = "debug/force_state"
 
     def __init__(self, name: str, context: "Context"):
         super().__init__(name)
         self.ctx = context
         self._srv = None
+        self._force_state_srv = None
         self._bb_writer: _BlackboardWriter | None = None
 
     def setup(self, **kwargs) -> None:
         """py_trees 가 트리 setup 시 1회 호출 — 서비스 서버 + blackboard 권한 등록."""
         # lazy import — ROS sourcing 안 된 환경에서도 본 모듈 import 가능하게
-        from gogoping_msgs.srv import SetGoal
+        from gogoping_msgs.srv import ForceState, SetGoal
 
-        self._srv_type = SetGoal
         self._srv = self.ctx.node.create_service(
             SetGoal, self.SERVICE_NAME, self._on_set_goal_request,
+        )
+        self._force_state_srv = self.ctx.node.create_service(
+            ForceState, self.FORCE_STATE_SERVICE_NAME, self._on_force_state_request,
         )
 
         # blackboard writer — reconciler 에 주입할 wrapper.
@@ -113,6 +117,55 @@ class CommandListener(py_trees.behaviour.Behaviour):
             f"reason={result.reason!r}"
         )
 
+        return response
+
+    # ------------------------------------------------------------ ForceState callback
+
+    # ASSIST/PLAY 의 sub_task 매핑 — admin UI debug dropdown 의 옵션과 일치
+    _ASSIST_SUB_TASKS = ("carry", "follow", "lullaby")
+    _PLAY_SUB_TASKS = ("hideseek",)
+
+    def _on_force_state_request(self, request, response):
+        """``ForceState.srv`` 콜백 — admin UI 디버그가 호출.
+
+        transition 규칙 우회. ``fsm.force_state(target)`` + (옵션) blackboard.task 세팅.
+        sub_task 가 비어있지 않으면 force_state 전에 blackboard 의 assist_task / play_task
+        세팅 — BT swap 후 TaskSelector 가 해당 branch 진입.
+        """
+        target = request.target_state
+        sub_task = getattr(request, "sub_task", "") or ""
+
+        # sub_task 유효성 (state 와 짝)
+        if sub_task:
+            if target == "ASSIST" and sub_task not in self._ASSIST_SUB_TASKS:
+                response.accepted = False
+                response.reason = "invalid_sub_task"
+                return response
+            if target == "PLAY" and sub_task not in self._PLAY_SUB_TASKS:
+                response.accepted = False
+                response.reason = "invalid_sub_task"
+                return response
+            if target not in ("ASSIST", "PLAY"):
+                # ASSIST/PLAY 외에는 sub_task 무시 (warn only)
+                self.ctx.node.get_logger().warning(
+                    f"ForceState: sub_task={sub_task!r} ignored for state={target!r}"
+                )
+                sub_task = ""
+
+        # blackboard 의 task 키 미리 세팅 — TaskSelector 가 BT swap 직후 올바른 branch 진입
+        if sub_task:
+            if target == "ASSIST":
+                self._bb_writer.set("assist_task", sub_task)
+            elif target == "PLAY":
+                self._bb_writer.set("play_task", sub_task)
+
+        ok = self.ctx.fsm.force_state(target)
+        response.accepted = ok
+        response.reason = "" if ok else "invalid_state"
+        self.ctx.node.get_logger().info(
+            f"ForceState target={target!r} sub_task={sub_task!r} → accepted={ok}, "
+            f"current_state={self.ctx.fsm.current_state!r}"
+        )
         return response
 
 

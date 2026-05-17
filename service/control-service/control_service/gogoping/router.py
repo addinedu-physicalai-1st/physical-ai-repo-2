@@ -43,6 +43,24 @@ class GogopingModeResponse(BaseModel):
 # ---------------------------------------------------------------- Router install
 
 
+_VALID_FORCE_STATES = (
+    "CHARGING", "IDLE", "ASSIST", "PLAY", "MANUAL",
+    "RETURNING", "LOW_BATTERY_RETURN", "ERROR",
+)
+
+
+class ForceStateRequest(BaseModel):
+    """admin UI 의 디버그 패널이 POST 하는 payload."""
+    target_state: str        # 8개 STATES 중 하나
+    sub_task: str = ""       # 옵션 — "carry"/"follow"/"lullaby" (ASSIST) / "hideseek" (PLAY)
+
+
+class ForceStateResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    current_state: str = ""  # bridge 가 최근 본 state (참고용)
+
+
 def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
     """app 에 라우터 부착. ``bridge`` 는 lifespan 에서 미리 ``start()`` 호출되어 있어야 함."""
 
@@ -67,6 +85,20 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
         return GogopingModeResponse(
             accepted=accepted, reason=reason,
             goal_mode=goal.mode, goal_task=goal.task,
+        )
+
+    @router.post("/debug/force-state", response_model=ForceStateResponse)
+    async def force_state(req: ForceStateRequest) -> ForceStateResponse:
+        """[디버그 전용] FSM 강제 state 전이 (+ 옵션 sub_task)."""
+        if req.target_state not in _VALID_FORCE_STATES:
+            raise HTTPException(400, f"invalid target_state: {req.target_state!r}")
+        accepted, reason = await asyncio.to_thread(
+            bridge.force_state_sync, req.target_state, req.sub_task,
+        )
+        latest = bridge.get_latest_state() or {}
+        return ForceStateResponse(
+            accepted=accepted, reason=reason,
+            current_state=latest.get("fsm_state", ""),
         )
 
     app.include_router(router)
