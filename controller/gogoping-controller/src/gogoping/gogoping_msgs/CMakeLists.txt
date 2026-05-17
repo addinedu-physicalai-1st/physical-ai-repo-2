@@ -19,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SendCommand.srv"          # [DEPRECATED] — SetGoal.srv 사용
   "srv/SetGoal.srv"
   "srv/ForceState.srv"
+  "srv/SetBatteryLevel.srv"
   "srv/RouteToVertex.srv"
   "action/NavigateToVertex.action"
   DEPENDENCIES std_msgs geometry_msgs builtin_interfaces

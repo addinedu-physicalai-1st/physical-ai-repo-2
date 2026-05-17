@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (walking skeleton — 8 MainTree + FSM 8 state + ForceState debug)
+마지막 업데이트: 2026-05-18 (walking skeleton + 배터리 monitor 라인 — BatterySubscriber 실 구현 + battery_low_monitor + sim 디버그 슬라이더)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -18,11 +18,11 @@
 | 트리 | 상태 | 비고 |
 |---|---|---|
 | BT_charging_main | ✅ | Parallel(BatteryFullMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
-| BT_idle_main | ✅ | Parallel(CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
-| BT_assist_main | ✅ | Parallel(CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
-| BT_play_main | ✅ | Parallel(CommandListener + TaskSelector — hideseek 분기, stub) |
-| BT_manual_main | ✅ | Parallel(CommandListener). torque OFF / 자동 monitor 0개. docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
-| BT_returning_main | ✅ | Parallel(CommandListener). 진짜 ReturnSubTree 는 미작성 |
+| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
+| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
+| BT_play_main | ✅ | Parallel(BatteryLowMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
+| BT_manual_main | ✅ | Parallel(CommandListener). torque OFF / 자동 monitor 0개 (BatteryLowMonitor 의도적 미배치 — 사용자 직접 제어 중 자동 빼앗김 방지). docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
+| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + CommandListener). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. 진짜 ReturnSubTree 는 미작성 |
 | BT_low_battery_return_main | ✅ | Parallel(빈 lockdown — CommandListener 없음). battery_low escalation 도피 state. docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(빈 terminal). reset 없음 — 사람이 재시작 |
 
@@ -59,7 +59,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | Behavior | 상태 | 파일 |
 |---|---|---|
 | battery_full_monitor | ✅ | [battery_full_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) — BT_charging_main 에 배치, 부팅 시 CHARGING → IDLE 자동 전이 (BATTERY_LEVEL init=100.0 가정) |
-| battery_low_monitor | ☐ | `BatterySubscriber` 가 진짜 ROS 토픽 구독 시작 후 |
+| battery_low_monitor | ✅ | [battery_low_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_low_monitor.py) — hysteresis 20% 진입 / 25% 진출, edge-triggered. BT_idle/assist/play/returning_main 4개 배치 (RETURNING 은 LOW_BATTERY_RETURN escalation). 5 시나리오 통과 |
 | hardware_health_monitor | ☐ | |
 | collision_event_handler | ☐ | |
 | map_boundary_monitor | ☐ | 맵 밖 이탈 시 fault(reason="out_of_map"). ASSIST/PLAY/RETURNING 만 (MANUAL 의도적 제외) |
@@ -135,7 +135,11 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | nav2 stack (실물) | ☐ | TODO. (`device-gogoping-laptop.sh` 에 nav2 window 자리 마련됨) |
 | `device-gogoping-laptop.sh` | 🟡 | graph-router + modes 2 window. nav2 / vision 미포함 |
 | `device-gogoping-sim.sh` | ✅ | gazebo + graph-router + modes + rviz self-contained |
-| ROS msg/srv 계약 (gogoping_msgs) | ✅ | `Goal.msg` / `GoalStatus.msg` / `SetGoal.srv` / `ForceState.srv` (CMakeLists 등록 완료) |
+| ROS msg/srv 계약 (gogoping_msgs) | ✅ | `Goal.msg` / `GoalStatus.msg` / `SetGoal.srv` / `ForceState.srv` / `SetBatteryLevel.srv` (CMakeLists 등록 완료) |
+| BatterySubscriber (real) | ✅ | [battery_subscriber.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/battery_subscriber.py) — `/gogoping/battery` (sensor_msgs/BatteryState) 구독. `percentage * 100 → Keys.BATTERY_LEVEL`. NaN 시 직전 값 유지 |
+| sim_battery_node | ✅ | [gogoping_bringup/sim_battery_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/sim_battery_node.py) — sim 전용. `/gogoping/battery` 1Hz publish + `/gogoping/sim/set_battery_level` srv. device-gogoping-sim.sh 가 자동 실행 |
+| Control Service `/api/gogoping/debug/battery` | ✅ | BatteryDebugSlider → state_client → POST → ros_bridge.set_battery_level_sync → `SetBatteryLevel.srv` |
+| Admin UI BatteryDebugSlider | ✅ | BTStateInline 디버그 영역. QSlider(0-100) + 현재값 라벨 + 적용. 임계점 (low 50/55, full 80) 표시 |
 | server REST `/waypoints/route` `/waypoints/navigate` | ✅ | tests/test_waypoints_router.py 통과 |
 | admin UI lanes / route 시각화 | ✅ | graph map 모드 |
 | robot-web 음성 → goto_vertex | ✅ | "X로 가" / "복귀" 인식 + `/waypoints/navigate` 호출 (보조 모드 우회 통과). 분류기는 [service/ai-service/ai_service/hub.py](../../../../service/ai-service/ai_service/hub.py) `_try_goto_vertex` / `_is_return_text` |

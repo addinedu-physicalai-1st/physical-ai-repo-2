@@ -53,8 +53,8 @@ from gogoping_modes.context import Context
 
 
 class BatteryLowMonitor(py_trees.behaviour.Behaviour):
-    LOW_ENTER = 50.0   # 진입 임계
-    LOW_EXIT = 55.0    # 진출 (hysteresis)
+    LOW_ENTER = 20.0   # 진입 임계
+    LOW_EXIT = 25.0    # 진출 (hysteresis)
 
     def __init__(self, name: str, context: Context):
         super().__init__(name)

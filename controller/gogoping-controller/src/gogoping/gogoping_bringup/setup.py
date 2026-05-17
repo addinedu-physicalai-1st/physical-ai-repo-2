@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'sim_status_publisher = gogoping_bringup.sim_status_publisher:main',
+            'sim_battery_node = gogoping_bringup.sim_battery_node:main',
         ],
     },
 )

@@ -146,5 +146,43 @@ class StateClient:
 
         threading.Thread(target=_run, name=f"force_state_{target_state}", daemon=True).start()
 
+    def post_battery_level(
+        self,
+        level: float,
+        on_result: Callable[[float, bool, str], None] | None = None,
+    ) -> None:
+        """**sim 디버그** — ``POST /api/gogoping/debug/battery``.
+
+        별도 thread 에서 HTTP 호출. 응답 시 ``on_result(level, ok, reason)`` 콜백 —
+        admin UI 의 BatteryDebugSlider 가 ✓/✗ 표시.
+
+        운영(실물 Pi) 환경엔 sim_battery_node 없음 → ok=False, reason="service_unavailable".
+        """
+        url = f"{self._base}/api/gogoping/debug/battery"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(url, json={"level": level})
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(level, ok, reason)
+                except Exception as e:
+                    logger.warning(f"battery_level on_result 콜백 오류: {e}")
+
+        threading.Thread(target=_run, name=f"battery_level_{level:.0f}", daemon=True).start()
+
 
 __all__ = ["StateClient"]

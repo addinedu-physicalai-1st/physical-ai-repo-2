@@ -28,9 +28,9 @@ CHARGING
 
 IDLE
   main: Parallel
-        ├─ BatteryLowMonitor
-        ├─ HardwareHealthMonitor
-        └─ CommandListener
+        ├─ BatteryLowMonitor      (✅ — battery ≤ 20% → battery_low → RETURNING)
+        ├─ HardwareHealthMonitor  (추후)
+        └─ CommandListener        (✅)
   sub: 없음
 
 
@@ -81,9 +81,10 @@ MANUAL
 
 RETURNING
   main: Parallel (SuccessOnSelected=[ReturnSubTree])
-        ├─ HardwareHealthMonitor
-        ├─ CollisionEventHandler
-        └─ MapBoundaryMonitor           ※ 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map")
+        ├─ BatteryLowMonitor      (✅ — escalation: 또 떨어지면 LOW_BATTERY_RETURN)
+        ├─ HardwareHealthMonitor  (추후)
+        ├─ CollisionEventHandler  (추후)
+        └─ MapBoundaryMonitor     (추후)   ※ 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map")
 
   sub: ReturnSubTree (Sequence, memory=True)
         ├─ NavigateToPose(charging_dock_approach_key)
