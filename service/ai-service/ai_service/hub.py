@@ -33,8 +33,9 @@ from ai_service.llm import LLMError, generate_chat, generate_report
 from ai_service.edge_tts_synth import synthesize_edge_mp3
 from ai_service.config import settings as ai_settings
 
+from ai_service import prompts
 from ai_service.guard_replies import teacher_idk_line
-from ai_service.robots import STOP_TOKENS, is_known_robot, modes_for, robot_display_name
+from ai_service.robots import STOP_TOKENS, is_known_robot, modes_for
 
 
 @asynccontextmanager
@@ -213,7 +214,7 @@ def _emotion_demo_response(text: str, robot: str) -> dict | None:
     if len(c) > 10 and not has_imperative:
         return None
 
-    name = robot_display_name(robot)
+    name = prompts.display_name(robot)
 
     if any(k in c for k in ("화내", "화나", "짜증", "빡쳐", "열받", "분노")):
         return {
@@ -418,11 +419,11 @@ async def voice_intent(req: IntentRequest) -> dict:
     except asyncio.TimeoutError:
         return {
             "kind": "chat",
-            "reply": teacher_idk_line(robot_display_name(req.robot)),
+            "reply": teacher_idk_line(prompts.display_name(req.robot)),
             "emotion": "basic",
         }
     except LLMError:
-        name = robot_display_name(req.robot)
+        name = prompts.display_name(req.robot)
         return {
             "kind": "chat",
             "reply": f"{name}에게 잠깐 연결 문제가 생겼어요. 다시 한번 말해줄래요?",
