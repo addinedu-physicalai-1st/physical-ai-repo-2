@@ -1,6 +1,6 @@
-"""Nav2 NavigateToPose 액션 클라이언트 (Day 2 TODO).
+"""Nav2 NavigateToPose 액션 클라이언트 (TODO).
 
-# STUB: replace Day 2
+# STUB
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class Nav2Client:
-    """Day 2 에 nav2_msgs/action/NavigateToPose 클라이언트로 구현.
+    """추후 nav2_msgs/action/NavigateToPose 클라이언트로 구현.
 
     예상 API: send_goal(pose_name) -> goal_handle, poll_status(handle) -> Status, cancel(handle).
     """

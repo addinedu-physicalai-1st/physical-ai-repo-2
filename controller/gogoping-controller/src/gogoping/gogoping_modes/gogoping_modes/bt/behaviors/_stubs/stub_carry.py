@@ -1,6 +1,6 @@
-"""# STUB: replace Day 3~4 — BT_carry_sub.py placeholder.
+"""# STUB — BT_carry_sub.py placeholder.
 
-## 진짜 carry sub tree 의 모양 (Day 3~4 작성 예정)
+## 진짜 carry sub tree 의 모양 (추후 작성)
 
 ``BT_carry_sub`` 는 운반 task 의 root. ``blackboard.CARRY_MODE`` 값에 따라 3-way 분기:
 
@@ -23,7 +23,7 @@
 
 ## 교체 시점
 
-Day 3~4. 작성 순서:
+작성 순서:
 1. ``bt/trees/sub_trees/BT_carry_sub.py`` 의 ``build(ctx)`` 함수 작성
 2. ``bt/trees/main_trees/BT_assist_main.py`` 의 ``StubCarry()`` 호출을
    ``build_carry(ctx)`` 로 교체
@@ -43,7 +43,7 @@ class StubCarry(StubRunningThenSuccess):
     실제 작동 시 ``"BT_carry_sub"`` 아래에 ``"LoadStabilityCheck"`` /
     ``"NavigateToPose(destination_key)"`` 등이 나오게 될 자리.
 
-    # STUB: replace Day 3~4 — bt/trees/sub_trees/BT_carry_sub.py 의 build_carry 로 교체.
+    # STUB — bt/trees/sub_trees/BT_carry_sub.py 의 build_carry 로 교체.
     """
 
     def __init__(self, running_ticks: int | None = None):

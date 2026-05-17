@@ -1,6 +1,6 @@
-"""# STUB: replace Day 3~4 — BT_hide_and_seek_sub.py placeholder.
+"""# STUB — BT_hide_and_seek_sub.py placeholder.
 
-## 진짜 hide-and-seek sub tree 의 모양 (Day 3~4 작성 예정)
+## 진짜 hide-and-seek sub tree 의 모양 (추후 작성)
 
 ``BT_hide_and_seek_sub`` 는 숨바꼭질 task. 1회 실행 후 종료되는 가장 복잡한 sub tree —
 ``search_waypoints`` 리스트 길이에 따라 *동적 빌드* 되는 특이 케이스 (자세한
@@ -29,11 +29,11 @@ blackboard read: ``HIDE_POSITION_KEY``, ``SEARCH_WAYPOINTS``, ``HOME_POSITION_KE
 ## 본 stub 의 동작
 
 3 tick RUNNING → SUCCESS. 진짜 hide-and-seek 은 N waypoint 순회라 수십초~수분이지만
-Day 1 단계엔 짧게.
+현재 단계엔 짧게.
 
 ## 교체 시점
 
-Day 3~4. 다른 stub 과 달리 *동적 빌드* 패턴이라 ``build_hide_and_seek(ctx)`` 함수가
+다른 stub 과 달리 *동적 빌드* 패턴이라 ``build_hide_and_seek(ctx)`` 함수가
 blackboard 의 ``SEARCH_WAYPOINTS`` 를 build 시점에 읽어 N 개 Sequence 를 생성. 자세한
 구조는 ``conventions.md §4.1`` 참조 — 일반 build_*(ctx) 패턴과 다른 점만 거기 정리됨.
 """
@@ -45,7 +45,7 @@ from ._base import StubRunningThenSuccess
 class StubHideseek(StubRunningThenSuccess):
     """hideseek sub tree 자리를 채우는 placeholder.
 
-    # STUB: replace Day 3~4 —
+    # STUB —
     # bt/trees/sub_trees/BT_hide_and_seek_sub.py 의 build_hide_and_seek 로 교체.
     """
 

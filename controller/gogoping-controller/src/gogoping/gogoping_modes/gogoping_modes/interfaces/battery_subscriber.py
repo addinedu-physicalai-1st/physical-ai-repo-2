@@ -1,6 +1,6 @@
-"""배터리 상태 토픽 구독 → blackboard.battery_level 갱신 (Day 2 TODO).
+"""배터리 상태 토픽 구독 → blackboard.battery_level 갱신 (TODO).
 
-# STUB: replace Day 2
+# STUB
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class BatterySubscriber:
-    """Day 2 에 sensor_msgs/BatteryState 구독으로 구현.
+    """추후 sensor_msgs/BatteryState 구독으로 구현.
 
     수신 시 ``blackboard.BATTERY_LEVEL`` 을 percentage 로 W.
     """

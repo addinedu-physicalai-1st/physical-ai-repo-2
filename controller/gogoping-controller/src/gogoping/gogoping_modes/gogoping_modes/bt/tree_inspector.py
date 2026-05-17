@@ -19,7 +19,7 @@ snapshot 구조::
           ...
         ]
       },
-      "sub_tree": null,    # Day 3+ 에 BT_*_sub 이름 패턴 매칭 시 채워짐
+      "sub_tree": null,    # + 에 BT_*_sub 이름 패턴 매칭 시 채워짐
       "ts": 1730000035.123
     }
 
@@ -29,8 +29,8 @@ snapshot 구조::
   composite (Selector/Sequence/Parallel) 자체는 표시 안 함 — 자식만. RUNNING 가 아닌
   leaves (SUCCESS/FAILURE/INVALID) 도 포함해서 진행도 표시 (admin 위젯이 status 별
   시각 차별 적용).
-- **sub_tree**: ``BT_*_sub`` naming convention 으로 식별. Day 3+ 진짜 SubTree 가 생기면
-  자동으로 잡힘. Day 1 walking skeleton 의 stub 들 (StubCarry 등) 은 BT_*_sub 이름이
+- **sub_tree**: ``BT_*_sub`` naming convention 으로 식별. + 진짜 SubTree 가 생기면
+  자동으로 잡힘. 현재 단계 의 stub 들 (StubCarry 등) 은 BT_*_sub 이름이
   아니라 *main_tree.children* 에 그대로 평탄화됨.
 """
 from __future__ import annotations
@@ -113,7 +113,7 @@ def _leaf_dict(node: Any) -> dict:
 def _find_subtree(node: Any, depth: int) -> Any | None:
     """RUNNING 인 BT_*_sub 첫 매칭 노드 반환 (없으면 None).
 
-    Day 1 단계엔 stub 들이 BT_*_sub 이름이 아니므로 None 반환. Day 3+ 진짜
+    현재 단계엔 stub 들이 BT_*_sub 이름이 아니므로 None 반환. + 진짜
     SubTree 작성 시 자동으로 잡힘.
     """
     if depth >= _MAX_DEPTH:

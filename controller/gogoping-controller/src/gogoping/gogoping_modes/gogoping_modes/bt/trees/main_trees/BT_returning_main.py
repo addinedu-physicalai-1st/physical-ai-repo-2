@@ -1,6 +1,6 @@
 """RETURNING state MainTree — 도크로 자율 복귀 중.
 
-Day 1 walking skeleton: CommandListener 만 (ReturnSubTree 와 모니터들은 Day 2).
+현재 stub: CommandListener 만 (ReturnSubTree 와 모니터들은 ).
 """
 from __future__ import annotations
 
@@ -17,6 +17,6 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         children=[
             CommandListener("CommandListener", ctx),
-            # TODO Day 2: HardwareHealthMonitor, CollisionEventHandler, MapBoundaryMonitor, ReturnSubTree
+            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler, MapBoundaryMonitor, ReturnSubTree
         ],
     )

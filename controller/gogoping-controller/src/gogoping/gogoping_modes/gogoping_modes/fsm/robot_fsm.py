@@ -119,3 +119,27 @@ class RobotFSM:
     def _after_state_change(self, *args, **kwargs) -> None:
         for fn in self._listeners:
             fn()
+
+    # ------------------------------------------------------------ debug
+
+    def force_state(self, target: str) -> bool:
+        """**디버그 전용** — transition 규칙 우회하고 state 강제 진입.
+
+        admin UI 의 debug_state_bar (TopBar 디버그 row) 가 호출. 정상 운영에선 사용 X.
+
+        - 모든 state 간 임의 전이 가능 (CHARGING / LOW_BATTERY_RETURN / ERROR 도 진입 가능)
+        - ``on_state_change`` 콜백 정상 발화 → main.py 가 BT swap 처리
+        - target 이 STATES 외면 False
+
+        주의: transition library 의 callback API 가 직접 set_state 시 fire 되지 않으므로
+        본 메서드가 수동으로 ``_after_state_change`` 호출.
+        """
+        if target not in STATES:
+            return False
+        old = self.current_state
+        if old == target:
+            return True  # no-op (이미 그 state)
+        self.machine.set_state(target)
+        # transitions.Machine.set_state 는 callback 안 부름 — 직접 호출
+        self._after_state_change()
+        return True
