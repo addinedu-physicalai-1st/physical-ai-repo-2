@@ -3,18 +3,19 @@
  * 율동 재생 팝업 — EduPing 의 '율동' 모드 진입 시 표시.
  *
  * 라이브러리 (GET /api/eduping/dance) 를 띄우고, 곡 선택 시
- * POST /api/eduping/dance/{slug}/play (target='real' 우선, 실패 시 'sim')
- * + <audio> 동시 재생. ThreeJS 시뮬레이션 (OpenarmViewer) 으로 모션 미리보기.
+ * unified stream WS (/api/eduping/dance/{slug}/stream) 로 audio + motion 을 동시에 받아
+ * Web Audio API 로 t_ms 정각에 schedule 한다 (useDanceStream 컴포저블).
+ * ThreeJS 시뮬레이션 (OpenarmViewer) 으로 모션 미리보기.
  *
  * 닫기·재생 종료 시 '대기' 모드로 복귀.
  *
  * 녹화 기능은 본 팝업에 없음 — 녹화는 '율동 등록' 모드의 DanceManager 가 담당.
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
-import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
+import { useDanceStream } from './useDanceStream';
 
 interface DanceItem {
   slug: string;
@@ -25,14 +26,8 @@ interface DanceItem {
   has_motion?: boolean;
 }
 
-interface PlayResult {
-  ok: boolean;
-  duration_s: number;
-}
-
 const mode = useModeStore();
-const stateWs = useEdupingStateWs();
-stateWs.start();
+const stream = useDanceStream();
 
 const items = ref<DanceItem[]>([]);
 const loading = ref(false);
@@ -40,31 +35,21 @@ const error = ref('');
 
 const playingSlug = ref<string>('');
 const playingItem = computed(() => items.value.find((i) => i.slug === playingSlug.value) ?? null);
-const playStartMs = ref<number | null>(null);
-const playDurationS = ref(0);
-const playElapsedS = ref(0);
-let progressTimer: number | null = null;
-let endTimer: number | null = null;
 
-const songPlayer = ref<HTMLAudioElement | null>(null);
+const playDurationS = computed(() => stream.durationMs.value / 1000);
+const playElapsedS = computed(() => stream.elapsedMs.value / 1000);
+const progressPct = computed(() => {
+  if (playDurationS.value <= 0) return 0;
+  return Math.min(100, (playElapsedS.value / playDurationS.value) * 100);
+});
 
-function clearTimers(): void {
-  if (progressTimer !== null) {
-    window.clearInterval(progressTimer);
-    progressTimer = null;
-  }
-  if (endTimer !== null) {
-    window.clearTimeout(endTimer);
-    endTimer = null;
-  }
-}
+stream.onEnd(() => {
+  playingSlug.value = '';
+});
 
-function stopAudio(): void {
-  const el = songPlayer.value;
-  if (!el) return;
-  el.pause();
-  el.currentTime = 0;
-}
+watch(stream.error, (e) => {
+  if (e) error.value = e;
+});
 
 async function refresh(): Promise<void> {
   loading.value = true;
@@ -82,129 +67,27 @@ async function refresh(): Promise<void> {
 }
 
 function play(item: DanceItem): void {
-  // 이미 재생 중이면 정지 후 새로 시작
-  if (playingSlug.value) {
-    finishPlayback();
-    // 백엔드에도 정지 신호 (fire-and-forget — 응답을 기다리면 audio 시작이 늦어짐)
-    void fetch('/api/eduping/dance/stop', { method: 'POST' }).catch(() => {});
+  if (stream.isPlaying.value) {
+    stream.close();
   }
   playingSlug.value = item.slug;
   error.value = '';
-
-  // 곡 재생을 즉시 시작 — 사용자 클릭 제스처와 같은 tick 에 있어야 autoplay 허용된다.
-  // POST /play 를 await 한 뒤에 audio.play() 를 하면 HTTP RTT(수십~수백ms) 만큼
-  // 곡이 모션보다 늦어 싱크가 어긋난다. 모션은 backend·ROS 전송 지연이 있어
-  // 거의 동시에 보낸 audio·POST 중 audio 가 살짝 먼저 들리는 게 자연스럽다.
-  const audio = songPlayer.value;
-  if (audio && item.has_song !== false) {
-    audio.currentTime = 0;
-    void audio.play().catch(() => {/* autoplay 차단 시 무시 */});
-  }
-
-  // 진행률 timer 도 같은 시점에 시작 — POST 응답을 기다리지 않는다.
-  // duration 은 응답이 오면 보정. 그 전엔 곡 길이를 임시로 사용.
-  playStartMs.value = Date.now();
-  playDurationS.value = audio ? (audio.duration || 0) : 0;
-  playElapsedS.value = 0;
-  clearTimers();
-  progressTimer = window.setInterval(() => {
-    if (playStartMs.value === null) return;
-    const e = (Date.now() - playStartMs.value) / 1000;
-    playElapsedS.value = playDurationS.value > 0 ? Math.min(playDurationS.value, e) : e;
-  }, 80);
-
-  // 모션 POST 는 병렬로. target='real' 우선, 실패 시 'sim' 폴백.
-  void requestMotion(item);
+  stream.open(item.slug);
 }
 
-async function requestMotion(item: DanceItem): Promise<void> {
-  const startedSlug = item.slug;
-  const targets: Array<'real' | 'sim'> = ['real', 'sim'];
-  let result: PlayResult | null = null;
-  let lastErr = '';
-  for (const target of targets) {
-    try {
-      const res = await fetch(
-        `/api/eduping/dance/${encodeURIComponent(item.slug)}/play`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target }),
-        },
-      );
-      if (!res.ok) {
-        lastErr = `HTTP ${res.status}`;
-        continue;
-      }
-      result = (await res.json()) as PlayResult;
-      if (result.ok) break;
-      lastErr = '재생 실패';
-      result = null;
-    } catch (e) {
-      lastErr = (e as Error).message;
-    }
-  }
-
-  // 사용자가 그 사이 다른 곡으로 바꿨거나 닫았으면 무시
-  if (playingSlug.value !== startedSlug) return;
-
-  if (!result || !result.ok) {
-    error.value = `재생 실패: ${lastErr || '알 수 없는 오류'}`;
-    finishPlayback();
-    return;
-  }
-
-  // duration 보정 + 종료 타이머
-  const dur = Math.max(0, Number(result.duration_s) || 0);
-  if (dur > 0) {
-    playDurationS.value = dur;
-  }
-  if (endTimer !== null) window.clearTimeout(endTimer);
-  if (playDurationS.value > 0 && playStartMs.value !== null) {
-    const elapsed = (Date.now() - playStartMs.value) / 1000;
-    const remaining = Math.max(0, playDurationS.value - elapsed);
-    endTimer = window.setTimeout(finishPlayback, Math.round(remaining * 1000) + 200);
-  }
-}
-
-function finishPlayback(): void {
-  clearTimers();
+function stop(): void {
+  stream.close();
   playingSlug.value = '';
-  playStartMs.value = null;
-  playDurationS.value = 0;
-  playElapsedS.value = 0;
-  stopAudio();
-}
-
-async function stop(): Promise<void> {
-  finishPlayback();
-  // backend 에 정지 신호 — endpoint 가 없으면 무시
-  try {
-    await fetch('/api/eduping/dance/stop', { method: 'POST' });
-  } catch {
-    /* 정지 API 없을 수 있음 — duration 끝나면 자동 종료되므로 치명적이지 않음 */
-  }
 }
 
 function close(): void {
-  finishPlayback();
+  stream.close();
   mode.setMode('대기');
 }
 
-function onAudioEnded(): void {
-  // 모션 duration 보다 곡이 짧을 수 있음 — 곡 끝나도 모션은 그대로 둠
-  // (반대로 모션이 짧으면 endTimer 가 정리)
-}
-
-const progressPct = computed(() => {
-  if (playDurationS.value <= 0) return 0;
-  return Math.min(100, (playElapsedS.value / playDurationS.value) * 100);
-});
-
 onMounted(refresh);
 onUnmounted(() => {
-  clearTimers();
-  stopAudio();
+  stream.close();
 });
 </script>
 
@@ -223,7 +106,7 @@ onUnmounted(() => {
 
           <div class="popup-body">
             <div class="viewer-pane">
-              <OpenarmViewer source="follower" />
+              <OpenarmViewer :external-snapshot="stream.currentSnapshot.value" />
               <div v-if="playingItem" class="now-playing">
                 <div class="np-name">
                   <Icon name="music" :size="16" />
@@ -237,14 +120,6 @@ onUnmounted(() => {
                   <Icon name="square" :size="14" /> 정지
                 </button>
               </div>
-              <audio
-                v-if="playingItem && playingItem.has_song !== false"
-                ref="songPlayer"
-                :key="playingItem.slug"
-                :src="`/api/eduping/dance/${encodeURIComponent(playingItem.slug)}/song`"
-                preload="auto"
-                @ended="onAudioEnded"
-              />
             </div>
 
             <aside class="list-pane">
