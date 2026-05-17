@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (map_boundary_monitor + OdomSubscriber + MapCache 추가 — 비정형 맵 out_of_map fault 라인)
+마지막 업데이트: 2026-05-18 (MapBoundaryMonitor 7 트리로 확장 — MANUAL 위치 안전 예외 포함, ERROR 만 제외)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -27,13 +27,13 @@
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
-| BT_charging_main | ✅ | Parallel(BatteryFullMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
-| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
+| BT_charging_main | ✅ | Parallel(BatteryFullMonitor + MapBoundaryMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
+| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + MapBoundaryMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
 | BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
 | BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
-| BT_manual_main | ✅ | Parallel(CommandListener). torque OFF / 자동 monitor 0개 (BatteryLowMonitor 의도적 미배치 — 사용자 직접 제어 중 자동 빼앗김 방지). docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
+| BT_manual_main | ✅ | Parallel(MapBoundaryMonitor + CommandListener). torque OFF / battery·HW·collision monitor 미배치 — 위치 안전(MapBoundary)만 예외적 배치 (사용자가 맵 밖 옮기면 nav2 복귀 불가). docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
 | BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. 진짜 ReturnSubTree 는 미작성 |
-| BT_low_battery_return_main | ✅ | Parallel(빈 lockdown — CommandListener 없음). battery_low escalation 도피 state. docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
+| BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor) — lockdown (CommandListener 없음, 사용자 명령 차단) + 안전 monitor 만 배치. battery_low escalation 도피 state. docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(빈 terminal). reset 없음 — 사람이 재시작 |
 
 > **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree (carry/follow/lullaby/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
@@ -73,7 +73,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | idle_timeout_monitor | ✅ | [idle_timeout_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) — IDLE 진입 후 ROS param `idle_timeout_seconds` (기본 60s) 경과 시 `idle_timeout` trigger. edge-triggered, `initialise()` 에서 timer 리셋. BT_idle_main 만 배치. 6 시나리오 통과 |
 | hardware_health_monitor | ☐ | |
 | collision_event_handler | ☐ | |
-| map_boundary_monitor | ✅ | [map_boundary_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) — blackboard.ROBOT_POSE 읽고 `map_cache.is_outside(x, y)` → 박스 밖 또는 unknown 셀이면 `fault(reason="out_of_map")` 발화. ASSIST/PLAY/RETURNING 배치 (MANUAL 의도적 제외). 발화 시 blackboard.ERROR_REASON / ERROR_SOURCE 도 세팅. 7 시나리오 통과 |
+| map_boundary_monitor | ✅ | [map_boundary_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) — blackboard.ROBOT_POSE 읽고 `map_cache.is_outside(x, y)` → 박스 밖 또는 unknown 셀이면 `fault(reason="out_of_map")` 발화. **7 트리 배치** (CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN, ERROR 만 제외). MANUAL 은 다른 monitor 와 달리 위치 안전 예외로 포함. 발화 시 blackboard.ERROR_REASON / ERROR_SOURCE 도 세팅. 7 시나리오 통과 |
 | command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — `SetGoal.srv` + `ForceState.srv` 2개 서버 호스팅. SetGoal → `goal_reconciler` 호출. ForceState → `fsm.force_state()` + sub_task blackboard 세팅 (ASSIST→assist_task, PLAY→play_task). unit test 7 + reconciler 13 |
 | docking_contact_check | ☐ | |
 | check_task | ✅ | [check_task.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py) — TaskSelector 분기 Condition. 5 시나리오 통과 |

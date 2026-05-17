@@ -43,9 +43,15 @@ STATES = [
     "RETURNING", "LOW_BATTERY_RETURN", "ERROR",
 ]
 
-# fault: 자동 감지 monitor 가 있는 state. MANUAL 만 monitor 없어서 제외.
+# fault: 자동 감지 monitor 가 있는 state. ERROR 만 terminal 이라 제외.
+# MANUAL 도 포함 — 사용자가 들고 옮기다 맵 경계 넘으면 nav2 가 path planning 불가
+# 하므로 MapBoundaryMonitor 만 예외적으로 배치 (battery_low / hardware_health /
+# collision 은 여전히 MANUAL 미배치, docs/bt/trees/BT_manual_main.md 정책 참조).
 # LOW_BATTERY_RETURN 은 monitor (HW/Collision/MapBoundary) 있어 포함.
-_FAULT_SOURCES = ["CHARGING", "IDLE", "ASSIST", "PLAY", "RETURNING", "LOW_BATTERY_RETURN"]
+_FAULT_SOURCES = [
+    "CHARGING", "IDLE", "ASSIST", "PLAY", "MANUAL",
+    "RETURNING", "LOW_BATTERY_RETURN",
+]
 # 사용자 명시 복귀 명령 source — MANUAL 포함 (유저가 명령하면 torque ON + 도크 주행)
 _RETURN_COMMAND_SOURCES = ["IDLE", "ASSIST", "PLAY", "MANUAL"]
 # 배터리 모니터 자동 복귀 source — MANUAL 제외 (직접 미는 중 자동 빼앗기지 않음).

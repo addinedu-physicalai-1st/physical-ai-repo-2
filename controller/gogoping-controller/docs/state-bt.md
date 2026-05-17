@@ -20,9 +20,11 @@
 
 CHARGING
   main: Parallel
-        ├─ BatteryFullMonitor
-        ├─ HardwareHealthMonitor
-        └─ DockingContactCheck
+        ├─ BatteryFullMonitor     (✅ ≥ 70% → battery_full → IDLE)
+        ├─ MapBoundaryMonitor     (✅ amcl 미스로컬라이즈 / 누군가 들고 옮긴 케이스 안전망)
+        ├─ HardwareHealthMonitor  (추후)
+        ├─ DockingContactCheck    (추후)
+        └─ CommandListener        (✅)
   sub: 없음
 
 
@@ -30,6 +32,7 @@ IDLE
   main: Parallel
         ├─ BatteryLowMonitor      (✅ — battery ≤ 20% → battery_low → RETURNING)
         ├─ IdleTimeoutMonitor     (✅ — idle_timeout_seconds 경과 → idle_timeout → RETURNING)
+        ├─ MapBoundaryMonitor     (✅ — 비정상 pose 감지 → fault)
         ├─ HardwareHealthMonitor  (추후)
         └─ CommandListener        (✅)
   sub: 없음
@@ -65,18 +68,22 @@ PLAY
 MANUAL
   main: Parallel
         ├─ ManualTorqueHold        ※ initialise() 에서 torque OFF service 호출,
-        │                            terminate() 에서 torque ON 복원. 매 tick RUNNING 유지.
-        └─ CommandListener         ※ 수신: cancel / return_request 만 유효
-                                      (assist/play/manual_request 은 IDLE 에서만)
+        │                            terminate() 에서 torque ON 복원 (추후).
+        ├─ MapBoundaryMonitor      (✅ — 위치 안전 예외)
+        └─ CommandListener         (✅ — cancel / return_request / 다른 *_request)
   sub: 없음
 
   ※ MANUAL 은 task 가 없는 *상태* — 로봇이 가만히 서있고 torque 만 풀려 있음.
-    의도적으로 *모든 자동 감지 monitor 미배치* — 사용자가 직접 제어:
+    의도적으로 *대부분의 자동 감지 monitor 미배치* — 사용자가 직접 제어:
       - BatteryLowMonitor 없음 (battery_low → MANUAL 무효) — 자동 빼앗김 방지
-      - HardwareHealthMonitor 없음 (fault → MANUAL 무효) — 토크 OFF 라 의미 약함
+      - HardwareHealthMonitor 없음 (fault 의미 약함) — 토크 OFF
       - CollisionEventHandler 없음 — 토크 OFF 라 자율 충돌 위험 없음
-    이탈 경로는 오직 사용자 명시 명령 (cancel / return_request) 만.
-    cancel / return_request 시 ManualTorqueHold.terminate() 가 torque ON 복원.
+    예외 — **MapBoundaryMonitor 만 배치**:
+      사용자가 들고 옮기다 맵 경계 넘으면 nav2 가 path planning 불가하므로 즉시 ERROR 알림.
+    이탈 경로:
+      - 사용자 명시 명령: cancel / return_request / 다른 *_request
+      - 자동 fault: MapBoundaryMonitor 발화 (out_of_map)
+    cancel / return_request / fault 시 ManualTorqueHold.terminate() 가 torque ON 복원.
 
 
 RETURNING
@@ -95,10 +102,15 @@ RETURNING
 
 LOW_BATTERY_RETURN
   main: Parallel(SuccessOnAll)
-        └─ (자식 0개 — lockdown idle)
-  sub: ReturnSubTree (추후 — 동일 시퀀스 NavTo → Align → Approach → Verify)
+        ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 경계 이탈 시 fault)
+        ├─ HardwareHealthMonitor  (추후)
+        ├─ CollisionEventHandler  (추후)
+        └─ ReturnSubTree          (추후 — NavTo → Align → Approach → Verify)
+  sub: ReturnSubTree (추후)
 
-  ※ CommandListener 의도적 미배치 — 사용자 SetGoal 거부 (lockdown).
+  ※ lockdown 정책 정확히:
+      - *사용자 명령* 차단 (CommandListener 미배치 — SetGoal 거부)
+      - *안전 monitor* 는 정상 배치 (자율 ERROR 전이 가능)
     이탈 경로: docked → CHARGING / fault → ERROR 만.
     battery_low escalation 진입 — RETURNING 도중 배터리 떨어져도 본 state 로 강제 전환.
 

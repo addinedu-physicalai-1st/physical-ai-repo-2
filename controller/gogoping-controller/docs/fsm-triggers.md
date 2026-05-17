@@ -29,7 +29,7 @@
 | `idle_timeout` | — | `idle_timeout_monitor` (✅) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` (기본 60s) 경과 시 발화 — 무인 자율 복귀 |
 | `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 70% 진입 |
 | `docked` | — | `verify_docking_contact` | RETURNING → CHARGING | (발표 단계: 수동 진입) |
-| `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN → ERROR** (MANUAL 제외 — monitor 미배치) | `blackboard.error_reason = reason` 세팅. ERROR 는 terminal — reset trigger 없음 |
+| `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN → ERROR** (ERROR 만 제외 — terminal). MANUAL 은 MapBoundaryMonitor 만 예외 배치 — 다른 monitor (battery/hw/collision) 는 MANUAL 미배치 정책 유지 | `blackboard.error_reason = reason` 세팅. ERROR 는 terminal — reset trigger 없음 |
 
 ## 상태 전이 다이어그램
 
@@ -63,7 +63,7 @@
 > - `assist_request` (**IDLE / PLAY / MANUAL → ASSIST**): active mode 간 직접 전이 — BT swap 1회로 처리
 > - `play_request` (**IDLE / ASSIST / MANUAL → PLAY**): 동일
 > - `manual_request` (**IDLE / ASSIST / PLAY → MANUAL**): 동일. MANUAL 진입 시 `ManualTorqueHold.initialise()` 가 torque OFF
-> - `fault` (→ ERROR): CHARGING / IDLE / ASSIST / PLAY / RETURNING. **MANUAL 제외** — monitor 미배치
+> - `fault` (→ ERROR): CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / LOW_BATTERY_RETURN. MANUAL 도 포함 — MapBoundaryMonitor 만 예외적 배치 (사용자가 맵 밖으로 옮기면 nav2 복귀 불가 → ERROR 알림)
 > - `return_request` (IDLE / ASSIST / PLAY / **MANUAL** → RETURNING): 사용자 명령 또는 SubTree FAILURE fallback
 > - `battery_low` (IDLE / ASSIST / PLAY → RETURNING): hysteresis 20% 진입. **MANUAL 제외** — 자동 빼앗김 방지
 > - `idle_timeout` (IDLE → RETURNING): IDLE 진입 후 일정 시간 무명령 시 자율 복귀
