@@ -1,12 +1,12 @@
 """IDLE state MainTree — 명령 대기.
 
-Day 1 walking skeleton: CommandListener 만 (배터리/HW monitor 는 Day 2).
+현재 stub: CommandListener 만 (배터리/HW monitor 는 ).
 
-진짜 Day 2 모양 (``docs/state-bt.md``):
+진짜 추후 모양 (``docs/state-bt.md``):
     Parallel
-      ├─ BatteryLowMonitor    (Day 2)
-      ├─ HardwareHealthMonitor (Day 2)
-      └─ CommandListener      (Day 1 ✅)
+      ├─ BatteryLowMonitor   
+      ├─ HardwareHealthMonitor
+      └─ CommandListener      (추후 ✅)
 """
 from __future__ import annotations
 
@@ -23,6 +23,6 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         children=[
             CommandListener("CommandListener", ctx),
-            # TODO Day 2: BatteryLowMonitor, HardwareHealthMonitor
+            # TODO 추후: BatteryLowMonitor, HardwareHealthMonitor
         ],
     )

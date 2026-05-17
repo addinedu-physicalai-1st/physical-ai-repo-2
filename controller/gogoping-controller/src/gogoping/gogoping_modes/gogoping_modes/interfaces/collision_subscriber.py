@@ -1,6 +1,6 @@
-"""Nav2 Collision Monitor 상태 구독 → blackboard.collision_state 갱신 (Day 2 TODO).
+"""Nav2 Collision Monitor 상태 구독 → blackboard.collision_state 갱신 (TODO).
 
-# STUB: replace Day 2
+# STUB
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class CollisionSubscriber:
-    """Day 2 에 nav2 collision_monitor 상태 토픽 구독으로 구현.
+    """추후 nav2 collision_monitor 상태 토픽 구독으로 구현.
 
     수신 시 ``blackboard.COLLISION_STATE`` 을 "ok" / "warn" / "fault" 로 W.
     """

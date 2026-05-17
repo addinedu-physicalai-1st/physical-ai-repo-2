@@ -40,7 +40,7 @@ snapshot 포맷:
 호환: 기존 "running_children": [str] 포맷도 받음 — 모두 RUNNING 으로 간주.
 
 API:
-  update_snapshot(snapshot: dict) — state_client (Day 2) 가 호출
+  update_snapshot(snapshot: dict) — state_client () 가 호출
   reset() — 모든 셀을 placeholder 로
   show() / hide() — 페이지 전환 시 TopBar 가 호출
 """
@@ -63,13 +63,15 @@ from . import soften
 
 # FSM state → (강조 색, 텍스트 색) 매핑.
 _STATE_COLORS: dict[str, tuple[str, str]] = {
-    "CHARGING":  (COLORS["sky"],         COLORS["text"]),
-    "IDLE":      (COLORS["text_muted"],  COLORS["text"]),
-    "ASSIST":    (COLORS["mint"],        COLORS["text"]),
-    "PLAY":      (COLORS["lavender"],    COLORS["text"]),
-    "RETURNING": (COLORS["accent"],      COLORS["text"]),
-    "ERROR":     (COLORS["danger"],      COLORS["danger"]),
-    "—":         (COLORS["border_strong"], COLORS["text_muted"]),
+    "CHARGING":            (COLORS["sky"],            COLORS["text"]),
+    "IDLE":                (COLORS["text_muted"],     COLORS["text"]),
+    "ASSIST":              (COLORS["mint"],           COLORS["text"]),
+    "PLAY":                (COLORS["lavender"],       COLORS["text"]),
+    "MANUAL":              (COLORS["primary_dim"],    COLORS["text"]),     # 분홍 — 사용자 직접 제어
+    "RETURNING":           (COLORS["accent"],         COLORS["text"]),     # 주황 — 자발 복귀
+    "LOW_BATTERY_RETURN":  (COLORS["warning"],        COLORS["text"]),     # 진한 주황 — lockdown
+    "ERROR":               (COLORS["danger"],         COLORS["danger"]),
+    "—":                   (COLORS["border_strong"],  COLORS["text_muted"]),
 }
 
 _PLACEHOLDER = "—"
@@ -244,7 +246,7 @@ class BTStateInline(QWidget):
     """TopBar 우측에 들어가는 inline 3칸 BT 상태 위젯.
 
     AdminWindow 가 페이지 전환 시 show()/hide() 로 노출 제어.
-    Day 2 의 state_client 가 update_snapshot() 으로 갱신.
+    추후 의 state_client 가 update_snapshot() 으로 갱신.
 
     snapshot 포맷:
       {

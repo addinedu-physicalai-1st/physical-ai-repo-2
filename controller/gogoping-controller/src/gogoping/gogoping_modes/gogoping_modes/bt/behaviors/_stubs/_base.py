@@ -1,10 +1,10 @@
-"""# STUB: replace Day 3~4 — 공통 베이스 (N tick RUNNING 후 SUCCESS).
+"""# STUB — 공통 베이스 (N tick RUNNING 후 SUCCESS).
 
-본 모듈은 *Day 1 walking skeleton* 단계의 placeholder behaviour 베이스 클래스다.
-진짜 BT_*_sub 트리가 작성되는 Day 3~4 에 ``_stubs/`` 폴더 통째로 삭제 +
+본 모듈은 *현재 단계* 단계의 placeholder behaviour 베이스 클래스다.
+진짜 BT_*_sub 트리가 작성되는 추후 ``_stubs/`` 폴더 통째로 삭제 +
 사용처 (BT_assist_main, BT_play_main 의 TaskSelector 자식) 교체된다.
 
-## 본 폴더가 존재하는 이유 — walking skeleton
+## 본 폴더가 존재하는 이유 — 구현 단계 분리
 
 end-to-end 흐름 검증을 *진짜 task 구현 전에* 끝낸다. 즉::
 
@@ -30,13 +30,13 @@ py_trees 의 단독 ``tick_once()`` 는 직전 status 가 SUCCESS/FAILURE 면 �
 리셋하므로 재진입 시 또 N tick 의 RUNNING 을 보여준다. Selector(memory=False) 등에서
 같은 자식이 여러 번 re-tick 되어도 매번 N tick 보장.
 
-## 교체 계획 (Day 3~4)
+## 교체 계획
 
 1. 진짜 ``bt/trees/sub_trees/BT_<name>_sub.py`` 작성 (build(ctx) 함수 export)
 2. 사용처의 ``Stub<Name>`` import 를 ``build_<name>`` 호출로 교체
 3. 본 폴더 ``_stubs/`` 통째로 삭제
 
-## 청소 명령 (Day 5)
+## 청소 명령
 
 ::
 
@@ -56,7 +56,7 @@ class StubRunningThenSuccess(py_trees.behaviour.Behaviour):
     각 task 별 서브클래스 (``StubCarry``, ``StubFollow``, ``StubLullaby``,
     ``StubHideseek``) 를 통해 사용 — 이름이 admin BT 위젯에 그대로 표시되도록.
 
-    # STUB: replace Day 3~4 — 진짜 sub-tree (BT_carry_sub 등) 로 교체.
+    # STUB — 진짜 sub-tree (BT_carry_sub 등) 로 교체.
     """
 
     DEFAULT_RUNNING_TICKS = 3  # ~300ms @ 10Hz

@@ -1,6 +1,6 @@
 """PLAY state MainTree — 아이 놀이 (hideseek).
 
-Day 1 walking skeleton: CommandListener + TaskSelector(hideseek stub).
+현재 stub: CommandListener + TaskSelector(hideseek stub).
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _task_selector(ctx: Context) -> py_trees.behaviour.Behaviour:
                 name="hideseek_branch", memory=True,
                 children=[
                     CheckTask(Keys.PLAY_TASK, "hideseek"),
-                    StubHideseek(),  # STUB: replace Day 3~4 with build_hide_and_seek(ctx)
+                    StubHideseek(),  # STUB with build_hide_and_seek(ctx)
                 ],
             ),
         ],
@@ -38,6 +38,6 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         children=[
             CommandListener("CommandListener", ctx),
             task_sel,
-            # TODO Day 2: monitors
+            # TODO 추후: monitors
         ],
     )

@@ -1,6 +1,6 @@
-"""gogoping_camera_pan 토픽 publish 래퍼 (Day 2 TODO).
+"""gogoping_camera_pan 토픽 publish 래퍼 (TODO).
 
-# STUB: replace Day 2
+# STUB
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class CameraPanClient:
-    """Day 2 에 /camera_pan/auto publish 로 구현.
+    """추후 /camera_pan/auto publish 로 구현.
 
     예상 API: set_target(yaw_rad, pitch_rad), sweep(start, end, period), set_idle().
     """

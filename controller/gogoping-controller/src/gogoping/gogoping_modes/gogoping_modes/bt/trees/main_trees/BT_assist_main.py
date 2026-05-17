@@ -1,8 +1,8 @@
 """ASSIST state MainTree — 교사 보조 (carry / follow / lullaby).
 
-Day 1 walking skeleton: CommandListener + TaskSelector (stub 자식들).
-Day 2: 배터리/HW/충돌/맵바운더리 monitor 추가.
-Day 3~4: stub 4개를 진짜 SubTree 호출로 교체.
+현재 stub: CommandListener + TaskSelector (stub 자식들).
+추후: 배터리/HW/충돌/맵바운더리 monitor 추가.
+추후: stub 4개를 진짜 SubTree 호출로 교체.
 
 TaskSelector 동작:
     blackboard.assist_task == "carry"   → CheckTask("carry")    SUCCESS → StubCarry
@@ -33,21 +33,21 @@ def _task_selector(ctx: Context) -> py_trees.behaviour.Behaviour:
                 name="carry_branch", memory=True,
                 children=[
                     CheckTask(Keys.ASSIST_TASK, "carry"),
-                    StubCarry(),    # STUB: replace Day 3~4 with build_carry(ctx)
+                    StubCarry(),    # STUB with build_carry(ctx)
                 ],
             ),
             py_trees.composites.Sequence(
                 name="follow_branch", memory=True,
                 children=[
                     CheckTask(Keys.ASSIST_TASK, "follow"),
-                    StubFollow(),   # STUB: replace Day 3~4 with build_follow(ctx)
+                    StubFollow(),   # STUB with build_follow(ctx)
                 ],
             ),
             py_trees.composites.Sequence(
                 name="lullaby_branch", memory=True,
                 children=[
                     CheckTask(Keys.ASSIST_TASK, "lullaby"),
-                    StubLullaby(),  # STUB: replace Day 3~4 with build_lullaby(ctx)
+                    StubLullaby(),  # STUB with build_lullaby(ctx)
                 ],
             ),
         ],
@@ -80,6 +80,6 @@ def _build_assist_root(ctx: Context) -> py_trees.behaviour.Behaviour:
         children=[
             CommandListener("CommandListener", ctx),
             task_sel,
-            # TODO Day 2: BatteryLowMonitor, HardwareHealthMonitor, CollisionEventHandler, MapBoundaryMonitor
+            # TODO 추후: BatteryLowMonitor, HardwareHealthMonitor, CollisionEventHandler, MapBoundaryMonitor
         ],
     )

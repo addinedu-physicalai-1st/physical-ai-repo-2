@@ -2,7 +2,7 @@
 
 - ``UIPublisher`` — 완성. ``/gogoping/state`` 토픽 publish.
 - 나머지 5개 (``Nav2Client`` / ``CameraPanClient`` / ``BatterySubscriber`` /
-  ``CollisionSubscriber`` / ``DBLogger``) — Day 2 에 구현 예정인 stub.
+  ``CollisionSubscriber`` / ``DBLogger``) — 추후 구현 예정인 stub.
 
 모든 클래스의 ``__init__`` 첫 인자는 ``node: rclpy.node.Node`` — Context 가 부팅 시 1회
 주입한다.

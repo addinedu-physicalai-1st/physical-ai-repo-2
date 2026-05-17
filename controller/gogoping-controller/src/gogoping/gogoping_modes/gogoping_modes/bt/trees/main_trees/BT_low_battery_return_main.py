@@ -12,9 +12,9 @@ CommandListener 부재가 핵심 — 사용자가 SetGoal.srv 호출해도 받�
 가 거부 (current_state == LOW_BATTERY_RETURN 면 fsm_in_low_battery_return reason). 결국
 robot 은 충전소 도달까지 일관 진행, 도착 시 docked → CHARGING.
 
-Day 1 walking skeleton: monitor 들 + ReturnSubTree 모두 Day 2~3 에 구현. 현재는 빈 Parallel
+현재 stub: monitor 들 + ReturnSubTree 모두 추후 구현. 현재는 빈 Parallel
 (CommandListener 도 없고 monitor 도 없음 → 사실상 idle BT). main.py 의 spin 이 계속 tick
-하므로 docked trigger 가 외부 (BatterySubscriber Day 2) 에서 발화될 때까지 가만히 있음.
+하므로 docked trigger 가 외부 (BatterySubscriber ) 에서 발화될 때까지 가만히 있음.
 """
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         name="BT_low_battery_return_main",
         policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         children=[
-            # Day 1 walking skeleton — 자식 0개 (idle).
-            # Day 2~3 TODO:
+            # 현재 단계 — 자식 0개 (idle).
+            # TODO:
             #   HardwareHealthMonitor, CollisionEventHandler, MapBoundaryMonitor,
             #   ReturnSubTree (NavTo charging_dock_approach_key → AlignToDock →
             #                  ApproachDock → VerifyDockingContact)
