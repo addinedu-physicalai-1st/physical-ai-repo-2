@@ -9,7 +9,7 @@ ASSIST FSM state 의 MainTree. TaskSelector 로 sub mode (carry / follow / lulla
 ```
 Parallel (BT_assist_main)
 ├── monitor: Sequence
-│   ├── command_listener        # ← return_command / cancel / sub mode 변경
+│   ├── command_listener        # ← return_request / cancel / sub mode 변경
 │   ├── battery_low_monitor     # ← battery_low trigger
 │   ├── hardware_health_monitor # ← fault trigger
 │   └── collision_event_handler # ← fault trigger
@@ -25,10 +25,10 @@ monitor 가 trigger 발사하면 sub_tree 의 RUNNING 이 INVALID 로 끊기고 
 
 | 발화 / 명령 | intent kind | FSM trigger | 결과 |
 |---|---|---|---|
-| "복귀" / "돌아가" / "충전" | sub_command(action=return) | `return_command` | ASSIST → RETURNING (BT_returning_main) |
+| "복귀" / "돌아가" / "충전" | sub_command(action=return) | `return_request` | ASSIST → RETURNING (BT_returning_main) |
 | "그만" / "정지" / "취소" | sub_command(action=stop) | `cancel` | 현재 sub_tree 종료, ASSIST 유지 (TaskSelector 가 다시 분기) |
-| "운반" / "추종" / "자장가" | mode_change(mode=...) | `assist_command` (task 변경) | blackboard.assist_task 갱신 → TaskSelector 다른 sub_tree 선택 |
-| "X로 가" (vertex) | goto_vertex(name) | `assist_command(task=carry, carry_mode=goto, target_vertex_name=X)` | carry sub mode 진입 후 [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) 호출 |
+| "운반" / "추종" / "자장가" | mode_change(mode=...) | `assist_request` (task 변경) | blackboard.assist_task 갱신 → TaskSelector 다른 sub_tree 선택 |
+| "X로 가" (vertex) | goto_vertex(name) | `assist_request(task=carry, carry_mode=goto, target_vertex_name=X)` | carry sub mode 진입 후 [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) 호출 |
 
 다른 state 의 trigger 매트릭스: [BT_idle_main](BT_idle_main.md), [BT_play_main](BT_play_main.md).
 
@@ -36,9 +36,9 @@ FSM transition 정의: [../../fsm-triggers.md](../../fsm-triggers.md).
 
 ## 진입 / 종료
 
-- **진입**: IDLE → ASSIST (`assist_command` trigger)
+- **진입**: IDLE → ASSIST (`assist_request` trigger)
 - **종료**:
-  - `return_command` → RETURNING
+  - `return_request` → RETURNING
   - `cancel` (전체 종료 의미) → IDLE
   - `battery_low` → RETURNING
   - `fault` → ERROR

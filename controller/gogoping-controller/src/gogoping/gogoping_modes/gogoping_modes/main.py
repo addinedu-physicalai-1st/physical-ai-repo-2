@@ -7,7 +7,7 @@
 4. FSM 의 ``on_state_change`` 콜백에 ``_on_state_change`` 등록 → BT 트리 swap
 5. ``TICK_HZ`` 주기로 ``_tick``:
      - 트리 tick
-     - root SUCCESS / FAILURE → 적절한 trigger (assist_done / play_done / return_command)
+     - root SUCCESS / FAILURE → 적절한 trigger (assist_done / play_done / return_request)
      - 1Hz 로 ``tree_inspector.snapshot`` 생성 후 ``UIPublisher.publish_state``
 6. ``rclpy.spin``
 
@@ -154,9 +154,9 @@ class GogopingModes:
         예: FollowSubTree 의 Loss Recovery 끝까지 대상 못 찾음 → FAILURE → RETURNING.
         """
         self._logger.warning(
-            f"[tree FAILURE] {self._current_state} → return_command"
+            f"[tree FAILURE] {self._current_state} → return_request"
         )
-        self.ctx.fsm.trigger("return_command")
+        self.ctx.fsm.trigger("return_request")
 
 
 def main() -> None:

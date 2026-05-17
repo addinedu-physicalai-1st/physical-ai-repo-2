@@ -192,7 +192,7 @@ class GogopingModes:
 
     def _on_tree_failure(self):
         # FollowSubTree Loss Recovery 끝까지 실패 등 → RETURNING 으로 도피
-        self.ctx.fsm.trigger("return_command")
+        self.ctx.fsm.trigger("return_request")
 
 
 def main():
@@ -244,7 +244,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
 기본은 static 트리. `HideAndSeekSubTree` 만 예외 — `search_waypoints` 리스트 크기에 따라 N 개의 Search Sequence 를 build 시점에 생성한다.
 
 **전제**
-- 사용자가 hide-and-seek 명령을 보낼 때 `command_listener` 가 `blackboard.search_waypoints` 를 먼저 세팅 → 그 다음 `play_command` trigger 발사
+- 사용자가 hide-and-seek 명령을 보낼 때 `command_listener` 가 `blackboard.search_waypoints` 를 먼저 세팅 → 그 다음 `play_request` trigger 발사
 - FSM transition 콜백이 `BT_play_main.build(ctx)` 호출 → 내부에서 `BT_hide_and_seek_sub.build(ctx)` 호출 → 그 시점에 blackboard 읽기
 
 ```python

@@ -5,7 +5,7 @@
 #   1) Goal validation (mode/task 조합이 valid 한지)
 #   2) blackboard.current_goal 세팅
 #   3) 현재 state ↔ goal 차이 비교 후 적절한 FSM trigger 자체 발화
-#      (assist_command / play_command / cancel / return_command / reset 등)
+#      (assist_request / play_request / cancel / return_request / manual_request 등)
 #
 # 같은 goal 재호출 = 무해. 다른 goal 호출 = preempt.
 #

@@ -10,10 +10,10 @@
   - `terminate(new_status)` 는 **idempotent** — 진행 중 외부 작업 cancel
 - **MainTree root SUCCESS** (ASSIST/PLAY 한정) = task 완료. `main.py` 의 spin 루프가 감지 후 `assist_done` / `play_done` trigger 발사 + 트리 swap.
   CHARGING / IDLE / RETURNING / ERROR 의 MainTree 는 root SUCCESS 가 task 완료 의미 아님 — state 전이는 trigger 발화 (`battery_*` / `docked` / `fault` / `reset` / `*_command`) 가 담당.
-- **MainTree root FAILURE** → `main.py._on_tree_failure()` 가 `return_command` trigger 발사 → RETURNING 으로 도피 (예: FollowSubTree Loss Recovery 끝까지 실패)
+- **MainTree root FAILURE** → `main.py._on_tree_failure()` 가 `return_request` trigger 발사 → RETURNING 으로 도피 (예: FollowSubTree Loss Recovery 끝까지 실패)
 - 자세한 trigger 이름·시그니처: [fsm-triggers.md](fsm-triggers.md)
 - 자세한 blackboard 키: [blackboard-schema.md](blackboard-schema.md)
-- **Active mode 직접 전이** — `assist_command` / `play_command` / `manual_command` 는 IDLE 뿐 아니라 *다른 active mode* 에서도 발화 가능 (예: ASSIST 중 PLAY 누르면 직접 PLAY 로). BT swap 1회로 처리되며 `terminate(INVALID)` 가 이전 트리의 시간-구속 cleanup 보장 (ManualTorqueHold 의 torque ON 복원, NavigateToPose 의 nav2 goal cancel 등). 따라서 모든 behavior 의 `terminate()` 는 **idempotent + cleanup-complete** 해야 함.
+- **Active mode 직접 전이** — `assist_request` / `play_request` / `manual_request` 는 IDLE 뿐 아니라 *다른 active mode* 에서도 발화 가능 (예: ASSIST 중 PLAY 누르면 직접 PLAY 로). BT swap 1회로 처리되며 `terminate(INVALID)` 가 이전 트리의 시간-구속 cleanup 보장 (ManualTorqueHold 의 torque ON 복원, NavigateToPose 의 nav2 goal cancel 등). 따라서 모든 behavior 의 `terminate()` 는 **idempotent + cleanup-complete** 해야 함.
 
 ---
 
@@ -40,7 +40,7 @@ ASSIST
         ├─ CollisionEventHandler
         ├─ MapBoundaryMonitor           ※ 맵 밖 이탈 시 fault(reason="out_of_map")
         ├─ CommandListener              ※ 수신: cancel 만 유효
-        │                                  (assist/play/return_command 은 IDLE 에서만)
+        │                                  (assist/play/return_request 은 IDLE 에서만)
         │
         └─ TaskSelector (Selector, memory=False)
               ├─ Sequence: CheckTask("carry")   → CarrySubTree
@@ -65,8 +65,8 @@ MANUAL
   main: Parallel
         ├─ ManualTorqueHold        ※ initialise() 에서 torque OFF service 호출,
         │                            terminate() 에서 torque ON 복원. 매 tick RUNNING 유지.
-        └─ CommandListener         ※ 수신: cancel / return_command 만 유효
-                                      (assist/play/manual_command 은 IDLE 에서만)
+        └─ CommandListener         ※ 수신: cancel / return_request 만 유효
+                                      (assist/play/manual_request 은 IDLE 에서만)
   sub: 없음
 
   ※ MANUAL 은 task 가 없는 *상태* — 로봇이 가만히 서있고 torque 만 풀려 있음.
@@ -74,8 +74,8 @@ MANUAL
       - BatteryLowMonitor 없음 (battery_low → MANUAL 무효) — 자동 빼앗김 방지
       - HardwareHealthMonitor 없음 (fault → MANUAL 무효) — 토크 OFF 라 의미 약함
       - CollisionEventHandler 없음 — 토크 OFF 라 자율 충돌 위험 없음
-    이탈 경로는 오직 사용자 명시 명령 (cancel / return_command) 만.
-    cancel / return_command 시 ManualTorqueHold.terminate() 가 torque ON 복원.
+    이탈 경로는 오직 사용자 명시 명령 (cancel / return_request) 만.
+    cancel / return_request 시 ManualTorqueHold.terminate() 가 torque ON 복원.
 
 
 RETURNING

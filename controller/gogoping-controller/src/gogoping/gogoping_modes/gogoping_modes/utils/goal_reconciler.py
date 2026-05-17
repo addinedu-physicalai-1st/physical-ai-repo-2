@@ -7,7 +7,7 @@
 
 ## Goal-based 디자인 요약
 
-UI 는 trigger 이름 (assist_command, manual_command, ...) 을 모른다. 대신
+UI 는 trigger 이름 (assist_request, manual_request, ...) 을 모른다. 대신
 "원하는 mode" 만 알려주면 (Goal.msg 의 ``mode`` 필드) 본 함수가 현재 state 와 비교해
 적절한 trigger 를 발화한다. 자세한 배경: ``docs/fsm-triggers.md`` 의 머리말 노트.
 
@@ -164,18 +164,16 @@ def reconcile(
         _set_task_blackboard(goal, blackboard)
         return ReconcileResult(accepted=True, reason="same_mode")
 
-    # 2) CHARGING / ERROR 는 desired 로 발행 불가 케이스 따로
+    # 2) lockdown states — 사용자 명령 전체 거부
     if current == "CHARGING":
         # 사용자 직접 명령으로는 CHARGING 이탈 불가 — battery_full monitor 만 가능
         return ReconcileResult(accepted=False, reason="fsm_in_charging")
     if current == "ERROR":
-        if mode == "IDLE":
-            # reset trigger 로 ERROR → IDLE
-            ok = fsm.trigger("reset")
-            return ReconcileResult(
-                accepted=ok, reason="" if ok else "reset_failed", trigger_fired="reset" if ok else None,
-            )
-        return ReconcileResult(accepted=False, reason="fsm_in_error")
+        # ERROR 는 terminal — 어떤 명령도 받지 않음. robot 재시작 필요.
+        return ReconcileResult(accepted=False, reason="fsm_in_error_terminal")
+    if current == "LOW_BATTERY_RETURN":
+        # 배터리 자동 복귀 중 — 안전 우선. 충전소 도달까지 lockdown.
+        return ReconcileResult(accepted=False, reason="fsm_in_low_battery_return")
 
     # 3) 일반적인 desired mode 매핑
     if mode == "IDLE":
@@ -190,29 +188,29 @@ def reconcile(
         )
 
     if mode == "RETURNING":
-        ok = fsm.trigger("return_command")
+        ok = fsm.trigger("return_request")
         return ReconcileResult(
-            accepted=ok, trigger_fired="return_command" if ok else None,
+            accepted=ok, trigger_fired="return_request" if ok else None,
         )
 
     if mode == "ASSIST":
         _set_task_blackboard(goal, blackboard)
-        ok = fsm.trigger("assist_command", task=goal["task"])
+        ok = fsm.trigger("assist_request", task=goal["task"])
         return ReconcileResult(
-            accepted=ok, trigger_fired="assist_command" if ok else None,
+            accepted=ok, trigger_fired="assist_request" if ok else None,
         )
 
     if mode == "PLAY":
         _set_task_blackboard(goal, blackboard)
-        ok = fsm.trigger("play_command", task=goal["task"])
+        ok = fsm.trigger("play_request", task=goal["task"])
         return ReconcileResult(
-            accepted=ok, trigger_fired="play_command" if ok else None,
+            accepted=ok, trigger_fired="play_request" if ok else None,
         )
 
     if mode == "MANUAL":
-        ok = fsm.trigger("manual_command")
+        ok = fsm.trigger("manual_request")
         return ReconcileResult(
-            accepted=ok, trigger_fired="manual_command" if ok else None,
+            accepted=ok, trigger_fired="manual_request" if ok else None,
         )
 
     # 도달 불가 — validate 가 잡았어야 함
