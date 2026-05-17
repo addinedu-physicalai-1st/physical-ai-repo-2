@@ -76,7 +76,7 @@ Parallel(SuccessOnAll(synchronise=False))
    `tree.shutdown()` 시 py_trees 가 모든 RUNNING 자식의 terminate 를 호출하는지 `py-trees-spike.md` Test 3 로 검증 후 운영.
 2. MANUAL 상태에서 로봇이 *물리적으로* 위험한 곳에 있을 수 있음 (계단 근처 등) — `CollisionEventHandler` 가 nav2 collision monitor 의 keep-out zone 체크 유지.
 3. `battery_low` 진입 시 torque 가 자동 복원되어 도크로 자율 주행 — 사용자가 로봇을 들고 있는 상태였다면 *놓아야* 안전.
-   → admin UI 의 BTStateInline 이 MANUAL 알약 표시 시 "battery 50% 미만이면 자동 복귀합니다" 안내 문구 권장.
+   → admin UI 의 BTStateInline 이 MANUAL 알약 표시 시 "battery 20% 미만이면 자동 복귀합니다" 안내 문구 권장.
 
 ## 상태
 

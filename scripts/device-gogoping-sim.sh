@@ -2,13 +2,15 @@
 # scripts/device-gogoping-sim.sh — GogoPing 가제보 시뮬레이션 launcher.
 #
 # 동작:
-#   - tmux 세션 'gogoping-sim' 안에 window 4개:
+#   - tmux 세션 'gogoping-sim' 안에 window 5개:
 #       gazebo       : gogoping_bringup sim.launch.py
 #                      (gogoping_navigation/launch_sim_with_pinky.launch.xml 을
 #                       namespace=gogoping 으로 include + sim_status_publisher 노드)
 #       graph-router : gogoping_navigation/graph_router.launch.xml (다익스트라 + nav2 위임)
 #       modes        : gogoping_modes (FSM + BT 본체 — /gogoping/state publish,
 #                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
+#       sim-battery  : sim_battery_node — /gogoping/battery 1Hz publish +
+#                      /gogoping/sim/set_battery_level srv 로 admin UI 슬라이더 디버그
 #       rviz         : rviz2 시각화
 #
 # 사용:
@@ -91,7 +93,11 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes"
 
-    # window 3: rviz (map / TF / AMCL / costmap / plan 시각화)
+    # window 3: sim-battery (sim 전용 — /gogoping/battery 1Hz + 디버그 slider srv)
+    tmux new-window -t "$SESSION" -n sim-battery -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 run gogoping_bringup sim_battery_node --ros-args -r __ns:=/gogoping"
+
+    # window 4: rviz (map / TF / AMCL / costmap / plan 시각화)
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
     tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
@@ -121,12 +127,14 @@ case "$ACTION" in
       "ros2 launch gogoping_bringup sim"
       "ros2 launch gogoping_navigation graph_router"
       "ros2 run gogoping_modes"
+      "ros2 run gogoping_bringup sim_battery_node"
       "gz sim"
       "ruby .*gz sim"
       "parameter_bridge"
       "ros_gz_image"
       "robot_state_publisher"
       "sim_status_publisher"
+      "sim_battery_node"
       "rviz2"
     )
     for p in "${_patterns[@]}"; do

@@ -323,6 +323,14 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # 배터리 디버그 슬라이더 → state_client.post_battery_level
+        self.topbar.bt_state.battery_debug.battery_level_requested.connect(
+            lambda level: self.state_client.post_battery_level(
+                level,
+                on_result=self.topbar.bt_state.battery_debug.set_last_result,
+            )
+        )
+
         self._select("gogoping")
 
     def _select(self, key: str) -> None:

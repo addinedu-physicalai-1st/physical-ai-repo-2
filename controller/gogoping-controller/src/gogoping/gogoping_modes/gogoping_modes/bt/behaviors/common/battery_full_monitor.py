@@ -29,9 +29,9 @@ if TYPE_CHECKING:
 
 
 class BatteryFullMonitor(py_trees.behaviour.Behaviour):
-    """배터리 ≥ 80% 시 ``battery_full`` FSM trigger 발화."""
+    """배터리 ≥ 70% 시 ``battery_full`` FSM trigger 발화."""
 
-    FULL_ENTER = 80.0  # 진입 임계 (%)
+    FULL_ENTER = 70.0  # 진입 임계 (%)
 
     def __init__(self, name: str, context: "Context"):
         super().__init__(name)

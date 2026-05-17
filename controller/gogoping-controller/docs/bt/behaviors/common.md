@@ -25,10 +25,10 @@
 
 ## battery_full_monitor  *(구현됨)*
 
-배터리 ≥ 80% 감지 시 `"battery_full"` FSM trigger 발화.
+배터리 ≥ 70% 감지 시 `"battery_full"` FSM trigger 발화.
 
 - read: `Keys.BATTERY_LEVEL`
-- threshold: `FULL_ENTER = 80.0` (%)
+- threshold: `FULL_ENTER = 70.0` (%)
 - edge-triggered (`_fired` 플래그, `initialise()` 에서 리셋)
 - monitor 컨벤션 — 매 tick RUNNING 리턴
 
@@ -37,14 +37,19 @@ walking skeleton 단계엔 `BatterySubscriber` 가 stub 이라 `BATTERY_LEVEL` �
 | Used in | BT_charging_main |
 | 파일 | [`bt/behaviors/common/battery_full_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) |
 
-## battery_low_monitor  *(스켈레톤)*
+## battery_low_monitor  *(구현됨)*
 
-배터리 ≤ 50% 감지 시 `"battery_low"` FSM trigger 발화. hysteresis 50% 진입 / 55% 진출.
+배터리 ≤ 20% 감지 시 `"battery_low"` FSM trigger 발화. hysteresis 20% 진입 / 25% 진출.
 
 - read: `Keys.BATTERY_LEVEL`
-- `BatterySubscriber` 가 실제 ROS 토픽 구독으로 교체되면 의미있게 동작
+- threshold: `LOW_ENTER = 20.0`, `LOW_EXIT = 25.0` (%)
+- edge-triggered (`_fired` 플래그). hysteresis — 25% 위로 회복되면 reset 후 재발화 가능
+- monitor 컨벤션 — 매 tick RUNNING 리턴
+- `BatterySubscriber` 가 `/gogoping/battery` 토픽 구독으로 blackboard 갱신. sim 환경에서는 `sim_battery_node` 가 publisher + `SetBatteryLevel.srv` 디버그 server.
 
-| Used in (예정) | BT_idle_main, BT_assist_main, BT_play_main, BT_returning_main (RETURNING → LOW_BATTERY_RETURN escalation) |
+| Used in | BT_idle_main, BT_assist_main, BT_play_main, BT_returning_main (RETURNING → LOW_BATTERY_RETURN escalation). **MANUAL 의도적 제외** — 사용자 직접 제어 중 자동 빼앗김 방지 |
+| 파일 | [`bt/behaviors/common/battery_low_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_low_monitor.py) |
+| 테스트 | 5 시나리오 (100% no-fire / 20% fire / 10% no-double / 26%→20% re-fire / initialise re-arm) |
 
 ## hardware_health_monitor  *(스켈레톤)*
 

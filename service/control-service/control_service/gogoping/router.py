@@ -61,6 +61,16 @@ class ForceStateResponse(BaseModel):
     current_state: str = ""  # bridge 가 최근 본 state (참고용)
 
 
+class BatteryDebugRequest(BaseModel):
+    """admin UI 의 BatteryDebugSlider 가 POST 하는 payload."""
+    level: float = Field(ge=0.0, le=100.0)
+
+
+class BatteryDebugResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+
+
 def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
     """app 에 라우터 부착. ``bridge`` 는 lifespan 에서 미리 ``start()`` 호출되어 있어야 함."""
 
@@ -100,6 +110,21 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
             accepted=accepted, reason=reason,
             current_state=latest.get("fsm_state", ""),
         )
+
+    @router.post("/debug/battery", response_model=BatteryDebugResponse)
+    async def set_battery(req: BatteryDebugRequest) -> BatteryDebugResponse:
+        """[sim 디버그 전용] 배터리 레벨 강제 설정 — sim_battery_node 서버.
+
+        운영(실물 Pi) 환경엔 server 없음 → ``service_unavailable`` 반환.
+        """
+        accepted, reason = await asyncio.to_thread(
+            bridge.set_battery_level_sync, req.level,
+        )
+        if not accepted:
+            logger.warning(
+                f"SetBatteryLevel 거부: level={req.level} reason={reason!r}"
+            )
+        return BatteryDebugResponse(accepted=accepted, reason=reason)
 
     app.include_router(router)
 
@@ -142,4 +167,9 @@ def _install_state_ws(app: FastAPI, bridge: GogopingRosBridge) -> None:
             unreg()
 
 
-__all__ = ["install", "GogopingModeRequest", "GogopingModeResponse"]
+__all__ = [
+    "install",
+    "GogopingModeRequest", "GogopingModeResponse",
+    "ForceStateRequest", "ForceStateResponse",
+    "BatteryDebugRequest", "BatteryDebugResponse",
+]

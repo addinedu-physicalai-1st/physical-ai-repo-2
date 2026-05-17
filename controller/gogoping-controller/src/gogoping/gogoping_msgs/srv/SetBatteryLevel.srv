@@ -1,0 +1,16 @@
+# [디버그 전용] sim 배터리 레벨 강제 설정.
+#
+# admin UI 의 BatteryDebugSlider 가 호출. 운영(실물 Pi) 환경에서는 진짜 배터리 드라이버가
+# /gogoping/battery 를 publish 하므로 본 srv 가 노출되지 않는다 (gogoping_bringup 의
+# sim_battery_node 만이 server 를 등록).
+#
+# 동작:
+#   sim_battery_node 가 server. request.level (0.0 ~ 100.0) 을 받아 내부 상태 갱신,
+#   다음 publish tick 부터 새 값으로 /gogoping/battery 송출. BatterySubscriber 가 받아
+#   blackboard 의 Keys.BATTERY_LEVEL 갱신. 50% 이하면 battery_low_monitor 가 trigger
+#   발화 → 자동 RETURNING / LOW_BATTERY_RETURN escalation 검증 가능.
+
+float32 level           # 0.0 ~ 100.0 (%). 범위 밖이면 clamp.
+---
+bool accepted           # 정상 처리 시 True. 항상 True (clamp 처리하므로 reject 없음).
+string reason           # 미사용 (clamp 발생 시 "clamped_to_0" / "clamped_to_100" 로 알림).

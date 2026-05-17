@@ -34,10 +34,11 @@ controller/gogoping-controller/src/gogoping/
         │   │   │
         │   │   ├── common/
         │   │   │   ├── __init__.py
-        │   │   │   ├── battery_full_monitor.[py|/]   # 배터리 ≥ 80% 감지 → "battery_full" trigger
+        │   │   │   ├── battery_full_monitor.[py|/]   # 배터리 ≥ 70% 감지 → "battery_full" trigger (✅)
         │   │   │   │                                 #   Used in: BT_charging_main
-        │   │   │   ├── battery_low_monitor.[py|/]    # 배터리 ≤ 50% 감지 → "battery_low" trigger
-        │   │   │   │                                 #   Used in: BT_idle_main, BT_assist_main, BT_play_main
+        │   │   │   ├── battery_low_monitor.[py|/]    # 배터리 ≤ 20% 감지 → "battery_low" trigger (✅)
+        │   │   │   │                                 #   hysteresis 20/25, edge-triggered.
+        │   │   │   │                                 #   Used in: BT_idle/assist/play/returning_main
         │   │   │   ├── hardware_health_monitor.[py|/] # 센서/모터 응답 끊김 감지 → "fault" trigger
         │   │   │   │                                 #   Used in: BT_charging_main, BT_idle_main, BT_assist_main,
         │   │   │   │                                 #            BT_play_main, BT_returning_main
@@ -152,7 +153,8 @@ controller/gogoping-controller/src/gogoping/
         │   ├── nav2_client.py            # Nav2 NavigateToPose 액션 클라이언트  (stub)
         │   ├── camera_pan_client.py      # gogoping_camera_pan 토픽 publish 래퍼 (/camera_pan/auto)  (stub)
         │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish  (✅ 실 구현 — `/gogoping/state` 1Hz)
-        │   ├── battery_subscriber.py     # 배터리 상태 토픽 구독  (stub — init 100.0 반환)
+        │   ├── battery_subscriber.py     # /gogoping/battery 구독 (sensor_msgs/BatteryState)
+        │   │                             #   → blackboard.BATTERY_LEVEL 갱신 (✅)
         │   ├── collision_subscriber.py   # Collision Monitor 상태 토픽 구독  (stub)
         │   └── db_logger.py              # error_log 테이블 INSERT  (stub)
         │

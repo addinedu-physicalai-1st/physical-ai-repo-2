@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 TOPIC_STATE = "/gogoping/state"
 SERVICE_SET_GOAL = "/gogoping/set_goal"
 SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
+SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
 
 
 def ros_available() -> bool:
@@ -35,7 +36,7 @@ def ros_available() -> bool:
     """
     try:
         import rclpy  # noqa: F401
-        from gogoping_msgs.srv import ForceState, SetGoal  # noqa: F401
+        from gogoping_msgs.srv import ForceState, SetBatteryLevel, SetGoal  # noqa: F401
         return True
     except ImportError:
         return False
@@ -67,6 +68,7 @@ class GogopingRosBridge:
         self._node: Any = None
         self._cli: Any = None              # SetGoal.srv client
         self._force_state_cli: Any = None  # ForceState.srv client (디버그 전용)
+        self._set_battery_cli: Any = None  # SetBatteryLevel.srv client (sim 디버그 전용)
         self._sub: Any = None              # /gogoping/state subscriber
         self._executor: Any = None
 
@@ -84,7 +86,7 @@ class GogopingRosBridge:
 
         # lazy import (top-level 에서 import 하면 ROS 없는 환경에서 control-service 자체가 죽음)
         import rclpy
-        from gogoping_msgs.srv import ForceState, SetGoal
+        from gogoping_msgs.srv import ForceState, SetBatteryLevel, SetGoal
         from std_msgs.msg import String
 
         if "ROS_DOMAIN_ID" not in os.environ:
@@ -99,6 +101,9 @@ class GogopingRosBridge:
         self._node = rclpy.create_node("gogoping_control_bridge")
         self._cli = self._node.create_client(SetGoal, SERVICE_SET_GOAL)
         self._force_state_cli = self._node.create_client(ForceState, SERVICE_FORCE_STATE)
+        self._set_battery_cli = self._node.create_client(
+            SetBatteryLevel, SERVICE_SET_BATTERY_LEVEL,
+        )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
         )
@@ -196,6 +201,34 @@ class GogopingRosBridge:
         result = future.result()
         return bool(result.accepted), str(result.reason)
 
+    # ----------------------------------------------------------- set_battery (sim 디버그)
+
+    def set_battery_level_sync(self, level: float) -> tuple[bool, str]:
+        """**sim 디버그 전용** — sim_battery_node 의 배터리 레벨 강제 설정.
+
+        ``gogoping_msgs/srv/SetBatteryLevel`` 동기 호출. 운영(실물 Pi) 환경엔 server
+        없음 → ``(False, "service_unavailable")`` 반환.
+        """
+        if not self._ros_ok or self._set_battery_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._set_battery_cli.service_is_ready():
+            if not self._set_battery_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from gogoping_msgs.srv import SetBatteryLevel
+        req = SetBatteryLevel.Request()
+        req.level = float(level)
+
+        future = self._set_battery_cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        return bool(result.accepted), str(result.reason)
+
     # ----------------------------------------------------------- state pubsub
 
     def _on_state_msg(self, msg: Any) -> None:
@@ -240,5 +273,6 @@ class GogopingRosBridge:
 
 __all__ = [
     "GogopingRosBridge", "BridgeUnavailable", "ros_available",
-    "TOPIC_STATE", "SERVICE_SET_GOAL",
+    "TOPIC_STATE", "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
+    "SERVICE_SET_BATTERY_LEVEL",
 ]

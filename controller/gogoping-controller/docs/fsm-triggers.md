@@ -25,9 +25,9 @@
 | `assist_done` | — | (main.py 루프, ASSIST main SUCCESS 감지) | ASSIST → IDLE | `assist_task = ""` 리셋 |
 | `play_done` | — | (main.py 루프, PLAY main SUCCESS 감지) | PLAY → IDLE | `play_task = ""` 리셋 |
 | `cancel` | — | `command_listener` | ASSIST/PLAY/MANUAL → IDLE | task 키 리셋. MANUAL 에서 발화 시 torque ON 자동 |
-| `battery_low` | — | `battery_low_monitor` | IDLE/ASSIST/PLAY → RETURNING (**MANUAL 제외** — 자동 빼앗김 방지) | hysteresis: 50% 진입, 55% 진출 |
+| `battery_low` | — | `battery_low_monitor` | IDLE/ASSIST/PLAY → RETURNING (**MANUAL 제외** — 자동 빼앗김 방지) | hysteresis: 20% 진입, 25% 진출 |
 | `idle_timeout` | — | `idle_timeout_monitor` (추후) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` 초과 시 발화 — 무인 자율 복귀 |
-| `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 80% 진입 |
+| `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 70% 진입 |
 | `docked` | — | `verify_docking_contact` | RETURNING → CHARGING | (발표 단계: 수동 진입) |
 | `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN → ERROR** (MANUAL 제외 — monitor 미배치) | `blackboard.error_reason = reason` 세팅. ERROR 는 terminal — reset trigger 없음 |
 
@@ -65,7 +65,7 @@
 > - `manual_request` (**IDLE / ASSIST / PLAY → MANUAL**): 동일. MANUAL 진입 시 `ManualTorqueHold.initialise()` 가 torque OFF
 > - `fault` (→ ERROR): CHARGING / IDLE / ASSIST / PLAY / RETURNING. **MANUAL 제외** — monitor 미배치
 > - `return_request` (IDLE / ASSIST / PLAY / **MANUAL** → RETURNING): 사용자 명령 또는 SubTree FAILURE fallback
-> - `battery_low` (IDLE / ASSIST / PLAY → RETURNING): hysteresis 50% 진입. **MANUAL 제외** — 자동 빼앗김 방지
+> - `battery_low` (IDLE / ASSIST / PLAY → RETURNING): hysteresis 20% 진입. **MANUAL 제외** — 자동 빼앗김 방지
 > - `idle_timeout` (IDLE → RETURNING): IDLE 진입 후 일정 시간 무명령 시 자율 복귀
 > - `cancel` (ASSIST / PLAY / **MANUAL** → IDLE): MANUAL 의 정상 종료 경로 (torque 자동 ON)
 >
