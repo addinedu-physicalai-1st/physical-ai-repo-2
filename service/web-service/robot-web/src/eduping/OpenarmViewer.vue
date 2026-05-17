@@ -13,11 +13,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
 import { useEdupingStateWs, type JointSnapshot } from '@/composables/useEdupingStateWs';
+import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 import Icon from '@/common/Icon.vue';
 
-const props = withDefaults(defineProps<{ source?: 'leader' | 'follower' }>(), {
-  source: 'leader',
-});
+const props = withDefaults(
+  defineProps<{
+    source?: 'leader' | 'follower';
+    externalSnapshot?: StreamJointSnapshot | null;
+  }>(),
+  { source: 'leader', externalSnapshot: null },
+);
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
@@ -106,14 +111,29 @@ function applyJointState(snap: JointSnapshot | null): void {
   }
 }
 
+function applyExternalSnapshot(snap: StreamJointSnapshot | null): void {
+  if (!robot || !snap) return;
+  for (let i = 0; i < snap.jointNames.length; i++) {
+    try {
+      robot.setJointValue(snap.jointNames[i], snap.positions[i]);
+    } catch {
+      /* unknown joint — silently skip */
+    }
+  }
+}
+
 function startAnimation(): void {
   const tick = () => {
     animationId = requestAnimationFrame(tick);
-    // 매 프레임 현재 source 채널을 읽어서 적용. watch 기반 reactivity 가 두 번째 재생부터
-    // 업데이트를 놓치는 경우가 있어 (Vue 3.5 + ref 재할당 + source toggle 조합), render loop
-    // 폴링으로 우회. applyJointState 는 setJointValue idempotent — 같은 값이면 no-op.
-    const snap = props.source === 'follower' ? stateWs.follower.value : stateWs.leader.value;
-    applyJointState(snap);
+    // externalSnapshot prop 이 있으면 dance stream 모드 — WS 무시하고 prop 값을 폴링.
+    // (URDF 가 늦게 로드되어도 매 프레임 재적용되므로 watch 가 놓쳐도 복구됨.)
+    // 없으면 기존 WS 채널 폴링. applyJointState 는 setJointValue idempotent — 같은 값이면 no-op.
+    if (props.externalSnapshot) {
+      applyExternalSnapshot(props.externalSnapshot);
+    } else {
+      const snap = props.source === 'follower' ? stateWs.follower.value : stateWs.leader.value;
+      applyJointState(snap);
+    }
     controls?.update();
     if (renderer && scene && camera) renderer.render(scene, camera);
   };
@@ -142,7 +162,10 @@ onMounted(() => {
   loadUrdf();
   startAnimation();
   setupResize();
-  stateWs.start();
+  // externalSnapshot prop 으로 외부에서 joint 를 주입받는 경우 WS 구독 불필요.
+  if (!props.externalSnapshot) {
+    stateWs.start();
+  }
 });
 
 onBeforeUnmount(() => {
