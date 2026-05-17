@@ -32,10 +32,10 @@ from typing import TYPE_CHECKING
 import py_trees
 from py_trees.common import Access, Status
 
-from .goal_reconciler import reconcile
+from ....utils.goal_reconciler import reconcile
 
 if TYPE_CHECKING:
-    from ...context import Context
+    from ....context import Context
 
 
 class CommandListener(py_trees.behaviour.Behaviour):

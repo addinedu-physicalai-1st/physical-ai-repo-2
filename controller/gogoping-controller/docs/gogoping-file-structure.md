@@ -114,24 +114,35 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   └── wait_for_exit.[py|/]          # carry_mode 변경 / cancel 명령까지 RUNNING
         │   │   │                                     #   Used in: BT_carry_sub (manual mode)
         │   │   │
-        │   │   └── recovery/
+        │   │   ├── recovery/
+        │   │   │   ├── __init__.py
+        │   │   │   ├── stop_all_motors.[py|/]        # cmd_vel = 0 (안전 정지)
+        │   │   │   │                                 #   Used in: BT_error_main
+        │   │   │   ├── notify_admin_ui.[py|/]        # WebSocket 으로 에러 alert publish
+        │   │   │   │                                 #   Used in: BT_error_main
+        │   │   │   └── log_error_to_db.[py|/]        # error_log 테이블 INSERT (디버깅용)
+        │   │   │                                     #   Used in: BT_error_main
+        │   │   │
+        │   │   └── _stubs/               # ★ Day 1 walking skeleton 임시 placeholder.
+        │   │       │                     #   Day 3~4 에 진짜 SubTree 작성 후 폴더째 삭제.
+        │   │       │                     #   grep -rn "STUB:" controller/gogoping-controller/ 로 검색.
         │   │       ├── __init__.py
-        │   │       ├── stop_all_motors.[py|/]        # cmd_vel = 0 (안전 정지)
-        │   │       │                                 #   Used in: BT_error_main
-        │   │       ├── notify_admin_ui.[py|/]        # WebSocket 으로 에러 alert publish
-        │   │       │                                 #   Used in: BT_error_main
-        │   │       └── log_error_to_db.[py|/]        # error_log 테이블 INSERT (디버깅용)
-        │   │                                         #   Used in: BT_error_main
+        │   │       ├── _base.py                     # StubRunningThenSuccess — N tick RUNNING 후 SUCCESS
+        │   │       ├── stub_carry.py                # BT_carry_sub 자리 (Day 3~4 교체)
+        │   │       ├── stub_follow.py               # BT_follow_sub 자리
+        │   │       ├── stub_lullaby.py              # BT_lullaby_sub 자리
+        │   │       └── stub_hideseek.py             # BT_hide_and_seek_sub 자리
         │   │
         │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
         │       ├── __init__.py
         │       │
-        │       ├── main_trees/           # FSM state 별 MainTree (총 6개)
-        │       │   ├── __init__.py
+        │       ├── main_trees/           # FSM state 별 MainTree (총 7개)
+        │       │   ├── __init__.py               # build_main_tree(state, ctx) dispatcher
         │       │   ├── BT_charging_main.py       # CHARGING — 충전 대기 + 도킹 접점 감시
         │       │   ├── BT_idle_main.py           # IDLE — 명령 대기 + 배터리 감시
         │       │   ├── BT_assist_main.py         # ASSIST — TaskSelector → carry/follow/lullaby
         │       │   ├── BT_play_main.py           # PLAY — TaskSelector → hideseek
+        │       │   ├── BT_manual_main.py         # MANUAL — torque off, 사용자 직접 밀어 이동
         │       │   ├── BT_returning_main.py      # RETURNING — 도킹 완료까지
         │       │   └── BT_error_main.py          # ERROR — terminal (StopAll → Notify → Log)
         │       │
@@ -152,8 +163,11 @@ controller/gogoping-controller/src/gogoping/
         │   ├── collision_subscriber.py   # Collision Monitor 상태 토픽 구독
         │   └── db_logger.py              # error_log 테이블 INSERT
         │
-        └── utils/                        # 공통 helper (Rule of Three 적용 시 채움)
-            └── __init__.py
+        └── utils/                        # 공통 helper / 순수 함수
+            ├── __init__.py
+            ├── waypoints_client.py       # control-server REST 에서 patrol 가져오기 (hide-and-seek 등)
+            └── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수,
+                                          #   command_listener 가 import. ROS 의존성 0 → 단위 테스트 가능)
             
             
             
