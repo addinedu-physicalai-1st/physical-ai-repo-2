@@ -21,8 +21,8 @@ setup(
     license='Proprietary',
     entry_points={
         'console_scripts': [
-            # main 노드는 구현 시작 시 활성화
-            # 'main = gogoping_modes.main:main',
+            # ros2 run gogoping_modes gogoping_modes 로 띄움
+            'gogoping_modes = gogoping_modes.main:main',
         ],
     },
 )

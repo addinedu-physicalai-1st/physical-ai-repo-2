@@ -19,9 +19,28 @@
 
 ---
 
-## battery_full_monitor / battery_low_monitor  *(스켈레톤)*
+## battery_full_monitor  *(구현됨 — Day 1)*
 
-배터리 ≥ 80% / ≤ 50% 감지 → `"battery_full"` / `"battery_low"` FSM trigger.
+배터리 ≥ 80% 감지 시 `"battery_full"` FSM trigger 발화.
+
+- read: `Keys.BATTERY_LEVEL`
+- threshold: `FULL_ENTER = 80.0` (%)
+- edge-triggered (`_fired` 플래그, `initialise()` 에서 리셋)
+- monitor 컨벤션 — 매 tick RUNNING 리턴
+
+Day 1 walking skeleton 단계엔 `BatterySubscriber` 가 stub 이라 `BATTERY_LEVEL` 이 init 기본값 100.0 으로 고정 → 부팅 시 첫 tick 에 즉시 fire. 사용자가 의도한 "부팅=CHARGING, 배터리 정상이면 IDLE" 시퀀스 자연 재현.
+
+| Used in | BT_charging_main |
+| 파일 | [`bt/behaviors/common/battery_full_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) |
+
+## battery_low_monitor  *(스켈레톤 — Day 2)*
+
+배터리 ≤ 50% 감지 시 `"battery_low"` FSM trigger 발화. hysteresis 50% 진입 / 55% 진출.
+
+- read: `Keys.BATTERY_LEVEL`
+- Day 2 에 `BatterySubscriber` 가 실제 ROS 토픽 구독으로 교체되면 의미있게 동작
+
+| Used in (예정) | BT_idle_main, BT_assist_main, BT_play_main |
 
 ## hardware_health_monitor  *(스켈레톤)*
 
