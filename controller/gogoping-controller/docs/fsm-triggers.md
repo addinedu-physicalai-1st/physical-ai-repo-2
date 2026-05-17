@@ -1,6 +1,18 @@
 # FSM Triggers
 
-`robot_fsm.py` 의 transition 트리거 명세. 모든 BT 가드 / interface / 외부 명령은 본 문서의 trigger 만 호출.
+`robot_fsm.py` 의 transition 트리거 명세.
+
+> **본 trigger 표는 internal API.** (2026-05-17 결정)
+>
+> UI / Control Server 는 trigger 를 직접 발화하지 않고 `gogoping_msgs/srv/SetGoal.srv`
+> 로 *goal* 만 변경한다. `bt/behaviors/common/command_listener.py` 가 SetGoal 을 받아
+> 현재 state ↔ goal 차이를 보고 본 표의 적절한 trigger 를 *자체* 발화하는 reconciler 패턴.
+>
+> 따라서 본 trigger 이름은 외부에 노출되지 않으며 자유롭게 리팩터링 가능.
+> 외부 인터페이스 변경은 `Goal.msg` / `GoalStatus.msg` / `SetGoal.srv` 의 spec 변경 시에만.
+
+내부 호출 주체: BT monitor 노드 (`battery_low_monitor` / `hardware_health_monitor` /
+`collision_event_handler` 등), `command_listener` (goal reconciler), `main.py._on_tree_failure`.
 
 ## Trigger 목록
 
