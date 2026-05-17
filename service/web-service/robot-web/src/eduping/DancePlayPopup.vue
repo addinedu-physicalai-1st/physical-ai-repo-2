@@ -73,6 +73,27 @@ function play(item: DanceItem): void {
   playingSlug.value = item.slug;
   error.value = '';
   stream.open(item.slug);
+  // 실물 팔 따라가도록 trigger — fire-and-forget. sim 모드에선 fallback 처리.
+  void triggerRealArm(item.slug);
+}
+
+async function triggerRealArm(slug: string): Promise<void> {
+  for (const target of ['real', 'sim'] as const) {
+    try {
+      const res = await fetch(
+        `/api/eduping/dance/${encodeURIComponent(slug)}/play`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target }),
+        },
+      );
+      if (res.ok) return;
+    } catch {
+      /* 다음 target 시도 */
+    }
+  }
+  // 둘 다 실패 — stream 으로 시각화·곡은 계속 흐름. 사용자엔 silent fail.
 }
 
 function stop(): void {
