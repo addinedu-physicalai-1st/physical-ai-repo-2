@@ -103,7 +103,7 @@ async function triggerReturnHome(): Promise<void> {
       const res = await fetch('/api/eduping/arm/return-home', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, duration_s: 1.5 }),
+        body: JSON.stringify({ target, duration_s: 3.0 }),
       });
       if (res.ok) return;
     } catch {

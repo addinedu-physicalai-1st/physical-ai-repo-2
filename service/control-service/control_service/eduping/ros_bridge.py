@@ -566,7 +566,7 @@ class EdupingRosBridge:
         return result
 
     def return_to_home(
-        self, *, target: str = "sim", duration_s: float = 1.5
+        self, *, target: str = "sim", duration_s: float = 3.0
     ) -> dict:
         """양팔을 HOME_POSE 로 부드럽게 복귀.
 
@@ -577,7 +577,7 @@ class EdupingRosBridge:
         실물 측은 JTC spline 이 알아서 현재 → keyframes[0] 보간하므로 동일 trajectory OK.
         """
         if duration_s <= 0:
-            duration_s = 1.5
+            duration_s = 3.0
         if target == "real" and self._teleop_active:
             raise ValueError(
                 "실물 동기화 (teleop) 가 켜져있는 상태에서는 실물 복귀 불가 — 토글 끄고 다시 시도하세요."

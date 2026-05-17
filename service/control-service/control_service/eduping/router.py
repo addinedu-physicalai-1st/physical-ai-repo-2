@@ -110,7 +110,7 @@ class PlayIn(BaseModel):
 
 class ReturnHomeIn(BaseModel):
     target: Literal["sim", "real"] = "sim"
-    duration_s: float = Field(default=1.5, ge=0.3, le=5.0)
+    duration_s: float = Field(default=3.0, ge=0.3, le=5.0)
 
 
 # ---------------------------------------------------------------------------
