@@ -1,4 +1,4 @@
-"""Robot state WS client — Control Server `/ws/robot-state` 구독.
+"""Robot state WS client + 디버그 REST helper.
 
 teleop_client.py 와 같은 패턴 — daemon thread 에서 WS 수신, 끊기면 1초 후 재연결.
 
@@ -6,6 +6,10 @@ teleop_client.py 와 같은 패턴 — daemon thread 에서 WS 수신, 끊기면
     self.state_client = StateClient()
     self.state_client.connect(self.topbar.bt_state.update_snapshot)
     # closeEvent 에서 self.state_client.stop()
+
+REST helper:
+    self.state_client.post_force_state("ERROR")
+    # 디버그용 — control-server /api/gogoping/debug/force-state 호출
 
 받은 payload 포맷: ``gogoping_modes.bt.tree_inspector.snapshot`` 의 dict 그대로 —
 ``app/admin-app/widgets/bt_state_inline.py`` 의 ``update_snapshot()`` 시그니처와 호환.
@@ -16,6 +20,8 @@ import json
 import logging
 import threading
 from typing import Callable
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +100,51 @@ class StateClient:
         if self._ws_thread is not None and self._ws_thread.is_alive():
             self._ws_thread.join(timeout=1.5)
         self._ws_thread = None
+
+    # ----------------------------------------------------------- 디버그 REST
+
+    def post_force_state(
+        self,
+        target_state: str,
+        sub_task: str = "",
+        on_result: Callable[[str, bool, str], None] | None = None,
+    ) -> None:
+        """**디버그** — ``POST /api/gogoping/debug/force-state``.
+
+        별도 thread 에서 HTTP 호출 (Qt main thread 차단 방지). 응답 시
+        ``on_result(state, ok, reason)`` 콜백 — Qt signal 또는 단순 함수.
+
+        admin UI 의 DebugStatePanel 적용 버튼이 호출.
+        ``sub_task`` 비어있지 않으면 blackboard.assist_task / play_task 같이 세팅됨.
+        """
+        url = f"{self._base}/api/gogoping/debug/force-state"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(
+                        url,
+                        json={"target_state": target_state, "sub_task": sub_task},
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(target_state, ok, reason)
+                except Exception as e:
+                    logger.warning(f"force_state on_result 콜백 오류: {e}")
+
+        threading.Thread(target=_run, name=f"force_state_{target_state}", daemon=True).start()
 
 
 __all__ = ["StateClient"]

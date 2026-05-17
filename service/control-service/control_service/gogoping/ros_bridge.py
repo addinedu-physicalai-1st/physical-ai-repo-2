@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # 토픽 / 서비스 이름 (gogoping_modes 와 일치 — 모두 /gogoping/* namespace)
 TOPIC_STATE = "/gogoping/state"
 SERVICE_SET_GOAL = "/gogoping/set_goal"
+SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
 
 
 def ros_available() -> bool:
@@ -34,7 +35,7 @@ def ros_available() -> bool:
     """
     try:
         import rclpy  # noqa: F401
-        from gogoping_msgs.srv import SetGoal  # noqa: F401
+        from gogoping_msgs.srv import ForceState, SetGoal  # noqa: F401
         return True
     except ImportError:
         return False
@@ -64,8 +65,9 @@ class GogopingRosBridge:
 
         # rclpy 객체는 start() 에서만 생성 (테스트가 mock 으로 대체 가능)
         self._node: Any = None
-        self._cli: Any = None      # SetGoal.srv client
-        self._sub: Any = None      # /gogoping/state subscriber
+        self._cli: Any = None              # SetGoal.srv client
+        self._force_state_cli: Any = None  # ForceState.srv client (디버그 전용)
+        self._sub: Any = None              # /gogoping/state subscriber
         self._executor: Any = None
 
     # ----------------------------------------------------------- lifecycle
@@ -82,7 +84,7 @@ class GogopingRosBridge:
 
         # lazy import (top-level 에서 import 하면 ROS 없는 환경에서 control-service 자체가 죽음)
         import rclpy
-        from gogoping_msgs.srv import SetGoal
+        from gogoping_msgs.srv import ForceState, SetGoal
         from std_msgs.msg import String
 
         if "ROS_DOMAIN_ID" not in os.environ:
@@ -96,6 +98,7 @@ class GogopingRosBridge:
 
         self._node = rclpy.create_node("gogoping_control_bridge")
         self._cli = self._node.create_client(SetGoal, SERVICE_SET_GOAL)
+        self._force_state_cli = self._node.create_client(ForceState, SERVICE_FORCE_STATE)
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
         )
@@ -153,6 +156,38 @@ class GogopingRosBridge:
         req.goal.target_id = goal.target_id
 
         future = self._cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        return bool(result.accepted), str(result.reason)
+
+    # ----------------------------------------------------------- force_state (디버그)
+
+    def force_state_sync(
+        self, target_state: str, sub_task: str = "",
+    ) -> tuple[bool, str]:
+        """**디버그 전용** — FSM 강제 state 전이.
+
+        ``ForceState.srv`` 동기 호출. transition 규칙 우회.
+        ``sub_task`` 비어있지 않으면 force_state 전에 blackboard 의 assist_task /
+        play_task 세팅 — admin debug UI 의 sub combo box 가 채움.
+        """
+        if not self._ros_ok or self._force_state_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._force_state_cli.service_is_ready():
+            if not self._force_state_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from gogoping_msgs.srv import ForceState
+        req = ForceState.Request()
+        req.target_state = target_state
+        req.sub_task = sub_task
+
+        future = self._force_state_cli.call_async(req)
         deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
         while not future.done() and time.time() < deadline:
             time.sleep(0.01)

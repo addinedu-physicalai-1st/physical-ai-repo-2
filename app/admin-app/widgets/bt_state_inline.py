@@ -269,9 +269,14 @@ class BTStateInline(QWidget):
         self._main = _TreeCell("BT main", kind="main")
         self._sub = _TreeCell("BT sub", kind="sub")
 
+        # 디버그 패널 — BT sub 옆 (state + sub_task combo + 적용)
+        from .debug_state_panel import DebugStatePanel
+        self.debug_panel = DebugStatePanel()
+
         lay.addWidget(self._state, 0, Qt.AlignVCenter)
         lay.addWidget(self._main, 0, Qt.AlignVCenter)
         lay.addWidget(self._sub, 0, Qt.AlignVCenter)
+        lay.addWidget(self.debug_panel, 0, Qt.AlignVCenter)
 
     # ------------------------------------------------------------------ API
 
