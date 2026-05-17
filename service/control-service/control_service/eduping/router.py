@@ -110,7 +110,6 @@ class PlayIn(BaseModel):
 
 class ReturnHomeIn(BaseModel):
     target: Literal["sim", "real"] = "sim"
-    duration_s: float = Field(default=3.0, ge=0.3, le=5.0)
 
 
 # ---------------------------------------------------------------------------
@@ -303,13 +302,13 @@ async def dance_play(req: Request, slug: str, body: PlayIn) -> dict:
 
 @router.post("/arm/return-home")
 async def arm_return_home(req: Request, body: ReturnHomeIn) -> dict:
-    """양팔을 고정 HOME_POSE 로 1.5s 동안 부드럽게 복귀.
+    """양팔을 고정 HOME_POSE 로 trapezoidal velocity profile 로 복귀.
 
-    율동 정지/종료 시 호출. 진행 중 재생이 있으면 인터럽트 후 home 으로 ramp.
+    duration 은 현재 pose ↔ HOME 의 최대 joint delta + HOME_V_MAX / HOME_A_MAX 로 자동 산출.
     """
     bridge = _bridge(req)
     try:
-        return bridge.return_to_home(target=body.target, duration_s=body.duration_s)
+        return bridge.return_to_home(target=body.target)
     except (ValueError, BridgeUnavailable) as e:
         raise HTTPException(400, str(e)) from e
 

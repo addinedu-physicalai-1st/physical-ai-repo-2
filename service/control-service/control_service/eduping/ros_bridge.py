@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import subprocess
 import threading
 import time
@@ -565,28 +566,27 @@ class EdupingRosBridge:
             result["real"] = real_status
         return result
 
-    def return_to_home(
-        self, *, target: str = "sim", duration_s: float = 3.0
-    ) -> dict:
-        """양팔을 HOME_POSE 로 부드럽게 복귀.
+    def return_to_home(self, *, target: str = "sim") -> dict:
+        """양팔을 HOME_POSE 로 trapezoidal velocity profile 로 복귀.
 
-        합성 Routine (현재 pose @t=0 + HOME @t=duration_s) → 기존 publish/playback
-        파이프라인 재사용. sim_twin 의 선형 보간은 첫 keyframe 이전엔 hold (즉시 점프)
-        하므로 반드시 t=0 keyframe 으로 현재 pose 를 명시해야 부드럽게 보임. 진행 중
-        율동/greeting 재생이 있으면 _start_playback 가 _stop_playback 으로 안전 인터럽트.
-        실물 측은 JTC spline 이 알아서 현재 → keyframes[0] 보간하므로 동일 trajectory OK.
+        - 가장 큰 |delta| 가진 joint 가 HOME_V_MAX 로 cruise, HOME_A_MAX 로 가속/감속.
+        - 다른 joint 들은 같은 시간 안에서 time-scaled → 모두 동시 출발·도착, 시작·끝 속도 0.
+        - 50Hz 키프레임으로 곡선 sampling → sim_twin 의 선형 보간도 자연스럽게 곡선처럼 보임.
+        - 실물 측은 다 같은 trajectory 를 JTC 에 전달 → cubic spline 으로 더 부드럽게.
         """
-        if duration_s <= 0:
-            duration_s = 3.0
         if target == "real" and self._teleop_active:
             raise ValueError(
                 "실물 동기화 (teleop) 가 켜져있는 상태에서는 실물 복귀 불가 — 토글 끄고 다시 시도하세요."
             )
-        from eduarm.joint_names import HOME_POSE, OPENARM_JOINT_NAMES  # type: ignore[import-not-found]
+        from eduarm.joint_names import (  # type: ignore[import-not-found]
+            HOME_A_MAX,
+            HOME_POSE,
+            HOME_V_MAX,
+            OPENARM_JOINT_NAMES,
+        )
         from eduarm.routines_io import Keyframe, Routine  # type: ignore[import-not-found]
 
         joint_names = list(OPENARM_JOINT_NAMES)
-        # 현재 follower pose 캡쳐 — t=0 keyframe 시작점. 비어있거나 길이 불일치면 HOME 으로 fallback.
         with self._lock:
             f_names = list(self._follower.joint_names)
             f_pos = list(self._follower.positions)
@@ -599,18 +599,22 @@ class EdupingRosBridge:
         else:
             start_pos = list(HOME_POSE)
 
+        keyframes = _trapezoidal_keyframes(
+            start=start_pos,
+            end=list(HOME_POSE),
+            v_max=HOME_V_MAX,
+            a_max=HOME_A_MAX,
+            dt=0.02,
+            Keyframe=Keyframe,
+        )
         routine = Routine(
             name="__home__",
             kind=KIND_DANCE,
-            keyframes=[
-                Keyframe(t=0.0, pos=start_pos),
-                Keyframe(t=float(duration_s), pos=list(HOME_POSE)),
-            ],
+            keyframes=keyframes,
             sample_hz=50,
             joint_names=joint_names,
         )
-        # 첫 keyframe 이 이미 현재 pose 라 별도 ramp 불필요 (그렇지 않으면 0.3s 가량 hold 후 시작).
-        ramp_s = 0.0
+        ramp_s = 0.0  # 첫 keyframe 이 이미 현재 pose
 
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
@@ -631,8 +635,8 @@ class EdupingRosBridge:
         result: dict = {
             "ok": True,
             "target": target,
-            "duration_s": round(float(duration_s) + ramp_s, 3),
-            "ramp_s": round(ramp_s, 3),
+            "duration_s": round(routine.duration_s, 3),
+            "frame_count": len(keyframes),
         }
         if target == "real":
             result["real"] = self._send_real_follower_goals(routine, 1.0, ramp_s)
@@ -858,6 +862,66 @@ class EdupingRosBridge:
 
 
 # --- helpers ----------------------------------------------------------------
+
+
+def _trapezoidal_keyframes(
+    *,
+    start: list[float],
+    end: list[float],
+    v_max: float,
+    a_max: float,
+    dt: float,
+    Keyframe: Any,
+) -> list[Any]:
+    """양팔 16-joint 동기 trapezoidal velocity profile 키프레임 생성.
+
+    가장 큰 |delta| 가진 joint 가 v_max 로 cruise · a_max 로 가속/감속 → 그 joint 의
+    시간을 master 로 잡고 다른 joint 들은 같은 normalized 진행도 s(t) ∈ [0,1] 로 time-scaled.
+    선형 보간 (`pos = start + s*delta`) 이므로 joint 별 속도는 delta 에 비례 (큰 joint 빠름,
+    작은 joint 느림), 모두 동시에 시작/도착.
+
+    profile (master joint 기준 d_max 거리):
+      - t_acc = v_max / a_max
+      - d_acc = ½·v_max·t_acc
+      - 2·d_acc ≥ d_max 면 v_max 도달 못함 → 삼각 (t_acc = sqrt(d_max / a_max), cruise=0)
+      - 아니면 t_cruise = (d_max - 2·d_acc) / v_max, 총 T = 2·t_acc + t_cruise
+    """
+    n = len(start)
+    if len(end) != n:
+        raise ValueError(f"start/end joint count mismatch: {n} vs {len(end)}")
+    deltas = [e - s for s, e in zip(start, end)]
+    d_max = max((abs(d) for d in deltas), default=0.0)
+    if d_max < 1e-6:
+        # 이미 목표 위치 — 두 keyframe 으로 즉시 종료 (sim_twin hold).
+        return [Keyframe(t=0.0, pos=list(start)), Keyframe(t=dt, pos=list(end))]
+
+    t_acc = v_max / a_max
+    d_acc = 0.5 * v_max * t_acc
+    if 2.0 * d_acc >= d_max:
+        # 삼각 — v_max 까지 못 가속
+        t_acc = math.sqrt(d_max / a_max)
+        t_cruise = 0.0
+    else:
+        t_cruise = (d_max - 2.0 * d_acc) / v_max
+    T = 2.0 * t_acc + t_cruise
+
+    keyframes: list[Any] = []
+    t = 0.0
+    while t < T:
+        # master joint 의 진행 거리 d(t) ∈ [0, d_max]
+        if t <= t_acc:
+            d = 0.5 * a_max * t * t
+        elif t <= t_acc + t_cruise:
+            d = 0.5 * v_max * t_acc + v_max * (t - t_acc)
+        else:
+            tau = T - t
+            d = d_max - 0.5 * a_max * tau * tau
+        s = max(0.0, min(1.0, d / d_max))
+        keyframes.append(Keyframe(t=t, pos=[sp + s * dp for sp, dp in zip(start, deltas)]))
+        t += dt
+    # 정확한 끝점 보장
+    keyframes.append(Keyframe(t=T, pos=list(end)))
+    return keyframes
 
 
 def _js_to_dict(js: _JsState) -> dict | None:
