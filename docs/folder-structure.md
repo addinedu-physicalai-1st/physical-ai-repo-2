@@ -199,6 +199,7 @@ scripts/ui-portal.sh
 scripts/ui-admin.sh
 
 # 디바이스 1회 셋업 — README 의 단계별 명령 (apt install + git submodule init + colcon build) 을 따라 수동 실행
+# - eduping 노트북: `pydub` 의 mp3 decode 를 위해 `apt install ffmpeg` 필요.
 
 # 디바이스 (매 실행 — ros2 launch)
 scripts/device-gogoping-pi.sh              # 라즈베리파이에서
