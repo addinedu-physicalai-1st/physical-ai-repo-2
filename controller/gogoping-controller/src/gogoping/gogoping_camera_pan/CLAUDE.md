@@ -54,7 +54,7 @@ uno  -> host: OK:<pan>,<tilt>\n     (적용된 deg)
 - `keyboard_teleop` — 터미널 raw stdin → `cmd_pan` / `cmd_tilt` publish. TTY 필요해서 launch 가 아니라 `ros2 run` 으로 띄움
 - `pan_scanner` — 자동 sin sweep. teleop 과 동시에 못 씀 (둘 다 `/cmd_pan` 으로 publish)
 
-## 키맵 (keyboard_teleop)
+## 키맵 (keyboard_teleop — 터미널)
 
 | 키 | 동작 |
 |---|---|
@@ -63,6 +63,17 @@ uno  -> host: OK:<pan>,<tilt>\n     (적용된 deg)
 | `space` | center 복귀 |
 | `[` / `]` | step 축소 / 확대 (0.5° ~ 45°) |
 | `q`, Ctrl-C | 종료 |
+
+## 키맵 (admin-app CameraPanCard — PyQt UI)
+
+| 키 | 동작 | 범위 |
+|---|---|---|
+| `W` / `A` / `S` / `D` | tilt+/pan-/tilt-/pan+ | **글로벌** (카드 포커스 불필요) |
+| `C` | center 복귀 | **글로벌** |
+| 화살표 ↑ ↓ ← → | tilt+/tilt-/pan-/pan+ | 카드 포커스일 때만 (Teleop 과 충돌) |
+| `Space` | center 복귀 | 카드 포커스일 때만 |
+
+text input 위젯 (QLineEdit / QSpinBox 등) 안에선 글로벌 단축키 무시 — 타이핑 보존.
 
 ## 실행
 

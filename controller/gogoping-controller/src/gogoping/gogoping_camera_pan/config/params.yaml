@@ -13,7 +13,7 @@ servo_bridge:
       min_deg: 30.0
       max_deg: 150.0
       center_deg: 90.0
-    rate_limit_deg_per_s: 180.0
+    rate_limit_deg_per_s: 90.0  # 빠른 최대속도보다 visual smoothness 우선
     pan_joint_name: camera_pan_joint
     tilt_joint_name: camera_tilt_joint
     state_pub_hz: 20.0

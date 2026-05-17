@@ -1,23 +1,35 @@
 """Camera pan/tilt 카드 — 2축 서보 원격 조작 (admin-app).
 
-키/버튼 hold → 10Hz 로 target deg 누적 → Control Server REST POST.
+키/버튼 hold → 30Hz 로 target deg 누적 → Control Server REST POST.
 WS 로 servo_bridge 의 실측 JointState 수신해 표시 갱신.
 rclpy 직접 import 금지 (Control Server 경유).
+
+글로벌 단축키 (카드 포커스 없이 동작):
+    W A S D   pan/tilt
+    C         center
+text input 위젯 (QLineEdit / QSpinBox 등) 안에 포커스 있으면 가로채지 않음.
+화살표 + Space 는 TeleopCard 와 충돌하므로 글로벌 X — 카드 포커스일 때만.
 """
 
 from __future__ import annotations
 
 from typing import Callable
 
-from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
+    QApplication,
+    QComboBox,
     QDoubleSpinBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QSizePolicy,
+    QSpinBox,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -26,21 +38,32 @@ from theme import COLORS
 from widgets import Card, StatusBadge
 
 # 한 tick 당 누적되는 각도 = step_deg / 한 번의 publish 가 한 tick
-CMD_TICK_MS = 100  # 10 Hz
+CMD_TICK_MS = 33  # ~30 Hz — visual smoothness
 HEALTH_TICK_MS = 5000
 
 PAN_MIN, PAN_MAX, PAN_CENTER = 5.0, 175.0, 90.0
 TILT_MIN, TILT_MAX, TILT_CENTER = 30.0, 150.0, 90.0
+DEFAULT_STEP_DEG = 0.5  # 30Hz × 0.5° = 15°/s (servo bridge rate_limit 90°/s 이하)
 
 _GLYPH = {"left": "◀", "right": "▶", "up": "▲", "down": "▼"}
 
-# arrow + WASD 모두 지원
+# arrow + WASD 모두 지원 (카드 포커스일 때). 화살표는 글로벌 X (Teleop 과 충돌).
 _KEY_TO_DIR = {
     Qt.Key_Left: "left", Qt.Key_A: "left",
     Qt.Key_Right: "right", Qt.Key_D: "right",
     Qt.Key_Up: "up", Qt.Key_W: "up",
     Qt.Key_Down: "down", Qt.Key_S: "down",
 }
+
+# 글로벌 단축키 대상 — WASD 만 (Teleop 안 씀). 화살표는 카드 포커스일 때만.
+_GLOBAL_DIR_KEYS = {Qt.Key_W, Qt.Key_A, Qt.Key_S, Qt.Key_D}
+_GLOBAL_CENTER_KEY = Qt.Key_C
+
+# text input 위젯에 포커스 있으면 글로벌 단축키 무시 (타이핑 충돌 방지)
+_TEXT_INPUT_WIDGETS = (
+    QLineEdit, QTextEdit, QPlainTextEdit,
+    QSpinBox, QDoubleSpinBox, QComboBox,
+)
 
 SendCmdFn = Callable[[float | None, float | None], bool]
 
@@ -106,6 +129,23 @@ class CameraPanCard(QWidget):
         self._health_timer.setInterval(HEALTH_TICK_MS)
         self._health_timer.timeout.connect(self._on_health_tick)
         self._health_timer.start()
+
+        # 글로벌 단축키 — QApplication 전체에서 WASD/C 수신.
+        # 카드 destroy 시 filter 도 제거 (destroyed 시그널).
+        self._global_filter: _GlobalHotkeyFilter | None = None
+        app = QApplication.instance()
+        if app is not None:
+            self._global_filter = _GlobalHotkeyFilter(self)
+            app.installEventFilter(self._global_filter)
+            self.destroyed.connect(self._uninstall_global_filter)
+
+    def _uninstall_global_filter(self) -> None:
+        if self._global_filter is None:
+            return
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self._global_filter)
+        self._global_filter = None
 
     # ── build ────────────────────────────────────────────────────────────────
     def _make_dir_btn(self, kind: str) -> QPushButton:
@@ -188,15 +228,15 @@ class CameraPanCard(QWidget):
 
         lay.addWidget(_hdr("STEP"), 4, 0)
         self.step_spin = QDoubleSpinBox(box)
-        self.step_spin.setRange(0.5, 20.0)
-        self.step_spin.setSingleStep(0.5)
-        self.step_spin.setValue(2.0)
+        self.step_spin.setRange(0.1, 20.0)
+        self.step_spin.setSingleStep(0.1)
+        self.step_spin.setValue(DEFAULT_STEP_DEG)
         self.step_spin.setSuffix(" °/tick")
         self.step_spin.setFocusPolicy(Qt.NoFocus)
         self.step_spin.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         lay.addWidget(self.step_spin, 4, 1)
 
-        hint = QLabel("키: WASD / 화살표 (hold) · Space=center")
+        hint = QLabel("키: WASD (글로벌) / 화살표 (포커스) · C 또는 Space=center")
         hint.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 11px;"
         )
@@ -220,26 +260,36 @@ class CameraPanCard(QWidget):
         self._send(self._target_pan, self._target_tilt)
         self._update_target_labels()
 
+    # 키 입력 → 내부 상태 변경 helper (focus / global 양쪽에서 호출).
+    # True 반환 시 이벤트를 처리(소비)한 것으로 본다.
+    def handle_key_press(self, key: int) -> bool:
+        if key == Qt.Key_Space or key == _GLOBAL_CENTER_KEY:
+            self._on_center_clicked()
+            return True
+        if key in _KEY_TO_DIR:
+            self._keys_down.add(key)
+            self._ensure_publishing()
+            return True
+        return False
+
+    def handle_key_release(self, key: int) -> bool:
+        if key in self._keys_down:
+            self._keys_down.discard(key)
+            self._maybe_stop()
+            return True
+        return False
+
     def keyPressEvent(self, e) -> None:  # noqa: N802
         if e.isAutoRepeat():
             return
-        k = e.key()
-        if k == Qt.Key_Space:
-            self._on_center_clicked()
-            return
-        if k in _KEY_TO_DIR:
-            self._keys_down.add(k)
-            self._ensure_publishing()
+        if self.handle_key_press(e.key()):
             return
         super().keyPressEvent(e)
 
     def keyReleaseEvent(self, e) -> None:  # noqa: N802
         if e.isAutoRepeat():
             return
-        k = e.key()
-        if k in self._keys_down:
-            self._keys_down.discard(k)
-            self._maybe_stop()
+        if self.handle_key_release(e.key()):
             return
         super().keyReleaseEvent(e)
 
@@ -326,3 +376,35 @@ class CameraPanCard(QWidget):
             self._get_health()
         except Exception:
             pass
+
+
+class _GlobalHotkeyFilter(QObject):
+    """QApplication 전체에 설치되는 키 필터.
+
+    WASD = 방향, C = center. text input 위젯 (QLineEdit/QSpinBox 등) 안에
+    포커스가 있으면 가로채지 않고 통과시켜 타이핑을 막지 않는다.
+    autoRepeat 이벤트는 무시 — 카드 내부 tick timer 가 hold 시 누적을 담당.
+    """
+
+    def __init__(self, card: "CameraPanCard") -> None:
+        super().__init__(card)
+        self._card = card
+
+    def eventFilter(self, obj, ev) -> bool:  # noqa: N802 (Qt API)
+        t = ev.type()
+        if t != QEvent.KeyPress and t != QEvent.KeyRelease:
+            return False
+        if ev.isAutoRepeat():
+            return False
+        key = ev.key()
+        if key not in _GLOBAL_DIR_KEYS and key != _GLOBAL_CENTER_KEY:
+            return False
+        focus = QApplication.focusWidget()
+        if isinstance(focus, _TEXT_INPUT_WIDGETS):
+            return False
+        # 카드가 이미 포커스면 keyPressEvent 로 받게 두고 중복 처리 X.
+        if focus is self._card:
+            return False
+        if t == QEvent.KeyPress:
+            return self._card.handle_key_press(key)
+        return self._card.handle_key_release(key)

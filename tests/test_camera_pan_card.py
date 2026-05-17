@@ -11,10 +11,12 @@ import pytest
 pytest.importorskip("pytestqt")
 pytest.importorskip("PyQt5")
 
-from PyQt5.QtCore import Qt, QEvent
+from PyQt5.QtCore import QEvent, Qt
 from PyQt5.QtGui import QKeyEvent
+from PyQt5.QtWidgets import QApplication, QLineEdit
 
 from widgets.camera_pan_card import (
+    CMD_TICK_MS,
     PAN_CENTER,
     PAN_MAX,
     PAN_MIN,
@@ -79,28 +81,31 @@ def test_space_publishes_center(qtbot):
 # ── 키 hold → 10Hz 누적 publish ───────────────────────────────────────────
 
 
-def test_pan_right_key_accumulates_at_10hz(qtbot):
+def test_pan_right_key_accumulates_at_tick_rate(qtbot):
     card, calls = _make_card(qtbot)
     card.step_spin.setValue(2.0)
     card.setFocus()
     qtbot.waitUntil(card.hasFocus, timeout=1000)
 
     start_pan = card._target_pan
+    # 5 tick 정도 누름
+    hold_ms = CMD_TICK_MS * 5 + CMD_TICK_MS // 2
     _press(card, Qt.Key_D)
-    qtbot.wait(550)  # 5 ticks worth
+    qtbot.wait(hold_ms)
     _release(card, Qt.Key_D)
-    qtbot.wait(150)
+    qtbot.wait(CMD_TICK_MS * 2)
 
-    # ~5 calls (즉시 1회 + 100ms 마다 4~5회 = 5~6) → 4~7 허용
+    expected = hold_ms / CMD_TICK_MS  # ~5
     n = len(calls)
-    assert 3 <= n <= 8, f"expected ~5 calls, got {n}"
-    # 매 call 마다 pan 만 보낸다 (tilt 는 None)
+    # 즉시 1회 포함 + 타이밍 jitter → expected×0.5 ~ expected×1.8 허용
+    assert expected * 0.5 <= n <= expected * 1.8 + 2, (
+        f"expected ~{expected} calls, got {n} (tick={CMD_TICK_MS}ms)"
+    )
+    # 매 call 마다 pan 만 (tilt None)
     for pan, tilt in calls:
         assert tilt is None
         assert pan is not None
-    # target_pan 누적
     assert card._target_pan > start_pan
-    # 마지막 call 의 pan 이 현재 target 과 같다
     assert calls[-1][0] == card._target_pan
 
 
@@ -202,3 +207,79 @@ def test_on_state_ros_off_badge(qtbot):
     card, _ = _make_card(qtbot)
     card.on_state({"ros_ok": False, "pan_deg": None, "tilt_deg": None})
     assert "off" in card.comm_badge.text().lower()
+
+
+# ── 글로벌 단축키 (event filter) ──────────────────────────────────────────
+
+
+def _send_app_key(key: int, press: bool = True) -> None:
+    """QApplication 전체에 KeyPress/Release 이벤트 보냄.
+
+    포커스 위젯에 sendEvent → app 의 eventFilter 가 가로채야 함.
+    """
+    ev_type = QEvent.KeyPress if press else QEvent.KeyRelease
+    ev = QKeyEvent(ev_type, key, Qt.NoModifier, autorep=False)
+    target = QApplication.focusWidget() or QApplication.instance()
+    QApplication.sendEvent(target, ev)
+
+
+def test_global_wasd_works_without_focus(qtbot):
+    """WASD 글로벌 단축키: 카드에 포커스가 없어도 동작."""
+    card, calls = _make_card(qtbot)
+    # 카드 외 다른 위젯을 만들고 포커스 줌
+    other = QLineEdit()
+    qtbot.addWidget(other)
+    other.show()
+    qtbot.waitExposed(other)
+    # text input 이면 가로채지 않으므로, 우선 카드도 다른 일반 위젯도 아닌 위젯에 포커스를 줌
+    # → QLineEdit 자체엔 가로채면 안 됨 (다음 테스트). 여기서는 카드/입력위젯 둘 다 비활성화.
+    card.clearFocus()
+    other.clearFocus()
+    assert QApplication.focusWidget() not in (card,)
+
+    _send_app_key(Qt.Key_D, press=True)
+    qtbot.wait(CMD_TICK_MS * 4)
+    _send_app_key(Qt.Key_D, press=False)
+    qtbot.wait(CMD_TICK_MS * 2)
+
+    assert len(calls) >= 2, "global D 키가 publish 를 트리거해야 함"
+    assert card._target_pan > PAN_CENTER
+
+
+def test_global_c_centers(qtbot):
+    """C 키 글로벌 = center 복귀."""
+    card, calls = _make_card(qtbot)
+    card._target_pan = 120.0
+    card._target_tilt = 60.0
+    card.clearFocus()
+    _send_app_key(Qt.Key_C, press=True)
+    qtbot.wait(20)
+    assert (PAN_CENTER, TILT_CENTER) in calls
+    assert card._target_pan == PAN_CENTER
+    assert card._target_tilt == TILT_CENTER
+
+
+def test_global_arrow_keys_NOT_intercepted(qtbot):
+    """화살표는 글로벌 X — Teleop 과 충돌 방지. 카드 포커스 없으면 publish 안 됨."""
+    card, calls = _make_card(qtbot)
+    card.clearFocus()
+    _send_app_key(Qt.Key_Right, press=True)
+    qtbot.wait(CMD_TICK_MS * 3)
+    _send_app_key(Qt.Key_Right, press=False)
+    assert len(calls) == 0, f"화살표는 글로벌이면 안 됨, got {len(calls)}"
+
+
+def test_global_wasd_ignored_in_text_input(qtbot):
+    """QLineEdit 안에서 'd' 타이핑 시 카메라 동작 안 함 (타이핑 보존)."""
+    card, calls = _make_card(qtbot)
+    le = QLineEdit()
+    qtbot.addWidget(le)
+    le.show()
+    qtbot.waitExposed(le)
+    le.setFocus()
+    qtbot.waitUntil(lambda: QApplication.focusWidget() is le, timeout=1000)
+
+    qtbot.keyClick(le, Qt.Key_D)
+    qtbot.wait(CMD_TICK_MS * 2)
+    assert len(calls) == 0, "text input 안에서는 WASD 가 카메라로 가지 않아야 함"
+    assert "d" in le.text().lower()
