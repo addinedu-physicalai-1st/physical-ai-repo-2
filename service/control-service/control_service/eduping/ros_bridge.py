@@ -570,9 +570,11 @@ class EdupingRosBridge:
     ) -> dict:
         """양팔을 HOME_POSE 로 부드럽게 복귀.
 
-        합성 Routine (단일 keyframe at t=duration_s) → 기존 publish/playback 파이프라인
-        재사용. 진행 중 율동/greeting 재생이 있으면 _start_playback 가 _stop_playback 으로
-        안전 인터럽트. 현재 follower pose → home 까지 smoothstep ramp + JTC spline.
+        합성 Routine (현재 pose @t=0 + HOME @t=duration_s) → 기존 publish/playback
+        파이프라인 재사용. sim_twin 의 선형 보간은 첫 keyframe 이전엔 hold (즉시 점프)
+        하므로 반드시 t=0 keyframe 으로 현재 pose 를 명시해야 부드럽게 보임. 진행 중
+        율동/greeting 재생이 있으면 _start_playback 가 _stop_playback 으로 안전 인터럽트.
+        실물 측은 JTC spline 이 알아서 현재 → keyframes[0] 보간하므로 동일 trajectory OK.
         """
         if duration_s <= 0:
             duration_s = 1.5
@@ -583,14 +585,32 @@ class EdupingRosBridge:
         from eduarm.joint_names import HOME_POSE, OPENARM_JOINT_NAMES  # type: ignore[import-not-found]
         from eduarm.routines_io import Keyframe, Routine  # type: ignore[import-not-found]
 
+        joint_names = list(OPENARM_JOINT_NAMES)
+        # 현재 follower pose 캡쳐 — t=0 keyframe 시작점. 비어있거나 길이 불일치면 HOME 으로 fallback.
+        with self._lock:
+            f_names = list(self._follower.joint_names)
+            f_pos = list(self._follower.positions)
+        start_pos: list[float]
+        if f_names:
+            try:
+                start_pos = [float(f_pos[f_names.index(n)]) for n in joint_names]
+            except ValueError:
+                start_pos = list(HOME_POSE)
+        else:
+            start_pos = list(HOME_POSE)
+
         routine = Routine(
             name="__home__",
             kind=KIND_DANCE,
-            keyframes=[Keyframe(t=float(duration_s), pos=list(HOME_POSE))],
+            keyframes=[
+                Keyframe(t=0.0, pos=start_pos),
+                Keyframe(t=float(duration_s), pos=list(HOME_POSE)),
+            ],
             sample_hz=50,
-            joint_names=list(OPENARM_JOINT_NAMES),
+            joint_names=joint_names,
         )
-        ramp_s = self._compute_ramp_s(routine)
+        # 첫 keyframe 이 이미 현재 pose 라 별도 ramp 불필요 (그렇지 않으면 0.3s 가량 hold 후 시작).
+        ramp_s = 0.0
 
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
