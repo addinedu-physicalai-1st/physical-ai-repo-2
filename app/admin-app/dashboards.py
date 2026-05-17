@@ -387,6 +387,16 @@ class GogoPingDashboard(QWidget):
         self._timer.timeout.connect(self._on_tick)
         self._timer.start(60)
 
+    def update_battery(self, level: float) -> None:
+        """``/gogoping/state`` snapshot 의 battery_level 을 받아 헤더 chip + 시스템 카드 바 갱신.
+
+        main.py 의 state_client 콜백이 snapshot.get("battery_level") 추출 후 호출.
+        """
+        pct = max(0, min(100, int(round(level))))
+        self.battery_chip.set_value(f"{pct}%")
+        self.battery_chip.set_pct(pct)
+        self.battery.set_pct(pct)
+
     def on_state(self, msg: dict) -> None:
         """WS /teleop/state 단일 수신점. LiDAR/ODOM/Teleop 에 분배."""
         scan = msg.get("scan") or {}

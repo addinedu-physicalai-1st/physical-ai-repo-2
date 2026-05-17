@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'sim_status_publisher = gogoping_bringup.sim_status_publisher:main',
             'sim_battery_node = gogoping_bringup.sim_battery_node:main',
+            'battery_publisher_node = gogoping_bringup.battery_publisher_node:main',
         ],
     },
 )
