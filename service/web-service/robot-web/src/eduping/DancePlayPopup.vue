@@ -156,7 +156,7 @@ onUnmounted(() => {
                   <span class="np-time">{{ playElapsedS.toFixed(1) }} / {{ playDurationS.toFixed(1) }}s</span>
                 </div>
                 <button type="button" class="btn-stop" @click="stop">
-                  <Icon name="square" :size="14" /> 정지
+                  <Icon name="stop" :size="14" /> 정지
                 </button>
               </div>
             </div>
@@ -173,7 +173,7 @@ onUnmounted(() => {
                   @click="play(item)"
                 >
                   <div class="item-icon">
-                    <Icon :name="item.slug === playingSlug ? 'square' : 'play'" :size="18" />
+                    <Icon :name="item.slug === playingSlug ? 'stop' : 'play'" :size="18" />
                   </div>
                   <div class="item-meta">
                     <div class="item-name">{{ item.display_name }}</div>
