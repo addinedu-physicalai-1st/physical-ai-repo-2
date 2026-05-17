@@ -313,7 +313,8 @@ class AdminWindow(QMainWindow):
         # control-server base URL 은 PINGDER_CONTROL_URL 환경변수 우선.
         control_url = os.environ.get("PINGDER_CONTROL_URL", "http://localhost:8000")
         self.state_client = StateClient(base_url=control_url)
-        self.state_client.connect(self.topbar.bt_state.update_snapshot)
+        # BTStateInline (topbar) + GogoPingDashboard 둘 다 snapshot 으로 갱신
+        self.state_client.connect(self._on_robot_state)
 
         # 디버그 패널 (BTStateInline 우측) → state_client.post_force_state
         self.topbar.bt_state.debug_panel.force_state_requested.connect(
@@ -332,6 +333,22 @@ class AdminWindow(QMainWindow):
         )
 
         self._select("gogoping")
+
+    def _on_robot_state(self, snap: dict) -> None:
+        """``/ws/robot-state`` snapshot 단일 수신점. BTStateInline + GogoPingDashboard 분배.
+
+        daemon thread 에서 호출 — 위젯 갱신은 setText / set_pct 류 단순 호출만이라
+        BTStateInline 의 update_snapshot 과 동일 위험 패턴 (기존 코드 일치).
+        """
+        self.topbar.bt_state.update_snapshot(snap)
+        level = snap.get("battery_level")
+        if level is not None:
+            page = self.pages.get("gogoping")
+            if page is not None:
+                try:
+                    page.update_battery(float(level))
+                except Exception:
+                    pass
 
     def _select(self, key: str) -> None:
         self.sidebar.select(key)

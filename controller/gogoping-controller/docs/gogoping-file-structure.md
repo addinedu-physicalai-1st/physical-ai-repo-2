@@ -1,8 +1,13 @@
 controller/gogoping-controller/src/gogoping/
 ├── gogoping_bringup/
-│   └── launch/
-│       ├── pi.launch.py                  # 라즈베리파이 (vicpinky_bringup + sllidar + camera)
-│       └── laptop.launch.py              # 노트북 (Nav2 + modes + vision)
+│   ├── launch/
+│   │   ├── pi.launch.py                  # 라즈베리파이 (vicpinky_bringup + sllidar + camera + battery_publisher_node)
+│   │   └── laptop.launch.py              # 노트북 (Nav2 + modes + vision)
+│   └── gogoping_bringup/
+│       ├── sim_status_publisher.py       # sim 활성 신호 1Hz (Bool /gogoping/sim_active)
+│       ├── sim_battery_node.py           # sim 전용 — /gogoping/battery + SetBatteryLevel.srv
+│       └── battery_publisher_node.py     # Pi 운영용 — /gogoping/battery (source: static/sysfs/uart)
+│                                         #   하드웨어 spec 확정 후 source=sysfs/uart 로 전환
 │
 ├── gogoping_camera/                      # USB 카메라 → UDP MJPEG 송출
 ├── gogoping_camera_pan/                  # Arduino 서보 (pyserial, UI/BT 양쪽 사용, 우선순위 토픽 분리)

@@ -55,6 +55,18 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={"robot": "gogoping"}.items(),
     )
 
+    # 배터리 publisher — /gogoping/battery 1Hz (sensor_msgs/BatteryState).
+    # 상대 토픽 "battery" 사용 → GroupAction 의 PushRosNamespace 가 /gogoping/ prefix.
+    # source=static 기본 (placeholder 100%). 진짜 ADC 통합 시 source=sysfs 또는 uart.
+    battery_publisher = Node(
+        package="gogoping_bringup",
+        executable="battery_publisher_node",
+        parameters=[{
+            "source": "static",   # TODO 하드웨어 spec 확정 후 "sysfs" or "uart"
+            "level": 100.0,
+        }],
+    )
+
     return LaunchDescription([
         GroupAction([
             PushRosNamespace("gogoping"),
@@ -63,5 +75,6 @@ def generate_launch_description() -> LaunchDescription:
             bringup_node,
             laser_filter,
             camera_stream,
+            battery_publisher,
         ]),
     ])

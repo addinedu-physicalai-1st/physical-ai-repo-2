@@ -20,6 +20,7 @@ snapshot 구조::
         ]
       },
       "sub_tree": null,    # + 에 BT_*_sub 이름 패턴 매칭 시 채워짐
+      "battery_level": 87.3,  # blackboard.BATTERY_LEVEL (0~100 %, None = 미수신)
       "ts": 1730000035.123
     }
 
@@ -38,11 +39,31 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import py_trees
+from py_trees.common import Access
+
+from .blackboard import Keys
+
 
 # composite 클래스 이름 — py_trees 내장 (Selector / Sequence / Parallel).
 _COMPOSITE_CLASS_NAMES = frozenset({"Selector", "Sequence", "Parallel"})
 
 _MAX_DEPTH = 6  # 안전망 — 사이클 / 무한 nesting 방지
+
+# blackboard 읽기 전용 client — 첫 호출 시 lazy 생성, snapshot() 매 호출마다 재사용
+_bb_reader: py_trees.blackboard.Client | None = None
+
+
+def _read_battery_level() -> float | None:
+    """blackboard.BATTERY_LEVEL 을 안전하게 읽어 float 반환. 실패 시 None."""
+    global _bb_reader
+    if _bb_reader is None:
+        _bb_reader = py_trees.blackboard.Client(name="tree_inspector_reader")
+        _bb_reader.register_key(key=Keys.BATTERY_LEVEL, access=Access.READ)
+    try:
+        return float(_bb_reader.get(Keys.BATTERY_LEVEL))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def snapshot(
@@ -80,6 +101,7 @@ def snapshot(
         "fsm_state": fsm_state,
         "main_tree": main_block,
         "sub_tree": sub_block,
+        "battery_level": _read_battery_level(),
         "ts": time.time(),
     }
 
