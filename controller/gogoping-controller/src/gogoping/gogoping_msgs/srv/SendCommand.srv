@@ -1,4 +1,10 @@
-# UI / Control Server → gogoping_modes 명령 인터페이스
+# [DEPRECATED — 2026-05-17] 새 코드는 srv/SetGoal.srv 를 사용한다.
+#
+# 본 srv 는 trigger-based 인터페이스로, UI 가 FSM 의 trigger 이름을 직접 전달했다.
+# Goal-based 로 리팩터링 (UI 가 원하는 mode/task 만 명시, trigger 발화는 robot 내부 책임)
+# 하면서 SetGoal.srv 로 교체. 본 srv 는 호환을 위해 남겨두지만 신규 client/server 작성 금지.
+#
+# UI / Control Server → gogoping_modes 명령 인터페이스 (legacy)
 #
 # command / task / 등 필드의 의미와 매핑은
 # controller/gogoping-controller/docs/fsm-triggers.md 참조.

@@ -9,14 +9,18 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 
 # 메시지 / 서비스 / 액션 정의 — 실제 정의 추가 시 아래 목록에 등록.
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Placeholder.msg"
-  "srv/SendCommand.srv"
+  "msg/Goal.msg"
+  "msg/GoalStatus.msg"
+  "srv/SendCommand.srv"          # [DEPRECATED] — SetGoal.srv 사용
+  "srv/SetGoal.srv"
   "srv/RouteToVertex.srv"
   "action/NavigateToVertex.action"
-  DEPENDENCIES std_msgs geometry_msgs
+  DEPENDENCIES std_msgs geometry_msgs builtin_interfaces
 )
 
 ament_export_dependencies(rosidl_default_runtime)
