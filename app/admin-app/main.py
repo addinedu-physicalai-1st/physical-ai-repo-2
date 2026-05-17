@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (
 
 from config.client_id import get_or_create_client_id
 from dashboards import EduPingDashboard, GogoPingDashboard, NoriArmDashboard
+from services.state_client import StateClient
 from services.stream_client import StreamClient
 from theme import COLORS, ROBOTS, apply_theme
 from widgets import Icon, StatusBadge
@@ -308,6 +309,12 @@ class AdminWindow(QMainWindow):
         right_lay.addWidget(self.stack, 1)
         root_lay.addWidget(right, 4)
 
+        # /ws/robot-state 구독 — gogoping_modes 의 BT 상태가 topbar.bt_state 로 흘러감.
+        # control-server base URL 은 PINGDER_CONTROL_URL 환경변수 우선.
+        control_url = os.environ.get("PINGDER_CONTROL_URL", "http://localhost:8000")
+        self.state_client = StateClient(base_url=control_url)
+        self.state_client.connect(self.topbar.bt_state.update_snapshot)
+
         self._select("gogoping")
 
     def _select(self, key: str) -> None:
@@ -321,6 +328,10 @@ class AdminWindow(QMainWindow):
                 self.stream_client.stop()
             except Exception:
                 pass
+        try:
+            self.state_client.stop()
+        except Exception:
+            pass
         super().closeEvent(ev)
 
 

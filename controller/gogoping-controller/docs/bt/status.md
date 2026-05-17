@@ -43,16 +43,16 @@
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
-| battery_full_monitor | ☐ | |
-| battery_low_monitor | ☐ | |
-| hardware_health_monitor | ☐ | |
-| collision_event_handler | ☐ | |
-| map_boundary_monitor | ☐ | 맵 밖 이탈 시 fault(reason="out_of_map"). ASSIST/PLAY/RETURNING 만 (MANUAL 의도적 제외) |
-| command_listener | ☐ | |
-| docking_contact_check | ☐ | |
-| check_task | ☐ | |
-| check_carry_mode | ☐ | |
-| ui_publish | ☐ | |
+| battery_full_monitor | ✅ | [battery_full_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) — BT_charging_main 에 배치, 부팅 시 CHARGING → IDLE 자동 전이 (BATTERY_LEVEL init=100.0 가정) |
+| battery_low_monitor | ☐ | Day 2 (`BatterySubscriber` 가 진짜 ROS 토픽 구독 시작 후) |
+| hardware_health_monitor | ☐ | Day 2 |
+| collision_event_handler | ☐ | Day 2 |
+| map_boundary_monitor | ☐ | 맵 밖 이탈 시 fault(reason="out_of_map"). ASSIST/PLAY/RETURNING 만 (MANUAL 의도적 제외). Day 2 |
+| command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — SetGoal.srv 서버 + goal_reconciler 호출. unit test 7 + reconciler 13 |
+| docking_contact_check | ☐ | Day 2 |
+| check_task | ✅ | [check_task.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py) — TaskSelector 분기 Condition. 5 시나리오 통과 |
+| check_carry_mode | ☐ | Day 3+ (BT_carry_sub 작성 시) |
+| ui_publish | ☐ | Day 3+ (HideAndSeek / Lullaby 작성 시) |
 
 ### navigation/
 
@@ -114,7 +114,8 @@
 | graph.py (다익스트라) | ✅ | 14 단위 테스트 pass |
 | graph_router_node | ✅ | service + action server 노출 |
 | nav2 stack (sim) | ✅ | sim_with_nav2.launch.xml |
-| nav2 stack (실물) | ☐ | laptop launch 미작성 (placeholder) |
+| nav2 stack (실물) | ☐ | Day 2~ TODO. (`device-gogoping-laptop.sh` 에 nav2 window 자리 마련됨) |
+| `device-gogoping-laptop.sh` | 🟡 | graph-router + modes 2 window. nav2 / vision 은 Day 2~ |
 | server REST `/waypoints/route` `/waypoints/navigate` | ✅ | tests/test_waypoints_router.py 통과 |
 | admin UI lanes / route 시각화 | ✅ | graph map 모드 |
 | robot-web 음성 → goto_vertex | ✅ | "X로 가" / "복귀" 인식 + `/waypoints/navigate` 호출 (보조 모드 우회 통과). 분류기는 [service/ai-service/ai_service/hub.py](../../../../service/ai-service/ai_service/hub.py) `_try_goto_vertex` / `_is_return_text` |

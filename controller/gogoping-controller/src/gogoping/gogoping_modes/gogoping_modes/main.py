@@ -43,7 +43,9 @@ class GogopingModes:
 
     TICK_HZ = 10.0          # BT tick frequency
     PUBLISH_HZ = 1.0        # /gogoping/state publish frequency
-    INITIAL_STATE = "IDLE"  # Day 1 walking skeleton 은 IDLE 시작 (CHARGING 부팅 시퀀스는 Day 2)
+    # 부팅 시퀀스: CHARGING → battery_full (BatteryFullMonitor 가 첫 tick 에 발화) → IDLE.
+    # docs/fsm-triggers.md 의 표준 흐름.
+    INITIAL_STATE = "CHARGING"
 
     def __init__(self, node: rclpy.node.Node):
         self.node = node

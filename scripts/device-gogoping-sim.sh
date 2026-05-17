@@ -2,10 +2,14 @@
 # scripts/device-gogoping-sim.sh — GogoPing 가제보 시뮬레이션 launcher.
 #
 # 동작:
-#   - tmux 세션 'gogoping-sim' 안에 window 1개 (gazebo)
-#   - gazebo : gogoping_bringup sim.launch.py
-#              (gogoping_navigation/launch_sim_with_pinky.launch.xml 을
-#               namespace=gogoping 으로 include + sim_status_publisher 노드)
+#   - tmux 세션 'gogoping-sim' 안에 window 4개:
+#       gazebo       : gogoping_bringup sim.launch.py
+#                      (gogoping_navigation/launch_sim_with_pinky.launch.xml 을
+#                       namespace=gogoping 으로 include + sim_status_publisher 노드)
+#       graph-router : gogoping_navigation/graph_router.launch.xml (다익스트라 + nav2 위임)
+#       modes        : gogoping_modes (FSM + BT 본체 — /gogoping/state publish,
+#                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
+#       rviz         : rviz2 시각화
 #
 # 사용:
 #   scripts/device-gogoping-sim.sh           # 세션 시작·attach (이미 떠있으면 attach)
@@ -83,7 +87,11 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n graph-router -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
 
-    # window 2: rviz (map / TF / AMCL / costmap / plan 시각화)
+    # window 2: gogoping_modes (FSM + BT 본체 — /gogoping/state publish, /gogoping/set_goal server)
+    tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes"
+
+    # window 3: rviz (map / TF / AMCL / costmap / plan 시각화)
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
     tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
@@ -112,6 +120,7 @@ case "$ACTION" in
     _patterns=(
       "ros2 launch gogoping_bringup sim"
       "ros2 launch gogoping_navigation graph_router"
+      "ros2 run gogoping_modes"
       "gz sim"
       "ruby .*gz sim"
       "parameter_bridge"
