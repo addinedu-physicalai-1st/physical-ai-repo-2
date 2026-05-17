@@ -46,6 +46,8 @@ dependencies = [
   # conda env 가 transitive 로 4.x 끌어가는 경우 빌드 시 TransientParseError 발생하므로 핀.
   "empy==3.3.4",
   "pydub>=0.25.1",
+  # GogoPing FSM (gogoping_modes/fsm/robot_fsm.py) — pytransitions state machine
+  "transitions>=0.9",
 ]
 
 [dependency-groups]

@@ -13,6 +13,7 @@
 | `play_done` | — | (main.py 루프, PLAY main SUCCESS 감지) | PLAY → IDLE | `play_task = ""` 리셋 |
 | `cancel` | — | `command_listener` | ASSIST/PLAY → IDLE | task 키 리셋 |
 | `battery_low` | — | `battery_low_monitor` | IDLE/ASSIST/PLAY → RETURNING | hysteresis: 50% 진입, 55% 진출 |
+| `idle_timeout` | — | `idle_timeout_monitor` (Day 2 TODO) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` 초과 시 발화 — 무인 자율 복귀 |
 | `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 80% 진입 |
 | `docked` | — | `verify_docking_contact` | RETURNING → CHARGING | (발표 단계: 수동 진입) |
 | `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, 기타 monitor | any → ERROR | `blackboard.error_reason = reason` 세팅 |
@@ -34,6 +35,7 @@
        │
        │  return_command  (IDLE / ASSIST / PLAY 어디서든 — main.py FAILURE fallback 포함)
        │  battery_low     (IDLE / ASSIST / PLAY)
+       │  idle_timeout    (IDLE only — Day 2 TODO)
    RETURNING ◄───────────────────────────────────────
 ```
 
@@ -41,6 +43,7 @@
 > - `fault` (any active → ERROR): CHARGING / IDLE / ASSIST / PLAY / RETURNING 어디서든
 > - `return_command` (IDLE / ASSIST / PLAY → RETURNING): 사용자 명령 또는 SubTree FAILURE fallback
 > - `battery_low` (IDLE / ASSIST / PLAY → RETURNING): hysteresis 50% 진입
+> - `idle_timeout` (IDLE → RETURNING): IDLE 진입 후 일정 시간 무명령 시 자율 복귀
 
 ## 호출 컨벤션
 

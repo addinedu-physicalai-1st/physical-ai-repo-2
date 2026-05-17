@@ -142,7 +142,7 @@ class GogopingModes:
         )
         self.tree: py_trees.trees.BehaviourTree | None = None
         self._current_state: str | None = None
-        fsm.machine.add_callback("on_state_change", self._on_state_change)
+        fsm.add_callback("on_state_change", self._on_state_change)
         self._timer = node.create_timer(1.0 / self.TICK_HZ, self._tick)
 
     def _on_state_change(self):
