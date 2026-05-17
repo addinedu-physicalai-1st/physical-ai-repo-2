@@ -116,6 +116,19 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[control-service] camera_pan (router + bridge mock) — ROS 불필요"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest \
+  tests/test_camera_pan_router.py \
+  tests/test_camera_pan_bridge.py \
+  -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[noriarm-controller/noriarm_framework] 매니페스트 + 정책 + trajectory 단위 테스트"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
@@ -221,6 +234,23 @@ echo "[admin-app] waypoint map card — nav graph editor"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 conda run -n jazzy pytest tests/test_waypoint_map_card_edit.py -v "$@" || {
+  rc=$?
+  if [[ "$rc" -eq 5 ]]; then
+    echo "  ※ pytest-qt 미설치 — 전체 SKIPPED (정상)"
+  elif [[ "$rc" -eq 134 ]]; then
+    echo "  ※ Qt cleanup SIGABRT — 테스트 결과는 정상"
+  else
+    EXIT=1
+  fi
+}
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[admin-app] camera_pan_card — pytest-qt (없으면 자동 skip)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+conda run -n jazzy pytest tests/test_camera_pan_card.py -v "$@" || {
   rc=$?
   if [[ "$rc" -eq 5 ]]; then
     echo "  ※ pytest-qt 미설치 — 전체 SKIPPED (정상)"
