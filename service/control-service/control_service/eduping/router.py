@@ -59,6 +59,8 @@ from control_service.eduping.ros_bridge import (
     ros_available,
 )
 
+from .dance_stream import iter_dance_frames
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/eduping", tags=["eduping"])
 
@@ -292,6 +294,40 @@ async def dance_play(req: Request, slug: str, body: PlayIn) -> dict:
         raise HTTPException(404, str(e)) from e
     except (ValueError, BridgeUnavailable) as e:
         raise HTTPException(400, str(e)) from e
+
+
+@router.websocket("/dance/{slug}/stream")
+async def dance_stream_ws(websocket: WebSocket, slug: str) -> None:
+    """율동 통합 스트림 — motion frame + PCM chunk binary push.
+
+    Frame format: 자세한 사양은 dance_stream.py docstring 참조.
+    """
+    if not SLUG_RE.match(slug):
+        await websocket.close(code=1008, reason="invalid slug")
+        return
+    await websocket.accept()
+    bridge = getattr(websocket.app.state, "eduping_bridge", None)
+    if bridge is None:
+        await websocket.close(code=1011, reason="bridge unavailable")
+        return
+    try:
+        async for ftype, t_ms, payload in iter_dance_frames(bridge.routines_root, slug, realtime=True):
+            header = bytes([ftype]) + t_ms.to_bytes(8, "big")
+            await websocket.send_bytes(header + payload)
+    except WebSocketDisconnect:
+        return
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("dance_stream_ws 종료: slug=%s", slug)
+        # 명확한 error frame 없이 그냥 끊음 — client 가 close code 로 감지
+        try:
+            await websocket.close(code=1011, reason=str(exc)[:120])
+        except Exception:  # noqa: BLE001
+            pass
+        return
+    try:
+        await websocket.close()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # ---------------------------------------------------------------------------
