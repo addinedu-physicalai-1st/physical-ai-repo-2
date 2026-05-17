@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (idle_timeout_monitor 추가 — IDLE 자율 복귀 라인)
+마지막 업데이트: 2026-05-18 (map_boundary_monitor + OdomSubscriber + MapCache 추가 — 비정형 맵 out_of_map fault 라인)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -15,9 +15,9 @@
 |---|---|---|
 | **Trees** | **8 / 13** | MainTree 8/8 ✅ · SubTree 0/5 ☐ |
 | **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
-| **Behaviors** | **7 / 33** | common 6/11 · navigation 1/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
-| **Infrastructure** | **27 / 30** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물) |
-| **합계** | **43 / 81** | walking skeleton + battery line + idle_timeout |
+| **Behaviors** | **8 / 33** | common 7/11 · navigation 1/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
+| **Infrastructure** | **29 / 32** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). OdomSubscriber + MapCache 추가 |
+| **합계** | **46 / 83** | walking skeleton + battery line + idle_timeout + map_boundary |
 
 ---
 
@@ -29,10 +29,10 @@
 |---|---|---|
 | BT_charging_main | ✅ | Parallel(BatteryFullMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
 | BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
-| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
-| BT_play_main | ✅ | Parallel(BatteryLowMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
+| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
+| BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
 | BT_manual_main | ✅ | Parallel(CommandListener). torque OFF / 자동 monitor 0개 (BatteryLowMonitor 의도적 미배치 — 사용자 직접 제어 중 자동 빼앗김 방지). docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
-| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + CommandListener). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. 진짜 ReturnSubTree 는 미작성 |
+| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. 진짜 ReturnSubTree 는 미작성 |
 | BT_low_battery_return_main | ✅ | Parallel(빈 lockdown — CommandListener 없음). battery_low escalation 도피 state. docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(빈 terminal). reset 없음 — 사람이 재시작 |
 
@@ -64,7 +64,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ## Behaviors
 
-### common/ — 6 / 11
+### common/ — 7 / 11
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -73,7 +73,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | idle_timeout_monitor | ✅ | [idle_timeout_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) — IDLE 진입 후 ROS param `idle_timeout_seconds` (기본 60s) 경과 시 `idle_timeout` trigger. edge-triggered, `initialise()` 에서 timer 리셋. BT_idle_main 만 배치. 6 시나리오 통과 |
 | hardware_health_monitor | ☐ | |
 | collision_event_handler | ☐ | |
-| map_boundary_monitor | ☐ | 맵 밖 이탈 시 fault(reason="out_of_map"). ASSIST/PLAY/RETURNING 만 (MANUAL 의도적 제외) |
+| map_boundary_monitor | ✅ | [map_boundary_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) — blackboard.ROBOT_POSE 읽고 `map_cache.is_outside(x, y)` → 박스 밖 또는 unknown 셀이면 `fault(reason="out_of_map")` 발화. ASSIST/PLAY/RETURNING 배치 (MANUAL 의도적 제외). 발화 시 blackboard.ERROR_REASON / ERROR_SOURCE 도 세팅. 7 시나리오 통과 |
 | command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — `SetGoal.srv` + `ForceState.srv` 2개 서버 호스팅. SetGoal → `goal_reconciler` 호출. ForceState → `fsm.force_state()` + sub_task blackboard 세팅 (ASSIST→assist_task, PLAY→play_task). unit test 7 + reconciler 13 |
 | docking_contact_check | ☐ | |
 | check_task | ✅ | [check_task.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py) — TaskSelector 분기 Condition. 5 시나리오 통과 |
@@ -129,7 +129,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ---
 
-## 인프라 / 외부 시스템 — 27 / 30
+## 인프라 / 외부 시스템 — 29 / 32
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
@@ -148,6 +148,8 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | `device-gogoping-sim.sh` | ✅ | gazebo + graph-router + modes + rviz self-contained |
 | ROS msg/srv 계약 (gogoping_msgs) | ✅ | `Goal.msg` / `GoalStatus.msg` / `SetGoal.srv` / `ForceState.srv` / `SetBatteryLevel.srv` (CMakeLists 등록 완료) |
 | BatterySubscriber (real) | ✅ | [battery_subscriber.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/battery_subscriber.py) — `/gogoping/battery` (sensor_msgs/BatteryState) 구독. `percentage * 100 → Keys.BATTERY_LEVEL`. NaN 시 직전 값 유지 |
+| OdomSubscriber (real) | ✅ | [odom_subscriber.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/odom_subscriber.py) — `/gogoping/odom` (nav_msgs/Odometry) 구독. quaternion → yaw atan2 변환 → `Keys.ROBOT_POSE = {x, y, yaw}` |
+| MapCache (real) | ✅ | [map_cache.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/map_cache.py) — `/map` (절대 경로, root namespace) OccupancyGrid 구독. **transient_local + reliable QoS** (nav2_map_server 와 일치). `is_outside(x, y)` 메서드 — 격자 박스 밖 또는 unknown 셀이면 True, 맵 미수신 시 None |
 | sim_battery_node | ✅ | [gogoping_bringup/sim_battery_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/sim_battery_node.py) — **sim 전용**. `/gogoping/battery` 1Hz publish + `/gogoping/sim/set_battery_level` srv. device-gogoping-sim.sh 가 자동 실행 |
 | battery_publisher_node | 🟡 | [gogoping_bringup/battery_publisher_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/battery_publisher_node.py) — **Pi 운영용**. `pi.launch.py` 안 `PushRosNamespace("gogoping")` 그룹에 등록 → `/gogoping/battery` 1Hz. ROS param `source` 으로 `static`/`sysfs`/`uart` 선택. **현재 source=static (placeholder 100%)** — 진짜 ADC 통합은 하드웨어 spec 확정 후 TODO |
 | Control Service `/api/gogoping/debug/battery` | ✅ | BatteryDebugSlider → state_client → POST → ros_bridge.set_battery_level_sync → `SetBatteryLevel.srv` |

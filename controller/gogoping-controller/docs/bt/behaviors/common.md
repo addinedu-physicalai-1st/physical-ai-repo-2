@@ -72,16 +72,41 @@ IDLE 상태에서 N초 무명령 시 `"idle_timeout"` FSM trigger 발화 — 무
 
 Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 
-## map_boundary_monitor  *(스켈레톤)*
+## map_boundary_monitor  *(구현됨)*
 
-로봇의 현재 pose (`/amcl_pose` 또는 `/odom`) 가 로드된 맵 경계 밖으로 나가면 즉시 `"fault"` trigger 를 `reason="out_of_map"` 으로 발화.
+로봇의 현재 pose 가 로드된 맵 영역 밖이면 즉시 `"fault"` trigger 를 `reason="out_of_map"` 으로 발화.
 
-- threshold: 맵 점유 영역 (occupancy grid) 의 *외곽* + 안전 margin (예: 0.5m). ROS param 으로 조정.
-- 발화 후에는 `_fired = True` 로 edge-triggered 유지 (반복 발화 방지).
+**판별 방식** — `MapCache.is_outside(x, y)` 가 OccupancyGrid 기반으로:
+1. 격자 박스 (width × height) 밖 → True
+2. 박스 안이지만 `data[idx] == -1` (unknown 셀) → True  ← **비정형 맵 (L자/ㄷ자 등) 자동 처리**
+3. 그 외 (free=0 / occupied=100) → False
+4. 맵 미수신 시 None → 발화 안 함 (보수적 default — ERROR terminal 이라 false positive 회피)
+
+**데이터 흐름**:
+```
+/gogoping/odom (Vic Pinky 드라이버) ──→ OdomSubscriber ──→ blackboard.ROBOT_POSE
+/map           (nav2_map_server)    ──→ MapCache        ──→ ctx.map_cache.is_outside(x,y)
+                                              │
+                                              ▼
+                                    MapBoundaryMonitor (매 tick R)
+                                              │ outside == True
+                                              ▼
+                              blackboard.ERROR_REASON = "out_of_map"
+                              blackboard.ERROR_SOURCE = "MapBoundaryMonitor"
+                              fsm.trigger("fault", reason="out_of_map")
+                                              │
+                                              ▼
+                                         state: ERROR (terminal)
+```
+
+- 발화 후에는 `_fired = True` 로 edge-triggered 유지 (반복 발화 방지). ERROR terminal 이라 re-arm 필요 없으나 `initialise()` 가 새 트리 진입 시 리셋해주므로 ASSIST/PLAY/RETURNING 재진입 시 다시 발화 가능.
 - 일반 경로 이탈 (re-plan 가능한 수준) 은 본 monitor 대상이 *아님* — 그건 nav2 가 자체 처리. **본 monitor 는 "맵 밖으로 완전히 나간 catastrophic 케이스" 한정**.
-- MANUAL state 에는 의도적으로 배치하지 않음 — MANUAL 은 사용자가 직접 제어하므로 자동 ERROR 전이 금지 (사용자가 로봇을 들고 맵 경계 너머로 가도 ERROR 안 가짐). 자세한 이유 [`bt/trees/BT_manual_main.md`](../trees/BT_manual_main.md).
+- MANUAL state 에는 의도적으로 배치하지 않음 — MANUAL 은 사용자가 직접 제어하므로 자동 ERROR 전이 금지. 자세한 이유 [`bt/trees/BT_manual_main.md`](../trees/BT_manual_main.md).
 
 | Used in | BT_assist_main, BT_play_main, BT_returning_main |
+| 파일 | [`bt/behaviors/common/map_boundary_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) |
+| 의존 interfaces | [`OdomSubscriber`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/odom_subscriber.py) · [`MapCache`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/map_cache.py) |
+| 테스트 | 7 시나리오 (inside / outside fire / map None / no-double / ERROR_REASON 세팅 / initialise re-arm / pose 누락) |
 
 ## docking_contact_check  *(스켈레톤)*
 
