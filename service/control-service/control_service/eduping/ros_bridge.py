@@ -565,6 +565,59 @@ class EdupingRosBridge:
             result["real"] = real_status
         return result
 
+    def return_to_home(
+        self, *, target: str = "sim", duration_s: float = 1.5
+    ) -> dict:
+        """양팔을 HOME_POSE 로 부드럽게 복귀.
+
+        합성 Routine (단일 keyframe at t=duration_s) → 기존 publish/playback 파이프라인
+        재사용. 진행 중 율동/greeting 재생이 있으면 _start_playback 가 _stop_playback 으로
+        안전 인터럽트. 현재 follower pose → home 까지 smoothstep ramp + JTC spline.
+        """
+        if duration_s <= 0:
+            duration_s = 1.5
+        if target == "real" and self._teleop_active:
+            raise ValueError(
+                "실물 동기화 (teleop) 가 켜져있는 상태에서는 실물 복귀 불가 — 토글 끄고 다시 시도하세요."
+            )
+        from eduarm.joint_names import HOME_POSE, OPENARM_JOINT_NAMES  # type: ignore[import-not-found]
+        from eduarm.routines_io import Keyframe, Routine  # type: ignore[import-not-found]
+
+        routine = Routine(
+            name="__home__",
+            kind=KIND_DANCE,
+            keyframes=[Keyframe(t=float(duration_s), pos=list(HOME_POSE))],
+            sample_hz=50,
+            joint_names=list(OPENARM_JOINT_NAMES),
+        )
+        ramp_s = self._compute_ramp_s(routine)
+
+        msg = JointTrajectory()
+        msg.joint_names = list(routine.joint_names)
+        for kf in routine.keyframes:
+            t_scaled = float(kf.t) + ramp_s
+            sec = int(t_scaled)
+            nsec = int((t_scaled - sec) * 1e9)
+            pt = JointTrajectoryPoint()
+            pt.positions = [float(x) for x in kf.pos]
+            pt.time_from_start = Duration(sec=sec, nanosec=nsec)
+            msg.points.append(pt)
+
+        if self._js_pub is None:
+            raise BridgeUnavailable("publisher not initialized — start() 호출 안됨")
+        self._js_pub.publish(msg)
+        self._start_playback(routine.joint_names, routine.keyframes, 1.0, ramp_s)
+
+        result: dict = {
+            "ok": True,
+            "target": target,
+            "duration_s": round(float(duration_s) + ramp_s, 3),
+            "ramp_s": round(ramp_s, 3),
+        }
+        if target == "real":
+            result["real"] = self._send_real_follower_goals(routine, 1.0, ramp_s)
+        return result
+
     def _compute_ramp_s(self, routine: Any) -> float:
         """현재 follower pose 와 routine 첫 keyframe 의 최대 갭 → ramp 시간 (clamp).
 

@@ -35,3 +35,7 @@ OPENARM_JOINT_NAMES_LEFT: list[str] = [
 OPENARM_JOINT_NAMES: list[str] = OPENARM_JOINT_NAMES_RIGHT + OPENARM_JOINT_NAMES_LEFT
 
 NUM_JOINTS: int = len(OPENARM_JOINT_NAMES)
+
+# 양팔 home pose — 모든 joint zero, gripper close. 율동 정지 시 복귀 목표.
+# 순서: OPENARM_JOINT_NAMES 와 동일 (right 1..7 + r-finger + left 1..7 + l-finger).
+HOME_POSE: list[float] = [0.0] * NUM_JOINTS

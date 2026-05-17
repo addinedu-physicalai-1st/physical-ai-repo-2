@@ -108,6 +108,11 @@ class PlayIn(BaseModel):
     speed: float = Field(default=1.0, ge=0.1, le=2.0)
 
 
+class ReturnHomeIn(BaseModel):
+    target: Literal["sim", "real"] = "sim"
+    duration_s: float = Field(default=1.5, ge=0.3, le=5.0)
+
+
 # ---------------------------------------------------------------------------
 # health
 # ---------------------------------------------------------------------------
@@ -292,6 +297,19 @@ async def dance_play(req: Request, slug: str, body: PlayIn) -> dict:
         return bridge.play_routine(KIND_DANCE, slug, speed=body.speed, target=body.target)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
+    except (ValueError, BridgeUnavailable) as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@router.post("/arm/return-home")
+async def arm_return_home(req: Request, body: ReturnHomeIn) -> dict:
+    """양팔을 고정 HOME_POSE 로 1.5s 동안 부드럽게 복귀.
+
+    율동 정지/종료 시 호출. 진행 중 재생이 있으면 인터럽트 후 home 으로 ramp.
+    """
+    bridge = _bridge(req)
+    try:
+        return bridge.return_to_home(target=body.target, duration_s=body.duration_s)
     except (ValueError, BridgeUnavailable) as e:
         raise HTTPException(400, str(e)) from e
 
