@@ -65,6 +65,12 @@ last_synced: "2026-05-13T14:08:22"
 
 > 구현 완료 — [implemented.md](implemented.md) 참조
 
+### 1.2 율동 통합 스트리밍
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
+| SR-EDU-DANCE-STREAM | 율동 음악·모션 동기 스트리밍 | Control Server 가 `WS /api/eduping/dance/{slug}/stream` 으로 motion frame (50Hz float32 LE) 과 PCM s16le mono 16kHz 청크 (20ms 단위) 를 server `time.monotonic()` clock 의 같은 `t_ms` 위에 묶어 binary frame 으로 push. 로봇 UI 가 Web Audio API 로 sample-accurate 스케줄해 곡·3D 시각화·실물 팔 모션을 동시에 진행. 실물 팔에는 기존 `POST /dance/{slug}/play` JointTrajectory 단발 발사를 병행. 자세한 frame wire format 은 [docs/superpowers/plans/2026-05-17-dance-unified-stream.md](superpowers/plans/2026-05-17-dance-unified-stream.md). | High |
+
 ### 1.4 무궁화꽃이 피었습니다
 
 | S ID | Name | Description | Priority |
