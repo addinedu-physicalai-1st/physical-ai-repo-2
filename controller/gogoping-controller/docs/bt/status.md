@@ -2,18 +2,28 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (walking skeleton + 배터리 monitor 라인 — BatterySubscriber 실 구현 + battery_low_monitor + sim 디버그 슬라이더)
+마지막 업데이트: 2026-05-18 (idle_timeout_monitor 추가 — IDLE 자율 복귀 라인)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
 - 🟡 부분 구현 (스켈레톤 파일 있음 — stub 의미 동등성 검증, 진짜 동작 미검증)
 - ☐ 미구현 (코드 X, 명세만)
 
+## 진행률 (✅ / 전체 — 🟡 / ☐ 미포함)
+
+| 영역 | 진행 | 비고 |
+|---|---|---|
+| **Trees** | **8 / 13** | MainTree 8/8 ✅ · SubTree 0/5 ☐ |
+| **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
+| **Behaviors** | **7 / 33** | common 6/11 · navigation 1/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
+| **Infrastructure** | **27 / 30** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물) |
+| **합계** | **43 / 81** | walking skeleton + battery line + idle_timeout |
+
 ---
 
 ## Trees
 
-### MainTree (8개)
+### MainTree — 8 / 8
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
@@ -28,7 +38,7 @@
 
 > **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree (carry/follow/lullaby/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
 
-### SubTree — 진짜 구현 (0개)
+### SubTree — 0 / 5
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
@@ -38,7 +48,7 @@
 | BT_hide_and_seek_sub | ☐ | StubHideseek 로 대체 중. 1회 실행 후 종료 |
 | BT_return_sub | ☐ | NavigateToPose → AlignToDock → ApproachDock → VerifyDockingContact |
 
-### Stub (_stubs/ — 4개 + 2 base)
+### Stub (_stubs/) — 1 / 5 (+ 4 🟡)
 
 walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더째 삭제 + 사용처 (BT_assist_main / BT_play_main) 교체. `grep -rn "STUB:" controller/gogoping-controller/` 로 검색.
 
@@ -54,7 +64,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ## Behaviors
 
-### common/
+### common/ — 6 / 11
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -70,7 +80,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | check_carry_mode | ☐ | BT_carry_sub 작성 시 |
 | ui_publish | ☐ | HideAndSeek / Lullaby 작성 시 |
 
-### navigation/
+### navigation/ — 1 / 8
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -83,7 +93,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | maintain_distance | ☐ | |
 | check_arrival | ☐ | |
 
-### perception/
+### perception/ — 0 / 5
 
 | Behavior | 상태 |
 |---|---|
@@ -93,7 +103,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | child_face_tracker | ☐ |
 | load_stability_check | ☐ |
 
-### follow/
+### follow/ — 0 / 4
 
 | Behavior | 상태 |
 |---|---|
@@ -102,14 +112,14 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | raise_camera_pan | ☐ |
 | pan_camera_sweep | ☐ |
 
-### manual/
+### manual/ — 0 / 2
 
 | Behavior | 상태 |
 |---|---|
 | enable_manual_control | ☐ |
 | wait_for_exit | ☐ |
 
-### recovery/
+### recovery/ — 0 / 3
 
 | Behavior | 상태 |
 |---|---|
@@ -119,7 +129,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ---
 
-## 인프라 / 외부 시스템
+## 인프라 / 외부 시스템 — 27 / 30
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
