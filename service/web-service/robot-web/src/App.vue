@@ -12,6 +12,7 @@ import BottomDock from '@/common/BottomDock.vue';
 import StartOverlay from '@/common/StartOverlay.vue';
 import AttendanceCamera from '@/eduping/AttendanceCamera.vue';
 import DanceManager from '@/eduping/DanceManager.vue';
+import DancePlayPopup from '@/eduping/DancePlayPopup.vue';
 import GreetingManager from '@/eduping/GreetingManager.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
 
@@ -33,6 +34,7 @@ const attendanceMode = computed<'IN' | 'OUT' | null>(() => {
 
 const showOXQuiz = computed(() => robot.value.id === 'noriarm');
 const showDanceManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '율동 등록');
+const showDancePopup = computed(() => robot.value.id === 'eduping' && currentMode.value === '율동');
 const showGreetingManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '등하원 인사 설정');
 
 const voiceController: VoiceController = useVoiceController(robot.value);
@@ -66,6 +68,7 @@ function handleStart(): void {
     <AttendanceCamera :mode="attendanceMode" />
     <OXQuiz v-if="showOXQuiz" />
     <DanceManager v-if="showDanceManager" />
+    <DancePlayPopup v-if="showDancePopup" />
     <GreetingManager v-if="showGreetingManager" />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
