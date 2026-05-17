@@ -403,14 +403,16 @@ async def greeting_play(req: Request, slot: str, body: PlayIn) -> dict:
 
 
 class _Hub:
-    """teleop._Hub 의 simplified 복제. snapshot fn 한 개를 100ms 마다 broadcast.
+    """teleop._Hub 의 simplified 복제. snapshot fn 한 개를 일정 주기로 broadcast.
 
     한 인스턴스 = 한 WS endpoint. install() 에서 startup/shutdown 훅으로 lifecycle.
+    tick_fn 으로 broadcast 주기를 동적 제어 가능 (예: home 복귀 중 50Hz burst).
     """
 
-    def __init__(self, name: str, snapshot_fn) -> None:
+    def __init__(self, name: str, snapshot_fn, tick_fn=None) -> None:
         self._name = name
         self._snapshot_fn = snapshot_fn
+        self._tick_fn = tick_fn  # callable[[], float] returning sleep seconds; None → WS_TICK_S 상수
         self._clients: list[asyncio.Queue] = []
         self._task: asyncio.Task | None = None
         self._stopped = False
@@ -454,7 +456,7 @@ class _Hub:
                 except Exception:  # noqa: BLE001
                     continue
             try:
-                await asyncio.sleep(WS_TICK_S)
+                await asyncio.sleep(self._tick_fn() if self._tick_fn else WS_TICK_S)
             except asyncio.CancelledError:
                 raise
 
@@ -515,7 +517,7 @@ async def start_hubs(app: FastAPI, bridge: EdupingRosBridge) -> None:
     """lifespan startup. bridge 설정 + WS hub 두 개 시작."""
     global _state_hub, _recording_hub
     app.state.eduping_bridge = bridge
-    _state_hub = _Hub("state", bridge.state_snapshot)
+    _state_hub = _Hub("state", bridge.state_snapshot, bridge.state_tick_s)
     _recording_hub = _Hub("recording", bridge.recording_snapshot)
     await _state_hub.start()
     await _recording_hub.start()

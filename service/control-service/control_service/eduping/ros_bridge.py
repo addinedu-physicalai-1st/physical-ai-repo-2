@@ -142,6 +142,9 @@ class EdupingRosBridge:
         # "실물 follower 연결됨" 캐시 (tmux 세션 hardware_type 검사 TTL).
         self._real_active_at: float = 0.0
         self._real_active_val: bool = False
+        # /state WS broadcast burst 모드 — return_to_home 같은 짧고 중요한 모션 중
+        # 50Hz tick (vs 평소 10Hz) 로 부드러운 시각화. monotonic 시각 기준 expiry.
+        self._burst_until_s: float = 0.0
         # Live teleop 독립 상태 — 녹화와 무관하게 leader → forward_position 패스스루 ON/OFF.
         self._teleop_active: bool = False
         # Teleop SmoothDamp tracking — cmd + per-joint velocity 를 함께 유지.
@@ -353,6 +356,15 @@ class EdupingRosBridge:
                 "follower": _js_to_dict(self._follower),
                 "real_active": self.is_real_follower_active(),
             }
+
+    # WS hub 가 broadcast 주기로 사용 — burst 활성 시 50Hz, 평소 10Hz.
+    STATE_TICK_NORMAL_S: float = 0.1
+    STATE_TICK_BURST_S: float = 0.02
+
+    def state_tick_s(self) -> float:
+        if time.monotonic() < self._burst_until_s:
+            return self.STATE_TICK_BURST_S
+        return self.STATE_TICK_NORMAL_S
 
     def is_real_follower_active(self) -> bool:
         """tmux 의 eduping-device 세션에 hardware_type=real bringup 이 떠있는지 — 3s TTL 캐시."""
@@ -631,6 +643,8 @@ class EdupingRosBridge:
             raise BridgeUnavailable("publisher not initialized — start() 호출 안됨")
         self._js_pub.publish(msg)
         self._start_playback(routine.joint_names, routine.keyframes, 1.0, ramp_s)
+        # 모션 duration + 0.3s tail 동안 /state WS 를 50Hz burst 모드로.
+        self._burst_until_s = time.monotonic() + routine.duration_s + 0.3
 
         result: dict = {
             "ok": True,
