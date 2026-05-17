@@ -147,8 +147,10 @@ case "$ACTION" in
       "$(wrap_cmd uvicorn ai_service.hub:app --host 0.0.0.0 --port 8001 --reload)"
 
     # window 3: control :8000 — NoriArm + Eduping(OpenArm) + Gogoping 통합용 ROS 환경.
-    # ROS jazzy → repo root install overlay (있으면) → 각 워크스페이스 install 폴백 → noriarm_framework PYTHONPATH 순서.
-    # 루트 colcon build 가 안 된 환경에서도 동작하도록 워크스페이스별 install/setup.bash 를 보조로 같이 source.
+    # ROS jazzy → install overlay → noriarm_framework PYTHONPATH 순서.
+    # 권장: repo root 에서 `colcon build --symlink-install` 한 번으로 모든 패키지 빌드 → $REPO_ROOT/install/ 에
+    # 통합 setup.bash 생성. 그 한 줄만 source. per-workspace install/ (eduping-controller/, noriarm-controller/) 은
+    # 과거에 빌드해뒀던 잔재일 수 있고 part-build 면 "not found" 경고가 다발 → 루트 install 이 있을 땐 무시.
     NORIARM_FRAMEWORK_PATH="$REPO_ROOT/controller/noriarm-controller/src/noriarm_framework"
     ROS_SETUP="/opt/ros/jazzy/setup.bash"
     ROOT_WS_SETUP="$REPO_ROOT/install/setup.bash"
@@ -160,13 +162,24 @@ case "$ACTION" in
     # 해당 파일 수정 시에는 control window 에서 Ctrl+C 후 수동 재실행 필요.
     CONTROL_CMD="$(wrap_cmd uvicorn control_service.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
 
-    if [[ ! -f "$ROOT_WS_SETUP" && ! -f "$EDUPING_WS_SETUP" ]]; then
+    if [[ ! -f "$ROOT_WS_SETUP" && ! -f "$EDUPING_WS_SETUP" && ! -f "$NORIARM_WS_SETUP" && ! -f "$GOGOPING_WS_SETUP" ]]; then
       echo "[run_server] ⚠ 워크스페이스 빌드 결과 없음 — /api/eduping/*, graph routing 등 일부 기능이 거절됩니다." >&2
-      echo "[run_server]   cd $REPO_ROOT/controller/eduping-controller && source $ROS_SETUP && colcon build --symlink-install 후 재실행." >&2
+      echo "[run_server]   cd $REPO_ROOT && source $ROS_SETUP && colcon build --symlink-install 후 재실행." >&2
+    fi
+
+    # source 전략: root install 이 있으면 그것만 (모든 패키지 통합). 없으면 per-workspace 폴백.
+    # 둘 다 source 하면 stale per-workspace 의 미완성 setup.bash 가 "not found" 경고를 다발시킨다.
+    if [[ -f "$ROOT_WS_SETUP" ]]; then
+      WS_SOURCING="source $ROOT_WS_SETUP"
+    else
+      WS_SOURCING=""
+      [[ -f "$EDUPING_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $EDUPING_WS_SETUP;"
+      [[ -f "$NORIARM_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $NORIARM_WS_SETUP;"
+      [[ -f "$GOGOPING_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $GOGOPING_WS_SETUP;"
     fi
 
     tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
-      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; [ -f $ROOT_WS_SETUP ] && source $ROOT_WS_SETUP; [ -f $EDUPING_WS_SETUP ] && source $EDUPING_WS_SETUP; [ -f $NORIARM_WS_SETUP ] && source $NORIARM_WS_SETUP; [ -f $GOGOPING_WS_SETUP ] && source $GOGOPING_WS_SETUP; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
+      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
 
     # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
