@@ -145,7 +145,7 @@ onUnmounted(() => {
 
           <div class="popup-body">
             <div class="viewer-pane">
-              <OpenarmViewer :external-snapshot="stream.currentSnapshot.value" />
+              <OpenarmViewer source="follower" :external-snapshot="stream.currentSnapshot.value" />
               <div v-if="playingItem" class="now-playing">
                 <div class="np-name">
                   <Icon name="music" :size="16" />
