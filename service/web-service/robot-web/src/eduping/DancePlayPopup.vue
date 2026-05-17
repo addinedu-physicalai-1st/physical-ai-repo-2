@@ -33,6 +33,7 @@ const error = ref('');
 
 const playingSlug = ref<string>('');
 const playingItem = computed(() => items.value.find((i) => i.slug === playingSlug.value) ?? null);
+const pendingItem = ref<DanceItem | null>(null);  // 재생 확인 대기 중
 
 const playDurationS = computed(() => stream.durationMs.value / 1000);
 const playElapsedS = computed(() => stream.elapsedMs.value / 1000);
@@ -64,10 +65,22 @@ async function refresh(): Promise<void> {
   }
 }
 
-function play(item: DanceItem): void {
+function requestPlay(item: DanceItem): void {
+  // 클릭 즉시 재생 X — 안전을 위해 확인 팝업 띄움.
+  pendingItem.value = item;
+}
+
+function confirmPlay(): void {
+  const item = pendingItem.value;
+  pendingItem.value = null;
+  if (!item) return;
   playingSlug.value = item.slug;
   error.value = '';
   stream.play(item.slug);
+}
+
+function cancelPlay(): void {
+  pendingItem.value = null;
 }
 
 function stop(): void {
@@ -129,7 +142,7 @@ onUnmounted(() => {
                   :key="item.slug"
                   class="item"
                   :class="{ playing: item.slug === playingSlug }"
-                  @click="play(item)"
+                  @click="requestPlay(item)"
                 >
                   <div class="item-icon">
                     <Icon :name="item.slug === playingSlug ? 'stop' : 'play'" :size="18" />
@@ -148,6 +161,26 @@ onUnmounted(() => {
                 <small>'율동 등록' 모드에서 새 곡을 추가하세요.</small>
               </div>
             </aside>
+          </div>
+        </div>
+      </Transition>
+
+      <Transition name="fade">
+        <div v-if="pendingItem" class="confirm-overlay" @click.self="cancelPlay">
+          <div class="confirm-card" role="alertdialog" aria-modal="true">
+            <div class="confirm-icon">
+              <Icon name="alert" :size="32" />
+            </div>
+            <h3>「{{ pendingItem.display_name }}」 재생할까요?</h3>
+            <p class="confirm-body">
+              로봇 팔이 움직입니다. 주변에 사람이나 물건이 없는지 확인하세요.
+            </p>
+            <div class="confirm-actions">
+              <button type="button" class="btn-cancel" @click="cancelPlay">취소</button>
+              <button type="button" class="btn-confirm" @click="confirmPlay">
+                <Icon name="play" :size="14" /> 재생
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
@@ -393,4 +426,73 @@ onUnmounted(() => {
 .pop-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
 .pop-enter-from { opacity: 0; transform: scale(0.94) translateY(10px); }
 .pop-leave-to { opacity: 0; transform: scale(0.97); }
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-card {
+  background: white;
+  border-radius: 18px;
+  padding: 28px 32px 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+  text-align: center;
+}
+.confirm-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fef3c7;
+  color: #d97706;
+}
+.confirm-card h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  color: #1e293b;
+  letter-spacing: -0.01em;
+}
+.confirm-body {
+  margin: 0 0 22px;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.btn-cancel, .btn-confirm {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+.btn-cancel:hover { background: #e2e8f0; }
+.btn-confirm {
+  background: #ec4899;
+  color: white;
+}
+.btn-confirm:hover { background: #db2777; }
 </style>
