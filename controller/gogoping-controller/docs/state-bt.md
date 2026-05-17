@@ -13,6 +13,7 @@
 - **MainTree root FAILURE** → `main.py._on_tree_failure()` 가 `return_command` trigger 발사 → RETURNING 으로 도피 (예: FollowSubTree Loss Recovery 끝까지 실패)
 - 자세한 trigger 이름·시그니처: [fsm-triggers.md](fsm-triggers.md)
 - 자세한 blackboard 키: [blackboard-schema.md](blackboard-schema.md)
+- **Active mode 직접 전이** — `assist_command` / `play_command` / `manual_command` 는 IDLE 뿐 아니라 *다른 active mode* 에서도 발화 가능 (예: ASSIST 중 PLAY 누르면 직접 PLAY 로). BT swap 1회로 처리되며 `terminate(INVALID)` 가 이전 트리의 시간-구속 cleanup 보장 (ManualTorqueHold 의 torque ON 복원, NavigateToPose 의 nav2 goal cancel 등). 따라서 모든 behavior 의 `terminate()` 는 **idempotent + cleanup-complete** 해야 함.
 
 ---
 

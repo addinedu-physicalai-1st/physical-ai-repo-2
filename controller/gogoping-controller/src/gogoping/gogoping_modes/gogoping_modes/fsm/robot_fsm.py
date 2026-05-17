@@ -39,9 +39,12 @@ _RETURN_COMMAND_SOURCES = ["IDLE", "ASSIST", "PLAY", "MANUAL"]
 _BATTERY_LOW_SOURCES = ["IDLE", "ASSIST", "PLAY"]
 
 TRANSITIONS = [
-    {"trigger": "assist_command", "source": "IDLE",     "dest": "ASSIST"},
-    {"trigger": "play_command",   "source": "IDLE",     "dest": "PLAY"},
-    {"trigger": "manual_command", "source": "IDLE",     "dest": "MANUAL"},
+    # active-mode 진입 — IDLE 뿐 아니라 *다른 active mode* 에서도 직접 전이 가능.
+    # 사용자가 ASSIST 중 PLAY 누르면 IDLE 경유 없이 BT swap 1회로 처리.
+    # terminate lifecycle 이 cleanup 보장 (ManualTorqueHold 의 torque ON 복원 등).
+    {"trigger": "assist_command", "source": ["IDLE", "PLAY", "MANUAL"],   "dest": "ASSIST"},
+    {"trigger": "play_command",   "source": ["IDLE", "ASSIST", "MANUAL"], "dest": "PLAY"},
+    {"trigger": "manual_command", "source": ["IDLE", "ASSIST", "PLAY"],   "dest": "MANUAL"},
     {"trigger": "battery_full",   "source": "CHARGING", "dest": "IDLE"},
     {"trigger": "reset",          "source": "ERROR",    "dest": "IDLE"},
     {"trigger": "assist_done",    "source": "ASSIST",   "dest": "IDLE"},
