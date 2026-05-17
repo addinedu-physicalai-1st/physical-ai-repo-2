@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<!--
+  실물 노트북용 nav2 localization stack — map_server + AMCL + lifecycle_manager.
+
+  목적: 실 환경에서 /map 발행 + /amcl_pose 발행 + map → odom TF broadcast.
+  gogoping_modes 의 MapCache (/map) + PoseSubscriber (/amcl_pose) + map_boundary_monitor
+  가 정상 동작하게 됨.
+
+  sim_with_nav2.launch.xml 과의 차이:
+   * gazebo include 없음 (실 로봇이 LIDAR / 휠 odom 직접 발행)
+   * planner / controller / bt_navigator / waypoint_follower / velocity_smoother 없음
+     (현재 단계엔 nav2 navigation 미사용 — localization 만)
+   * use_sim_time = False (실 시계)
+   * 기본 map = real_lidar_map.yaml (실 SLAM 결과)
+
+  사용:
+    ros2 launch gogoping_navigation localization_real.launch.xml
+    # 또는 device-gogoping-laptop.sh 의 localization window 가 자동 호출
+
+  주의:
+   * Pi 가 device-gogoping-pi.sh 로 떠 있어야 /gogoping/scan, /gogoping/odom, /tf
+     (gogoping/odom → base_footprint) 가 들어옴.
+   * 같은 ROS_DOMAIN_ID 필요 (201~219).
+-->
+<launch>
+    <arg name="map"
+         default="$(find-pkg-share gogoping_navigation)/maps/real_lidar_map.yaml"/>
+    <arg name="params_file"
+         default="$(find-pkg-share gogoping_navigation)/params/nav2_params_real.yaml"/>
+    <arg name="use_sim_time" default="false"/>
+    <arg name="autostart" default="true"/>
+    <arg name="log_level" default="info"/>
+
+    <!-- map_server — /map 토픽 발행 (transient_local QoS). MapCache 가 구독. -->
+    <node pkg="nav2_map_server" exec="map_server" name="map_server" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="yaml_filename" value="$(var map)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- AMCL — /gogoping/scan + /gogoping/odom 기반 localization.
+         /amcl_pose 발행 + map → odom TF broadcast.
+         PoseSubscriber 가 /amcl_pose 구독. -->
+    <node pkg="nav2_amcl" exec="amcl" name="amcl" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- lifecycle_manager — map_server + amcl 자동 activate -->
+    <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
+          name="lifecycle_manager_localization" output="screen">
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <param name="autostart" value="$(var autostart)"/>
+        <param name="node_names" value="['map_server', 'amcl']"/>
+    </node>
+</launch>

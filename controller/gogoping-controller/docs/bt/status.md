@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (PoseSubscriber rename — /amcl_pose map-frame 구독으로 교체. 좌표 = AMCL map-frame pose)
+마지막 업데이트: 2026-05-18 (실물 노트북 localization stack — localization_real.launch.xml + nav2_params_real.yaml + device-gogoping-laptop.sh localization window)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -143,8 +143,8 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | graph.py (다익스트라) | ✅ | 14 단위 테스트 pass |
 | graph_router_node | ✅ | service + action server 노출 |
 | nav2 stack (sim) | ✅ | sim_with_nav2.launch.xml |
-| nav2 stack (실물) | ☐ | TODO. (`device-gogoping-laptop.sh` 에 nav2 window 자리 마련됨) |
-| `device-gogoping-laptop.sh` | 🟡 | graph-router + modes 2 window. nav2 / vision 미포함 |
+| nav2 stack (실물) | 🟡 | localization 만 — map_server + AMCL + lifecycle_manager (`localization_real.launch.xml` + `nav2_params_real.yaml`). planner / controller / bt_navigator 는 추후 |
+| `device-gogoping-laptop.sh` | ✅ | graph-router + **localization** + modes 3 window. nav2 navigation / vision 미포함 |
 | `device-gogoping-sim.sh` | ✅ | gazebo + graph-router + modes + rviz self-contained |
 | ROS msg/srv 계약 (gogoping_msgs) | ✅ | `Goal.msg` / `GoalStatus.msg` / `SetGoal.srv` / `ForceState.srv` / `SetBatteryLevel.srv` / `SetRobotPose.srv` (CMakeLists 등록 완료) |
 | BatterySubscriber (real) | ✅ | [battery_subscriber.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/battery_subscriber.py) — `/gogoping/battery` (sensor_msgs/BatteryState) 구독. `percentage * 100 → Keys.BATTERY_LEVEL`. NaN 시 직전 값 유지 |
