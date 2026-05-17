@@ -6,6 +6,9 @@ controller/gogoping-controller/src/gogoping/
 │   └── gogoping_bringup/
 │       ├── sim_status_publisher.py       # sim 활성 신호 1Hz (Bool /gogoping/sim_active)
 │       ├── sim_battery_node.py           # sim 전용 — /gogoping/battery + SetBatteryLevel.srv
+│       ├── sim_teleport_node.py          # sim 전용 — /gogoping/sim/teleport_pose srv,
+│       │                                 #   subprocess gz set_pose 호출. admin UI 적용
+│       │                                 #   버튼이 가제보 entity 즉시 텔레포트하게 함
 │       └── battery_publisher_node.py     # Pi 운영용 — /gogoping/battery (source: static/sysfs/uart)
 │                                         #   하드웨어 spec 확정 후 source=sysfs/uart 로 전환
 │
