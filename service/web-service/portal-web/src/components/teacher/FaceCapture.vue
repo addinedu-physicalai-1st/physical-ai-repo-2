@@ -27,6 +27,10 @@ const thumbs = ref<string[]>([])
 const flash = ref(false)
 const finalizing = ref(false)
 
+const cameras = ref<MediaDeviceInfo[]>([])
+const selectedDeviceId = ref<string>('')
+const hasCameras = computed(() => cameras.value.length > 0)
+
 const showSpinner = computed(() => finalizing.value || props.uploading)
 
 // 부모에서 업로드가 종료되면 (성공/실패 무관) finalizing 도 해제해 스피너가
@@ -60,15 +64,68 @@ const currentStepLabel = computed(() => {
   return t ? stepLabels[t] : '완료'
 })
 
+async function listCameras() {
+  let devs = await navigator.mediaDevices.enumerateDevices()
+  if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
+    try {
+      const tmp = await navigator.mediaDevices.getUserMedia({ video: true })
+      tmp.getTracks().forEach((t) => t.stop())
+    } catch {
+      /* 권한 거부해도 enumerate 는 동작 (label 빈 채로) */
+    }
+    devs = await navigator.mediaDevices.enumerateDevices()
+  }
+  cameras.value = devs.filter((d) => d.kind === 'videoinput')
+  if (cameras.value.length === 0) {
+    selectedDeviceId.value = ''
+    return
+  }
+  const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value)
+  if (!selectedDeviceId.value || !stillValid) {
+    selectedDeviceId.value = cameras.value[0].deviceId
+  }
+}
+
 async function setupCamera() {
+  if (cameras.value.length === 0) await listCameras()
+  const video = selectedDeviceId.value
+    ? { deviceId: { exact: selectedDeviceId.value }, width: 640, height: 480 }
+    : { width: 640, height: 480 }
   stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: 640, height: 480 },
+    video,
     audio: false,
   })
   if (videoRef.value) {
     videoRef.value.srcObject = stream
     await videoRef.value.play()
   }
+}
+
+async function changeCamera() {
+  // 캡처 진행 중 카메라 교체 — 기존 stream 만 교체하고 mediapipe·rafId 는 그대로.
+  if (!stream) return
+  stream.getTracks().forEach((t) => t.stop())
+  stream = null
+  try {
+    await setupCamera()
+  } catch {
+    primaryHint.value = '카메라 접근 실패 — 권한을 허용했는지 확인해주세요'
+  }
+}
+
+async function rescan() {
+  await listCameras()
+}
+
+let deviceChangeDebounce: number | null = null
+function scheduleListCamerasOnDeviceChange() {
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce)
+  }
+  deviceChangeDebounce = window.setTimeout(() => {
+    deviceChangeDebounce = null
+    void listCameras()
+  }, 400)
 }
 
 function setupFaceMesh() {
@@ -174,6 +231,7 @@ function cleanup() {
 
 onMounted(async () => {
   try {
+    await listCameras()
     await setupCamera()
     setupFaceMesh()
     rafId = requestAnimationFrame(loop)
@@ -181,9 +239,15 @@ onMounted(async () => {
   } catch {
     primaryHint.value = '카메라 접근 실패 — 권한을 허용했는지 확인해주세요'
   }
+  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange)
 })
 
 onBeforeUnmount(() => {
+  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange)
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce)
+    deviceChangeDebounce = null
+  }
   cleanup()
   thumbs.value.forEach((url) => URL.revokeObjectURL(url))
 })
@@ -192,6 +256,20 @@ onBeforeUnmount(() => {
 <template>
   <div class="capture">
     <div class="capture__main">
+      <div class="capture__cam-controls">
+        <select
+          v-model="selectedDeviceId"
+          :disabled="!hasCameras"
+          class="capture__cam-select"
+          @change="changeCamera"
+        >
+          <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+          <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+            {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+          </option>
+        </select>
+        <button class="capture__cam-rescan" type="button" title="다시 스캔" @click="rescan">↻</button>
+      </div>
       <div class="capture__preview" :class="{ 'capture__preview--flash': flash }">
         <video ref="videoRef" muted playsinline />
         <canvas ref="canvasRef" class="capture__canvas" />
@@ -265,6 +343,38 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+}
+
+.capture__cam-controls {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.capture__cam-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+}
+.capture__cam-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.capture__cam-rescan {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
 .capture__preview {

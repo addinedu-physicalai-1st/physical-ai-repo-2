@@ -2,8 +2,9 @@
 /**
  * OX 퀴즈 우상단 표정 미리보기.
  *
- * 외장 USB 카메라 (예: Alcorlink USB 2.0 Camera) 를 사용한다. 노트북 내장 카메라는
- * label 필터로 제외한다 — `selectExternalCamera` 의 `pickExternalCamera`.
+ * 기본은 외장 USB 카메라 (예: Alcorlink USB 2.0 Camera) — `pickExternalCamera` 가
+ * 노트북 내장 카메라를 label 패턴으로 제외하고 첫 외장을 고른다. 사용자는 드롭다운으로
+ * 다른 카메라로 바꿀 수 있다(내장 포함).
  *
  * 외장 카메라가 1대뿐이면 OXVisionPreview (좌하단 보드 인식) 와 같은 물리 카메라를
  * 공유한다. Chrome 은 동일 deviceId 에 대한 두 번째 getUserMedia 를 내부적으로
@@ -13,7 +14,7 @@
  * 프레임을 Control Server 로 업로드한다. 연속 촬영은 쿨다운(약 2.8초) 간격으로 허용한다.
  * 부모가 `armed=false` 또는 `:reset-on="key"` 로 세션 상태를 초기화한다.
  */
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
 
@@ -36,6 +37,10 @@ const emit = defineEmits<{
 const videoRef = ref<HTMLVideoElement | null>(null);
 const error = ref<string | null>(null);
 
+const cameras = ref<MediaDeviceInfo[]>([]);
+const selectedDeviceId = ref<string>('');
+const hasCameras = computed(() => cameras.value.length > 0);
+
 let stream: MediaStream | null = null;
 
 const emotionCapture = useEmotionCapture({
@@ -47,17 +52,50 @@ const emotionCapture = useEmotionCapture({
 
 const EMOTION_SUSTAIN_MAX = 3;
 
-async function start(): Promise<void> {
-  error.value = null;
+async function listCameras(): Promise<void> {
   try {
-    const external = await pickExternalCamera();
-    if (!external) {
+    // 권한 트리거 — label 이 비어 있으면 enumerate 가 빈 라벨만 돌려준다.
+    let devs = await navigator.mediaDevices.enumerateDevices();
+    if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+        tmp.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* 권한 거부해도 enumerate 는 동작 (label 빈 채로) */
+      }
+      devs = await navigator.mediaDevices.enumerateDevices();
+    }
+    cameras.value = devs.filter((d) => d.kind === 'videoinput');
+    if (cameras.value.length === 0) {
+      selectedDeviceId.value = '';
       emit('integrated-available', false);
       return;
     }
+    const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
+    if (!selectedDeviceId.value || !stillValid) {
+      // 기본은 외장 USB — 없으면 첫 번째.
+      const ext = await pickExternalCamera();
+      selectedDeviceId.value = ext?.deviceId ?? cameras.value[0].deviceId;
+    }
+  } catch (e) {
+    error.value = `카메라 목록 실패: ${e instanceof Error ? e.message : String(e)}`;
+    emit('integrated-available', false);
+  }
+}
+
+async function start(): Promise<void> {
+  error.value = null;
+  await listCameras();
+  if (!selectedDeviceId.value) return;
+  await startStream();
+}
+
+async function startStream(): Promise<void> {
+  stopStream();
+  try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        deviceId: { exact: external.deviceId },
+        deviceId: { exact: selectedDeviceId.value },
         width: { ideal: 640 },
         height: { ideal: 360 },
       },
@@ -70,12 +108,12 @@ async function start(): Promise<void> {
     }
     emit('integrated-available', true);
   } catch (e) {
-    error.value = `외장 카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
+    error.value = `카메라 시작 실패: ${e instanceof Error ? e.message : String(e)}`;
     emit('integrated-available', false);
   }
 }
 
-function stop(): void {
+function stopStream(): void {
   emotionCapture.detach();
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
@@ -84,18 +122,61 @@ function stop(): void {
   if (videoRef.value) videoRef.value.srcObject = null;
 }
 
+async function onChange(): Promise<void> {
+  await startStream();
+}
+
+async function rescan(): Promise<void> {
+  await listCameras();
+}
+
+let deviceChangeDebounce: number | null = null;
+function scheduleListCamerasOnDeviceChange(): void {
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+  }
+  deviceChangeDebounce = window.setTimeout(() => {
+    deviceChangeDebounce = null;
+    void listCameras();
+  }, 400);
+}
+
 // 부모가 resetKey 증가시키면 세션 초기화 — 다음 표정 트리거부터 다시 촬영 가능.
 watch(
   () => props.resetKey,
   () => emotionCapture.reset(),
 );
 
-onMounted(start);
-onUnmounted(stop);
+onMounted(() => {
+  void start();
+  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+});
+onUnmounted(() => {
+  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+    deviceChangeDebounce = null;
+  }
+  stopStream();
+});
 </script>
 
 <template>
   <div class="cam-panel" :class="{ 'is-captured': emotionCapture.captured.value }">
+    <div class="cam-controls">
+      <select
+        v-model="selectedDeviceId"
+        :disabled="!hasCameras"
+        class="cam-select"
+        @change="onChange"
+      >
+        <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+        <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+          {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+        </option>
+      </select>
+      <button class="rescan" type="button" title="다시 스캔" @click="rescan">↻</button>
+    </div>
     <video ref="videoRef" muted playsinline />
     <!-- 셔터 플래시 — flashTick 값이 바뀔 때마다 :key 가 바뀌어 element 재마운트 → CSS 키프레임
          1회 재생. tick=0 (초기) 일 때는 렌더 안 함. -->
@@ -135,19 +216,52 @@ onUnmounted(stop);
 <style scoped>
 .cam-panel {
   width: 240px;
-  height: 140px;
   border-radius: 12px;
   overflow: hidden;
   background: #000;
   position: relative;
   transition: box-shadow 0.4s ease;
+  display: flex;
+  flex-direction: column;
 }
 .cam-panel.is-captured {
   box-shadow: 0 0 0 3px #f0c042 inset;
 }
+.cam-controls {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.cam-select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  font-family: inherit;
+  background: white;
+  color: #1f3a4d;
+}
+.cam-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.rescan {
+  background: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  color: #5b7a8c;
+  flex-shrink: 0;
+}
 .cam-panel video {
   width: 100%;
-  height: 100%;
+  height: 140px;
   object-fit: cover;
   display: block;
 }

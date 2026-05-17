@@ -321,57 +321,61 @@ const progressLabel = computed(
           </div>
         </div>
 
-        <!-- 우상단: 내장 등 첫 videoinput — 표정(자연 촬영). USB 보드 카메라가 있어도 같은 위치 유지. -->
-        <div v-show="integratedCameraAvailable === true" class="capture-float">
-          <IntegratedCameraPreview
-            :armed="captureArmed"
-            :reset-key="captureResetKey"
-            robot="noriarm"
-            mode="ox-quiz"
-            @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
-            @captured="handleNaturalShot"
-          />
-          <p class="capture-caption">표정 촬영 (내장 카메라)</p>
-        </div>
-
-        <!-- 좌하단: USB/외장 카메라 — 보드 영상 + YOLO WebSocket + mediapipe Hands.
-             enumerate 순서의 첫 번째가 내장이면 기본 선택은 2번째(보드) 쪽으로 잡히도록 OXVisionPreview 내부에서 처리.
-             내장이 우상단에서 표정을 담당하면 여기서는 emotion-armed 를 끈다. -->
-        <div v-show="usbCameraAvailable === true" class="vision-float">
-          <OXVisionPreview
-            :armed="phase === 'question' && !submitting"
-            :emotion-armed="captureArmed && oxPanelEmotionEnabled"
-            :emotion-reset-key="captureResetKey"
-            robot="noriarm"
-            mode="ox-quiz"
-            @select="(r: 'O' | 'X') => void selectAnswer(r)"
-            @usb-available="(v: boolean) => (usbCameraAvailable = v)"
-            @emotion-captured="handleNaturalShot"
-          />
-          <p class="vision-caption">
-            <span class="status-dot status-vision" />
-            <template v-if="integratedCameraAvailable === true">
-              보드·손 인식 (YOLO)
-            </template>
-            <template v-else>
-              보드 인식 · 첫 카메라는 표정 · 문제·생각·해설 단계에서만 인식
-            </template>
-          </p>
-        </div>
-
-        <!-- 우하단 floating: sim 일 때 URDF 뷰어, real 일 때 연결 배지 -->
-        <div v-if="showSimViewer" class="viewer-float sim">
-          <div class="viewer-float-canvas">
-            <UrdfViewer />
+        <!-- 좌측 스택 — 카메라·시뮬레이션은 모두 왼쪽에 둔다 (우측 ModeSelectorFab 사이드바를 가리지 않도록).
+             flex column 으로 자연 스택. 위→아래: 표정 카메라 / 보드 카메라 / sim 뷰어(또는 실물 연결 배지). -->
+        <div class="left-stack">
+          <!-- 표정(자연 촬영) — 내장 등 첫 videoinput. -->
+          <div v-show="integratedCameraAvailable === true" class="capture-float">
+            <IntegratedCameraPreview
+              :armed="captureArmed"
+              :reset-key="captureResetKey"
+              robot="noriarm"
+              mode="ox-quiz"
+              @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
+              @captured="handleNaturalShot"
+            />
+            <p class="capture-caption">표정 촬영 (내장 카메라)</p>
           </div>
-          <p class="viewer-float-caption">
-            <span class="status-dot status-sim" />
-            노리암 시뮬레이션
-          </p>
-        </div>
-        <div v-else class="viewer-float real">
-          <span class="status-dot status-real" />
-          실물 노리암 연결됨
+
+          <!-- 보드 카메라 — USB/외장. YOLO WebSocket + mediapipe Hands.
+               enumerate 순서의 첫 번째가 내장이면 기본 선택은 2번째(보드) 쪽으로 잡히도록 OXVisionPreview 내부에서 처리.
+               내장이 표정을 담당하면 여기서는 emotion-armed 를 끈다. -->
+          <div v-show="usbCameraAvailable === true" class="vision-float">
+            <OXVisionPreview
+              :armed="phase === 'question' && !submitting"
+              :emotion-armed="captureArmed && oxPanelEmotionEnabled"
+              :emotion-reset-key="captureResetKey"
+              robot="noriarm"
+              mode="ox-quiz"
+              @select="(r: 'O' | 'X') => void selectAnswer(r)"
+              @usb-available="(v: boolean) => (usbCameraAvailable = v)"
+              @emotion-captured="handleNaturalShot"
+            />
+            <p class="vision-caption">
+              <span class="status-dot status-vision" />
+              <template v-if="integratedCameraAvailable === true">
+                보드·손 인식 (YOLO)
+              </template>
+              <template v-else>
+                보드 인식 · 첫 카메라는 표정 · 문제·생각·해설 단계에서만 인식
+              </template>
+            </p>
+          </div>
+
+          <!-- sim 일 때 URDF 뷰어, real 일 때 연결 배지 -->
+          <div v-if="showSimViewer" class="viewer-float sim">
+            <div class="viewer-float-canvas">
+              <UrdfViewer />
+            </div>
+            <p class="viewer-float-caption">
+              <span class="status-dot status-sim" />
+              노리암 시뮬레이션
+            </p>
+          </div>
+          <div v-else class="viewer-float real">
+            <span class="status-dot status-real" />
+            실물 노리암 연결됨
+          </div>
         </div>
       </div>
     </Transition>
@@ -400,11 +404,28 @@ const progressLabel = computed(
   min-width: 480px;
   max-width: 720px;
 }
-/* 우하단 floating 뷰어 패널. 카드 위로 살짝 올라와도 z-index 로 OX 오버레이 안에 정착. */
-.viewer-float {
+/* 좌측 스택 컨테이너 — 카메라·시뮬레이션 패널을 전부 모아 둠. 우측 ModeSelectorFab(200px) 와 안 겹침. */
+.left-stack {
   position: absolute;
-  right: 24px;
+  top: 24px;
   bottom: 24px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 19;
+  align-items: flex-start;
+  pointer-events: none;
+  /* 화면이 짧으면 위에서부터 보이고 나머지는 스크롤 — UI 깨짐보다 낫다 */
+  overflow-y: auto;
+}
+.left-stack > * {
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+/* 카드 위에 떠있는 뷰어 패널 (sim 또는 real 배지). flex column 안에 들어가 자동 스택. */
+.viewer-float {
   background: white;
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
@@ -460,9 +481,6 @@ const progressLabel = computed(
   box-shadow: 0 0 0 3px rgba(58, 143, 194, 0.18);
 }
 .vision-float {
-  position: absolute;
-  left: 24px;
-  bottom: 24px;
   background: white;
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
@@ -473,9 +491,6 @@ const progressLabel = computed(
   gap: 6px;
 }
 .capture-float {
-  position: absolute;
-  top: 24px;
-  right: 24px;
   background: white;
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);

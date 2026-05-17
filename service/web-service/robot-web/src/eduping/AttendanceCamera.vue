@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, watch } from 'vue';
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue';
 import { FaceMesh, type Results } from '@mediapipe/face_mesh';
 import { useModeStore } from '@/stores/mode';
 import { useTTS } from '@/composables/useTTS';
@@ -43,6 +43,10 @@ function armSkipMessage(code: string | null): string | null {
   return null;
 }
 
+const cameras = ref<MediaDeviceInfo[]>([]);
+const selectedDeviceId = ref<string>('');
+const hasCameras = computed(() => cameras.value.length > 0);
+
 let stream: MediaStream | null = null;
 let faceMesh: FaceMesh | null = null;
 let rafId: number | null = null;
@@ -82,18 +86,39 @@ interface CheckResult {
   arm_status: string | null;
 }
 
+async function listCameras(): Promise<void> {
+  let devs = await navigator.mediaDevices.enumerateDevices();
+  if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
+    try {
+      const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+      tmp.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* 권한 거부해도 enumerate 는 동작 (label 빈 채로) */
+    }
+    devs = await navigator.mediaDevices.enumerateDevices();
+  }
+  cameras.value = devs.filter((d) => d.kind === 'videoinput');
+  if (cameras.value.length === 0) {
+    selectedDeviceId.value = '';
+    return;
+  }
+  const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
+  if (!selectedDeviceId.value || !stillValid) {
+    // 등하원 인식 기본값은 외장 USB — 노트북 내장은 거리·각도가 안 맞아 정확도가 낮다.
+    const ext = await pickExternalCamera();
+    selectedDeviceId.value = ext?.deviceId ?? cameras.value[0].deviceId;
+  }
+}
+
 async function setupCamera(): Promise<void> {
   if (stream) return;
-  // 등하원 출석은 외장 USB 카메라 (예: Alcorlink USB 2.0 Camera) 만 사용한다.
-  // 노트북 내장 카메라는 label 패턴으로 제외 — 외장이 없으면 에러 throw 후
-  // watch 의 catch 가 "카메라 접근 실패" 로 노출 (fail-closed).
-  const external = await pickExternalCamera();
-  if (!external) {
-    throw new Error('외장 USB 카메라가 연결되어 있지 않습니다');
+  if (cameras.value.length === 0) await listCameras();
+  if (!selectedDeviceId.value) {
+    throw new Error('사용 가능한 카메라가 없습니다');
   }
   stream = await navigator.mediaDevices.getUserMedia({
     video: {
-      deviceId: { exact: external.deviceId },
+      deviceId: { exact: selectedDeviceId.value },
       width: { ideal: 640 },
       height: { ideal: 480 },
     },
@@ -103,6 +128,39 @@ async function setupCamera(): Promise<void> {
     videoRef.value.srcObject = stream;
     await videoRef.value.play();
   }
+}
+
+async function restartStream(): Promise<void> {
+  if (!stream) return;
+  stream.getTracks().forEach((t) => t.stop());
+  stream = null;
+  await setupCamera();
+}
+
+async function onChange(): Promise<void> {
+  // 모드 활성 중에 카메라를 바꾸면 새 스트림으로 교체. 비활성 상태면 다음 활성 때 새 선택값 사용.
+  if (props.mode !== null) {
+    try {
+      await restartStream();
+    } catch {
+      status.value = '카메라 접근 실패';
+    }
+  }
+}
+
+async function rescan(): Promise<void> {
+  await listCameras();
+}
+
+let deviceChangeDebounce: number | null = null;
+function scheduleListCamerasOnDeviceChange(): void {
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+  }
+  deviceChangeDebounce = window.setTimeout(() => {
+    deviceChangeDebounce = null;
+    void listCameras();
+  }, 400);
 }
 
 function setupFaceMesh(): void {
@@ -282,7 +340,20 @@ watch(
   { immediate: true },
 );
 
-onBeforeUnmount(teardown);
+onMounted(() => {
+  // 첫 mount 에서 카메라 목록을 채워둠 — props.mode 가 null 이라 setupCamera 가 늦더라도
+  // 드롭다운에 즉시 항목이 표시됨.
+  void listCameras();
+  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+});
+onBeforeUnmount(() => {
+  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+    deviceChangeDebounce = null;
+  }
+  teardown();
+});
 </script>
 
 <template>
@@ -290,6 +361,20 @@ onBeforeUnmount(teardown);
     <div class="card">
       <div class="header">
         <span class="badge">{{ mode === 'IN' ? '등원' : '하원' }}</span>
+      </div>
+      <div class="cam-controls">
+        <select
+          v-model="selectedDeviceId"
+          :disabled="!hasCameras"
+          class="cam-select"
+          @change="onChange"
+        >
+          <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+          <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+            {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+          </option>
+        </select>
+        <button class="rescan" type="button" title="다시 스캔" @click="rescan">↻</button>
       </div>
       <div class="video-wrap">
         <video ref="videoRef" muted playsinline class="video" />
@@ -321,7 +406,7 @@ onBeforeUnmount(teardown);
 .attendance-pip {
   position: absolute;
   top: 24px;
-  right: 24px;
+  left: 24px;
   z-index: 5;
   pointer-events: none;
 }
@@ -352,6 +437,37 @@ onBeforeUnmount(teardown);
   font-weight: 700;
   border-radius: 999px;
   letter-spacing: 0.5px;
+}
+.cam-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.cam-select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #ccd;
+  font-size: 12px;
+  font-family: inherit;
+  background: white;
+  color: #1f3a4d;
+}
+.cam-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.rescan {
+  background: white;
+  border: 1px solid #ccd;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  color: #5b7a8c;
+  flex-shrink: 0;
 }
 .video-wrap {
   position: relative;
