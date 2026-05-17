@@ -31,6 +31,17 @@
 
 Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 
+## map_boundary_monitor  *(스켈레톤)*
+
+로봇의 현재 pose (`/amcl_pose` 또는 `/odom`) 가 로드된 맵 경계 밖으로 나가면 즉시 `"fault"` trigger 를 `reason="out_of_map"` 으로 발화.
+
+- threshold: 맵 점유 영역 (occupancy grid) 의 *외곽* + 안전 margin (예: 0.5m). ROS param 으로 조정.
+- 발화 후에는 `_fired = True` 로 edge-triggered 유지 (반복 발화 방지).
+- 일반 경로 이탈 (re-plan 가능한 수준) 은 본 monitor 대상이 *아님* — 그건 nav2 가 자체 처리. **본 monitor 는 "맵 밖으로 완전히 나간 catastrophic 케이스" 한정**.
+- MANUAL state 에는 의도적으로 배치하지 않음 — MANUAL 은 사용자가 직접 제어하므로 자동 ERROR 전이 금지 (사용자가 로봇을 들고 맵 경계 너머로 가도 ERROR 안 가짐). 자세한 이유 [`bt/trees/BT_manual_main.md`](../trees/BT_manual_main.md).
+
+| Used in | BT_assist_main, BT_play_main, BT_returning_main |
+
 ## docking_contact_check  *(스켈레톤)*
 
 도킹 접점 전류 흐름 감시. 끊김 시 fault.

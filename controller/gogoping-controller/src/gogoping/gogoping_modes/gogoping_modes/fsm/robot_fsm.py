@@ -1,9 +1,9 @@
-"""GogoPing 로봇 FSM — 6 states + 11 triggers.
+"""GogoPing 로봇 FSM — 7 states + 13 triggers.
 
 명세: ``controller/gogoping-controller/docs/fsm-triggers.md``, ``docs/state-bt.md``.
 
-- 6 states: ``CHARGING / IDLE / ASSIST / PLAY / RETURNING / ERROR``
-- 11 triggers: fsm-triggers.md 표 그대로
+- 7 states: ``CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / ERROR``
+- 13 triggers: fsm-triggers.md 표 그대로
 - 블랙보드 부수효과 ("동시 작업" 컬럼) 는 호출자 책임 — 본 모듈은 순수 state machine.
   command_listener / monitor 가 trigger 발화 직전 blackboard 를 세팅한 뒤 ``fsm.trigger(...)``.
 
@@ -15,6 +15,8 @@
     fsm.trigger("battery_low")                     # → RETURNING
     fsm.trigger("docked")                          # → CHARGING
     fsm.trigger("battery_full")                    # → IDLE
+    fsm.trigger("manual_command")                  # → MANUAL  (torque OFF)
+    fsm.trigger("cancel")                          # → IDLE   (torque ON 복귀)
     fsm.trigger("fault", reason="lidar_timeout")   # → ERROR
     fsm.trigger("reset")                           # → IDLE
 
@@ -27,23 +29,29 @@ from typing import Callable
 from transitions import Machine
 
 
-STATES = ["CHARGING", "IDLE", "ASSIST", "PLAY", "RETURNING", "ERROR"]
+STATES = ["CHARGING", "IDLE", "ASSIST", "PLAY", "MANUAL", "RETURNING", "ERROR"]
 
-_FAULT_SOURCES = ["CHARGING", "IDLE", "ASSIST", "PLAY", "RETURNING"]  # ERROR 제외
+# fault: 자동 감지 monitor 가 있는 state 만. MANUAL 은 monitor 없음 → 제외.
+_FAULT_SOURCES = ["CHARGING", "IDLE", "ASSIST", "PLAY", "RETURNING"]
+# 사용자 명시 복귀 명령 source — MANUAL 포함 (유저가 명령하면 torque ON + 도크 주행)
+_RETURN_COMMAND_SOURCES = ["IDLE", "ASSIST", "PLAY", "MANUAL"]
+# 배터리 모니터 자동 복귀 source — MANUAL 제외 (사용자가 직접 미는 중 자동 빼앗기지 않음)
+_BATTERY_LOW_SOURCES = ["IDLE", "ASSIST", "PLAY"]
 
 TRANSITIONS = [
     {"trigger": "assist_command", "source": "IDLE",     "dest": "ASSIST"},
     {"trigger": "play_command",   "source": "IDLE",     "dest": "PLAY"},
+    {"trigger": "manual_command", "source": "IDLE",     "dest": "MANUAL"},
     {"trigger": "battery_full",   "source": "CHARGING", "dest": "IDLE"},
     {"trigger": "reset",          "source": "ERROR",    "dest": "IDLE"},
     {"trigger": "assist_done",    "source": "ASSIST",   "dest": "IDLE"},
     {"trigger": "play_done",      "source": "PLAY",     "dest": "IDLE"},
-    {"trigger": "cancel",         "source": ["ASSIST", "PLAY"],         "dest": "IDLE"},
-    {"trigger": "return_command", "source": ["IDLE", "ASSIST", "PLAY"], "dest": "RETURNING"},
-    {"trigger": "battery_low",    "source": ["IDLE", "ASSIST", "PLAY"], "dest": "RETURNING"},
-    {"trigger": "idle_timeout",   "source": "IDLE",                     "dest": "RETURNING"},
-    {"trigger": "docked",         "source": "RETURNING",                "dest": "CHARGING"},
-    {"trigger": "fault",          "source": _FAULT_SOURCES,             "dest": "ERROR"},
+    {"trigger": "cancel",         "source": ["ASSIST", "PLAY", "MANUAL"], "dest": "IDLE"},
+    {"trigger": "return_command", "source": _RETURN_COMMAND_SOURCES,      "dest": "RETURNING"},
+    {"trigger": "battery_low",    "source": _BATTERY_LOW_SOURCES,         "dest": "RETURNING"},
+    {"trigger": "idle_timeout",   "source": "IDLE",                       "dest": "RETURNING"},
+    {"trigger": "docked",         "source": "RETURNING",                  "dest": "CHARGING"},
+    {"trigger": "fault",          "source": _FAULT_SOURCES,               "dest": "ERROR"},
 ]
 
 _TRIGGER_NAMES = frozenset(t["trigger"] for t in TRANSITIONS)

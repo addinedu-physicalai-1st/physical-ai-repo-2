@@ -37,6 +37,7 @@ ASSIST
         ├─ BatteryLowMonitor
         ├─ HardwareHealthMonitor
         ├─ CollisionEventHandler
+        ├─ MapBoundaryMonitor           ※ 맵 밖 이탈 시 fault(reason="out_of_map")
         ├─ CommandListener              ※ 수신: cancel 만 유효
         │                                  (assist/play/return_command 은 IDLE 에서만)
         │
@@ -52,16 +53,35 @@ PLAY
         ├─ BatteryLowMonitor
         ├─ HardwareHealthMonitor
         ├─ CollisionEventHandler
+        ├─ MapBoundaryMonitor           ※ 맵 밖 이탈 시 fault(reason="out_of_map")
         ├─ CommandListener              ※ 수신: cancel 만 유효
         │
         └─ TaskSelector (Selector, memory=False)
               └─ Sequence: CheckTask("hideseek") → HideAndSeekSubTree   ※ 1회 실행 후 종료
 
 
+MANUAL
+  main: Parallel
+        ├─ ManualTorqueHold        ※ initialise() 에서 torque OFF service 호출,
+        │                            terminate() 에서 torque ON 복원. 매 tick RUNNING 유지.
+        └─ CommandListener         ※ 수신: cancel / return_command 만 유효
+                                      (assist/play/manual_command 은 IDLE 에서만)
+  sub: 없음
+
+  ※ MANUAL 은 task 가 없는 *상태* — 로봇이 가만히 서있고 torque 만 풀려 있음.
+    의도적으로 *모든 자동 감지 monitor 미배치* — 사용자가 직접 제어:
+      - BatteryLowMonitor 없음 (battery_low → MANUAL 무효) — 자동 빼앗김 방지
+      - HardwareHealthMonitor 없음 (fault → MANUAL 무효) — 토크 OFF 라 의미 약함
+      - CollisionEventHandler 없음 — 토크 OFF 라 자율 충돌 위험 없음
+    이탈 경로는 오직 사용자 명시 명령 (cancel / return_command) 만.
+    cancel / return_command 시 ManualTorqueHold.terminate() 가 torque ON 복원.
+
+
 RETURNING
   main: Parallel (SuccessOnSelected=[ReturnSubTree])
         ├─ HardwareHealthMonitor
-        └─ CollisionEventHandler
+        ├─ CollisionEventHandler
+        └─ MapBoundaryMonitor           ※ 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map")
 
   sub: ReturnSubTree (Sequence, memory=True)
         ├─ NavigateToPose(charging_dock_approach_key)

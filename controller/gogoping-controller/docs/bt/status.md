@@ -13,13 +13,14 @@
 
 ## Trees
 
-### MainTree (6개)
+### MainTree (7개)
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
 | BT_idle_main | ☐ | |
 | BT_assist_main | ☐ | docs 작성 — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
 | BT_play_main | ☐ | |
+| BT_manual_main | ☐ | docs 작성 — [trees/BT_manual_main.md](trees/BT_manual_main.md). torque off 모드 |
 | BT_charging_main | ☐ | |
 | BT_returning_main | ☐ | |
 | BT_error_main | ☐ | |
@@ -46,6 +47,7 @@
 | battery_low_monitor | ☐ | |
 | hardware_health_monitor | ☐ | |
 | collision_event_handler | ☐ | |
+| map_boundary_monitor | ☐ | 맵 밖 이탈 시 fault(reason="out_of_map"). ASSIST/PLAY/RETURNING 만 (MANUAL 의도적 제외) |
 | command_listener | ☐ | |
 | docking_contact_check | ☐ | |
 | check_task | ☐ | |
@@ -105,7 +107,7 @@
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
-| FSM (robot_fsm.py) | 🟡 | 6 state + 12 transition + add_callback API 구현, sanity check 13건 pass. ROS 통합 / BT swap 검증 Day 3 |
+| FSM (robot_fsm.py) | 🟡 | 7 state (CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/ERROR) + 13 transition + add_callback API 구현, sanity check pass. ROS 통합 / BT swap 검증 Day 3 |
 | context.py | ☐ | |
 | blackboard.py 스키마 | 🟡 | 파일 존재, 키 등록 미검증 |
 | main.py BT swap | ☐ | |

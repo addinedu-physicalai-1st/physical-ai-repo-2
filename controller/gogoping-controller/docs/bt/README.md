@@ -30,6 +30,7 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | [trees/BT_idle_main.md](trees/BT_idle_main.md) | IDLE state — 명령 대기 + battery 감시 |
 | [trees/BT_assist_main.md](trees/BT_assist_main.md) | ASSIST — TaskSelector → carry/follow/lullaby + return_command listener |
 | [trees/BT_play_main.md](trees/BT_play_main.md) | PLAY — TaskSelector → hideseek + return_command listener |
+| [trees/BT_manual_main.md](trees/BT_manual_main.md) | MANUAL — torque off 모드, 사용자가 직접 밀어 이동. monitor + ManualTorqueHold + cancel/return listener |
 | [trees/BT_charging_main.md](trees/BT_charging_main.md) | CHARGING — battery_full 감지 + 도킹 접점 감시 |
 | [trees/BT_returning_main.md](trees/BT_returning_main.md) | RETURNING — BT_return_sub 호출 |
 | [trees/BT_error_main.md](trees/BT_error_main.md) | ERROR — terminal (StopAll → Notify → Log) |
