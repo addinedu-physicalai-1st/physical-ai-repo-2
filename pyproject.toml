@@ -45,6 +45,7 @@ dependencies = [
   # ROS 2 jazzy 빌드 — colcon + rosidl_generator_* 가 empy 3.x API 사용 (4.x 와 비호환).
   # conda env 가 transitive 로 4.x 끌어가는 경우 빌드 시 TransientParseError 발생하므로 핀.
   "empy==3.3.4",
+  "pydub>=0.25.1",
 ]
 
 [dependency-groups]
