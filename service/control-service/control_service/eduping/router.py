@@ -59,7 +59,7 @@ from control_service.eduping.ros_bridge import (
     ros_available,
 )
 
-from .dance_stream import iter_dance_frames
+from .dance_stream import iter_dance_frames, iter_home_ramp_frames
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/eduping", tags=["eduping"])
@@ -313,38 +313,128 @@ async def arm_return_home(req: Request, body: ReturnHomeIn) -> dict:
         raise HTTPException(400, str(e)) from e
 
 
-@router.websocket("/dance/{slug}/stream")
-async def dance_stream_ws(websocket: WebSocket, slug: str) -> None:
-    """율동 통합 스트림 — motion frame + PCM chunk binary push.
+@router.websocket("/dance/stream")
+async def dance_stream_ws(websocket: WebSocket) -> None:
+    """율동 모드 단일 양방향 채널.
 
-    Frame format: 자세한 사양은 dance_stream.py docstring 참조.
+    Client → server (TEXT JSON):
+      {"type":"play", "slug":"..."}
+      {"type":"stop"}
+    Server → client (BINARY frames, dance_stream.py 포맷):
+      0x03 header / 0x01 motion / 0x02 audio / 0x04 end
+      음악 동기 streaming + 정지 시 home ramp (motion-only) 모두 같은 채널.
+
+    State machine: idle ↔ playing ↔ home_ramp. 새 play 가 진행 중이면 cancel 후 시작.
+    팝업 unmount 시 WS close → finally 에서 안전 정리 + 최종 home 복귀 보장.
     """
-    if not SLUG_RE.match(slug):
-        await websocket.close(code=1008, reason="invalid slug")
-        return
     await websocket.accept()
     bridge = getattr(websocket.app.state, "eduping_bridge", None)
     if bridge is None:
         await websocket.close(code=1011, reason="bridge unavailable")
         return
-    try:
-        async for ftype, t_ms, payload in iter_dance_frames(bridge.routines_root, slug, realtime=True):
-            header = bytes([ftype]) + t_ms.to_bytes(8, "big")
-            await websocket.send_bytes(header + payload)
-    except WebSocketDisconnect:
-        return
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("dance_stream_ws 종료: slug=%s", slug)
-        # 명확한 error frame 없이 그냥 끊음 — client 가 close code 로 감지
+
+    current_task: asyncio.Task | None = None
+
+    async def cancel_current() -> None:
+        nonlocal current_task
+        if current_task is not None and not current_task.done():
+            current_task.cancel()
+            try:
+                await current_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+        current_task = None
+
+    async def _bg(name: str, fn, *args, **kwargs) -> None:
+        """동기 bridge 호출을 background thread 로 offload. action server 대기로
+        이벤트 루프 블록되는 것을 방지."""
         try:
-            await websocket.close(code=1011, reason=str(exc)[:120])
+            await asyncio.to_thread(fn, *args, **kwargs)
+        except Exception:  # noqa: BLE001
+            logger.exception("background %s 실패", name)
+
+    async def stream_dance(slug: str) -> None:
+        # play_routine 은 JointTrajectory publish + _playback_loop 시동 (즉시) +
+        # _send_real_follower_goals (action server 대기 최대 6s) 를 한꺼번에 함.
+        # background 로 던져서 WS frame streaming 즉시 시작.
+        asyncio.create_task(_bg("play_routine", bridge.play_routine, KIND_DANCE, slug, target="real"))
+        try:
+            async for ftype, t_ms, payload in iter_dance_frames(bridge.routines_root, slug, realtime=True):
+                await websocket.send_bytes(bytes([ftype]) + t_ms.to_bytes(8, "big") + payload)
+        except FileNotFoundError:
+            await websocket.send_text(json.dumps({"type": "error", "msg": f"slug not found: {slug}"}))
+        except (ValueError, BridgeUnavailable) as e:
+            await websocket.send_text(json.dumps({"type": "error", "msg": str(e)}))
+
+    async def stream_home_ramp() -> None:
+        # 순서가 중요: 정지 누른 직후의 dance pose 를 먼저 캡쳐, 그 다음에 bridge 호출.
+        # bridge.return_to_home 을 동기로 부르면 _send_real_follower_goals 가 최대 6s 블록 →
+        # start_pos 가 이미 HOME 근처가 됨 → "순간 이동" 시각 버그. background offload 로 해결.
+        from eduarm.joint_names import (  # type: ignore[import-not-found]
+            HOME_A_MAX,
+            HOME_POSE,
+            HOME_V_MAX,
+            OPENARM_JOINT_NAMES,
+        )
+        joint_names = list(OPENARM_JOINT_NAMES)
+        with bridge._lock:
+            f_names = list(bridge._follower.joint_names)
+            f_pos = list(bridge._follower.positions)
+        if f_names:
+            try:
+                start_pos = [float(f_pos[f_names.index(n)]) for n in joint_names]
+            except ValueError:
+                start_pos = list(HOME_POSE)
+        else:
+            start_pos = list(HOME_POSE)
+        # 캡쳐 후 background: sim_twin JointTrajectory publish (즉시) + 실물 action goal (느림).
+        asyncio.create_task(_bg("return_to_home", bridge.return_to_home, target="real"))
+        async for ftype, t_ms, payload in iter_home_ramp_frames(
+            joint_names=joint_names,
+            start_pos=start_pos,
+            end_pos=list(HOME_POSE),
+            v_max=HOME_V_MAX,
+            a_max=HOME_A_MAX,
+            realtime=True,
+        ):
+            await websocket.send_bytes(bytes([ftype]) + t_ms.to_bytes(8, "big") + payload)
+
+    try:
+        while True:
+            msg = await websocket.receive()
+            if msg.get("type") == "websocket.disconnect":
+                break
+            text = msg.get("text")
+            if not text:
+                continue
+            try:
+                ctrl = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            kind = ctrl.get("type")
+            if kind == "play":
+                slug = ctrl.get("slug", "")
+                if not SLUG_RE.match(slug):
+                    await websocket.send_text(json.dumps({"type": "error", "msg": "invalid slug"}))
+                    continue
+                await cancel_current()
+                current_task = asyncio.create_task(stream_dance(slug))
+            elif kind == "stop":
+                await cancel_current()
+                current_task = asyncio.create_task(stream_home_ramp())
+    except WebSocketDisconnect:
+        pass
+    except Exception:  # noqa: BLE001
+        logger.exception("dance_stream_ws 비정상 종료")
+    finally:
+        await cancel_current()
+        # WS 종료 (사용자 팝업 닫음) 시에도 항상 home 복귀 — sim_twin/실물팔이 마지막 dance pose 에 머무르지 않도록.
+        # background offload — action server 대기로 이벤트 루프 블록되지 않도록.
+        asyncio.create_task(_bg("return_to_home(final)", bridge.return_to_home, target="real"))
+        try:
+            await websocket.close()
         except Exception:  # noqa: BLE001
             pass
-        return
-    try:
-        await websocket.close()
-    except Exception:  # noqa: BLE001
-        pass
 
 
 # ---------------------------------------------------------------------------

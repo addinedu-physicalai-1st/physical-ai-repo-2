@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import struct
 import time
 from pathlib import Path
@@ -34,6 +35,94 @@ MOTION_TICK_HZ = 50
 TICK_MS = 1000 // MOTION_TICK_HZ  # 20
 AUDIO_SAMPLES_PER_TICK = TARGET_SAMPLE_RATE * TICK_MS // 1000  # 320
 AUDIO_BYTES_PER_TICK = AUDIO_SAMPLES_PER_TICK * 2  # s16 = 2byte
+
+
+def trapezoidal_profile(
+    start: list[float], end: list[float], v_max: float, a_max: float, dt: float = TICK_MS / 1000.0
+) -> list[tuple[float, list[float]]]:
+    """가장 큰 |delta| joint 가 v_max cruise · a_max 가속/감속, 나머지는 같은 시간 안에서
+    time-scaled. (t, pos) 튜플 리스트 반환, 시작/끝 속도 0.
+
+    profile:
+      t_acc = v_max / a_max,  d_acc = ½·v_max·t_acc
+      2·d_acc ≥ d_max  → 삼각 (v_max 못 미침)
+      else            → 사다리꼴, T = 2·t_acc + (d_max - 2·d_acc)/v_max
+    """
+    n = len(start)
+    if len(end) != n:
+        raise ValueError(f"start/end joint count mismatch: {n} vs {len(end)}")
+    deltas = [e - s for s, e in zip(start, end)]
+    d_max = max((abs(d) for d in deltas), default=0.0)
+    if d_max < 1e-6:
+        return [(0.0, list(start)), (dt, list(end))]
+
+    t_acc = v_max / a_max
+    d_acc = 0.5 * v_max * t_acc
+    if 2.0 * d_acc >= d_max:
+        t_acc = math.sqrt(d_max / a_max)
+        t_cruise = 0.0
+    else:
+        t_cruise = (d_max - 2.0 * d_acc) / v_max
+    T = 2.0 * t_acc + t_cruise
+
+    out: list[tuple[float, list[float]]] = []
+    t = 0.0
+    while t < T:
+        if t <= t_acc:
+            d = 0.5 * a_max * t * t
+        elif t <= t_acc + t_cruise:
+            d = 0.5 * v_max * t_acc + v_max * (t - t_acc)
+        else:
+            tau = T - t
+            d = d_max - 0.5 * a_max * tau * tau
+        s = max(0.0, min(1.0, d / d_max))
+        out.append((t, [sp + s * dp for sp, dp in zip(start, deltas)]))
+        t += dt
+    out.append((T, list(end)))
+    return out
+
+
+async def iter_home_ramp_frames(
+    *,
+    joint_names: list[str],
+    start_pos: list[float],
+    end_pos: list[float],
+    v_max: float,
+    a_max: float,
+    realtime: bool = True,
+) -> AsyncIterator[tuple[int, int, bytes]]:
+    """현재 pose → HOME 으로 trapezoidal 보간 motion-only 프레임 시퀀스.
+
+    Audio 는 보내지 않음 (PLAYING → HOME_RAMP 전환 시 클라이언트가 자연스레 무음).
+    iter_dance_frames 와 동일 frame format/타이밍 규칙.
+    """
+    keyframes = trapezoidal_profile(start_pos, end_pos, v_max, a_max, TICK_MS / 1000.0)
+    duration_s = keyframes[-1][0] if keyframes else 0.0
+    joint_count = len(joint_names)
+
+    meta = {
+        "slug": "__home__",
+        "sample_rate": TARGET_SAMPLE_RATE,
+        "motion_hz": MOTION_TICK_HZ,
+        "tick_ms": TICK_MS,
+        "joint_names": list(joint_names),
+        "motion_duration_s": round(duration_s, 3),
+        "audio_duration_s": 0.0,
+    }
+    yield (FRAME_TYPE_HEADER, 0, json.dumps(meta, ensure_ascii=False).encode("utf-8"))
+
+    start_mono = time.monotonic()
+    for t_s, pos in keyframes:
+        t_ms = int(round(t_s * 1000))
+        payload = struct.pack(f"<{joint_count}f", *pos)
+        yield (FRAME_TYPE_MOTION, t_ms, payload)
+        if realtime:
+            target = start_mono + t_s
+            now = time.monotonic()
+            if target > now:
+                await asyncio.sleep(target - now)
+
+    yield (FRAME_TYPE_END, int(round(duration_s * 1000)), b"")
 
 
 def _interp_joint_positions(

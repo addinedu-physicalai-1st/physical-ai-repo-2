@@ -145,6 +145,9 @@ class EdupingRosBridge:
         # /state WS broadcast burst 모드 — return_to_home 같은 짧고 중요한 모션 중
         # 50Hz tick (vs 평소 10Hz) 로 부드러운 시각화. monotonic 시각 기준 expiry.
         self._burst_until_s: float = 0.0
+        # return_to_home 중복 호출 dedup — 서버 사이드 (stream 종료) + 프론트 POST 가
+        # 같은 정지 이벤트로 0.x 초 안에 두 번 들어오면 두 번째는 trajectory 재발행 skip.
+        self._last_return_home_at: float = 0.0
         # Live teleop 독립 상태 — 녹화와 무관하게 leader → forward_position 패스스루 ON/OFF.
         self._teleop_active: bool = False
         # Teleop SmoothDamp tracking — cmd + per-joint velocity 를 함께 유지.
@@ -578,6 +581,8 @@ class EdupingRosBridge:
             result["real"] = real_status
         return result
 
+    RETURN_HOME_DEDUP_S: float = 0.5
+
     def return_to_home(self, *, target: str = "sim") -> dict:
         """양팔을 HOME_POSE 로 trapezoidal velocity profile 로 복귀.
 
@@ -585,11 +590,17 @@ class EdupingRosBridge:
         - 다른 joint 들은 같은 시간 안에서 time-scaled → 모두 동시 출발·도착, 시작·끝 속도 0.
         - 50Hz 키프레임으로 곡선 sampling → sim_twin 의 선형 보간도 자연스럽게 곡선처럼 보임.
         - 실물 측은 다 같은 trajectory 를 JTC 에 전달 → cubic spline 으로 더 부드럽게.
+
+        Dedup: RETURN_HOME_DEDUP_S 안의 중복 호출은 trajectory 재발행 skip
+        (sim_twin/_playback_loop 가 이미 진행 중이라 새로 publish 하면 hiccup).
+        target=='real' 만 들어왔으면 action goal 만 발사.
         """
         if target == "real" and self._teleop_active:
             raise ValueError(
                 "실물 동기화 (teleop) 가 켜져있는 상태에서는 실물 복귀 불가 — 토글 끄고 다시 시도하세요."
             )
+        now_mono = time.monotonic()
+        deduped = (now_mono - self._last_return_home_at) < self.RETURN_HOME_DEDUP_S
         from eduarm.joint_names import (  # type: ignore[import-not-found]
             HOME_A_MAX,
             HOME_POSE,
@@ -641,12 +652,22 @@ class EdupingRosBridge:
 
         if self._js_pub is None:
             raise BridgeUnavailable("publisher not initialized — start() 호출 안됨")
+
+        if deduped:
+            # 최근 호출의 trajectory 가 아직 진행 중 — sim_twin/_playback_loop 흔들지 않음.
+            # target=='real' 이면 action goal 만 발사 (실물팔 동기화).
+            result: dict = {"ok": True, "target": target, "deduped": True}
+            if target == "real":
+                result["real"] = self._send_real_follower_goals(routine, 1.0, ramp_s)
+            return result
+
+        self._last_return_home_at = now_mono
         self._js_pub.publish(msg)
         self._start_playback(routine.joint_names, routine.keyframes, 1.0, ramp_s)
         # 모션 duration + 0.3s tail 동안 /state WS 를 50Hz burst 모드로.
-        self._burst_until_s = time.monotonic() + routine.duration_s + 0.3
+        self._burst_until_s = now_mono + routine.duration_s + 0.3
 
-        result: dict = {
+        result = {
             "ok": True,
             "target": target,
             "duration_s": round(routine.duration_s, 3),

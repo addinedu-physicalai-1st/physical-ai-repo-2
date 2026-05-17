@@ -2,12 +2,10 @@
 /**
  * 율동 재생 팝업 — EduPing 의 '율동' 모드 진입 시 표시.
  *
- * 라이브러리 (GET /api/eduping/dance) 를 띄우고, 곡 선택 시
- * unified stream WS (/api/eduping/dance/{slug}/stream) 로 audio + motion 을 동시에 받아
- * Web Audio API 로 t_ms 정각에 schedule 한다 (useDanceStream 컴포저블).
- * ThreeJS 시뮬레이션 (OpenarmViewer) 으로 모션 미리보기.
- *
- * 닫기·재생 종료 시 '대기' 모드로 복귀.
+ * 라이브러리 (GET /api/eduping/dance) 를 띄우고, 곡 선택 시 단일 양방향
+ * WS (/api/eduping/dance/stream) 로 컨트롤 + audio/motion frame 을 주고받음 (useDanceStream).
+ * 정지·자연 종료 시 같은 채널로 home ramp motion frame 이 흘러와 시각화 단절 없음.
+ * 실물 팔/sim_twin JointTrajectory 발사도 백엔드가 WS 컨트롤에 묶어서 처리 — 별도 REST 콜 불필요.
  *
  * 녹화 기능은 본 팝업에 없음 — 녹화는 '율동 등록' 모드의 DanceManager 가 담당.
  */
@@ -45,7 +43,6 @@ const progressPct = computed(() => {
 
 stream.onEnd(() => {
   playingSlug.value = '';
-  void triggerReturnHome();
 });
 
 watch(stream.error, (e) => {
@@ -68,63 +65,25 @@ async function refresh(): Promise<void> {
 }
 
 function play(item: DanceItem): void {
-  if (stream.isPlaying.value) {
-    stream.close();
-  }
   playingSlug.value = item.slug;
   error.value = '';
-  stream.open(item.slug);
-  // 실물 팔 따라가도록 trigger — fire-and-forget. sim 모드에선 fallback 처리.
-  void triggerRealArm(item.slug);
-}
-
-async function triggerRealArm(slug: string): Promise<void> {
-  for (const target of ['real', 'sim'] as const) {
-    try {
-      const res = await fetch(
-        `/api/eduping/dance/${encodeURIComponent(slug)}/play`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target }),
-        },
-      );
-      if (res.ok) return;
-    } catch {
-      /* 다음 target 시도 */
-    }
-  }
-  // 둘 다 실패 — stream 으로 시각화·곡은 계속 흐름. 사용자엔 silent fail.
-}
-
-async function triggerReturnHome(): Promise<void> {
-  for (const target of ['real', 'sim'] as const) {
-    try {
-      const res = await fetch('/api/eduping/arm/return-home', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target }),
-      });
-      if (res.ok) return;
-    } catch {
-      /* 다음 target 시도 */
-    }
-  }
+  stream.play(item.slug);
 }
 
 function stop(): void {
-  stream.close();
+  stream.stop();
   playingSlug.value = '';
-  void triggerReturnHome();
 }
 
 function close(): void {
-  stream.close();
-  void triggerReturnHome();
-  mode.setMode('대기');
+  stream.stop();  // home ramp 시작
+  mode.setMode('대기');  // 팝업 unmount → onUnmounted 가 stream.close()
 }
 
-onMounted(refresh);
+onMounted(() => {
+  void refresh();
+  stream.connect();
+});
 onUnmounted(() => {
   stream.close();
 });

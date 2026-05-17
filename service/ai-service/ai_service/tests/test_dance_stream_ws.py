@@ -1,6 +1,8 @@
-"""WS endpoint smoke test — 실제 frame 형식보다 'WS 가 frame 을 흘려보냄' 만 확인."""
+"""WS endpoint smoke test — bidirectional 채널이 play 컨트롤을 받아 frame 을 흘려보내는지 확인."""
 from __future__ import annotations
 
+import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -30,33 +32,41 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+class _StubFollower:
+    joint_names: list[str] = []
+    positions: list[float] = []
+
+
+class _StubBridge:
+    routines_root = ROUTINES_ROOT
+    _lock = threading.Lock()
+    _follower = _StubFollower()
+
+    def play_routine(self, *args, **kwargs):  # noqa: D401
+        return {"ok": True}
+
+    def return_to_home(self, *args, **kwargs):
+        return {"ok": True, "stubbed": True}
+
+
 @pytest.fixture()
 def client() -> TestClient:
     app = FastAPI()
     app.include_router(router)
-
-    # bridge stub — routines_root 만 노출
-    class _StubBridge:
-        routines_root = ROUTINES_ROOT
-
     app.state.eduping_bridge = _StubBridge()
     return TestClient(app)
 
 
-def test_ws_stream_yields_header_then_frames_then_end(client: TestClient) -> None:
-    with client.websocket_connect("/api/eduping/dance/awesome-tomato/stream") as ws:
+def test_ws_stream_play_yields_header_then_frames(client: TestClient) -> None:
+    with client.websocket_connect("/api/eduping/dance/stream") as ws:
+        ws.send_text(json.dumps({"type": "play", "slug": "awesome-tomato"}))
         first = ws.receive_bytes()
-        ftype = first[0]
-        assert ftype == FRAME_TYPE_HEADER
+        assert first[0] == FRAME_TYPE_HEADER
 
-        end_seen = False
-        seen_frame_count = 0
-        while seen_frame_count < 500:
+        seen = 0
+        while seen < 500:
             msg = ws.receive_bytes()
-            seen_frame_count += 1
+            seen += 1
             if msg[0] == FRAME_TYPE_END:
-                end_seen = True
                 break
-        assert seen_frame_count > 0, "no body frames received after header"
-        # END may or may not arrive within the 500-frame cap depending on fixture length;
-        # absence of END is not an error for this smoke test.
+        assert seen > 0, "no body frames received after header"
