@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from ._base import StubRunningThenSuccess
+from ._base import StubInfiniteRunning, StubRunningThenSuccess
 from .stub_carry import StubCarry
 from .stub_follow import StubFollow
 from .stub_hideseek import StubHideseek
@@ -17,4 +17,5 @@ __all__ = [
     "StubHideseek",
     "StubLullaby",
     "StubRunningThenSuccess",
+    "StubInfiniteRunning",
 ]
