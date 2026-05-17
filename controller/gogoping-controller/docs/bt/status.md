@@ -105,7 +105,7 @@
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
-| FSM (robot_fsm.py) | ☐ | 6 state 정의만 — transition 미연결 |
+| FSM (robot_fsm.py) | 🟡 | 6 state + 12 transition + add_callback API 구현, sanity check 13건 pass. ROS 통합 / BT swap 검증 Day 3 |
 | context.py | ☐ | |
 | blackboard.py 스키마 | 🟡 | 파일 존재, 키 등록 미검증 |
 | main.py BT swap | ☐ | |

@@ -10,7 +10,8 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
-  <!-- py_trees / py_trees_ros / transitions / nav2_msgs / gogoping_msgs 등은 -->
+  <exec_depend>python3-transitions</exec_depend>
+  <!-- py_trees / py_trees_ros / nav2_msgs / gogoping_msgs 등은 -->
   <!-- submodule + 패키지가 도입된 후 추가 -->
 
   <export>
