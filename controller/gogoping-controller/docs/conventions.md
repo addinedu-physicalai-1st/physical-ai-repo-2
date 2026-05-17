@@ -109,6 +109,23 @@ class NavigateToPose(py_trees.behaviour.Behaviour):
 
 FSM state 가 바뀌면 그에 맞는 MainTree 로 교체. py_trees `BehaviourTree` 의 `setup → tick → shutdown` lifecycle 활용.
 
+## ROS namespace 규약
+
+`gogoping_modes` 노드는 **namespace `gogoping`** 으로 띄운다:
+
+```python
+node = rclpy.create_node("gogoping_modes", namespace="gogoping")
+```
+
+interfaces / behaviors 의 topic / service / action 이름은 **모두 상대 path** 로
+적는다 (예: `"state"`, `"set_goal"`, `"release_torque"`). namespace 가 자동으로
+prefix 해서 `/gogoping/state`, `/gogoping/set_goal` 등으로 노출된다.
+
+- 절대 path (`/gogoping/...`) 를 코드에 박지 않는다 — 멀티 robot / launch override 막힘.
+- 멀티 robot 시 launch 에서 `namespace:=gogoping_2` 등으로 덮으면 끝.
+
+---
+
 ```python
 # gogoping_modes/main.py
 import rclpy
@@ -180,7 +197,8 @@ class GogopingModes:
 
 def main():
     rclpy.init()
-    node = rclpy.create_node("gogoping_modes")
+    # namespace="gogoping" — 본 노드의 모든 토픽/서비스에 /gogoping/* prefix.
+    node = rclpy.create_node("gogoping_modes", namespace="gogoping")
     app = GogopingModes(node)
     rclpy.spin(node)
     node.destroy_node()
