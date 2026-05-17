@@ -85,6 +85,9 @@ class RobotPoseDebugRequest(BaseModel):
 class RobotPoseDebugResponse(BaseModel):
     accepted: bool
     reason: str = ""
+    # 가제보 텔레포트 결과 (sim 만 동작, 실물 service_unavailable)
+    gazebo_accepted: bool = False
+    gazebo_reason: str = ""
 
 
 def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
@@ -144,10 +147,14 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
 
     @router.post("/debug/pose", response_model=RobotPoseDebugResponse)
     async def set_robot_pose(req: RobotPoseDebugRequest) -> RobotPoseDebugResponse:
-        """[디버그 전용] 로봇 좌표 강제 override.
+        """[디버그] 로봇 좌표 강제 — SW override + gazebo 텔레포트 동시 호출.
 
-        clear=True 면 override 해제 (live odom 복원). clear=False 면 (x, y, yaw) 강제.
-        PoseSubscriber 가 POSE_OVERRIDE_ACTIVE 체크 후 amcl_pose 메시지 무시.
+        - SW override (SetRobotPose.srv): sim + 실물 둘 다 동작. blackboard.ROBOT_POSE
+          강제 + POSE_OVERRIDE_ACTIVE flag → PoseSubscriber 가 amcl_pose 무시.
+        - 가제보 텔레포트 (SetGazeboPose.srv): sim 만. gz set_pose service 호출.
+          실물엔 sim_teleport_node 없음 → service_unavailable (best-effort, 무시).
+
+        clear=True 면 SW override 만 해제 (가제보 텔레포트 skip).
         """
         accepted, reason = await asyncio.to_thread(
             bridge.set_robot_pose_sync, req.x, req.y, req.yaw, req.clear,
@@ -157,7 +164,24 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
                 f"SetRobotPose 거부: x={req.x} y={req.y} yaw={req.yaw} "
                 f"clear={req.clear} reason={reason!r}"
             )
-        return RobotPoseDebugResponse(accepted=accepted, reason=reason)
+
+        # clear=True 면 가제보 텔레포트 skip — 그냥 live amcl_pose 복원만
+        gz_ok = False
+        gz_reason = "skipped_on_clear"
+        if not req.clear:
+            gz_ok, gz_reason = await asyncio.to_thread(
+                bridge.set_gazebo_pose_sync, req.x, req.y, req.yaw,
+            )
+            if not gz_ok:
+                # sim_teleport_node 없는 실물 환경에선 service_unavailable — 정상
+                logger.info(
+                    f"SetGazeboPose (sim 전용) 응답: ok={gz_ok} reason={gz_reason!r}"
+                )
+
+        return RobotPoseDebugResponse(
+            accepted=accepted, reason=reason,
+            gazebo_accepted=gz_ok, gazebo_reason=gz_reason,
+        )
 
     app.include_router(router)
 

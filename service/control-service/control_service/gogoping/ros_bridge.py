@@ -28,6 +28,7 @@ SERVICE_SET_GOAL = "/gogoping/set_goal"
 SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
 SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
 SERVICE_SET_ROBOT_POSE = "/gogoping/debug/set_robot_pose"
+SERVICE_SET_GAZEBO_POSE = "/gogoping/sim/teleport_pose"
 
 
 def ros_available() -> bool:
@@ -38,7 +39,7 @@ def ros_available() -> bool:
     try:
         import rclpy  # noqa: F401
         from gogoping_msgs.srv import (  # noqa: F401
-            ForceState, SetBatteryLevel, SetGoal, SetRobotPose,
+            ForceState, SetBatteryLevel, SetGazeboPose, SetGoal, SetRobotPose,
         )
         return True
     except ImportError:
@@ -73,6 +74,7 @@ class GogopingRosBridge:
         self._force_state_cli: Any = None  # ForceState.srv client (디버그 전용)
         self._set_battery_cli: Any = None  # SetBatteryLevel.srv client (sim 디버그 전용)
         self._set_robot_pose_cli: Any = None  # SetRobotPose.srv client (디버그 전용)
+        self._set_gazebo_pose_cli: Any = None  # SetGazeboPose.srv client (sim 디버그 전용)
         self._sub: Any = None              # /gogoping/state subscriber
         self._executor: Any = None
 
@@ -91,7 +93,7 @@ class GogopingRosBridge:
         # lazy import (top-level 에서 import 하면 ROS 없는 환경에서 control-service 자체가 죽음)
         import rclpy
         from gogoping_msgs.srv import (
-            ForceState, SetBatteryLevel, SetGoal, SetRobotPose,
+            ForceState, SetBatteryLevel, SetGazeboPose, SetGoal, SetRobotPose,
         )
         from std_msgs.msg import String
 
@@ -112,6 +114,9 @@ class GogopingRosBridge:
         )
         self._set_robot_pose_cli = self._node.create_client(
             SetRobotPose, SERVICE_SET_ROBOT_POSE,
+        )
+        self._set_gazebo_pose_cli = self._node.create_client(
+            SetGazeboPose, SERVICE_SET_GAZEBO_POSE,
         )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
@@ -272,6 +277,39 @@ class GogopingRosBridge:
         result = future.result()
         return bool(result.accepted), str(result.reason)
 
+    # ----------------------------------------------------------- set_gazebo_pose (sim 디버그)
+
+    def set_gazebo_pose_sync(
+        self, x: float, y: float, yaw: float,
+    ) -> tuple[bool, str]:
+        """**sim 디버그 전용** — 가제보 entity 텔레포트.
+
+        ``gogoping_msgs/srv/SetGazeboPose`` 동기 호출. 실물(Pi) 환경엔 server 없음 →
+        ``(False, "service_unavailable")``. SW (blackboard) override 와는 별개 — admin
+        UI 의 적용 버튼은 둘 다 호출 (set_robot_pose_sync + set_gazebo_pose_sync).
+        """
+        if not self._ros_ok or self._set_gazebo_pose_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._set_gazebo_pose_cli.service_is_ready():
+            if not self._set_gazebo_pose_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from gogoping_msgs.srv import SetGazeboPose
+        req = SetGazeboPose.Request()
+        req.x = float(x)
+        req.y = float(y)
+        req.yaw = float(yaw)
+
+        future = self._set_gazebo_pose_cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        return bool(result.accepted), str(result.reason)
+
     # ----------------------------------------------------------- state pubsub
 
     def _on_state_msg(self, msg: Any) -> None:
@@ -318,4 +356,5 @@ __all__ = [
     "GogopingRosBridge", "BridgeUnavailable", "ros_available",
     "TOPIC_STATE", "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
     "SERVICE_SET_BATTERY_LEVEL", "SERVICE_SET_ROBOT_POSE",
+    "SERVICE_SET_GAZEBO_POSE",
 ]

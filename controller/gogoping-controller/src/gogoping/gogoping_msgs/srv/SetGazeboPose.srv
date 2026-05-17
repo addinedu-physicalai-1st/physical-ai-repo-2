@@ -1,0 +1,17 @@
+# [sim 디버그 전용] 가제보 entity 의 pose 강제 텔레포트.
+#
+# sim_teleport_node 가 server (gogoping_bringup, sim 전용). 호출 시 subprocess 로 gz
+# service `-s /world/<world_name>/set_pose` 호출 → 가제보 엔진이 entity 즉시 텔레포트.
+#
+# 실물(Pi) 환경엔 sim_teleport_node 미실행 → service_unavailable. SW (blackboard) override
+# (SetRobotPose.srv) 와는 별개 — admin UI 의 적용 버튼은 둘 다 호출.
+#
+# AMCL 가 텔레포트 후 LIDAR scan 으로 재수렴 (~1초). 그동안 SW override 유지 → MAP 카드
+# 좌표 즉시 반영 + 시각적 일관성. 원복 버튼으로 override 해제 시 AMCL 값으로 자연 복귀.
+
+float32 x        # m, world frame
+float32 y        # m, world frame
+float32 yaw      # rad, z 축 회전
+---
+bool accepted    # gz service 호출 성공 시 True
+string reason    # 실패 시 stderr 또는 "service_unavailable"
