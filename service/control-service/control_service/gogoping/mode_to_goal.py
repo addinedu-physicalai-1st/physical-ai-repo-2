@@ -66,6 +66,9 @@ def mode_to_goal(mode_label: str) -> Goal:
     if mode_label == "수동":
         return Goal(mode="MANUAL")
 
+    if mode_label == "복귀":
+        return Goal(mode="RETURNING")
+
     if mode_label == "추종":
         return Goal(
             mode="ASSIST", task="follow",
