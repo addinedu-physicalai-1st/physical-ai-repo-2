@@ -35,7 +35,7 @@ from .interfaces import (
     DBLogger,
     MapCache,
     Nav2Client,
-    OdomSubscriber,
+    PoseSubscriber,
     UIPublisher,
 )
 
@@ -69,7 +69,7 @@ class GogopingModes:
             battery=BatterySubscriber(node),
             collision=CollisionSubscriber(node),
             db_logger=DBLogger(node),
-            odom=OdomSubscriber(node),
+            pose=PoseSubscriber(node),
             map_cache=MapCache(node),
         )
 

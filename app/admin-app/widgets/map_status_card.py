@@ -1,15 +1,14 @@
-"""Map Status card — 현재 로봇 좌표가 맵 안인지 밖인지 시각화.
+"""Map Status card — 현재 로봇 좌표 + 맵 안/밖 인디케이터.
 
-GogoPingDashboard 의 ODOM 카드 옆에 배치 — 같은 가로 행. snapshot.in_map 값
-(True/False/None) 을 받아 색상 + 라벨 표시.
+GogoPingDashboard 의 ODOM 카드 옆에 배치. snapshot 의 in_map / robot_pose 받아
+배지 + 좌표 표시. **디버그 좌표 override 는 별도 위젯** (PoseDebugPanel — TopBar
+BTStateInline 의 배터리 디버그 옆에 배치).
 
 | in_map | 표시 |
 |---|---|
 | True   | 🟢 IN MAP (success) |
 | False  | 🔴 OUT OF MAP (danger) |
 | None   | ⚪ UNKNOWN (맵 미수신 또는 odom 미수신) |
-
-좌표 자체는 별도 widget (OdomCompact) 가 이미 표시함 — 본 card 는 boolean 상태만.
 """
 from __future__ import annotations
 
@@ -22,7 +21,7 @@ from . import soften
 
 
 class MapStatusCard(QWidget):
-    """🟢 IN MAP / 🔴 OUT OF MAP / ⚪ UNKNOWN 배지."""
+    """🟢/🔴/⚪ 배지 + 좌표 라벨 (compact)."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,26 +29,41 @@ class MapStatusCard(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(10, 8, 10, 8)
-        outer.setSpacing(4)
+        outer.setContentsMargins(8, 6, 8, 6)
+        outer.setSpacing(2)
 
+        # 배지 (icon + 라벨 한 줄)
         self._icon = QLabel("⚪")
         self._icon.setAlignment(Qt.AlignCenter)
-        self._icon.setStyleSheet("font-size: 28pt; background: transparent;")
+        self._icon.setStyleSheet("font-size: 16pt; background: transparent;")
         outer.addWidget(self._icon, 0, Qt.AlignCenter)
 
-        self._label = QLabel("UNKNOWN")
-        self._label.setAlignment(Qt.AlignCenter)
-        self._label.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 11pt; font-weight: 800; "
-            f"letter-spacing: 0.8px; background: transparent;"
+        self._badge = QLabel("UNKNOWN")
+        self._badge.setAlignment(Qt.AlignCenter)
+        self._badge.setStyleSheet(
+            f"color: {COLORS['text_muted']}; font-size: 9pt; font-weight: 800; "
+            f"letter-spacing: 0.6px; background: transparent;"
         )
-        outer.addWidget(self._label, 0, Qt.AlignCenter)
+        outer.addWidget(self._badge, 0, Qt.AlignCenter)
+
+        # 좌표 (x/y/yaw 한 줄씩)
+        self._x_label = QLabel("x  —")
+        self._y_label = QLabel("y  —")
+        self._yaw_label = QLabel("yaw  —")
+        for lab in (self._x_label, self._y_label, self._yaw_label):
+            lab.setStyleSheet(
+                f"color: {COLORS['text']}; font-size: 9pt; font-weight: 700; "
+                f"background: transparent;"
+            )
+            lab.setAlignment(Qt.AlignCenter)
+            outer.addWidget(lab, 0, Qt.AlignCenter)
 
         self.set_status(None)
 
+    # --------------------------------------------------------------- public API
+
     def set_status(self, in_map: bool | None) -> None:
-        """snapshot.in_map (True / False / None) 받아 표시 갱신."""
+        """snapshot.in_map (True / False / None) — 배지 갱신."""
         if in_map is True:
             icon, text, accent = "🟢", "IN MAP", COLORS["success"]
         elif in_map is False:
@@ -58,13 +72,12 @@ class MapStatusCard(QWidget):
             icon, text, accent = "⚪", "UNKNOWN", COLORS["text_muted"]
 
         self._icon.setText(icon)
-        self._label.setText(text)
-        self._label.setStyleSheet(
-            f"color: {accent}; font-size: 11pt; font-weight: 800; "
-            f"letter-spacing: 0.8px; background: transparent;"
+        self._badge.setText(text)
+        self._badge.setStyleSheet(
+            f"color: {accent}; font-size: 9pt; font-weight: 800; "
+            f"letter-spacing: 0.6px; background: transparent;"
         )
-        # 카드 자체에도 옅은 톤
-        bg = soften(accent, 0.15)
+        bg = soften(accent, 0.12)
         self.setStyleSheet(
             f"""
             QWidget#mapStatusCard {{
@@ -74,3 +87,22 @@ class MapStatusCard(QWidget):
             }}
             """
         )
+
+    def set_pose(self, pose: dict | None) -> None:
+        """snapshot.robot_pose ({x, y, yaw} or None) — 좌표 라벨 갱신."""
+        if pose is None:
+            self._x_label.setText("x  —")
+            self._y_label.setText("y  —")
+            self._yaw_label.setText("yaw  —")
+            return
+        try:
+            import math
+            x = float(pose.get("x", 0.0))
+            y = float(pose.get("y", 0.0))
+            yaw_rad = float(pose.get("yaw", 0.0))
+            deg = math.degrees(yaw_rad)
+        except (TypeError, ValueError):
+            return
+        self._x_label.setText(f"x  {x:+.2f}")
+        self._y_label.setText(f"y  {y:+.2f}")
+        self._yaw_label.setText(f"yaw  {deg:+.0f}°")

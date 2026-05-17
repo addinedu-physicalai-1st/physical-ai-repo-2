@@ -27,6 +27,7 @@ TOPIC_STATE = "/gogoping/state"
 SERVICE_SET_GOAL = "/gogoping/set_goal"
 SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
 SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
+SERVICE_SET_ROBOT_POSE = "/gogoping/debug/set_robot_pose"
 
 
 def ros_available() -> bool:
@@ -36,7 +37,9 @@ def ros_available() -> bool:
     """
     try:
         import rclpy  # noqa: F401
-        from gogoping_msgs.srv import ForceState, SetBatteryLevel, SetGoal  # noqa: F401
+        from gogoping_msgs.srv import (  # noqa: F401
+            ForceState, SetBatteryLevel, SetGoal, SetRobotPose,
+        )
         return True
     except ImportError:
         return False
@@ -69,6 +72,7 @@ class GogopingRosBridge:
         self._cli: Any = None              # SetGoal.srv client
         self._force_state_cli: Any = None  # ForceState.srv client (디버그 전용)
         self._set_battery_cli: Any = None  # SetBatteryLevel.srv client (sim 디버그 전용)
+        self._set_robot_pose_cli: Any = None  # SetRobotPose.srv client (디버그 전용)
         self._sub: Any = None              # /gogoping/state subscriber
         self._executor: Any = None
 
@@ -86,7 +90,9 @@ class GogopingRosBridge:
 
         # lazy import (top-level 에서 import 하면 ROS 없는 환경에서 control-service 자체가 죽음)
         import rclpy
-        from gogoping_msgs.srv import ForceState, SetBatteryLevel, SetGoal
+        from gogoping_msgs.srv import (
+            ForceState, SetBatteryLevel, SetGoal, SetRobotPose,
+        )
         from std_msgs.msg import String
 
         if "ROS_DOMAIN_ID" not in os.environ:
@@ -103,6 +109,9 @@ class GogopingRosBridge:
         self._force_state_cli = self._node.create_client(ForceState, SERVICE_FORCE_STATE)
         self._set_battery_cli = self._node.create_client(
             SetBatteryLevel, SERVICE_SET_BATTERY_LEVEL,
+        )
+        self._set_robot_pose_cli = self._node.create_client(
+            SetRobotPose, SERVICE_SET_ROBOT_POSE,
         )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
@@ -229,6 +238,40 @@ class GogopingRosBridge:
         result = future.result()
         return bool(result.accepted), str(result.reason)
 
+    # ----------------------------------------------------------- set_robot_pose (디버그)
+
+    def set_robot_pose_sync(
+        self, x: float, y: float, yaw: float, clear: bool = False,
+    ) -> tuple[bool, str]:
+        """**디버그 전용** — 로봇 좌표 강제 override.
+
+        ``gogoping_msgs/srv/SetRobotPose`` 동기 호출. clear=True 면 override 해제 (live
+        odom 복원). clear=False 면 (x, y, yaw) 로 blackboard.ROBOT_POSE 강제 + odom
+        suppress flag 활성.
+        """
+        if not self._ros_ok or self._set_robot_pose_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._set_robot_pose_cli.service_is_ready():
+            if not self._set_robot_pose_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from gogoping_msgs.srv import SetRobotPose
+        req = SetRobotPose.Request()
+        req.x = float(x)
+        req.y = float(y)
+        req.yaw = float(yaw)
+        req.clear = bool(clear)
+
+        future = self._set_robot_pose_cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        return bool(result.accepted), str(result.reason)
+
     # ----------------------------------------------------------- state pubsub
 
     def _on_state_msg(self, msg: Any) -> None:
@@ -274,5 +317,5 @@ class GogopingRosBridge:
 __all__ = [
     "GogopingRosBridge", "BridgeUnavailable", "ros_available",
     "TOPIC_STATE", "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
-    "SERVICE_SET_BATTERY_LEVEL",
+    "SERVICE_SET_BATTERY_LEVEL", "SERVICE_SET_ROBOT_POSE",
 ]

@@ -184,5 +184,50 @@ class StateClient:
 
         threading.Thread(target=_run, name=f"battery_level_{level:.0f}", daemon=True).start()
 
+    def post_robot_pose(
+        self,
+        x: float,
+        y: float,
+        yaw: float,
+        clear: bool = False,
+        on_result: Callable[[float, float, float, bool, bool, str], None] | None = None,
+    ) -> None:
+        """**디버그** — ``POST /api/gogoping/debug/pose``.
+
+        clear=True 면 override 해제 (live odom 복원). clear=False 면 (x, y, yaw) 강제.
+
+        별도 thread 에서 HTTP 호출. 응답 시 ``on_result(x, y, yaw, clear, ok, reason)`` 콜백.
+        admin UI 의 MapStatusCard 디버그 입력이 호출.
+        """
+        url = f"{self._base}/api/gogoping/debug/pose"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(
+                        url,
+                        json={"x": x, "y": y, "yaw": yaw, "clear": clear},
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(x, y, yaw, clear, ok, reason)
+                except Exception as e:
+                    logger.warning(f"robot_pose on_result 콜백 오류: {e}")
+
+        label = "clear" if clear else f"{x:.1f},{y:.1f}"
+        threading.Thread(target=_run, name=f"robot_pose_{label}", daemon=True).start()
+
 
 __all__ = ["StateClient"]

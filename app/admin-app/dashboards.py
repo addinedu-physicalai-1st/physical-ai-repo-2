@@ -361,14 +361,16 @@ class GogoPingDashboard(QWidget):
         self.odom_compact = OdomCompact()
         self.odom_card = Card("ODOM")
         self.odom_card.body.addWidget(self.odom_compact, 1)
-        self.odom_card.setFixedHeight(120)
+        # MAP 카드와 동일 minimum height 로 맞춤
+        self.odom_card.setMinimumHeight(160)
 
-        # MAP STATUS card — ODOM 옆 (현재 pose 가 맵 안인지 밖인지)
+        # MAP STATUS card — ODOM 옆 (현재 pose 가 맵 안인지 밖인지 + 좌표)
         from widgets.map_status_card import MapStatusCard
         self.map_status = MapStatusCard()
         self.map_status_card = Card("MAP")
         self.map_status_card.body.addWidget(self.map_status, 1)
-        self.map_status_card.setFixedHeight(120)
+        # 배지 (icon + 라벨) + 좌표 3줄 모두 보이려면 ~ 160px 필요
+        self.map_status_card.setMinimumHeight(160)
 
         # ODOM + MAP STATUS — 가로로 나란히
         top_row = QHBoxLayout()
@@ -419,12 +421,14 @@ class GogoPingDashboard(QWidget):
         self.map_status.set_status(in_map)
 
     def update_pose(self, pose: dict | None) -> None:
-        """``/gogoping/state`` snapshot 의 robot_pose 를 받아 ODOM 카드 갱신.
+        """``/gogoping/state`` snapshot 의 robot_pose 를 받아 ODOM 카드 + MAP 카드 갱신.
 
-        /teleop/state 의 odom 과 동일 widget — 둘 다 갱신. (/teleop/state 는 30Hz,
-        /gogoping/state 는 1Hz 라 /teleop/state 가 더 자주 갱신하지만 양쪽 호환).
+        /teleop/state 의 odom 과 ODOM 카드 widget 공유 — 둘 다 갱신. (/teleop/state 는
+        30Hz, /gogoping/state 는 1Hz 라 /teleop/state 가 더 자주 갱신하지만 양쪽 호환).
+        MAP 카드는 /gogoping/state 만 보고 좌표 (디버그 override 반영) 표시.
         """
         if pose is None:
+            self.map_status.set_pose(None)
             return
         try:
             self.odom_compact.set_odom(
@@ -432,6 +436,7 @@ class GogoPingDashboard(QWidget):
                 float(pose.get("y", 0.0)),
                 float(pose.get("yaw", 0.0)),
             )
+            self.map_status.set_pose(pose)
         except (TypeError, ValueError):
             pass
 

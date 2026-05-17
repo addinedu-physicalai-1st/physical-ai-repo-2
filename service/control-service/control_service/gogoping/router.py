@@ -71,6 +71,22 @@ class BatteryDebugResponse(BaseModel):
     reason: str = ""
 
 
+class RobotPoseDebugRequest(BaseModel):
+    """admin UI 의 MapStatusCard 디버그가 POST 하는 payload.
+
+    clear=True 면 x/y/yaw 무시, override 해제. clear=False 면 좌표 강제.
+    """
+    x: float = 0.0
+    y: float = 0.0
+    yaw: float = 0.0
+    clear: bool = False
+
+
+class RobotPoseDebugResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+
+
 def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
     """app 에 라우터 부착. ``bridge`` 는 lifespan 에서 미리 ``start()`` 호출되어 있어야 함."""
 
@@ -126,6 +142,23 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
             )
         return BatteryDebugResponse(accepted=accepted, reason=reason)
 
+    @router.post("/debug/pose", response_model=RobotPoseDebugResponse)
+    async def set_robot_pose(req: RobotPoseDebugRequest) -> RobotPoseDebugResponse:
+        """[디버그 전용] 로봇 좌표 강제 override.
+
+        clear=True 면 override 해제 (live odom 복원). clear=False 면 (x, y, yaw) 강제.
+        PoseSubscriber 가 POSE_OVERRIDE_ACTIVE 체크 후 amcl_pose 메시지 무시.
+        """
+        accepted, reason = await asyncio.to_thread(
+            bridge.set_robot_pose_sync, req.x, req.y, req.yaw, req.clear,
+        )
+        if not accepted:
+            logger.warning(
+                f"SetRobotPose 거부: x={req.x} y={req.y} yaw={req.yaw} "
+                f"clear={req.clear} reason={reason!r}"
+            )
+        return RobotPoseDebugResponse(accepted=accepted, reason=reason)
+
     app.include_router(router)
 
     # WS /ws/robot-state — admin-app 이 구독
@@ -172,4 +205,5 @@ __all__ = [
     "GogopingModeRequest", "GogopingModeResponse",
     "ForceStateRequest", "ForceStateResponse",
     "BatteryDebugRequest", "BatteryDebugResponse",
+    "RobotPoseDebugRequest", "RobotPoseDebugResponse",
 ]
