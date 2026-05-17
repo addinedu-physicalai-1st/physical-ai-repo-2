@@ -25,6 +25,7 @@ setup(
         'console_scripts': [
             'servo_bridge=gogoping_camera_pan.servo_bridge:main',
             'pan_scanner=gogoping_camera_pan.pan_scanner:main',
+            'keyboard_teleop=gogoping_camera_pan.keyboard_teleop:main',
         ],
     },
 )
