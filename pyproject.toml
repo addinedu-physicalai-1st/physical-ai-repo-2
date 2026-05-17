@@ -48,6 +48,8 @@ dependencies = [
   "pydub>=0.25.1",
   # GogoPing FSM (gogoping_modes/fsm/robot_fsm.py) — pytransitions state machine
   "transitions>=0.9",
+  # GogoPing BT 본체 — py_trees 2.2.x (py-trees-spike.md 의 spike 가 2.2 기준)
+  "py-trees>=2.2,<2.3",
 ]
 
 [dependency-groups]
