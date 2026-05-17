@@ -97,7 +97,11 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n sim-battery -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 run gogoping_bringup sim_battery_node --ros-args -r __ns:=/gogoping"
 
-    # window 4: rviz (map / TF / AMCL / costmap / plan 시각화)
+    # window 4: sim-teleport (sim 전용 — gz set_pose bridge for debug coord override)
+    tmux new-window -t "$SESSION" -n sim-teleport -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 run gogoping_bringup sim_teleport_node --ros-args -r __ns:=/gogoping"
+
+    # window 5: rviz (map / TF / AMCL / costmap / plan 시각화)
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
     tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
@@ -128,6 +132,7 @@ case "$ACTION" in
       "ros2 launch gogoping_navigation graph_router"
       "ros2 run gogoping_modes"
       "ros2 run gogoping_bringup sim_battery_node"
+      "ros2 run gogoping_bringup sim_teleport_node"
       "gz sim"
       "ruby .*gz sim"
       "parameter_bridge"
@@ -135,6 +140,7 @@ case "$ACTION" in
       "robot_state_publisher"
       "sim_status_publisher"
       "sim_battery_node"
+      "sim_teleport_node"
       "rviz2"
     )
     for p in "${_patterns[@]}"; do
