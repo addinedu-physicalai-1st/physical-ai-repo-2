@@ -20,15 +20,16 @@
 |---|---|---|---|---|
 | `assist_command` | `task: str` (`carry`/`follow`/`lullaby`) | `command_listener` | IDLE → ASSIST | `blackboard.assist_task = task` 세팅. `carry` 시 `carry_mode` + `destination_key`, `follow` 또는 `carry+follow` 시 `target_person_id` 도 세팅 |
 | `play_command` | `task: str` (`hideseek`) | `command_listener` | IDLE → PLAY | `blackboard.play_task = task` 세팅. `hideseek` 시 `target_person_id` + `hide_position_key` + `search_waypoints` + `home_position_key` 도 세팅 |
-| `return_command` | — | `command_listener` 또는 `main.py._on_tree_failure()` | **IDLE / ASSIST / PLAY → RETURNING** | 수동 복귀 또는 SubTree FAILURE 시 자동 복귀 |
+| `manual_command` | — | `command_listener` | IDLE → MANUAL | torque OFF — 사용자가 직접 밀어서 이동. 진입 시 `release_torque` 서비스 호출, 진출 시 `enable_torque` |
+| `return_command` | — | `command_listener` 또는 `main.py._on_tree_failure()` | **IDLE / ASSIST / PLAY / MANUAL → RETURNING** | 수동 복귀 또는 SubTree FAILURE 시 자동 복귀. MANUAL 에서 발화 시 torque ON 자동 |
 | `assist_done` | — | (main.py 루프, ASSIST main SUCCESS 감지) | ASSIST → IDLE | `assist_task = ""` 리셋 |
 | `play_done` | — | (main.py 루프, PLAY main SUCCESS 감지) | PLAY → IDLE | `play_task = ""` 리셋 |
-| `cancel` | — | `command_listener` | ASSIST/PLAY → IDLE | task 키 리셋 |
-| `battery_low` | — | `battery_low_monitor` | IDLE/ASSIST/PLAY → RETURNING | hysteresis: 50% 진입, 55% 진출 |
+| `cancel` | — | `command_listener` | ASSIST/PLAY/MANUAL → IDLE | task 키 리셋. MANUAL 에서 발화 시 torque ON 자동 |
+| `battery_low` | — | `battery_low_monitor` | IDLE/ASSIST/PLAY → RETURNING (**MANUAL 제외** — 자동 빼앗김 방지) | hysteresis: 50% 진입, 55% 진출 |
 | `idle_timeout` | — | `idle_timeout_monitor` (Day 2 TODO) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` 초과 시 발화 — 무인 자율 복귀 |
 | `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 80% 진입 |
 | `docked` | — | `verify_docking_contact` | RETURNING → CHARGING | (발표 단계: 수동 진입) |
-| `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, 기타 monitor | any → ERROR | `blackboard.error_reason = reason` 세팅 |
+| `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/RETURNING → ERROR** (MANUAL 제외 — monitor 미배치) | `blackboard.error_reason = reason` 세팅 |
 | `reset` | — | `command_listener` (admin) | ERROR → IDLE | error_reason 클리어, BT 재build |
 
 ## 상태 전이 다이어그램
@@ -38,24 +39,28 @@
        ▲                       │                    ▲
        │ docked                │ assist_command     │
        │                       │ play_command       │ fault
-       │                       ▼                    │ (모든 active state)
-       │                  ASSIST / PLAY ────────────┤
+       │                       │ manual_command     │ (모든 active state 포함 MANUAL)
+       │                       ▼                    │
+       │             ASSIST / PLAY / MANUAL ────────┤
        │                       │
        │                       │ assist_done / play_done / cancel
        │                       ▼
        │                     IDLE
        │
-       │  return_command  (IDLE / ASSIST / PLAY 어디서든 — main.py FAILURE fallback 포함)
-       │  battery_low     (IDLE / ASSIST / PLAY)
+       │  return_command  (IDLE / ASSIST / PLAY / MANUAL 어디서든 — main.py FAILURE fallback 포함)
+       │  battery_low     (IDLE / ASSIST / PLAY — MANUAL 제외)
        │  idle_timeout    (IDLE only — Day 2 TODO)
    RETURNING ◄───────────────────────────────────────
 ```
 
 > **다중 source 전이**
-> - `fault` (any active → ERROR): CHARGING / IDLE / ASSIST / PLAY / RETURNING 어디서든
-> - `return_command` (IDLE / ASSIST / PLAY → RETURNING): 사용자 명령 또는 SubTree FAILURE fallback
-> - `battery_low` (IDLE / ASSIST / PLAY → RETURNING): hysteresis 50% 진입
+> - `fault` (→ ERROR): CHARGING / IDLE / ASSIST / PLAY / RETURNING. **MANUAL 제외** — monitor 미배치
+> - `return_command` (IDLE / ASSIST / PLAY / **MANUAL** → RETURNING): 사용자 명령 또는 SubTree FAILURE fallback
+> - `battery_low` (IDLE / ASSIST / PLAY → RETURNING): hysteresis 50% 진입. **MANUAL 제외** — 자동 빼앗김 방지
 > - `idle_timeout` (IDLE → RETURNING): IDLE 진입 후 일정 시간 무명령 시 자율 복귀
+> - `cancel` (ASSIST / PLAY / **MANUAL** → IDLE): MANUAL 의 정상 종료 경로 (torque 자동 ON)
+>
+> **MANUAL 의 자동 전이 0개** — 모든 monitor 가 의도적으로 미배치. 이탈은 사용자 명령 (cancel / return_command) 만.
 
 ## 호출 컨벤션
 
