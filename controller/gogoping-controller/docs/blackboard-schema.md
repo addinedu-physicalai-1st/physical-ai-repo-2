@@ -27,7 +27,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | `carry_mode` | `str` (`manual` / `goto` / `follow`) | `command_listener` | `check_carry_mode` | carry 서브모드 |
 | `target_person_id` | `str` | `command_listener` | `detect_target_person`, `child_face_tracker` | follow/hide-and-seek 추적 대상 (ReID/face_id) |
 
-> 취소·복귀 등의 명령은 blackboard 플래그 없이 **`cancel` / `return_command` trigger 만 사용** — trigger ↔ blackboard 중복 방지.
+> 취소·복귀 등의 명령은 blackboard 플래그 없이 **`cancel` / `return_request` trigger 만 사용** — trigger ↔ blackboard 중복 방지.
 
 ### Perception (vision 토픽 어댑터가 W)
 

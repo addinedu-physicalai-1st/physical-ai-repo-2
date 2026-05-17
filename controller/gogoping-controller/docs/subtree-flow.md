@@ -6,8 +6,8 @@ SubTree
 
 | 경로 | 명령 | 컨텍스트 | 추가 가드 |
 |---|---|---|---|
-| (1) ASSIST 직속 | `assist_command, task=follow, target_id=...` | 단독 추종 (운반 없음) | 없음 |
-| (2) CarrySubTree 의 follow 모드 | `assist_command, task=carry, carry_mode=follow, target_id=...` | 짐 운반 + 추종 | `LoadStabilityCheck` |
+| (1) ASSIST 직속 | `assist_request, task=follow, target_id=...` | 단독 추종 (운반 없음) | 없음 |
+| (2) CarrySubTree 의 follow 모드 | `assist_request, task=carry, carry_mode=follow, target_id=...` | 짐 운반 + 추종 | `LoadStabilityCheck` |
 
 → 추종 로직 (1.5m 유지 / Loss Recovery 등) 은 `FollowSubTree` 한 곳에만 작성, 상위 컨텍스트가 가드를 추가한다.
 
@@ -59,7 +59,7 @@ CarryGotoMode (Sequence)
                             │     └─ WaitForReappear(7s)
                             └─ Failure
                       ※ Failure → FollowSubTree FAILURE → main.py 의 _on_tree_failure() 가
-                        return_command trigger 발사 → RETURNING 진입 (conventions.md §3 참조)
+                        return_request trigger 발사 → RETURNING 진입 (conventions.md §3 참조)
     
   -------------------------------------------------------------------------------                              
  LullabySubTree (Sequence, memory=True)

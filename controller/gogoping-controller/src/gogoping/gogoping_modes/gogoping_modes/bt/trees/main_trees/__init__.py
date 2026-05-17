@@ -13,6 +13,7 @@ from . import (
     BT_charging_main,
     BT_error_main,
     BT_idle_main,
+    BT_low_battery_return_main,
     BT_manual_main,
     BT_play_main,
     BT_returning_main,
@@ -20,13 +21,14 @@ from . import (
 
 
 _BUILDERS = {
-    "CHARGING":  BT_charging_main.build,
-    "IDLE":      BT_idle_main.build,
-    "ASSIST":    BT_assist_main.build,
-    "PLAY":      BT_play_main.build,
-    "MANUAL":    BT_manual_main.build,
-    "RETURNING": BT_returning_main.build,
-    "ERROR":     BT_error_main.build,
+    "CHARGING":            BT_charging_main.build,
+    "IDLE":                BT_idle_main.build,
+    "ASSIST":              BT_assist_main.build,
+    "PLAY":                BT_play_main.build,
+    "MANUAL":              BT_manual_main.build,
+    "RETURNING":           BT_returning_main.build,
+    "LOW_BATTERY_RETURN":  BT_low_battery_return_main.build,
+    "ERROR":               BT_error_main.build,
 }
 
 

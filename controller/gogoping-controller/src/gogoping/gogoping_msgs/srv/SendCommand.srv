@@ -10,17 +10,17 @@
 # controller/gogoping-controller/docs/fsm-triggers.md 참조.
 #
 # 예시:
-#   command="assist_command", task="carry",   carry_mode="goto",   destination_key="kitchen_door"
-#   command="assist_command", task="carry",   carry_mode="follow", target_id="teacher_kim"   # 운반+추종
-#   command="assist_command", task="follow",  target_id="teacher_kim"                        # 단독 추종
-#   command="assist_command", task="lullaby"
-#   command="play_command",   task="hideseek"      # 1회 실행 후 종료
+#   command="assist_request", task="carry",   carry_mode="goto",   destination_key="kitchen_door"
+#   command="assist_request", task="carry",   carry_mode="follow", target_id="teacher_kim"   # 운반+추종
+#   command="assist_request", task="follow",  target_id="teacher_kim"                        # 단독 추종
+#   command="assist_request", task="lullaby"
+#   command="play_request",   task="hideseek"      # 1회 실행 후 종료
 #   command="cancel"
-#   command="return_command"
+#   command="return_request"
 #   command="reset"
 
-string command          # "assist_command" / "play_command" / "cancel" / "return_command" / "reset"
-string task             # "carry" / "follow" / "lullaby" / "hideseek"  (assist_command/play_command 시)
+string command          # "assist_request" / "play_request" / "cancel" / "return_request" / "reset"
+string task             # "carry" / "follow" / "lullaby" / "hideseek"  (assist_request/play_request 시)
 string carry_mode       # "manual" / "goto" / "follow"                  (task=carry 시)
 string destination_key  # carry+goto 시 named_pose 키
 string target_id        # follow / hide-and-seek 대상 식별자 (child_id 또는 teacher_id)

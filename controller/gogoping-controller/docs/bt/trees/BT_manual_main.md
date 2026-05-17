@@ -8,11 +8,11 @@
 ```
 Parallel(SuccessOnAll(synchronise=False))
 ├─ ManualTorqueHold         manual/manual_torque_hold.md  (Day 2 TODO)
-└─ CommandListener          common/command_listener.md     ※ cancel / return_command 만 유효
+└─ CommandListener          common/command_listener.md     ※ cancel / return_request 만 유효
 ```
 
 > Parallel 정책은 `BT_idle_main` 과 동일 — root SUCCESS 는 task 완료 의미가 아님.
-> state 전이는 trigger 발화 (`cancel` / `return_command`) 만 담당.
+> state 전이는 trigger 발화 (`cancel` / `return_request`) 만 담당.
 > sub tree 없음.
 
 ### 의도적으로 *빠진* monitor 3개
@@ -25,7 +25,7 @@ Parallel(SuccessOnAll(synchronise=False))
 | `HardwareHealthMonitor` | torque OFF 라 모터 fault 의미 약함. 굳이 ERROR 로 강제 전이할 필요 없음 |
 | `CollisionEventHandler` | torque OFF 라 자율 충돌 위험 없음. 사용자가 충돌 회피 책임 |
 
-따라서 MANUAL 에서 다른 state 로의 *자동* 전이는 0개. 이탈 경로는 오직 **사용자 명시 명령** (`cancel` → IDLE / `return_command` → RETURNING) 만.
+따라서 MANUAL 에서 다른 state 로의 *자동* 전이는 0개. 이탈 경로는 오직 **사용자 명시 명령** (`cancel` → IDLE / `return_request` → RETURNING) 만.
 
 > FSM 의 `fault` source 에서도 MANUAL 이 제외되어 있음 (`robot_fsm.py:_FAULT_SOURCES`).
 > spec / 코드 일치 — 발화 주체 없는 trigger 는 valid source 에서도 제외.
@@ -35,7 +35,7 @@ Parallel(SuccessOnAll(synchronise=False))
 | Behavior | 책임 | 상세 |
 |---|---|---|
 | **`ManualTorqueHold`** (신규) | `initialise()` 에서 torque OFF service 호출, `terminate()` 에서 torque ON 복원. 매 tick RUNNING 유지 — 트리 살아있는 동안 torque off 상태 유지 | manual/manual_torque_hold.md (Day 2) |
-| `CommandListener` | UI / Control Server 명령 수신 | MANUAL 에서는 `cancel` / `return_command` 만 valid, `assist/play/manual_command` 은 IDLE 에서만 |
+| `CommandListener` | UI / Control Server 명령 수신 | MANUAL 에서는 `cancel` / `return_request` 만 valid, `assist/play/manual_request` 은 IDLE 에서만 |
 
 ### `ManualTorqueHold` 의 lifecycle 규약
 
@@ -43,23 +43,23 @@ Parallel(SuccessOnAll(synchronise=False))
 - `update()`: 항상 `Status.RUNNING` 리턴 (다른 monitor 와 동일). torque service 의 health 도 체크 가능 — 끊겼으면 `fault` 발화.
 - `terminate(new_status)`: **idempotent** torque ON 복원 (`enable_torque` service). new_status 에 관계없이 무조건 호출. blackboard 의 `manual_torque_active=False`.
 
-> **왜 별도 behavior 인가** — torque 제어는 *시간-구속* (반드시 cleanup 보장 필요). `MANUAL` state 의 trigger 가 무엇이든 (cancel / battery_low / fault / return_command) py_trees 의 `terminate()` 가 호출되어 torque 복원 보장.
+> **왜 별도 behavior 인가** — torque 제어는 *시간-구속* (반드시 cleanup 보장 필요). `MANUAL` state 의 trigger 가 무엇이든 (cancel / battery_low / fault / return_request) py_trees 의 `terminate()` 가 호출되어 torque 복원 보장.
 
 ## 진입 / 종료 trigger
 
 ### 진입
 | Trigger | From | Source 발화 주체 |
 |---|---|---|
-| `manual_command` | IDLE | `command_listener` (SetGoal mode="MANUAL" 받음) |
+| `manual_request` | IDLE | `command_listener` (SetGoal mode="MANUAL" 받음) |
 
 ### 종료
 | Trigger | To | Source 발화 주체 |
 |---|---|---|
 | `cancel` | IDLE | `command_listener` (SetGoal mode="IDLE" 받음) |
-| `return_command` | RETURNING | `command_listener` (SetGoal mode="RETURNING") |
+| `return_request` | RETURNING | `command_listener` (SetGoal mode="RETURNING") |
 
 > **자동 종료 trigger 0개.** battery_low / fault 모두 MANUAL source 에서 제외되어 있음.
-> 사용자가 admin UI 의 battery chip 보고 직접 `cancel` 또는 `return_command` 발행해야 함.
+> 사용자가 admin UI 의 battery chip 보고 직접 `cancel` 또는 `return_request` 발행해야 함.
 
 종료 trigger 시 `main.py._on_state_change` 가 트리 swap → `ManualTorqueHold.terminate()` 호출 → torque ON 복원.
 
