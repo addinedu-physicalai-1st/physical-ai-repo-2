@@ -84,8 +84,8 @@ Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 
 **데이터 흐름**:
 ```
-/gogoping/odom (Vic Pinky 드라이버) ──→ OdomSubscriber ──→ blackboard.ROBOT_POSE
-/map           (nav2_map_server)    ──→ MapCache        ──→ ctx.map_cache.is_outside(x,y)
+/amcl_pose     (nav2_amcl, map frame) ──→ PoseSubscriber ──→ blackboard.ROBOT_POSE
+/map           (nav2_map_server)      ──→ MapCache       ──→ ctx.map_cache.is_outside(x,y)
                                               │
                                               ▼
                                     MapBoundaryMonitor (매 tick R)
@@ -105,7 +105,7 @@ Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 
 | Used in | **7 트리** — BT_charging_main, BT_idle_main, BT_assist_main, BT_play_main, BT_manual_main, BT_returning_main, BT_low_battery_return_main (ERROR 만 제외 — terminal). **MANUAL 예외** — battery/hw/collision 은 MANUAL 미배치지만 MapBoundaryMonitor 만 예외적 배치 (위치 안전 우선) |
 | 파일 | [`bt/behaviors/common/map_boundary_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) |
-| 의존 interfaces | [`OdomSubscriber`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/odom_subscriber.py) · [`MapCache`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/map_cache.py) |
+| 의존 interfaces | [`PoseSubscriber`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/pose_subscriber.py) · [`MapCache`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/map_cache.py) |
 | 테스트 | 7 시나리오 (inside / outside fire / map None / no-double / ERROR_REASON 세팅 / initialise re-arm / pose 누락) |
 
 ## docking_contact_check  *(스켈레톤)*

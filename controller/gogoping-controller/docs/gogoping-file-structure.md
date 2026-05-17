@@ -167,7 +167,7 @@ controller/gogoping-controller/src/gogoping/
         │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish  (✅ 실 구현 — `/gogoping/state` 1Hz)
         │   ├── battery_subscriber.py     # /gogoping/battery 구독 (sensor_msgs/BatteryState)
         │   │                             #   → blackboard.BATTERY_LEVEL 갱신 (✅)
-        │   ├── odom_subscriber.py        # /gogoping/odom 구독 (nav_msgs/Odometry)
+        │   ├── pose_subscriber.py       # /amcl_pose 구독 (geometry_msgs/PoseWithCovarianceStamped, map frame)
         │   │                             #   → blackboard.ROBOT_POSE {x, y, yaw} (✅)
         │   ├── map_cache.py              # /map 구독 (OccupancyGrid, transient_local QoS, 절대경로)
         │   │                             #   is_outside(x, y) 메서드 노출 (✅)

@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetGoal.srv"
   "srv/ForceState.srv"
   "srv/SetBatteryLevel.srv"
+  "srv/SetRobotPose.srv"
   "srv/RouteToVertex.srv"
   "action/NavigateToVertex.action"
   DEPENDENCIES std_msgs geometry_msgs builtin_interfaces

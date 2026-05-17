@@ -332,6 +332,14 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # PoseDebugPanel (TopBar) → state_client.post_robot_pose
+        self.topbar.bt_state.pose_debug.pose_override_requested.connect(
+            lambda x, y, yaw, clear: self.state_client.post_robot_pose(
+                x, y, yaw, clear=clear,
+                on_result=self.topbar.bt_state.pose_debug.set_last_result,
+            )
+        )
+
         self._select("gogoping")
 
     def _on_robot_state(self, snap: dict) -> None:

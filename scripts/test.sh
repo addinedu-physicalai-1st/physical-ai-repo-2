@@ -87,6 +87,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_battery_monitors.py \
   tests/test_gogoping_idle_timeout_monitor.py \
   tests/test_gogoping_map_boundary_monitor.py \
+  tests/test_gogoping_pose_override.py \
   -v "$@"; then
   EXIT=1
 fi

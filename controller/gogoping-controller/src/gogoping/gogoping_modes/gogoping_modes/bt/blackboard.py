@@ -30,7 +30,8 @@ class Keys:
     HARDWARE_HEALTH = "hardware_health"           # dict[str, bool]
     COLLISION_STATE = "collision_state"           # "ok" / "warn" / "fault"
     DOCKING_CONTACT = "docking_contact"           # bool
-    ROBOT_POSE = "robot_pose"                     # dict {x: float, y: float, yaw: float}  (OdomSubscriber 가 W)
+    ROBOT_POSE = "robot_pose"                     # dict {x: float, y: float, yaw: float} — **map frame** (PoseSubscriber 가 /amcl_pose 에서 W)
+    POSE_OVERRIDE_ACTIVE = "pose_override_active" # bool — True 면 PoseSubscriber 가 W skip (디버그 좌표 강제 시)
 
     # 명령 / 모드 (command_listener 가 W)
     ASSIST_TASK = "assist_task"                   # "carry" / "follow" / "lullaby" / ""
@@ -67,6 +68,7 @@ _DEFAULTS: dict[str, object] = {
     Keys.COLLISION_STATE: "ok",
     Keys.DOCKING_CONTACT: False,
     Keys.ROBOT_POSE: {"x": 0.0, "y": 0.0, "yaw": 0.0},
+    Keys.POSE_OVERRIDE_ACTIVE: False,
     # 명령
     Keys.ASSIST_TASK: "",
     Keys.PLAY_TASK: "",

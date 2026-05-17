@@ -24,7 +24,7 @@ from .interfaces import (
     DBLogger,
     MapCache,
     Nav2Client,
-    OdomSubscriber,
+    PoseSubscriber,
     UIPublisher,
 )
 
@@ -45,5 +45,5 @@ class Context:
     battery: BatterySubscriber
     collision: CollisionSubscriber
     db_logger: DBLogger
-    odom: OdomSubscriber             # /gogoping/odom 구독 → blackboard.ROBOT_POSE
+    pose: PoseSubscriber             # /amcl_pose 구독 → blackboard.ROBOT_POSE (map frame)
     map_cache: MapCache              # /map 구독 + is_outside(x,y) (map_boundary_monitor 가 사용)

@@ -1,4 +1,4 @@
-"""CommandListener — UI 의 SetGoal / ForceState 서비스 요청을 받아 처리.
+"""CommandListener — UI 의 SetGoal / ForceState / SetRobotPose 서비스 요청을 받아 처리.
 
 ## 책임
 
@@ -6,6 +6,9 @@
    ``goal_reconciler.reconcile()`` 호출해 적절한 FSM trigger 발화.
 2. ``gogoping_msgs/srv/ForceState`` 서비스 서버 — 디버그 강제 state 전이 (admin UI 의
    debug_state_bar). ``fsm.force_state(target)`` 직접 호출 — transition 규칙 우회.
+3. ``gogoping_msgs/srv/SetRobotPose`` 서비스 서버 — 디버그 좌표 강제 override (admin UI 의
+   MapStatusCard 디버그 입력). blackboard.ROBOT_POSE 강제 설정 + POSE_OVERRIDE_ACTIVE
+   flag → PoseSubscriber 가 amcl_pose 메시지 W skip → 좌표 유지. clear=True 면 flag 해제.
 
 ## py_trees behavior 측면
 
@@ -51,18 +54,21 @@ class CommandListener(py_trees.behaviour.Behaviour):
 
     SERVICE_NAME = "set_goal"           # 상대 path — node namespace 가 /gogoping 으로 prefix
     FORCE_STATE_SERVICE_NAME = "debug/force_state"
+    SET_ROBOT_POSE_SERVICE_NAME = "debug/set_robot_pose"
 
     def __init__(self, name: str, context: "Context"):
         super().__init__(name)
         self.ctx = context
         self._srv = None
         self._force_state_srv = None
+        self._set_pose_srv = None
         self._bb_writer: _BlackboardWriter | None = None
+        self._pose_bb: py_trees.blackboard.Client | None = None
 
     def setup(self, **kwargs) -> None:
         """py_trees 가 트리 setup 시 1회 호출 — 서비스 서버 + blackboard 권한 등록."""
         # lazy import — ROS sourcing 안 된 환경에서도 본 모듈 import 가능하게
-        from gogoping_msgs.srv import ForceState, SetGoal
+        from gogoping_msgs.srv import ForceState, SetGoal, SetRobotPose
 
         self._srv = self.ctx.node.create_service(
             SetGoal, self.SERVICE_NAME, self._on_set_goal_request,
@@ -70,10 +76,19 @@ class CommandListener(py_trees.behaviour.Behaviour):
         self._force_state_srv = self.ctx.node.create_service(
             ForceState, self.FORCE_STATE_SERVICE_NAME, self._on_force_state_request,
         )
+        self._set_pose_srv = self.ctx.node.create_service(
+            SetRobotPose, self.SET_ROBOT_POSE_SERVICE_NAME, self._on_set_robot_pose_request,
+        )
 
         # blackboard writer — reconciler 에 주입할 wrapper.
         # 모든 cmd 관련 key 에 WRITE 권한 등록.
         self._bb_writer = _BlackboardWriter(self.name)
+
+        # ROBOT_POSE / POSE_OVERRIDE_ACTIVE 직접 쓰기용 별도 client
+        from ...blackboard import Keys as _Keys
+        self._pose_bb = py_trees.blackboard.Client(name=f"{self.name}/pose_writer")
+        self._pose_bb.register_key(key=_Keys.ROBOT_POSE, access=Access.WRITE)
+        self._pose_bb.register_key(key=_Keys.POSE_OVERRIDE_ACTIVE, access=Access.WRITE)
 
     def update(self) -> Status:
         # monitor 컨벤션 — 항상 RUNNING, 부수효과는 서비스 콜백에서.
@@ -166,6 +181,37 @@ class CommandListener(py_trees.behaviour.Behaviour):
             f"ForceState target={target!r} sub_task={sub_task!r} → accepted={ok}, "
             f"current_state={self.ctx.fsm.current_state!r}"
         )
+        return response
+
+    # ------------------------------------------------------------ SetRobotPose callback
+
+    def _on_set_robot_pose_request(self, request, response):
+        """``SetRobotPose.srv`` 콜백 — admin UI MapStatusCard 디버그.
+
+        - clear=True: POSE_OVERRIDE_ACTIVE 해제 → 다음 odom 메시지부터 live 복원.
+        - clear=False: ROBOT_POSE = {x, y, yaw} 직접 W + POSE_OVERRIDE_ACTIVE=True
+          → PoseSubscriber 가 다음 amcl_pose 메시지부터 W skip → 좌표 유지.
+        """
+        from ...blackboard import Keys as _Keys
+
+        if request.clear:
+            self._pose_bb.set(_Keys.POSE_OVERRIDE_ACTIVE, False)
+            self.ctx.node.get_logger().info(
+                "SetRobotPose: override cleared — live odom 복원"
+            )
+        else:
+            self._pose_bb.set(
+                _Keys.ROBOT_POSE,
+                {"x": float(request.x), "y": float(request.y), "yaw": float(request.yaw)},
+            )
+            self._pose_bb.set(_Keys.POSE_OVERRIDE_ACTIVE, True)
+            self.ctx.node.get_logger().info(
+                f"SetRobotPose: override active — "
+                f"x={request.x:.2f}, y={request.y:.2f}, yaw={request.yaw:.2f}"
+            )
+
+        response.accepted = True
+        response.reason = ""
         return response
 
 

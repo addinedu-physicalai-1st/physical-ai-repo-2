@@ -270,16 +270,19 @@ class BTStateInline(QWidget):
         self._sub = _TreeCell("BT sub", kind="sub")
 
         # 디버그 패널 — BT sub 옆 (state + sub_task combo + 적용)
-        from .debug_state_panel import DebugStatePanel
         from .battery_debug_slider import BatteryDebugSlider
+        from .debug_state_panel import DebugStatePanel
+        from .pose_debug_panel import PoseDebugPanel
         self.debug_panel = DebugStatePanel()
         self.battery_debug = BatteryDebugSlider()
+        self.pose_debug = PoseDebugPanel()
 
         lay.addWidget(self._state, 0, Qt.AlignVCenter)
         lay.addWidget(self._main, 0, Qt.AlignVCenter)
         lay.addWidget(self._sub, 0, Qt.AlignVCenter)
         lay.addWidget(self.debug_panel, 0, Qt.AlignVCenter)
         lay.addWidget(self.battery_debug, 0, Qt.AlignVCenter)
+        lay.addWidget(self.pose_debug, 0, Qt.AlignVCenter)
 
     # ------------------------------------------------------------------ API
 
