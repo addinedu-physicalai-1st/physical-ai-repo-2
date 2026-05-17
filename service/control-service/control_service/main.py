@@ -322,5 +322,32 @@ async def get_tts(text: str):
 
 @app.post("/api/mode")
 async def mode_click(req: ModeRequest) -> dict:
-    """모드 셀렉터 UI 클릭."""
+    """모드 셀렉터 UI 클릭 — robot id 별 routing.
+
+    - ``gogoping`` → ``_gogoping_bridge.send_goal_sync`` (mode_to_goal 변환 후 SetGoal.srv)
+    - ``eduping`` / ``noriarm`` — 현재 단순 로그 + ok 반환. 추후 각 brige 로 라우팅.
+    """
+    if req.robot == "gogoping":
+        from control_service.gogoping.mode_to_goal import UnsupportedMode, mode_to_goal
+
+        try:
+            goal = mode_to_goal(req.mode)
+        except UnsupportedMode as e:
+            raise HTTPException(400, str(e))
+
+        accepted, reason = await asyncio.to_thread(_gogoping_bridge.send_goal_sync, goal)
+        if not accepted:
+            logger.warning(
+                f"SetGoal 거부: mode={req.mode!r} → Goal({goal.to_dict()}) reason={reason!r}"
+            )
+        return {
+            "ok": accepted,
+            "robot": req.robot,
+            "mode": req.mode,
+            "reason": reason,
+            "goal_mode": goal.mode,
+            "goal_task": goal.task,
+        }
+
+    # eduping / noriarm — TODO: 각 robot 의 router 가 mode 클릭 처리하면 그쪽으로 라우팅.
     return {"ok": True, "robot": req.robot, "mode": req.mode}
