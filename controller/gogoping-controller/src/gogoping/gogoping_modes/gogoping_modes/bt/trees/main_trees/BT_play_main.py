@@ -12,6 +12,7 @@ from ...behaviors._stubs import StubHideseek
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
 from ...behaviors.common.check_task import CheckTask
 from ...behaviors.common.command_listener import CommandListener
+from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
 from ...blackboard import Keys
 
 
@@ -38,8 +39,9 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         policy=ParallelPolicy.SuccessOnSelected(children=[task_sel], synchronise=False),
         children=[
             BatteryLowMonitor("BatteryLowMonitor", ctx),
+            MapBoundaryMonitor("MapBoundaryMonitor", ctx),
             CommandListener("CommandListener", ctx),
             task_sel,
-            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler, MapBoundaryMonitor
+            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler
         ],
     )

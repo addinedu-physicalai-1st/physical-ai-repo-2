@@ -80,12 +80,13 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[tests] GogoPing battery / idle_timeout monitors (py_trees only — ROS 불필요)"
+echo "[tests] GogoPing battery / idle_timeout / map_boundary monitors (py_trees only — ROS 불필요)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 if ! conda run -n jazzy pytest \
   tests/test_gogoping_battery_monitors.py \
   tests/test_gogoping_idle_timeout_monitor.py \
+  tests/test_gogoping_map_boundary_monitor.py \
   -v "$@"; then
   EXIT=1
 fi

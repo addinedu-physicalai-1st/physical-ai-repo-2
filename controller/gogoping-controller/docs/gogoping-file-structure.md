@@ -47,6 +47,9 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   ├── idle_timeout_monitor.[py|/]   # IDLE N초 무명령 → "idle_timeout" trigger (✅)
         │   │   │   │                                 #   ROS param idle_timeout_seconds (기본 60s).
         │   │   │   │                                 #   Used in: BT_idle_main 만
+        │   │   │   ├── map_boundary_monitor.[py|/]   # 로봇 pose 가 맵 영역 밖 → "fault" (✅)
+        │   │   │   │                                 #   MapCache.is_outside(x,y) — 격자 박스 + unknown 셀 체크.
+        │   │   │   │                                 #   Used in: BT_assist/play/returning_main (MANUAL 제외)
         │   │   │   ├── hardware_health_monitor.[py|/] # 센서/모터 응답 끊김 감지 → "fault" trigger
         │   │   │   │                                 #   Used in: BT_charging_main, BT_idle_main, BT_assist_main,
         │   │   │   │                                 #            BT_play_main, BT_returning_main
@@ -163,6 +166,10 @@ controller/gogoping-controller/src/gogoping/
         │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish  (✅ 실 구현 — `/gogoping/state` 1Hz)
         │   ├── battery_subscriber.py     # /gogoping/battery 구독 (sensor_msgs/BatteryState)
         │   │                             #   → blackboard.BATTERY_LEVEL 갱신 (✅)
+        │   ├── odom_subscriber.py        # /gogoping/odom 구독 (nav_msgs/Odometry)
+        │   │                             #   → blackboard.ROBOT_POSE {x, y, yaw} (✅)
+        │   ├── map_cache.py              # /map 구독 (OccupancyGrid, transient_local QoS, 절대경로)
+        │   │                             #   is_outside(x, y) 메서드 노출 (✅)
         │   ├── collision_subscriber.py   # Collision Monitor 상태 토픽 구독  (stub)
         │   └── db_logger.py              # error_log 테이블 INSERT  (stub)
         │

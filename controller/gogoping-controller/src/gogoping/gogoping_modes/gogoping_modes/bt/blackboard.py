@@ -30,6 +30,7 @@ class Keys:
     HARDWARE_HEALTH = "hardware_health"           # dict[str, bool]
     COLLISION_STATE = "collision_state"           # "ok" / "warn" / "fault"
     DOCKING_CONTACT = "docking_contact"           # bool
+    ROBOT_POSE = "robot_pose"                     # dict {x: float, y: float, yaw: float}  (OdomSubscriber 가 W)
 
     # 명령 / 모드 (command_listener 가 W)
     ASSIST_TASK = "assist_task"                   # "carry" / "follow" / "lullaby" / ""
@@ -65,6 +66,7 @@ _DEFAULTS: dict[str, object] = {
     Keys.HARDWARE_HEALTH: {},
     Keys.COLLISION_STATE: "ok",
     Keys.DOCKING_CONTACT: False,
+    Keys.ROBOT_POSE: {"x": 0.0, "y": 0.0, "yaw": 0.0},
     # 명령
     Keys.ASSIST_TASK: "",
     Keys.PLAY_TASK: "",

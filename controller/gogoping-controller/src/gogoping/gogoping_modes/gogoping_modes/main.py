@@ -33,7 +33,9 @@ from .interfaces import (
     CameraPanClient,
     CollisionSubscriber,
     DBLogger,
+    MapCache,
     Nav2Client,
+    OdomSubscriber,
     UIPublisher,
 )
 
@@ -67,6 +69,8 @@ class GogopingModes:
             battery=BatterySubscriber(node),
             collision=CollisionSubscriber(node),
             db_logger=DBLogger(node),
+            odom=OdomSubscriber(node),
+            map_cache=MapCache(node),
         )
 
         # 4) BT 트리 상태 + state 변화 콜백

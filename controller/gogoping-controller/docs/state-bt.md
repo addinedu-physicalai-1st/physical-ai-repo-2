@@ -37,12 +37,11 @@ IDLE
 
 ASSIST
   main: Parallel (SuccessOnSelected=[TaskSelector])
-        ├─ BatteryLowMonitor
-        ├─ HardwareHealthMonitor
-        ├─ CollisionEventHandler
-        ├─ MapBoundaryMonitor           ※ 맵 밖 이탈 시 fault(reason="out_of_map")
-        ├─ CommandListener              ※ 수신: cancel 만 유효
-        │                                  (assist/play/return_request 은 IDLE 에서만)
+        ├─ BatteryLowMonitor      (✅ ≤20% → battery_low → RETURNING)
+        ├─ MapBoundaryMonitor     (✅ OccupancyGrid 기반 → fault(reason="out_of_map") → ERROR)
+        ├─ HardwareHealthMonitor  (추후)
+        ├─ CollisionEventHandler  (추후)
+        ├─ CommandListener        (✅)  ※ cancel 외 active mode 전이 (assist/play/manual_request) 도 가능
         │
         └─ TaskSelector (Selector, memory=False)
               ├─ Sequence: CheckTask("carry")   → CarrySubTree
@@ -53,11 +52,11 @@ ASSIST
 
 PLAY
   main: Parallel (SuccessOnSelected=[TaskSelector])
-        ├─ BatteryLowMonitor
-        ├─ HardwareHealthMonitor
-        ├─ CollisionEventHandler
-        ├─ MapBoundaryMonitor           ※ 맵 밖 이탈 시 fault(reason="out_of_map")
-        ├─ CommandListener              ※ 수신: cancel 만 유효
+        ├─ BatteryLowMonitor      (✅)
+        ├─ MapBoundaryMonitor     (✅)
+        ├─ HardwareHealthMonitor  (추후)
+        ├─ CollisionEventHandler  (추후)
+        ├─ CommandListener        (✅)  ※ cancel / 다른 active mode 전이
         │
         └─ TaskSelector (Selector, memory=False)
               └─ Sequence: CheckTask("hideseek") → HideAndSeekSubTree   ※ 1회 실행 후 종료
@@ -83,9 +82,9 @@ MANUAL
 RETURNING
   main: Parallel (SuccessOnSelected=[ReturnSubTree])
         ├─ BatteryLowMonitor      (✅ — escalation: 또 떨어지면 LOW_BATTERY_RETURN)
+        ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map"))
         ├─ HardwareHealthMonitor  (추후)
         ├─ CollisionEventHandler  (추후)
-        └─ MapBoundaryMonitor     (추후)   ※ 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map")
 
   sub: ReturnSubTree (Sequence, memory=True)
         ├─ NavigateToPose(charging_dock_approach_key)
