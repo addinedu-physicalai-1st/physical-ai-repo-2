@@ -6,15 +6,18 @@
 #   노트북       — Nav2·modes·vision (본 스크립트)
 #
 # 동작:
-#   - tmux 세션 'gogoping-laptop' 안에 window 2개:
+#   - tmux 세션 'gogoping-laptop' 안에 window 3개:
 #       graph-router : gogoping_navigation graph_router.launch.xml
 #                      (vertex 그래프 + 다익스트라 + nav2 위임)
+#       localization : gogoping_navigation localization_real.launch.xml
+#                      (map_server + AMCL + lifecycle_manager). /map + /amcl_pose +
+#                      map → odom TF 발행. map_boundary_monitor / PoseSubscriber 가 사용.
 #       modes        : gogoping_modes (FSM + BT 본체 — /gogoping/state publish,
 #                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
 #
-# 향후 (Day 2~) 추가될 window:
-#   - nav2     : nav2 stack (planner + costmap + AMCL) — 실물 launch 미작성
-#   - vision   : 사람 추적 / face matching / YOLO 추론 (laptop 노트북 쪽 NPU/GPU 사용)
+# 향후 추가될 window:
+#   - nav2-full : planner + controller + bt_navigator (자율 주행) — 추후
+#   - vision    : 사람 추적 / face matching / YOLO 추론 (laptop 노트북 쪽 NPU/GPU 사용)
 #
 # 사용:
 #   scripts/device-gogoping-laptop.sh           # 세션 시작·attach (이미 떠있으면 attach)
@@ -78,7 +81,11 @@ case "$ACTION" in
     tmux respawn-pane -k -t "$SESSION:graph-router" -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
 
-    # window 1: gogoping_modes (FSM + BT 본체)
+    # window 1: localization (map_server + AMCL + lifecycle_manager_localization)
+    tmux new-window -t "$SESSION" -n localization -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation localization_real.launch.xml"
+
+    # window 2: gogoping_modes (FSM + BT 본체)
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes"
 
@@ -93,7 +100,7 @@ case "$ACTION" in
 
     echo "[device-gogoping-laptop] 세션 '$SESSION' 시작 — attach"
     echo "[device-gogoping-laptop] ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-<unset>}"
-    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / modes' 클릭으로 전환"
+    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / modes' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)

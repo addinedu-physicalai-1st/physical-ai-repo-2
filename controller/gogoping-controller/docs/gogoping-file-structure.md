@@ -2,7 +2,7 @@ controller/gogoping-controller/src/gogoping/
 ├── gogoping_bringup/
 │   ├── launch/
 │   │   ├── pi.launch.py                  # 라즈베리파이 (vicpinky_bringup + sllidar + camera + battery_publisher_node)
-│   │   └── laptop.launch.py              # 노트북 (Nav2 + modes + vision)
+│   │   └── laptop.launch.py              # 노트북 (placeholder — device-gogoping-laptop.sh 가 직접 ros2 launch)
 │   └── gogoping_bringup/
 │       ├── sim_status_publisher.py       # sim 활성 신호 1Hz (Bool /gogoping/sim_active)
 │       ├── sim_battery_node.py           # sim 전용 — /gogoping/battery + SetBatteryLevel.srv
