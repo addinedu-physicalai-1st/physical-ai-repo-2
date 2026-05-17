@@ -51,6 +51,19 @@ walking skeleton 단계엔 `BatterySubscriber` 가 stub 이라 `BATTERY_LEVEL` �
 | 파일 | [`bt/behaviors/common/battery_low_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_low_monitor.py) |
 | 테스트 | 5 시나리오 (100% no-fire / 20% fire / 10% no-double / 26%→20% re-fire / initialise re-arm) |
 
+## idle_timeout_monitor  *(구현됨)*
+
+IDLE 상태에서 N초 무명령 시 `"idle_timeout"` FSM trigger 발화 — 무인 환경 자율 도크 복귀.
+
+- 사용 위치: BT_idle_main 만 (IDLE → RETURNING)
+- 임계값: ROS param `idle_timeout_seconds` (기본 60.0s). launch arg 로 override 가능
+- 타이밍 소스: `time.monotonic()` — 시스템 시계 변경에 영향 없음
+- edge-triggered (`_fired` 플래그). `initialise()` 에서 timer + 플래그 리셋 → IDLE 재진입 시 새로 카운트
+- monitor 컨벤션 — 매 tick RUNNING 리턴
+
+| 파일 | [`bt/behaviors/common/idle_timeout_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) |
+| 테스트 | 6 시나리오 (immediately no-fire / fire-after-timeout / no-double / initialise re-arm / default timeout / terminate idempotent) |
+
 ## hardware_health_monitor  *(스켈레톤)*
 
 센서/모터 응답 끊김 감지 → `"fault"` trigger.

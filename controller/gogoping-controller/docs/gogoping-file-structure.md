@@ -44,6 +44,9 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   ├── battery_low_monitor.[py|/]    # 배터리 ≤ 20% 감지 → "battery_low" trigger (✅)
         │   │   │   │                                 #   hysteresis 20/25, edge-triggered.
         │   │   │   │                                 #   Used in: BT_idle/assist/play/returning_main
+        │   │   │   ├── idle_timeout_monitor.[py|/]   # IDLE N초 무명령 → "idle_timeout" trigger (✅)
+        │   │   │   │                                 #   ROS param idle_timeout_seconds (기본 60s).
+        │   │   │   │                                 #   Used in: BT_idle_main 만
         │   │   │   ├── hardware_health_monitor.[py|/] # 센서/모터 응답 끊김 감지 → "fault" trigger
         │   │   │   │                                 #   Used in: BT_charging_main, BT_idle_main, BT_assist_main,
         │   │   │   │                                 #            BT_play_main, BT_returning_main
