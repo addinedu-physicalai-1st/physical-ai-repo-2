@@ -29,6 +29,8 @@ from control_service.routers import schedule as schedule_router
 from control_service.routers import voice as voice_router
 from control_service.camera_pan.ros_bridge import CameraPanBridge
 from control_service.camera_pan.router import install as install_camera_pan
+from control_service.gogoping.ros_bridge import GogopingRosBridge
+from control_service.gogoping.router import install as install_gogoping
 from control_service.teleop.ros_bridge import RosBridge
 from control_service.teleop.router import install as install_teleop
 from control_service.waypoints.ros_bridge import WaypointsRosBridge
@@ -86,6 +88,11 @@ async def lifespan(app: FastAPI):
         _camera_pan_bridge.start()
     except Exception as e:
         logger.warning(f"camera_pan RosBridge 시작 실패: {e}")
+
+    try:
+        _gogoping_bridge.start()
+    except Exception as e:
+        logger.warning(f"gogoping RosBridge 시작 실패 — /api/gogoping/* 503: {e}")
 
     try:
         await _teleop_hub.start()
@@ -184,6 +191,10 @@ async def lifespan(app: FastAPI):
         _camera_pan_bridge.shutdown()
     except Exception:
         pass
+    try:
+        _gogoping_bridge.shutdown()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="Pingdergarten Control", version="0.1.0", lifespan=lifespan)
@@ -220,6 +231,10 @@ install_waypoints(app, _waypoints_bridge)
 # camera_pan (GogoPing 2-axis camera servo) — POST /camera_pan/cmd, WS /camera_pan/state
 _camera_pan_bridge = CameraPanBridge()
 _camera_pan_hub = install_camera_pan(app, _camera_pan_bridge)
+
+# gogoping FSM/BT — SetGoal srv client + /gogoping/state subscriber. /ws/robot-state fan-out.
+_gogoping_bridge = GogopingRosBridge()
+install_gogoping(app, _gogoping_bridge)
 
 
 # NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.
