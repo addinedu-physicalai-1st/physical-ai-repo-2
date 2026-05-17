@@ -18,7 +18,7 @@
 | 트리 | 상태 | 비고 |
 |---|---|---|
 | BT_charging_main | ✅ | Parallel(BatteryFullMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
-| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
+| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
 | BT_assist_main | ✅ | Parallel(BatteryLowMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
 | BT_play_main | ✅ | Parallel(BatteryLowMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
 | BT_manual_main | ✅ | Parallel(CommandListener). torque OFF / 자동 monitor 0개 (BatteryLowMonitor 의도적 미배치 — 사용자 직접 제어 중 자동 빼앗김 방지). docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
@@ -60,6 +60,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 |---|---|---|
 | battery_full_monitor | ✅ | [battery_full_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) — BT_charging_main 에 배치, 부팅 시 CHARGING → IDLE 자동 전이 (BATTERY_LEVEL init=100.0 가정) |
 | battery_low_monitor | ✅ | [battery_low_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_low_monitor.py) — hysteresis 20% 진입 / 25% 진출, edge-triggered. BT_idle/assist/play/returning_main 4개 배치 (RETURNING 은 LOW_BATTERY_RETURN escalation). 5 시나리오 통과 |
+| idle_timeout_monitor | ✅ | [idle_timeout_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) — IDLE 진입 후 ROS param `idle_timeout_seconds` (기본 60s) 경과 시 `idle_timeout` trigger. edge-triggered, `initialise()` 에서 timer 리셋. BT_idle_main 만 배치. 6 시나리오 통과 |
 | hardware_health_monitor | ☐ | |
 | collision_event_handler | ☐ | |
 | map_boundary_monitor | ☐ | 맵 밖 이탈 시 fault(reason="out_of_map"). ASSIST/PLAY/RETURNING 만 (MANUAL 의도적 제외) |

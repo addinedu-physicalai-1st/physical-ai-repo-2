@@ -29,6 +29,7 @@ CHARGING
 IDLE
   main: Parallel
         ├─ BatteryLowMonitor      (✅ — battery ≤ 20% → battery_low → RETURNING)
+        ├─ IdleTimeoutMonitor     (✅ — idle_timeout_seconds 경과 → idle_timeout → RETURNING)
         ├─ HardwareHealthMonitor  (추후)
         └─ CommandListener        (✅)
   sub: 없음
