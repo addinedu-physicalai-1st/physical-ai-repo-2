@@ -1,12 +1,6 @@
-"""Launch only the servo_bridge.
+"""Launch the auto-sweep pan_scanner alongside servo_bridge.
 
-keyboard_teleop needs a TTY for raw stdin — run it separately:
-
-    ros2 run gogoping_camera_pan keyboard_teleop --ros-args \\
-        --params-file <install>/share/gogoping_camera_pan/config/params.yaml
-
-pan_scanner has its own launch (pan_scanner.launch.py) since it conflicts
-with keyboard_teleop (both publish to /servo_bridge/cmd_pan).
+Conflicts with keyboard_teleop — only run one publisher to /cmd_pan at a time.
 """
 
 import os
@@ -25,6 +19,13 @@ def generate_launch_description() -> LaunchDescription:
             package='gogoping_camera_pan',
             executable='servo_bridge',
             name='servo_bridge',
+            parameters=[params],
+            output='screen',
+        ),
+        Node(
+            package='gogoping_camera_pan',
+            executable='pan_scanner',
+            name='pan_scanner',
             parameters=[params],
             output='screen',
         ),
