@@ -341,14 +341,30 @@ class AdminWindow(QMainWindow):
         BTStateInline 의 update_snapshot 과 동일 위험 패턴 (기존 코드 일치).
         """
         self.topbar.bt_state.update_snapshot(snap)
+        page = self.pages.get("gogoping")
+        if page is None:
+            return
+
         level = snap.get("battery_level")
         if level is not None:
-            page = self.pages.get("gogoping")
-            if page is not None:
-                try:
-                    page.update_battery(float(level))
-                except Exception:
-                    pass
+            try:
+                page.update_battery(float(level))
+            except Exception:
+                pass
+
+        pose = snap.get("robot_pose")
+        if pose is not None:
+            try:
+                page.update_pose(pose)
+            except Exception:
+                pass
+
+        # in_map 은 키 자체가 있으면 (None 포함) 갱신 — UNKNOWN 표시 토글 위해
+        if "in_map" in snap:
+            try:
+                page.update_map_status(snap["in_map"])
+            except Exception:
+                pass
 
     def _select(self, key: str) -> None:
         self.sidebar.select(key)

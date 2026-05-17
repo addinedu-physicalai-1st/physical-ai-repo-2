@@ -135,7 +135,11 @@ class GogopingModes:
         # 3) 1Hz publish
         now = time.time()
         if now - self._last_publish >= 1.0 / self.PUBLISH_HZ:
-            snap = snapshot(self.ctx.fsm.current_state, self.tree.root)
+            snap = snapshot(
+                self.ctx.fsm.current_state,
+                self.tree.root,
+                map_cache=self.ctx.map_cache,
+            )
             self.ctx.ui.publish_state(snap)
             self._last_publish = now
 

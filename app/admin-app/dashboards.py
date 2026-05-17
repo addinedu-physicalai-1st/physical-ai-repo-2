@@ -363,10 +363,24 @@ class GogoPingDashboard(QWidget):
         self.odom_card.body.addWidget(self.odom_compact, 1)
         self.odom_card.setFixedHeight(120)
 
+        # MAP STATUS card — ODOM 옆 (현재 pose 가 맵 안인지 밖인지)
+        from widgets.map_status_card import MapStatusCard
+        self.map_status = MapStatusCard()
+        self.map_status_card = Card("MAP")
+        self.map_status_card.body.addWidget(self.map_status, 1)
+        self.map_status_card.setFixedHeight(120)
+
+        # ODOM + MAP STATUS — 가로로 나란히
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(10)
+        top_row.addWidget(self.odom_card, 1)
+        top_row.addWidget(self.map_status_card, 1)
+
         rb_lay = QVBoxLayout()
         rb_lay.setContentsMargins(0, 0, 0, 0)
         rb_lay.setSpacing(10)
-        rb_lay.addWidget(self.odom_card, 0)
+        rb_lay.addLayout(top_row, 0)
         rb_lay.addWidget(self.teleop_card, 1)
         rb_lay.addWidget(self.camera_pan_card, 1)
         quad.addLayout(rb_lay, 1, 1)
@@ -396,6 +410,30 @@ class GogoPingDashboard(QWidget):
         self.battery_chip.set_value(f"{pct}%")
         self.battery_chip.set_pct(pct)
         self.battery.set_pct(pct)
+
+    def update_map_status(self, in_map: bool | None) -> None:
+        """``/gogoping/state`` snapshot 의 in_map 을 받아 MAP 카드 갱신.
+
+        True = 🟢 IN MAP, False = 🔴 OUT OF MAP, None = ⚪ UNKNOWN (맵/odom 미수신).
+        """
+        self.map_status.set_status(in_map)
+
+    def update_pose(self, pose: dict | None) -> None:
+        """``/gogoping/state`` snapshot 의 robot_pose 를 받아 ODOM 카드 갱신.
+
+        /teleop/state 의 odom 과 동일 widget — 둘 다 갱신. (/teleop/state 는 30Hz,
+        /gogoping/state 는 1Hz 라 /teleop/state 가 더 자주 갱신하지만 양쪽 호환).
+        """
+        if pose is None:
+            return
+        try:
+            self.odom_compact.set_odom(
+                float(pose.get("x", 0.0)),
+                float(pose.get("y", 0.0)),
+                float(pose.get("yaw", 0.0)),
+            )
+        except (TypeError, ValueError):
+            pass
 
     def on_state(self, msg: dict) -> None:
         """WS /teleop/state 단일 수신점. LiDAR/ODOM/Teleop 에 분배."""

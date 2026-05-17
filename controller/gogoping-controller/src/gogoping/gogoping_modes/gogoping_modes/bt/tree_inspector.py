@@ -21,6 +21,8 @@ snapshot 구조::
       },
       "sub_tree": null,    # + 에 BT_*_sub 이름 패턴 매칭 시 채워짐
       "battery_level": 87.3,  # blackboard.BATTERY_LEVEL (0~100 %, None = 미수신)
+      "robot_pose": {"x": 3.2, "y": -1.4, "yaw": 0.78},  # blackboard.ROBOT_POSE (None = odom 미수신)
+      "in_map": true,         # map_cache.is_outside 부정. True/False/None (None = 맵 미수신)
       "ts": 1730000035.123
     }
 
@@ -54,14 +56,36 @@ _MAX_DEPTH = 6  # 안전망 — 사이클 / 무한 nesting 방지
 _bb_reader: py_trees.blackboard.Client | None = None
 
 
-def _read_battery_level() -> float | None:
-    """blackboard.BATTERY_LEVEL 을 안전하게 읽어 float 반환. 실패 시 None."""
+def _ensure_bb_reader() -> py_trees.blackboard.Client:
     global _bb_reader
     if _bb_reader is None:
         _bb_reader = py_trees.blackboard.Client(name="tree_inspector_reader")
         _bb_reader.register_key(key=Keys.BATTERY_LEVEL, access=Access.READ)
+        _bb_reader.register_key(key=Keys.ROBOT_POSE, access=Access.READ)
+    return _bb_reader
+
+
+def _read_battery_level() -> float | None:
+    """blackboard.BATTERY_LEVEL 을 안전하게 읽어 float 반환. 실패 시 None."""
+    bb = _ensure_bb_reader()
     try:
-        return float(_bb_reader.get(Keys.BATTERY_LEVEL))
+        return float(bb.get(Keys.BATTERY_LEVEL))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _read_robot_pose() -> dict | None:
+    """blackboard.ROBOT_POSE 를 안전하게 읽어 {x, y, yaw} 반환. 실패 시 None."""
+    bb = _ensure_bb_reader()
+    try:
+        pose = bb.get(Keys.ROBOT_POSE)
+        if not isinstance(pose, dict):
+            return None
+        return {
+            "x": float(pose.get("x", 0.0)),
+            "y": float(pose.get("y", 0.0)),
+            "yaw": float(pose.get("yaw", 0.0)),
+        }
     except (KeyError, TypeError, ValueError):
         return None
 
@@ -69,6 +93,7 @@ def _read_battery_level() -> float | None:
 def snapshot(
     fsm_state: str,
     root_tree: Any,
+    map_cache: Any = None,
     robot_id: str = "gogoping",
 ) -> dict:
     """py_trees root 의 현재 상태를 admin BT 위젯 호환 dict 로 변환.
@@ -79,6 +104,9 @@ def snapshot(
         FSM 의 ``current_state`` ("IDLE" / "ASSIST" / "PLAY" / "MANUAL" / ...)
     root_tree : py_trees.behaviour.Behaviour
         ``MainTree`` 의 root composite.
+    map_cache : MapCache or None
+        ``is_outside(x, y)`` 메서드 제공. None 이면 snapshot 의 ``in_map`` 도 None.
+        실제 운영엔 ``ctx.map_cache`` 가 주입됨.
     robot_id : str
         snapshot 의 ``robot_id`` 필드 — admin 의 ``BTStateBar`` 가 행 식별에 사용 (현재
         는 1로봇이라 항상 ``"gogoping"``).
@@ -96,12 +124,24 @@ def snapshot(
             "children": _flatten_leaves(sub_root, depth=0),
         }
 
+    pose = _read_robot_pose()
+    in_map: bool | None = None
+    if pose is not None and map_cache is not None:
+        try:
+            outside = map_cache.is_outside(pose["x"], pose["y"])
+            if outside is not None:
+                in_map = not bool(outside)
+        except Exception:
+            in_map = None
+
     return {
         "robot_id": robot_id,
         "fsm_state": fsm_state,
         "main_tree": main_block,
         "sub_tree": sub_block,
         "battery_level": _read_battery_level(),
+        "robot_pose": pose,
+        "in_map": in_map,
         "ts": time.time(),
     }
 
