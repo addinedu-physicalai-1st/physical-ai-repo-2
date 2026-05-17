@@ -31,6 +31,7 @@ from dashboards import EduPingDashboard, GogoPingDashboard, NoriArmDashboard
 from services.stream_client import StreamClient
 from theme import COLORS, ROBOTS, apply_theme
 from widgets import Icon, StatusBadge
+from widgets.bt_state_inline import BTStateInline
 
 
 def _detect_sim_mode() -> bool:
@@ -192,13 +193,13 @@ class Sidebar(QWidget):
 
 
 class TopBar(QWidget):
-    """본문 상단 — 페이지 타이틀 + 시스템 뱃지."""
+    """본문 상단 — 페이지 타이틀 + BT 상태 (GogoPing 전용) + 시스템 뱃지."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(80)
+        self.setMinimumHeight(100)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(28, 16, 28, 12)
+        lay.setContentsMargins(28, 12, 28, 10)
         lay.setSpacing(12)
 
         self.icon_box = QFrame()
@@ -229,6 +230,13 @@ class TopBar(QWidget):
         text_box.addWidget(self.title)
         text_box.addWidget(self.subtitle)
         lay.addLayout(text_box)
+        lay.addSpacing(20)
+
+        # GogoPing 전용 inline BT 상태 — state / BT main / BT sub 3칸.
+        # Day 2 의 state_client 가 self.bt_state.update_snapshot(...) 호출.
+        self.bt_state = BTStateInline()
+        lay.addWidget(self.bt_state, 0, Qt.AlignVCenter)
+
         lay.addStretch(1)
 
         self.network_badge = StatusBadge("ROS2 연결", COLORS["sky"])
@@ -242,6 +250,11 @@ class TopBar(QWidget):
         self.subtitle.setText(meta["tagline"])
         self.icon.set_kind(meta["icon"])
         self.icon.set_color(meta["color"])
+        # BT 상태는 GogoPing 페이지에서만 노출. 다른 페이지에서는 숨김.
+        if key == "gogoping":
+            self.bt_state.show()
+        else:
+            self.bt_state.hide()
 
 
 class AdminWindow(QMainWindow):
