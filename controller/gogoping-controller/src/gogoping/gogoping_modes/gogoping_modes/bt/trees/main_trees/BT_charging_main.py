@@ -15,6 +15,7 @@ from py_trees.common import ParallelPolicy
 from ....context import Context
 from ...behaviors.common.battery_full_monitor import BatteryFullMonitor
 from ...behaviors.common.command_listener import CommandListener
+from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
 
 
 def build(ctx: Context) -> py_trees.behaviour.Behaviour:
@@ -23,6 +24,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         children=[
             BatteryFullMonitor("BatteryFullMonitor", ctx),
+            MapBoundaryMonitor("MapBoundaryMonitor", ctx),
             CommandListener("CommandListener", ctx),
             # TODO 추후: HardwareHealthMonitor, DockingContactCheck
         ],

@@ -103,7 +103,7 @@ Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 - 일반 경로 이탈 (re-plan 가능한 수준) 은 본 monitor 대상이 *아님* — 그건 nav2 가 자체 처리. **본 monitor 는 "맵 밖으로 완전히 나간 catastrophic 케이스" 한정**.
 - MANUAL state 에는 의도적으로 배치하지 않음 — MANUAL 은 사용자가 직접 제어하므로 자동 ERROR 전이 금지. 자세한 이유 [`bt/trees/BT_manual_main.md`](../trees/BT_manual_main.md).
 
-| Used in | BT_assist_main, BT_play_main, BT_returning_main |
+| Used in | **7 트리** — BT_charging_main, BT_idle_main, BT_assist_main, BT_play_main, BT_manual_main, BT_returning_main, BT_low_battery_return_main (ERROR 만 제외 — terminal). **MANUAL 예외** — battery/hw/collision 은 MANUAL 미배치지만 MapBoundaryMonitor 만 예외적 배치 (위치 안전 우선) |
 | 파일 | [`bt/behaviors/common/map_boundary_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) |
 | 의존 interfaces | [`OdomSubscriber`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/odom_subscriber.py) · [`MapCache`](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/map_cache.py) |
 | 테스트 | 7 시나리오 (inside / outside fire / map None / no-double / ERROR_REASON 세팅 / initialise re-arm / pose 누락) |
