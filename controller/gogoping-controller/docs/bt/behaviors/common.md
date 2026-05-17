@@ -6,20 +6,24 @@
 
 ---
 
-## command_listener {#command_listener}  *(스켈레톤)*
+## command_listener {#command_listener}  *(구현됨)*
 
-외부 명령 수신 → blackboard 세팅 + `fsm.trigger()` 호출. **모든 MainTree 의 monitor 분기에서 항상 tick** (sub mode 무관 즉응).
+외부 명령 수신 → blackboard 세팅 + `fsm.trigger()` 호출. **CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING MainTree 에 배치** (LOW_BATTERY_RETURN/ERROR 는 의도적 제외 — lockdown).
 
 | 항목 | 값 |
 |---|---|
-| Source | server `/voice/intent` 응답 → `gogoping_msgs/SendCommand` 서비스 또는 별도 토픽 |
-| Blackboard write | `assist_task`, `play_task`, `carry_mode`, `target_id`, `target_vertex_name`, ... |
-| FSM trigger | command 종류에 따라 — 자세한 trigger 매트릭스는 [../trees/BT_assist_main.md](../trees/BT_assist_main.md), [../trees/BT_play_main.md](../trees/BT_play_main.md), [../trees/BT_idle_main.md](../trees/BT_idle_main.md) 참조 |
-| Used in | BT_idle_main, BT_assist_main, BT_play_main |
+| Source | `gogoping_msgs/srv/SetGoal` + `gogoping_msgs/srv/ForceState` 두 ROS 서비스 server 호스팅. Control Service 의 `GogopingRosBridge` 가 client. UI → POST `/api/gogoping/mode` (운영) / POST `/api/gogoping/debug/force-state` (디버그) → bridge → srv. |
+| SetGoal 처리 | `utils/goal_reconciler.py` 의 순수 함수 호출 — 현재 state ↔ Goal 차이를 보고 적절한 `*_request` trigger 매핑. ERROR / LOW_BATTERY_RETURN 진입 시 거부 (`accepted=False` + reason). |
+| ForceState 처리 | `fsm.force_state(target_state)` 호출 + sub_task 가 주어지면 blackboard 의 `assist_task` (ASSIST) 또는 `play_task` (PLAY) 세팅. transition 우회 — 디버그 전용. |
+| Blackboard write | `assist_task`, `play_task`, `carry_mode`, `target_id`, `destination_key`, ... |
+| FSM trigger | `assist_request` / `play_request` / `manual_request` / `return_request` / `cancel` (reconciler 가 매핑) |
+| Used in | BT_charging_main, BT_idle_main, BT_assist_main, BT_play_main, BT_manual_main, BT_returning_main |
+| 파일 | [`bt/behaviors/common/command_listener.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) |
+| 테스트 | unit test 7 (server lifecycle / Goal 처리 / ForceState 처리) + reconciler 13 (goal_reconciler 단위) |
 
 ---
 
-## battery_full_monitor  *(구현됨 — Day 1)*
+## battery_full_monitor  *(구현됨)*
 
 배터리 ≥ 80% 감지 시 `"battery_full"` FSM trigger 발화.
 
@@ -28,19 +32,19 @@
 - edge-triggered (`_fired` 플래그, `initialise()` 에서 리셋)
 - monitor 컨벤션 — 매 tick RUNNING 리턴
 
-Day 1 walking skeleton 단계엔 `BatterySubscriber` 가 stub 이라 `BATTERY_LEVEL` 이 init 기본값 100.0 으로 고정 → 부팅 시 첫 tick 에 즉시 fire. 사용자가 의도한 "부팅=CHARGING, 배터리 정상이면 IDLE" 시퀀스 자연 재현.
+walking skeleton 단계엔 `BatterySubscriber` 가 stub 이라 `BATTERY_LEVEL` 이 init 기본값 100.0 으로 고정 → 부팅 시 첫 tick 에 즉시 fire. 사용자가 의도한 "부팅=CHARGING, 배터리 정상이면 IDLE" 시퀀스 자연 재현.
 
 | Used in | BT_charging_main |
 | 파일 | [`bt/behaviors/common/battery_full_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) |
 
-## battery_low_monitor  *(스켈레톤 — Day 2)*
+## battery_low_monitor  *(스켈레톤)*
 
 배터리 ≤ 50% 감지 시 `"battery_low"` FSM trigger 발화. hysteresis 50% 진입 / 55% 진출.
 
 - read: `Keys.BATTERY_LEVEL`
-- Day 2 에 `BatterySubscriber` 가 실제 ROS 토픽 구독으로 교체되면 의미있게 동작
+- `BatterySubscriber` 가 실제 ROS 토픽 구독으로 교체되면 의미있게 동작
 
-| Used in (예정) | BT_idle_main, BT_assist_main, BT_play_main |
+| Used in (예정) | BT_idle_main, BT_assist_main, BT_play_main, BT_returning_main (RETURNING → LOW_BATTERY_RETURN escalation) |
 
 ## hardware_health_monitor  *(스켈레톤)*
 
@@ -65,9 +69,18 @@ Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 
 도킹 접점 전류 흐름 감시. 끊김 시 fault.
 
-## check_task / check_carry_mode  *(스켈레톤)*
+## check_task  *(구현됨)*
 
-blackboard 값 비교 (TaskSelector 분기용 Condition).
+blackboard `assist_task` / `play_task` 값 비교. TaskSelector 분기용 Condition. 매칭 시 SUCCESS, 불일치 시 FAILURE.
+
+- read: `Keys.ASSIST_TASK` 또는 `Keys.PLAY_TASK`
+- Used in: BT_assist_main (carry/follow/lullaby 분기), BT_play_main (hideseek 분기)
+- 파일: [`bt/behaviors/common/check_task.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py)
+- 테스트: 5 시나리오 통과
+
+## check_carry_mode  *(스켈레톤)*
+
+blackboard 값 비교 (BT_carry_sub 의 CarryCore 분기용 Condition).
 
 ## ui_publish  *(스켈레톤)*
 

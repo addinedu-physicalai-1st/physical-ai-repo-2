@@ -3,16 +3,23 @@
 `MANUAL` state 의 MainTree — 사용자가 로봇 본체를 직접 밀어서 이동할 수 있도록
 모터 torque 를 해제한 상태에서 안전 모니터링만 수행.
 
-## Root composite
+## Root composite (현재 walking skeleton)
 
 ```
 Parallel(SuccessOnAll(synchronise=False))
-├─ ManualTorqueHold         manual/manual_torque_hold.md  (Day 2 TODO)
-└─ CommandListener          common/command_listener.md     ※ cancel / return_request 만 유효
+└─ CommandListener          common/command_listener.md     ※ cancel / *_request / return_request 만 유효
 ```
 
+> 현재는 `CommandListener` 단독. `ManualTorqueHold` 는 추후 — Vic Pinky base driver 의 torque service spec 확정 후 추가. 추후 모양:
+>
+> ```
+> Parallel(SuccessOnAll(synchronise=False))
+> ├─ ManualTorqueHold      (추후 — initialise 에서 torque OFF, terminate 에서 ON 복원)
+> └─ CommandListener       (✅ 현재)
+> ```
+>
 > Parallel 정책은 `BT_idle_main` 과 동일 — root SUCCESS 는 task 완료 의미가 아님.
-> state 전이는 trigger 발화 (`cancel` / `return_request`) 만 담당.
+> state 전이는 trigger 발화 (`cancel` / `return_request` / 다른 `*_request`) 만 담당.
 > sub tree 없음.
 
 ### 의도적으로 *빠진* monitor 3개
@@ -34,8 +41,8 @@ Parallel(SuccessOnAll(synchronise=False))
 
 | Behavior | 책임 | 상세 |
 |---|---|---|
-| **`ManualTorqueHold`** (신규) | `initialise()` 에서 torque OFF service 호출, `terminate()` 에서 torque ON 복원. 매 tick RUNNING 유지 — 트리 살아있는 동안 torque off 상태 유지 | manual/manual_torque_hold.md (Day 2) |
-| `CommandListener` | UI / Control Server 명령 수신 | MANUAL 에서는 `cancel` / `return_request` 만 valid, `assist/play/manual_request` 은 IDLE 에서만 |
+| **`ManualTorqueHold`** (추후) | `initialise()` 에서 torque OFF service 호출, `terminate()` 에서 torque ON 복원. 매 tick RUNNING 유지 — 트리 살아있는 동안 torque off 상태 유지 | manual/manual_torque_hold.md |
+| `CommandListener` (✅) | UI / Control Server 명령 수신 | MANUAL 에서는 `cancel` / `return_request` / 다른 active mode 로의 `*_request` 가 valid |
 
 ### `ManualTorqueHold` 의 lifecycle 규약
 
@@ -71,8 +78,8 @@ Parallel(SuccessOnAll(synchronise=False))
 3. `battery_low` 진입 시 torque 가 자동 복원되어 도크로 자율 주행 — 사용자가 로봇을 들고 있는 상태였다면 *놓아야* 안전.
    → admin UI 의 BTStateInline 이 MANUAL 알약 표시 시 "battery 50% 미만이면 자동 복귀합니다" 안내 문구 권장.
 
-## 상태 (Day 1 시점)
+## 상태
 
-- 코드: ☐ (BT 빌더 미작성 — Day 2)
-- 의존 behavior: `ManualTorqueHold` 신규 + 기존 common 4개
-- 자세한 신규 behavior 명세: [`bt/behaviors/manual.md`](../behaviors/manual.md) 의 `manual_torque_hold` 항목 (Day 2 에 채움)
+- 코드: ✅ ([BT_manual_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_manual_main.py)) — `CommandListener` 만 배치된 walking skeleton
+- 의존 behavior: `CommandListener` (✅). `ManualTorqueHold` 는 추후 — torque service spec 확정 후
+- 자세한 신규 behavior 명세: [`bt/behaviors/manual.md`](../behaviors/manual.md) 의 `manual_torque_hold` 항목 (추후)

@@ -21,15 +21,7 @@ controller/gogoping-controller/src/gogoping/
         │
         ├── fsm/                          # 상태머신
         │   ├── __init__.py
-        │   ├── robot_fsm.py              # 6 states + transition 규칙 (trigger 정의)
-        │   └── states/                   # 각 state 의 lifecycle (on_enter/on_exit)
-        │       ├── __init__.py
-        │       ├── charging_state.py
-        │       ├── idle_state.py
-        │       ├── assist_state.py
-        │       ├── play_state.py
-        │       ├── returning_state.py
-        │       └── error_state.py
+        │   └── robot_fsm.py              # 8 states + 12 transition + force_state debug API
         │
         ├── bt/                           # Behavior Tree
         │   ├── __init__.py
@@ -123,28 +115,29 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   └── log_error_to_db.[py|/]        # error_log 테이블 INSERT (디버깅용)
         │   │   │                                     #   Used in: BT_error_main
         │   │   │
-        │   │   └── _stubs/               # ★ Day 1 walking skeleton 임시 placeholder.
-        │   │       │                     #   Day 3~4 에 진짜 SubTree 작성 후 폴더째 삭제.
+        │   │   └── _stubs/               # ★ walking skeleton 임시 placeholder.
+        │   │       │                     #   진짜 SubTree 작성 후 폴더째 삭제.
         │   │       │                     #   grep -rn "STUB:" controller/gogoping-controller/ 로 검색.
         │   │       ├── __init__.py
-        │   │       ├── _base.py                     # StubRunningThenSuccess — N tick RUNNING 후 SUCCESS
-        │   │       ├── stub_carry.py                # BT_carry_sub 자리 (Day 3~4 교체)
-        │   │       ├── stub_follow.py               # BT_follow_sub 자리
-        │   │       ├── stub_lullaby.py              # BT_lullaby_sub 자리
-        │   │       └── stub_hideseek.py             # BT_hide_and_seek_sub 자리
+        │   │       ├── _base.py                     # StubRunningThenSuccess (30 tick → SUCCESS) + StubInfiniteRunning (항상 RUNNING)
+        │   │       ├── stub_carry.py                # BT_carry_sub 자리 — 30 tick stub (carry+goto 목적지 도달 SUCCESS 의미)
+        │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미)
+        │   │       ├── stub_lullaby.py              # BT_lullaby_sub 자리 — 무한 RUNNING (사용자 stop 까지 RUNNING 의미)
+        │   │       └── stub_hideseek.py             # BT_hide_and_seek_sub 자리 — 30 tick stub (1회 사이클 SUCCESS 의미)
         │   │
         │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
         │       ├── __init__.py
         │       │
-        │       ├── main_trees/           # FSM state 별 MainTree (총 7개)
-        │       │   ├── __init__.py               # build_main_tree(state, ctx) dispatcher
-        │       │   ├── BT_charging_main.py       # CHARGING — 충전 대기 + 도킹 접점 감시
-        │       │   ├── BT_idle_main.py           # IDLE — 명령 대기 + 배터리 감시
-        │       │   ├── BT_assist_main.py         # ASSIST — TaskSelector → carry/follow/lullaby
-        │       │   ├── BT_play_main.py           # PLAY — TaskSelector → hideseek
-        │       │   ├── BT_manual_main.py         # MANUAL — torque off, 사용자 직접 밀어 이동
-        │       │   ├── BT_returning_main.py      # RETURNING — 도킹 완료까지
-        │       │   └── BT_error_main.py          # ERROR — terminal (StopAll → Notify → Log)
+        │       ├── main_trees/           # FSM state 별 MainTree (총 8개)
+        │       │   ├── __init__.py                       # build_main_tree(state, ctx) dispatcher
+        │       │   ├── BT_charging_main.py               # CHARGING — BatteryFullMonitor + CommandListener
+        │       │   ├── BT_idle_main.py                   # IDLE — CommandListener
+        │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(carry/follow/lullaby stubs)
+        │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek stub)
+        │       │   ├── BT_manual_main.py                 # MANUAL — CommandListener (torque off 는 추후)
+        │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
+        │       │   ├── BT_low_battery_return_main.py    # LOW_BATTERY_RETURN — 빈 lockdown (CommandListener 없음)
+        │       │   └── BT_error_main.py                  # ERROR — 빈 terminal (reset 없음)
         │       │
         │       └── sub_trees/            # 작업별 SubTree (총 5개)
         │           ├── __init__.py
@@ -156,18 +149,19 @@ controller/gogoping-controller/src/gogoping/
         │
         ├── interfaces/                   # 외부 HW / ROS action·service·topic 호출 래퍼
         │   ├── __init__.py
-        │   ├── nav2_client.py            # Nav2 NavigateToPose 액션 클라이언트
-        │   ├── camera_pan_client.py      # gogoping_camera_pan 토픽 publish 래퍼 (/camera_pan/auto)
-        │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish
-        │   ├── battery_subscriber.py     # 배터리 상태 토픽 구독
-        │   ├── collision_subscriber.py   # Collision Monitor 상태 토픽 구독
-        │   └── db_logger.py              # error_log 테이블 INSERT
+        │   ├── nav2_client.py            # Nav2 NavigateToPose 액션 클라이언트  (stub)
+        │   ├── camera_pan_client.py      # gogoping_camera_pan 토픽 publish 래퍼 (/camera_pan/auto)  (stub)
+        │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish  (✅ 실 구현 — `/gogoping/state` 1Hz)
+        │   ├── battery_subscriber.py     # 배터리 상태 토픽 구독  (stub — init 100.0 반환)
+        │   ├── collision_subscriber.py   # Collision Monitor 상태 토픽 구독  (stub)
+        │   └── db_logger.py              # error_log 테이블 INSERT  (stub)
         │
         └── utils/                        # 공통 helper / 순수 함수
             ├── __init__.py
             ├── waypoints_client.py       # control-server REST 에서 patrol 가져오기 (hide-and-seek 등)
-            └── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수,
-                                          #   command_listener 가 import. ROS 의존성 0 → 단위 테스트 가능)
+            ├── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수,
+            │                             #   command_listener 가 import. ROS 의존성 0 → 단위 테스트 13 pass)
+            └── tree_inspector.py         # snapshot(fsm_state, root_tree) → admin BTStateInline 호환 dict
             
             
             

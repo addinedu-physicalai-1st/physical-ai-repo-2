@@ -33,6 +33,7 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | [trees/BT_manual_main.md](trees/BT_manual_main.md) | MANUAL — torque off 모드, 사용자가 직접 밀어 이동. monitor + ManualTorqueHold + cancel/return listener |
 | [trees/BT_charging_main.md](trees/BT_charging_main.md) | CHARGING — battery_full 감지 + 도킹 접점 감시 |
 | [trees/BT_returning_main.md](trees/BT_returning_main.md) | RETURNING — BT_return_sub 호출 |
+| [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) | LOW_BATTERY_RETURN — 배터리 자동 복귀 lockdown (CommandListener 없음) |
 | [trees/BT_error_main.md](trees/BT_error_main.md) | ERROR — terminal (StopAll → Notify → Log) |
 | [trees/BT_carry_sub.md](trees/BT_carry_sub.md) | 운반 — manual / goto / follow 3 mode |
 | [trees/BT_follow_sub.md](trees/BT_follow_sub.md) | 추종 — 정상 ↔ Loss Recovery |
