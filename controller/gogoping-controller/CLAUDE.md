@@ -9,7 +9,7 @@ FSM 및 Behavior Tree 관련 모든 설계는 [docs/](docs/) 디렉토리에 있
 | 문서 | 내용 |
 |---|---|
 | [docs/gogoping-file-structure.md](docs/gogoping-file-structure.md) | `src/gogoping/` 패키지별 폴더 구조 + behavior 별 책임 + "Used in:" 역참조 |
-| [docs/state-bt.md](docs/state-bt.md) | FSM 6 states (CHARGING / IDLE / ASSIST / PLAY / RETURNING / ERROR) × MainTree 구조 + 트리 컨벤션 |
+| [docs/state-bt.md](docs/state-bt.md) | FSM 8 states (CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR) × MainTree 구조 + 트리 컨벤션 |
 | [docs/subtree-flow.md](docs/subtree-flow.md) | SubTree 5종 (Carry / Follow / Lullaby / HideAndSeek / Return) 의 자세한 노드 흐름 |
 | [docs/blackboard-schema.md](docs/blackboard-schema.md) | Blackboard 키 목록 + R/W 매트릭스 + 초기값 |
 | [docs/fsm-triggers.md](docs/fsm-triggers.md) | FSM trigger 이름 / kwargs / 전이 다이어그램 |
@@ -25,8 +25,8 @@ ROS 서비스 / 메시지 계약은 `src/gogoping/gogoping_msgs/{srv,msg,action}
 다음 항목 중 하나라도 **다르게 정의하려고 하면 반드시 사용자에게 먼저 확인**한다. 무단 변경 금지:
 
 - **폴더 구조** — `src/gogoping/` 하위 패키지 추가/삭제/이름변경, `gogoping_modes/gogoping_modes/{fsm,bt,interfaces,utils}` 의 하위 구조 변경
-- **FSM state** — 6 states (CHARGING / IDLE / ASSIST / PLAY / RETURNING / ERROR) 추가/삭제/이름변경, transition 규칙 변경
-- **BT 구조** — MainTree 6개 / SubTree 5개 의 구성 변경, behavior 카테고리 (common / navigation / perception / follow / manual / recovery) 추가/삭제
+- **FSM state** — 8 states (CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR) 추가/삭제/이름변경, transition 규칙 변경
+- **BT 구조** — MainTree 8개 / SubTree 5개 의 구성 변경, behavior 카테고리 (common / navigation / perception / follow / manual / recovery) 추가/삭제
 
 위 세 가지는 6명 코드베이스의 뼈대다. 한 명이 조용히 바꾸면 다른 사람 코드가 다 깨진다. 작은 추가 (behavior 한 개 추가, blackboard 키 한 개 추가 등) 는 사용자 확인 없이 진행해도 OK 지만 문서 (docs/blackboard-schema.md 등) 는 같이 갱신할 것.
 

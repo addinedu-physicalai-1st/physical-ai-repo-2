@@ -9,7 +9,8 @@
   - trigger 호출도 가능 (예: `verify_docking_contact` 가 `docked` trigger 발사 후 SUCCESS)
   - `terminate(new_status)` 는 **idempotent** — 진행 중 외부 작업 cancel
 - **MainTree root SUCCESS** (ASSIST/PLAY 한정) = task 완료. `main.py` 의 spin 루프가 감지 후 `assist_done` / `play_done` trigger 발사 + 트리 swap.
-  CHARGING / IDLE / RETURNING / ERROR 의 MainTree 는 root SUCCESS 가 task 완료 의미 아님 — state 전이는 trigger 발화 (`battery_*` / `docked` / `fault` / `reset` / `*_command`) 가 담당.
+  CHARGING / IDLE / RETURNING / LOW_BATTERY_RETURN / ERROR 의 MainTree 는 root SUCCESS 가 task 완료 의미 아님 — state 전이는 trigger 발화 (`battery_*` / `docked` / `fault` / `*_request`) 가 담당.
+  ERROR / LOW_BATTERY_RETURN 은 lockdown — 사용자 명령 차단 (CommandListener 미배치). reset trigger 없음.
 - **MainTree root FAILURE** → `main.py._on_tree_failure()` 가 `return_request` trigger 발사 → RETURNING 으로 도피 (예: FollowSubTree Loss Recovery 끝까지 실패)
 - 자세한 trigger 이름·시그니처: [fsm-triggers.md](fsm-triggers.md)
 - 자세한 blackboard 키: [blackboard-schema.md](blackboard-schema.md)
@@ -91,12 +92,21 @@ RETURNING
         └─ VerifyDockingContact              [스켈레톤]
 
 
+LOW_BATTERY_RETURN
+  main: Parallel(SuccessOnAll)
+        └─ (자식 0개 — lockdown idle)
+  sub: ReturnSubTree (추후 — 동일 시퀀스 NavTo → Align → Approach → Verify)
+
+  ※ CommandListener 의도적 미배치 — 사용자 SetGoal 거부 (lockdown).
+    이탈 경로: docked → CHARGING / fault → ERROR 만.
+    battery_low escalation 진입 — RETURNING 도중 배터리 떨어져도 본 state 로 강제 전환.
+
+
 ERROR
-  main: Parallel
-        ├─ Sequence (StopAllMotors → NotifyAdminUI → LogErrorToDB)
-        └─ CommandListener              ※ 수신: reset 만 유효
+  main: Parallel(SuccessOnAll)
+        └─ (자식 0개 — terminal)
   sub: 없음
 
-  ※ Sequence 가 1회 실행 후 SUCCESS 되어도 CommandListener 가 RUNNING 유지 →
-    트리 전체는 RUNNING 으로 reset 명령 대기. reset trigger 시 main.py 가
-    state 전이 + 트리 swap → IDLE 복귀. (시연 여부는 별도 결정 — 발표 1주 전)
+  ※ ERROR 는 terminal — reset trigger 없음. 사람이 robot 재시작해야 복구.
+    StopAllMotors / NotifyAdminUI / LogErrorToDB 는 추후 — fault trigger 발화 측 (monitor)
+    이 직접 처리하거나 ERROR 진입 시 main.py 의 hook 에서 처리.

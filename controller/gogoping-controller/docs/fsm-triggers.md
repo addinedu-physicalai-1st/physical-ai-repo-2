@@ -26,7 +26,7 @@
 | `play_done` | — | (main.py 루프, PLAY main SUCCESS 감지) | PLAY → IDLE | `play_task = ""` 리셋 |
 | `cancel` | — | `command_listener` | ASSIST/PLAY/MANUAL → IDLE | task 키 리셋. MANUAL 에서 발화 시 torque ON 자동 |
 | `battery_low` | — | `battery_low_monitor` | IDLE/ASSIST/PLAY → RETURNING (**MANUAL 제외** — 자동 빼앗김 방지) | hysteresis: 50% 진입, 55% 진출 |
-| `idle_timeout` | — | `idle_timeout_monitor` (Day 2 TODO) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` 초과 시 발화 — 무인 자율 복귀 |
+| `idle_timeout` | — | `idle_timeout_monitor` (추후) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` 초과 시 발화 — 무인 자율 복귀 |
 | `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 80% 진입 |
 | `docked` | — | `verify_docking_contact` | RETURNING → CHARGING | (발표 단계: 수동 진입) |
 | `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN → ERROR** (MANUAL 제외 — monitor 미배치) | `blackboard.error_reason = reason` 세팅. ERROR 는 terminal — reset trigger 없음 |
@@ -90,3 +90,30 @@ self.context.fsm.trigger("assist_request", task="carry")
 - behavior 가 같은 trigger 를 매 tick 호출해도 안전. 그러나 **불필요한 호출은 피한다** — monitor 는 edge-triggered 권장 (직전 값과 비교)
 - trigger 발화 후 behavior 는 **RUNNING 리턴 유지** — 트리 강제 종료는 main.py 의 BT swap 루프가 담당
 - 자세한 monitor 컨벤션: [state-bt.md](state-bt.md) 머리말 참조
+
+## 디버그 — `fsm.force_state(target_state)`
+
+transition 우회 강제 전이. **디버그 / 데모 전용**.
+
+```python
+fsm.force_state("ASSIST")          # CHARGING / ERROR / 어디서든 → ASSIST 즉시
+```
+
+내부 동작:
+
+1. `machine.set_state(target)` — transitions 라이브러리의 비공식 API. before/after 콜백 미발화.
+2. 수동으로 `_after_state_change()` 호출 — main.py 의 BT swap hook 발화. 트리 교체 정상.
+
+진입점:
+
+- Admin UI 의 **DebugStatePanel** (BTStateInline 옆) — state combo + sub combo + 적용 버튼.
+- POST `/api/gogoping/debug/force-state` → Control Service `GogopingRosBridge.force_state_sync` → `gogoping_msgs/srv/ForceState` 호출.
+- ROS srv 직접 호출도 가능 — `ros2 service call /gogoping/force_state gogoping_msgs/srv/ForceState "{target_state: 'ASSIST', sub_task: 'follow'}"`.
+
+sub_task 옵션:
+
+- target 이 `ASSIST` 일 때만 `carry` / `follow` / `lullaby` 중 하나 — blackboard.assist_task 세팅 → TaskSelector 가 해당 분기로
+- target 이 `PLAY` 일 때만 `hideseek` — blackboard.play_task 세팅
+- 기타 state 는 sub_task 무시
+
+운영 (`SetGoal.srv`) 과의 차이 — force_state 는 reconciler 우회. ERROR/LOW_BATTERY_RETURN lockdown 도 무시. 따라서 운영 코드 / UI 운영 경로에서는 호출 금지, 디버그 패널에서만 사용.
