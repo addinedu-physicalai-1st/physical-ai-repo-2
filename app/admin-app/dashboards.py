@@ -340,7 +340,7 @@ class GogoPingDashboard(QWidget):
         self.lidar_card.body.addWidget(self.lidar_view, 1)
         quad.addWidget(self.lidar_card, 1, 0)
 
-        # 우하: ODOM (위) + Teleop (아래) — 한 셀 안 세로 분할
+        # 우하: ODOM (위) + Teleop + CameraPan (세로 stack) — 한 셀 안 분할
         from services.teleop_client import TeleopClient
         from widgets.teleop_card import TeleopCard
         self.teleop_client = TeleopClient()
@@ -348,6 +348,14 @@ class GogoPingDashboard(QWidget):
             send_cmd_vel=self.teleop_client.post_cmd_vel,
             get_health=self.teleop_client.get_health,
             control_url=control_url,
+        )
+
+        from services.camera_pan_client import CameraPanClient
+        from widgets.camera_pan_card import CameraPanCard
+        self.camera_pan_client = CameraPanClient(base_url=control_url)
+        self.camera_pan_card = CameraPanCard(
+            send_cmd=self.camera_pan_client.post_cmd,
+            get_health=self.camera_pan_client.get_health,
         )
 
         self.odom_compact = OdomCompact()
@@ -360,6 +368,7 @@ class GogoPingDashboard(QWidget):
         rb_lay.setSpacing(10)
         rb_lay.addWidget(self.odom_card, 0)
         rb_lay.addWidget(self.teleop_card, 1)
+        rb_lay.addWidget(self.camera_pan_card, 1)
         quad.addLayout(rb_lay, 1, 1)
 
         quad.setColumnStretch(0, 1)
@@ -371,6 +380,7 @@ class GogoPingDashboard(QWidget):
 
         # WS state 라우팅 — Dashboard 가 단일 수신점
         self.teleop_client.connect_state_ws(self.on_state)
+        self.camera_pan_client.connect_state_ws(self.camera_pan_card.on_state)
 
         self._tick = 0
         self._timer = QTimer(self)

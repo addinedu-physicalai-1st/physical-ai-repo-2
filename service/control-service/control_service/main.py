@@ -27,6 +27,8 @@ from control_service.routers import photos as photos_router
 from control_service.routers import reports as reports_router
 from control_service.routers import schedule as schedule_router
 from control_service.routers import voice as voice_router
+from control_service.camera_pan.ros_bridge import CameraPanBridge
+from control_service.camera_pan.router import install as install_camera_pan
 from control_service.teleop.ros_bridge import RosBridge
 from control_service.teleop.router import install as install_teleop
 from control_service.waypoints.ros_bridge import WaypointsRosBridge
@@ -81,9 +83,19 @@ async def lifespan(app: FastAPI):
         logger.warning(f"waypoints RosBridge 시작 실패: {e}")
 
     try:
+        _camera_pan_bridge.start()
+    except Exception as e:
+        logger.warning(f"camera_pan RosBridge 시작 실패: {e}")
+
+    try:
         await _teleop_hub.start()
     except Exception as e:
         logger.warning(f"teleop hub 시작 실패: {e}")
+
+    try:
+        await _camera_pan_hub.start()
+    except Exception as e:
+        logger.warning(f"camera_pan hub 시작 실패: {e}")
 
     noriarm_bridge = None
     eduping_bridge = None
@@ -157,11 +169,19 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
+        await _camera_pan_hub.stop()
+    except Exception:
+        pass
+    try:
         _teleop_bridge.shutdown()
     except Exception:
         pass
     try:
         _waypoints_bridge.shutdown()
+    except Exception:
+        pass
+    try:
+        _camera_pan_bridge.shutdown()
     except Exception:
         pass
 
@@ -196,6 +216,10 @@ _teleop_hub = install_teleop(app, _teleop_bridge)
 # waypoints (GogoPing waypoint Goto / patrol) — REST + SSE
 _waypoints_bridge = WaypointsRosBridge()
 install_waypoints(app, _waypoints_bridge)
+
+# camera_pan (GogoPing 2-axis camera servo) — POST /camera_pan/cmd, WS /camera_pan/state
+_camera_pan_bridge = CameraPanBridge()
+_camera_pan_hub = install_camera_pan(app, _camera_pan_bridge)
 
 
 # NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.
