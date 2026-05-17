@@ -73,6 +73,10 @@ export function useDanceStream(): UseDanceStream {
     streamEpoch = 0;
     header = null;
     endingScheduled = false;
+    // snapshot null 로 reset → OpenarmViewer 가 /joint_states WS 폴백 → home ramp 추종 가능
+    currentSnapshot.value = null;
+    elapsedMs.value = 0;
+    durationMs.value = 0;
   }
 
   function close(): void {

@@ -45,6 +45,7 @@ const progressPct = computed(() => {
 
 stream.onEnd(() => {
   playingSlug.value = '';
+  void triggerReturnHome();
 });
 
 watch(stream.error, (e) => {
@@ -96,13 +97,30 @@ async function triggerRealArm(slug: string): Promise<void> {
   // 둘 다 실패 — stream 으로 시각화·곡은 계속 흐름. 사용자엔 silent fail.
 }
 
+async function triggerReturnHome(): Promise<void> {
+  for (const target of ['real', 'sim'] as const) {
+    try {
+      const res = await fetch('/api/eduping/arm/return-home', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, duration_s: 1.5 }),
+      });
+      if (res.ok) return;
+    } catch {
+      /* 다음 target 시도 */
+    }
+  }
+}
+
 function stop(): void {
   stream.close();
   playingSlug.value = '';
+  void triggerReturnHome();
 }
 
 function close(): void {
   stream.close();
+  void triggerReturnHome();
   mode.setMode('대기');
 }
 
