@@ -81,7 +81,7 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   ├── navigate_to_vertex.py         # graph_router NavigateToVertex 액션 호출 (target_vertex_name 인자)
         │   │   │   │                                 #   다익스트라 lane 따라 이동. 자세한 설계: docs/graph-routing.md
         │   │   │   │                                 #   Used in: BT_carry_sub (goto), BT_assist_main 의 named-pose 이동
-        │   │   │   ├── align_to_dock.[py|/]          # 도킹 정면 정렬 [스켈레톤]
+        │   │   │   ├── align_to_dock.py              # blackboard target yaw 까지 cmd_vel.angular.z 로 제자리 회전 → docs/bt/behaviors/navigation.md#align_to_dock
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── approach_dock.[py|/]          # 저속 직진으로 도킹 진입 [스켈레톤]
         │   │   │   │                                 #   Used in: BT_return_sub

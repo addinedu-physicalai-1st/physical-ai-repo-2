@@ -43,11 +43,23 @@ nav2 `NavigateToPose` 직접 호출 — vertex 그래프 무시, 임의 pose 로
 
 ---
 
-## align_to_dock {#align_to_dock}  *(스켈레톤)*
+## align_to_dock {#align_to_dock}
 
-도킹 정면 정렬. cmd_vel 직접 publish + odom 기반 yaw 조정.
+[bt/behaviors/navigation/align_to_dock.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/align_to_dock.py)
 
+블랙보드의 target yaw 까지 제자리 회전. ReturnSubTree 의 2단계 (NavigateToVertex 직후, ReverseIntoDock 직전) — 충전소입구 도착 시 nav2 가 yaw 안 맞춰주므로 (`yaw_goal_tolerance=3.14`) 본 behavior 가 보완.
+
+| 항목 | 값 |
+|---|---|
+| Topic publish | `/gogoping/cmd_vel` (geometry_msgs/Twist) |
+| Blackboard read | `ROBOT_POSE` (AMCL yaw), `CHARGING_DOCK_TARGET_YAW` (rad) |
+| Blackboard write | — |
+| Status | RUNNING (회전 중) / SUCCESS (\|yaw_error\| ≤ tolerance, cmd_vel=0 publish 후) / FAILURE (timeout 초과 또는 pose 없음) |
+| ROS param | `align_tolerance_rad` (기본 0.05), `align_angular_speed` (기본 0.5), `align_timeout_sec` (기본 10.0) |
+| terminate(INVALID) | cmd_vel = 0 publish (트리 중간 종료 시 정지) |
 | Used in | BT_return_sub |
+
+알고리즘: `error = wrap_to_pi(target_yaw - current_yaw)`. tolerance 안이면 정지+SUCCESS. 그렇지 않으면 부호로 회전 방향 결정, 고정 속도 `align_angular_speed` publish.
 
 ---
 

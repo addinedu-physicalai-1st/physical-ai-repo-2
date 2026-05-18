@@ -15,9 +15,9 @@
 |---|---|---|
 | **Trees** | **8 / 13** | MainTree 8/8 ✅ · SubTree 0/5 ☐ |
 | **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
-| **Behaviors** | **8 / 33** | common 7/11 · navigation 1/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
+| **Behaviors** | **9 / 33** | common 7/11 · navigation 2/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
 | **Infrastructure** | **34 / 37** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). PoseSubscriber + MapCache + gogoping_camera_pan 5종 추가 |
-| **합계** | **51 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt |
+| **합계** | **52 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + align_to_dock |
 
 ---
 
@@ -86,7 +86,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 |---|---|---|
 | **navigate_to_vertex** | ✅ | [navigate_to_vertex.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/navigate_to_vertex.py) — graph_router action client. import 검증만, BT 통합 동작 검증 미실시 |
 | navigate_to_pose | ☐ | |
-| align_to_dock | ☐ | |
+| align_to_dock | ✅ | [align_to_dock.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/align_to_dock.py) — blackboard ROBOT_POSE.yaw vs CHARGING_DOCK_TARGET_YAW 비교 → cmd_vel.angular.z publish. 9 단위 테스트 통과 (tests/test_gogoping_align_to_dock.py) |
 | approach_dock | ☐ | |
 | verify_docking_contact | ☐ | |
 | stop_base | ☐ | |
