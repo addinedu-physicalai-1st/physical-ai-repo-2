@@ -238,6 +238,42 @@ _gogoping_bridge = GogopingRosBridge()
 install_gogoping(app, _gogoping_bridge, _waypoints_bridge)
 
 
+# ─── FSM state 전이 ↔ waypoints active goal 동기화 ─────────────────────────────
+# BT 와 control-service 가 *각각* graph_router 를 호출할 수 있는 구조라서, BT 가
+# 자체 cancel 하더라도 control-service 의 active goal 이 stale 인 채로 남아 admin UI
+# (waypoint_map_card) 에 route 잔상이 그려진 상태로 머무는 문제가 있다.
+# 해결: state 전이 발생 시 control-service 의 waypoints active goal 도 자동 cancel.
+# cancel_current() 는 active 없으면 no-op 이라 idempotent. 새 모드 진입 시 BT 또는
+# control-service 가 새 nav 호출하면 그때 다시 active 등록.
+# 이 메커니즘은 RETURNING 뿐 아니라 모든 nav 사용 모드 (carry-goto 등) 에 공통 적용.
+_prev_fsm_state: dict[str, str | None] = {"value": None}
+
+def _cancel_waypoints_on_state_change(snapshot: dict) -> None:
+    new_state = snapshot.get("fsm_state")
+    if new_state is None or new_state == _prev_fsm_state["value"]:
+        return
+    prev = _prev_fsm_state["value"]
+    _prev_fsm_state["value"] = new_state
+    logger.info(f"[state-change] {prev} → {new_state} — waypoints cancel + plan clear")
+    try:
+        # 1) graph_router 의 active goal cancel (nav2 까지 forward 됨 — graph_router_node 의 cancel_callback)
+        _waypoints_bridge.cancel_current()
+        # 2) admin UI 의 update_plan 잔상 제거 — nav2 가 cancel 후 /plan 토픽에 empty
+        #    Path 를 publish 안 하므로 control-service 가 직접 SSE 로 empty plan 발송.
+        #    waypoint_map_card 의 paint 가 `len(self._plan) >= 2` 가드라 빈 리스트면 안 그림.
+        _waypoints_bridge._emit({"type": "plan", "points": []})
+        # 3) admin UI 의 set_route (우클릭 미리보기로 그려진 vertex 시퀀스) 도 정리 —
+        #    waypoint_map_card 의 _SseHandler.handle 이 goal_status 종료 상태 받으면
+        #    set_route(None) 자동 호출.
+        _waypoints_bridge._emit({
+            "type": "goal_status", "goal_id": "", "status": "canceled",
+        })
+    except Exception as e:
+        logger.warning(f"waypoints cancel on state change failed: {e}")
+
+_gogoping_bridge.register_state_callback(_cancel_waypoints_on_state_change)
+
+
 # NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.
 try:
     from control_service.noriarm.router import router as noriarm_router

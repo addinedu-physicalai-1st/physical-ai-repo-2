@@ -7,11 +7,14 @@
 - service /graph_router/route (RouteToVertex) — 시각화/디버깅용
 - action  /graph_router/navigate_to_vertex (NavigateToVertex)
    → 다익스트라로 vertex sequence 계산
-   → nav2 의 /follow_waypoints (FollowWaypoints) 액션 클라이언트로 위임
+   → nav2 의 NavigateThroughPoses 액션 클라이언트로 위임
    → feedback 중계
+   → **클라이언트 cancel** 시 nav2 goal 도 같이 cancel (BT_return_sub OneShot 의
+     terminate(INVALID) 가 호출하는 cancel_goal_async 가 여기까지 forward 됨)
 """
 from __future__ import annotations
 
+import asyncio
 import math
 from pathlib import Path
 from threading import Lock
@@ -20,7 +23,7 @@ import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateThroughPoses
-from rclpy.action import ActionClient, ActionServer
+from rclpy.action import ActionClient, ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.duration import Duration
@@ -90,6 +93,9 @@ class GraphRouterNode(Node):
             NavigateToVertex,
             "/graph_router/navigate_to_vertex",
             execute_callback=self._act_navigate,
+            # 클라이언트 (BT) 가 cancel 요청 시 즉시 수락 — _act_navigate 의 polling 루프가
+            # gh.is_cancel_requested 검출해서 nav2 goal 까지 forward cancel.
+            cancel_callback=lambda _gh: CancelResponse.ACCEPT,
             callback_group=cb,
         )
 
@@ -233,9 +239,26 @@ class GraphRouterNode(Node):
             result.message = "nav2 rejected goal"
             return result
 
-        # 최종 결과 대기
+        # 최종 결과 대기 — polling 으로 클라이언트 cancel request 검출.
+        # await get_result_future 만 쓰면 BT 의 cancel_goal_async() 가 nav2 까지 forward 안 됨.
         get_result_future = nav_gh.get_result_async()
-        await get_result_future
+        while not get_result_future.done():
+            if gh.is_cancel_requested:
+                self.get_logger().info(
+                    "navigate_to_vertex: client cancel → nav2 NavigateThroughPoses cancel"
+                )
+                try:
+                    cancel_future = nav_gh.cancel_goal_async()
+                    await cancel_future
+                except Exception as e:
+                    self.get_logger().warning(f"nav2 cancel failed: {e}")
+                gh.canceled()
+                result.success = False
+                result.message = "canceled by client"
+                result.final_vertex = seq[last_idx] if last_idx < len(seq) else ""
+                return result
+            await asyncio.sleep(0.05)
+
         wrapper = get_result_future.result()
         # action_msgs/GoalStatus: 4=SUCCEEDED
         succeeded = wrapper.status == 4
