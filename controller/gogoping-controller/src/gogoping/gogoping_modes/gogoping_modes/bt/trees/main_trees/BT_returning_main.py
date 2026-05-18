@@ -1,9 +1,15 @@
 """RETURNING state MainTree — 도크로 자율 복귀 중.
 
-현재 stub: CommandListener + BatteryLowMonitor (HW monitor / ReturnSubTree 는 추후).
+Parallel 자식:
+- BatteryLowMonitor — escalation 용 (RETURNING 중 배터리 더 떨어지면 LOW_BATTERY_RETURN)
+- MapBoundaryMonitor — 맵 밖 나가면 fault → ERROR
+- CommandListener — 사용자 cancel / 다른 명령 수신
+- ReturnSubTree — 실제 복귀 동작 (NavigateToVertex → AlignToDock → ReverseIntoDock)
 
-BatteryLowMonitor 는 escalation 용 — RETURNING 도중에도 배터리 더 떨어지면
-``battery_low`` trigger 발화 → LOW_BATTERY_RETURN lockdown 으로 전환.
+ReturnSubTree 가 SUCCESS 하면 robot 은 도크에 들어간 상태로 cmd_vel=0. 자동 `docked`
+trigger 는 발표 범위 외 — 사람이 admin UI 디버그 버튼으로 발사 → CHARGING.
+
+추후 추가: HardwareHealthMonitor, CollisionEventHandler.
 """
 from __future__ import annotations
 
@@ -14,6 +20,7 @@ from ....context import Context
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
 from ...behaviors.common.command_listener import CommandListener
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
+from ..sub_trees.BT_return_sub import build_return_subtree
 
 
 def build(ctx: Context) -> py_trees.behaviour.Behaviour:
@@ -24,6 +31,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
             BatteryLowMonitor("BatteryLowMonitor", ctx),
             MapBoundaryMonitor("MapBoundaryMonitor", ctx),
             CommandListener("CommandListener", ctx),
-            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler, ReturnSubTree
+            build_return_subtree(ctx),
+            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler
         ],
     )

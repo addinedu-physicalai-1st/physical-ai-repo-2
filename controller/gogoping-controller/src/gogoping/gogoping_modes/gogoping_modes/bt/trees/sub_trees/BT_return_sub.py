@@ -101,7 +101,7 @@ def build_return_subtree(ctx: "Context") -> py_trees.behaviour.Behaviour:
         ],
     )
     return py_trees.decorators.OneShot(
-        name="return_oneshot",
+        name="BT_return_sub",  # tree_inspector 의 BT_*_sub 패턴 매칭용 — admin UI BT SUB 영역에 표시
         child=sequence,
         policy=py_trees.common.OneShotPolicy.ON_COMPLETION,
     )

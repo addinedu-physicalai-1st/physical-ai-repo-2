@@ -32,8 +32,8 @@
 | BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
 | BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
 | BT_manual_main | ✅ | Parallel(MapBoundaryMonitor + CommandListener). torque OFF / battery·HW·collision monitor 미배치 — 위치 안전(MapBoundary)만 예외적 배치 (사용자가 맵 밖 옮기면 nav2 복귀 불가). docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
-| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. 진짜 ReturnSubTree 는 미작성 |
-| BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor) — lockdown (CommandListener 없음, 사용자 명령 차단) + 안전 monitor 만 배치. battery_low escalation 도피 state. docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
+| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + **ReturnSubTree**). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. ReturnSubTree = OneShot(NavTo "충전소입구" → AlignToDock → ReverseIntoDock) |
+| BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor + **ReturnSubTree**) — lockdown (CommandListener 없음, 사용자 명령 차단). ReturnSubTree 동일 (RETURNING 과 공유). docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(빈 terminal). reset 없음 — 사람이 재시작 |
 
 > **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree (carry/follow/lullaby/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
