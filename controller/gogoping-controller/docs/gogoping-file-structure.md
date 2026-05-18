@@ -164,7 +164,7 @@ controller/gogoping-controller/src/gogoping/
         │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
         │           ├── BT_lullaby_sub.py         # 자장가 — WaitForExit (UI 가 mp3 재생)
         │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 (1회 실행) — 숨기 → 카운트 → 탐색 → 복귀
-        │           └── BT_return_sub.py          # 도킹 복귀 시퀀스 (NavTo → Align → Approach → Verify)
+        │           └── BT_return_sub.py          # 도킹 복귀 — OneShot(Sequence(NavTo "충전소입구" → AlignToDock → ReverseIntoDock)). 빌더가 yaml 의 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 주입 → docs/bt/trees/BT_return_sub.md
         │
         ├── interfaces/                   # 외부 HW / ROS action·service·topic 호출 래퍼
         │   ├── __init__.py
