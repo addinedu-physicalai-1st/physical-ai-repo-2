@@ -63,15 +63,18 @@ _DOCKED_SOURCES = ["RETURNING", "LOW_BATTERY_RETURN"]
 TRANSITIONS = [
     # active-mode 진입 — IDLE 뿐 아니라 *다른 active mode* 에서도 직접 전이 가능.
     # 사용자가 ASSIST 중 PLAY 누르면 IDLE 경유 없이 BT swap 1회로 처리.
-    # terminate lifecycle 이 cleanup 보장 (ManualTorqueHold 의 torque ON 복원 등).
-    {"trigger": "assist_request", "source": ["IDLE", "PLAY", "MANUAL"],   "dest": "ASSIST"},
-    {"trigger": "play_request",   "source": ["IDLE", "ASSIST", "MANUAL"], "dest": "PLAY"},
-    {"trigger": "manual_request", "source": ["IDLE", "ASSIST", "PLAY"],   "dest": "MANUAL"},
+    # RETURNING (자발적 복귀) 도 source — 사용자가 복귀 중 마음 바꿔서 다른 명령 보내면 그쪽으로 전이.
+    # terminate lifecycle 이 cleanup 보장 (ManualTorqueHold 의 torque ON 복원, BT_return_sub OneShot 정리 등).
+    # LOW_BATTERY_RETURN 은 lockdown 이라 의도적으로 제외.
+    {"trigger": "assist_request", "source": ["IDLE", "PLAY", "MANUAL", "RETURNING"],   "dest": "ASSIST"},
+    {"trigger": "play_request",   "source": ["IDLE", "ASSIST", "MANUAL", "RETURNING"], "dest": "PLAY"},
+    {"trigger": "manual_request", "source": ["IDLE", "ASSIST", "PLAY", "RETURNING"],   "dest": "MANUAL"},
     {"trigger": "battery_full",   "source": "CHARGING", "dest": "IDLE"},
     # ERROR 는 terminal — reset transition 없음. 사람이 robot 재시작해야 복구.
     {"trigger": "assist_done",    "source": "ASSIST",   "dest": "IDLE"},
     {"trigger": "play_done",      "source": "PLAY",     "dest": "IDLE"},
-    {"trigger": "cancel",         "source": ["ASSIST", "PLAY", "MANUAL"], "dest": "IDLE"},
+    # cancel: ASSIST/PLAY/MANUAL 의 "대기" 클릭 + RETURNING 도중 "대기" 로 복귀 취소.
+    {"trigger": "cancel",         "source": ["ASSIST", "PLAY", "MANUAL", "RETURNING"], "dest": "IDLE"},
     {"trigger": "return_request", "source": _RETURN_COMMAND_SOURCES,      "dest": "RETURNING"},
     # battery_low 는 lockdown state 로. RETURNING (자발) 도 source 에 포함 — escalation.
     {"trigger": "battery_low",    "source": _BATTERY_LOW_SOURCES,         "dest": "LOW_BATTERY_RETURN"},
