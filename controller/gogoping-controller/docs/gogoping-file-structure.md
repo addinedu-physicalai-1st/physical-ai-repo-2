@@ -13,7 +13,9 @@ controller/gogoping-controller/src/gogoping/
 │                                         #   하드웨어 spec 확정 후 source=sysfs/uart 로 전환
 │
 ├── gogoping_camera/                      # USB 카메라 → UDP MJPEG 송출
-├── gogoping_camera_pan/                  # Arduino 서보 (pyserial, UI/BT 양쪽 사용, 우선순위 토픽 분리)
+├── gogoping_camera_pan/                  # Arduino Uno + MG995 ×2 pan/tilt 서보 (pyserial, ~/cmd_pan·~/cmd_tilt Float32,
+│                                         #   ~/state JointState). servo_bridge / keyboard_teleop / pan_scanner 3노드.
+│                                         #   상세 — src/gogoping/gogoping_camera_pan/CLAUDE.md
 ├── gogoping_navigation/                  # Nav2 wrapper (params + maps + launch)
 ├── gogoping_vision/                      # YOLO / ReID(Deep SORT, OSNet) / face_recognition
 ├── gogoping_msgs/                        # .msg / .srv / .action 정의

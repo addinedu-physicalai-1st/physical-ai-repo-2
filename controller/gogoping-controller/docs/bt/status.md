@@ -16,8 +16,8 @@
 | **Trees** | **8 / 13** | MainTree 8/8 ✅ · SubTree 0/5 ☐ |
 | **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
 | **Behaviors** | **8 / 33** | common 7/11 · navigation 1/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
-| **Infrastructure** | **29 / 32** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). PoseSubscriber + MapCache 추가 |
-| **합계** | **46 / 83** | walking skeleton + battery line + idle_timeout + map_boundary |
+| **Infrastructure** | **34 / 37** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). PoseSubscriber + MapCache + gogoping_camera_pan 5종 추가 |
+| **합계** | **51 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt |
 
 ---
 
@@ -169,6 +169,11 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | Admin UI BTStateInline | ✅ | 3 cell (state/main/sub) + 임베디드 DebugStatePanel |
 | Admin UI DebugStatePanel | ✅ | state combo + sub combo + 적용 버튼. state 의존 sub 옵션 (ASSIST→carry/follow/lullaby, PLAY→hideseek) |
 | Robot-web shared/robots.json | ✅ | gogoping 모드 — 대기 / 보조▾(추종/운반/자장가) / 놀이▾(숨바꼭질) / 수동 / 복귀 |
+| gogoping_camera_pan `servo_bridge` node | ✅ | [servo_bridge.py](../../src/gogoping/gogoping_camera_pan/gogoping_camera_pan/servo_bridge.py) + [firmware](../../src/gogoping/gogoping_camera_pan/firmware/servo_bridge/servo_bridge.ino) — Arduino Uno + MG995 ×2 (pan D9, tilt D10). 시리얼 (`/dev/arduino-camera`, 115200, `PT:`/`OK:` 라인) ↔ `~/cmd_pan`/`~/cmd_tilt` (Float32) 구독, `~/state` (JointState) publish. clamp (pan 5~175°, tilt 30~150°) + rate_limit + 20Hz state 재송신 (펌웨어 1000ms watchdog 대응). 패키지 문서 — [src/gogoping/gogoping_camera_pan/CLAUDE.md](../../src/gogoping/gogoping_camera_pan/CLAUDE.md) |
+| gogoping_camera_pan `keyboard_teleop` node | ✅ | [keyboard_teleop.py](../../src/gogoping/gogoping_camera_pan/gogoping_camera_pan/keyboard_teleop.py) — 터미널 raw stdin teleop (a/d=pan, w/s=tilt, space=center, [/]=step 조절). TTY 필요해서 `ros2 run` 으로 실행. BT 통합 전 수동 보정용 |
+| gogoping_camera_pan `pan_scanner` node | ✅ | [pan_scanner.py](../../src/gogoping/gogoping_camera_pan/gogoping_camera_pan/pan_scanner.py) — 자동 sin sweep (`/cmd_pan` publish). keyboard_teleop 과 동시 사용 X. BT 의 `pan_camera_sweep` behavior 와는 별도 (이쪽은 dev 도구) |
+| Control Service `/api/camera_pan/cmd` + `/camera_pan/state` WS | ✅ | [service/control-service/control_service/camera_pan/{ros_bridge,router}.py](../../../../service/control-service/control_service/camera_pan/ros_bridge.py) — POST cmd → `~/cmd_pan`/`~/cmd_tilt` publish, WS `/camera_pan/state` 로 JointState fan-out. Admin UI 가 사용 |
+| Admin UI CameraPanCard | ✅ | [widgets/camera_pan_card.py](../../../../app/admin-app/widgets/camera_pan_card.py) — 글로벌 단축키 W/A/S/D=pan·tilt±, C=center (text 입력 위젯 안에선 무시). 카드 포커스 시 화살표·Space 도 동작. 30Hz smooth tick. [services/camera_pan_client.py](../../../../app/admin-app/services/camera_pan_client.py) 가 control-service WS 와 통신 |
 
 ---
 
