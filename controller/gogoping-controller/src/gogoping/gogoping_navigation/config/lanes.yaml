@@ -1,80 +1,8 @@
 lanes:
-- from: 운동장11
-  to: 운동장12
-  bidirectional: true
-- from: 운동장12
-  to: 운동장13
-  bidirectional: true
-- from: 운동장13
-  to: 운동장14
-  bidirectional: true
-- from: 운동장21
-  to: 운동장22
-  bidirectional: true
-- from: 운동장22
-  to: 운동장23
-  bidirectional: true
-- from: 운동장23
-  to: 운동장24
-  bidirectional: true
-- from: 운동장31
-  to: 운동장32
-  bidirectional: true
-- from: 운동장32
-  to: 운동장33
-  bidirectional: true
-- from: 운동장33
-  to: 운동장34
-  bidirectional: true
-- from: 운동장41
-  to: 운동장42
-  bidirectional: true
-- from: 운동장42
-  to: 운동장43
-  bidirectional: true
-- from: 운동장43
-  to: 운동장44
-  bidirectional: true
-- from: 운동장11
-  to: 운동장21
-  bidirectional: true
-- from: 운동장21
-  to: 운동장31
-  bidirectional: true
-- from: 운동장31
-  to: 운동장41
-  bidirectional: true
-- from: 운동장12
-  to: 운동장22
-  bidirectional: true
-- from: 운동장22
-  to: 운동장32
-  bidirectional: true
-- from: 운동장32
-  to: 운동장42
-  bidirectional: true
-- from: 운동장13
-  to: 운동장23
-  bidirectional: true
-- from: 운동장23
-  to: 운동장33
-  bidirectional: true
-- from: 운동장33
-  to: 운동장43
-  bidirectional: true
-- from: 운동장14
-  to: 운동장24
-  bidirectional: true
-- from: 운동장24
-  to: 운동장34
-  bidirectional: true
-- from: 운동장34
-  to: 운동장44
-  bidirectional: true
-- from: 수면실1
-  to: 수면실2
-  bidirectional: true
 - from: 수면실2
+  to: 수면실
+  bidirectional: true
+- from: 수면실
   to: 수면실3
   bidirectional: true
 - from: 수면실4
@@ -86,31 +14,31 @@ lanes:
 - from: 수면실6
   to: 수면실7
   bidirectional: true
-- from: 수면실1
+- from: 수면실2
   to: 수면실4
   bidirectional: true
-- from: 수면실2
+- from: 수면실
   to: 수면실5
   bidirectional: true
 - from: 수면실3
   to: 수면실6
   bidirectional: true
-- from: 놀이방1
-  to: 놀이방2
-  bidirectional: true
 - from: 놀이방2
+  to: 놀이방
+  bidirectional: true
+- from: 놀이방
   to: 놀이방3
   bidirectional: true
 - from: 놀이방3
-  to: 놀이방7
-  bidirectional: true
-- from: 놀이방4
-  to: 놀이방5
+  to: 놀이방4
   bidirectional: true
 - from: 놀이방5
   to: 놀이방6
   bidirectional: true
-- from: 복도1
+- from: 놀이방6
+  to: 놀이방7
+  bidirectional: true
+- from: 복도
   to: 복도2
   bidirectional: true
 - from: 복도2
@@ -129,25 +57,25 @@ lanes:
   to: 복도7
   bidirectional: true
 - from: 복도7
-  to: 충전소
+  to: 충전소입구
   bidirectional: true
-- from: 출입구1
+- from: 출입구
   to: 출입구2
   bidirectional: true
 - from: 출입구2
-  to: 복도1
+  to: 복도
   bidirectional: true
-- from: 출입구1
+- from: 출입구
   to: 운동장입구
   bidirectional: true
 - from: 운동장입구
-  to: 운동장41
+  to: 운동장3
   bidirectional: true
 - from: 놀이방입구1
-  to: 놀이방6
-  bidirectional: true
-- from: 놀이방입구2
   to: 놀이방7
+  bidirectional: true
+- from: 놀이방입구
+  to: 놀이방4
   bidirectional: true
 - from: 수면실입구
   to: 수면실7
@@ -158,6 +86,15 @@ lanes:
 - from: 놀이방입구1
   to: 복도2
   bidirectional: true
-- from: 놀이방입구2
+- from: 놀이방입구
   to: 복도6
+  bidirectional: true
+- from: 운동장3
+  to: 운동장2
+  bidirectional: true
+- from: 운동장2
+  to: 운동장
+  bidirectional: true
+- from: 충전소입구
+  to: 충전소
   bidirectional: true
