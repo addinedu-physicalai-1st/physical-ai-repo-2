@@ -60,6 +60,7 @@ class GogopingModes:
         fsm = RobotFSM(initial=self.INITIAL_STATE)
 
         # 3) Context (불변 묶음)
+        from geometry_msgs.msg import Twist
         self.ctx = Context(
             node=node,
             fsm=fsm,
@@ -71,6 +72,7 @@ class GogopingModes:
             db_logger=DBLogger(node),
             pose=PoseSubscriber(node),
             map_cache=MapCache(node),
+            cmd_vel_pub=node.create_publisher(Twist, "/gogoping/cmd_vel", 10),
         )
 
         # 4) BT 트리 상태 + state 변화 콜백

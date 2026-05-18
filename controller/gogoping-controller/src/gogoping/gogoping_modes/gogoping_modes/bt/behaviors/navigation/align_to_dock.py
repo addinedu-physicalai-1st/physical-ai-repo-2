@@ -89,9 +89,15 @@ class AlignToDock(py_trees.behaviour.Behaviour):
         self._started_at: float | None = None
 
     def setup(self, **kwargs: Any) -> None:
-        """``/gogoping/cmd_vel`` publisher 생성. node 미주입 시 외부 inject 대기."""
+        """cmd_vel publisher 확보 — ctx.cmd_vel_pub 우선, 없으면 node 로 생성. 둘 다 없으면 외부 inject 대기."""
+        if self._cmd_vel_pub is not None:
+            return
+        shared = getattr(self.ctx, "cmd_vel_pub", None)
+        if shared is not None:
+            self._cmd_vel_pub = shared
+            return
         node = kwargs.get("node") or getattr(self.ctx, "node", None)
-        if node is None or self._cmd_vel_pub is not None:
+        if node is None:
             return
         try:
             from geometry_msgs.msg import Twist  # ROS 의존성 — setup 시점만
