@@ -35,13 +35,13 @@ class MapStatusCard(QWidget):
         # 배지 (icon + 라벨 한 줄)
         self._icon = QLabel("⚪")
         self._icon.setAlignment(Qt.AlignCenter)
-        self._icon.setStyleSheet("font-size: 16pt; background: transparent;")
+        self._icon.setStyleSheet("font-size: 13pt; background: transparent;")
         outer.addWidget(self._icon, 0, Qt.AlignCenter)
 
         self._badge = QLabel("UNKNOWN")
         self._badge.setAlignment(Qt.AlignCenter)
         self._badge.setStyleSheet(
-            f"color: {COLORS['text_muted']}; font-size: 9pt; font-weight: 800; "
+            f"color: {COLORS['text_muted']}; font-size: 8pt; font-weight: 800; "
             f"letter-spacing: 0.6px; background: transparent;"
         )
         outer.addWidget(self._badge, 0, Qt.AlignCenter)
@@ -52,7 +52,7 @@ class MapStatusCard(QWidget):
         self._yaw_label = QLabel("yaw  —")
         for lab in (self._x_label, self._y_label, self._yaw_label):
             lab.setStyleSheet(
-                f"color: {COLORS['text']}; font-size: 9pt; font-weight: 700; "
+                f"color: {COLORS['text']}; font-size: 8pt; font-weight: 700; "
                 f"background: transparent;"
             )
             lab.setAlignment(Qt.AlignCenter)
@@ -74,7 +74,7 @@ class MapStatusCard(QWidget):
         self._icon.setText(icon)
         self._badge.setText(text)
         self._badge.setStyleSheet(
-            f"color: {accent}; font-size: 9pt; font-weight: 800; "
+            f"color: {accent}; font-size: 8pt; font-weight: 800; "
             f"letter-spacing: 0.6px; background: transparent;"
         )
         bg = soften(accent, 0.12)

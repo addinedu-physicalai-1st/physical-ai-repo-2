@@ -111,12 +111,13 @@ class CameraPanCard(QWidget):
         head.addStretch(1)
         body.addLayout(head)
 
-        # ── 메인: D-pad | 상태 readout ────────────────────────────────────
-        main_row = QHBoxLayout()
-        main_row.setSpacing(14)
+        # ── 메인: D-pad / 상태 readout (세로 stack) ───────────────────────
+        # 좁은 카드 폭에서 가로 분할이면 readout 압축 → 세로로 쌓아 둘 다 가로폭 전체.
+        main_row = QVBoxLayout()
+        main_row.setSpacing(12)
 
-        main_row.addWidget(self._build_pad(), 0, Qt.AlignVCenter)
-        main_row.addWidget(self._build_readout(), 1)
+        main_row.addWidget(self._build_pad(), 0, Qt.AlignHCenter)
+        main_row.addWidget(self._build_readout(), 0)
 
         body.addLayout(main_row)
 
@@ -152,7 +153,7 @@ class CameraPanCard(QWidget):
         btn = QPushButton(_GLYPH[kind], self)
         btn.setObjectName(f"camPanBtn_{kind}")
         btn.setFocusPolicy(Qt.NoFocus)
-        btn.setFixedSize(56, 56)
+        btn.setFixedSize(40, 40)
         f = QFont(btn.font())
         f.setPointSize(16)
         f.setBold(True)
@@ -163,7 +164,7 @@ class CameraPanCard(QWidget):
 
     def _build_pad(self) -> QWidget:
         pad = QWidget(self)
-        pad.setFixedSize(QSize(200, 200))
+        pad.setFixedSize(QSize(150, 150))
         grid = QGridLayout(pad)
         grid.setContentsMargins(8, 8, 8, 8)
         grid.setSpacing(6)
@@ -176,7 +177,7 @@ class CameraPanCard(QWidget):
         self.btn_center = QPushButton("●", pad)
         self.btn_center.setObjectName("camPanBtn_center")
         self.btn_center.setFocusPolicy(Qt.NoFocus)
-        self.btn_center.setFixedSize(56, 56)
+        self.btn_center.setFixedSize(40, 40)
         cf = QFont(self.btn_center.font())
         cf.setPointSize(14)
         cf.setBold(True)

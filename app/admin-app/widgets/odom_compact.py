@@ -15,7 +15,7 @@ class _Compass(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._yaw = 0.0
-        self.setFixedSize(86, 86)
+        self.setFixedSize(56, 56)
 
     def set_yaw(self, yaw: float) -> None:
         self._yaw = yaw
@@ -60,8 +60,8 @@ class OdomCompact(QWidget):
 
         # horizontal: [compass | (x / y / yaw 라벨 세로 스택)]
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(12)
+        lay.setContentsMargins(8, 6, 8, 6)
+        lay.setSpacing(8)
 
         self.compass = _Compass(self)
         lay.addWidget(self.compass, 0, Qt.AlignVCenter)
@@ -74,8 +74,9 @@ class OdomCompact(QWidget):
         self.yaw_label = QLabel("yaw +0°")
         for lab in (self.x_label, self.y_label, self.yaw_label):
             lab.setStyleSheet(
-                f"color: {COLORS['text']}; font-size: 10pt; font-weight: 600;"
+                f"color: {COLORS['text']}; font-size: 9pt; font-weight: 600;"
             )
+            lab.setAlignment(Qt.AlignCenter)
             label_col.addWidget(lab)
         lay.addLayout(label_col, 1)
 

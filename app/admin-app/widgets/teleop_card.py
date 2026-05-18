@@ -71,17 +71,20 @@ def _load_vic_ip(json_path: pathlib.Path) -> str:
 class DirectionalPad(QWidget):
     """좌측 조이스틱 풍 D-pad. 4 방향 버튼 + STOP 가운데."""
 
-    PAD_SIZE = 224
-    BTN_SIZE = 60
+    PAD_SIZE = 168
+    BTN_SIZE = 44
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFixedSize(QSize(self.PAD_SIZE, self.PAD_SIZE))
         self._active: set[str] = set()  # {"up","down","left","right"}
 
+        # margin / spacing 계산: 3 * BTN_SIZE(44) + 2 * spacing(6) + 2 * margin(8) = 148
+        # PAD_SIZE(168) 안에 정확히 fit (= 168). 이전 margin 20 / spacing 8 이면
+        # 3*44 + 16 + 40 = 188 > 168 라 버튼 겹쳤음.
         grid = QGridLayout(self)
-        grid.setContentsMargins(20, 20, 20, 20)
-        grid.setSpacing(8)
+        grid.setContentsMargins(8, 8, 8, 8)
+        grid.setSpacing(6)
 
         self.btn_up = self._make_dir_btn("up", "teleopBtnUp")
         self.btn_down = self._make_dir_btn("down", "teleopBtnDown")
@@ -417,10 +420,11 @@ class TeleopCard(QWidget):
         head_row.addWidget(self.ip_label)
         body.addLayout(head_row)
 
-        # ---------- 단일 가로 행: D-pad | Cockpit | Telemetry stack ----------
-        # 세로 공간을 아끼고, 가로 빈 공간을 ODOM/LIDAR 가 흡수한다.
-        main_row = QHBoxLayout()
-        main_row.setSpacing(14)
+        # ---------- 세로 stack: D-pad / Cockpit ----------
+        # 좁은 카드 폭 (좌측 컬럼 절반) 에서 가로 분할이면 cockpit 슬라이더/숫자가 압축
+        # 되어 겹치는 문제 — 세로로 쌓아 D-pad / cockpit 모두 카드 가로폭 전체 확보.
+        main_row = QVBoxLayout()
+        main_row.setSpacing(12)
 
         # ── D-pad (왼쪽 컬럼) ──
         self._pad = DirectionalPad(self)
@@ -444,7 +448,6 @@ class TeleopCard(QWidget):
         pad_wrap = QVBoxLayout()
         pad_wrap.setContentsMargins(0, 0, 0, 0)
         pad_wrap.setSpacing(8)
-        pad_wrap.addStretch(1)
         pad_wrap.addWidget(self._pad, 0, Qt.AlignHCenter)
         hint = QLabel("화살표 키 또는 버튼")
         hint.setAlignment(Qt.AlignHCenter)
@@ -452,10 +455,9 @@ class TeleopCard(QWidget):
             f"color: {COLORS['text_muted']}; font-size: 11px; font-weight: 600;"
         )
         pad_wrap.addWidget(hint)
-        pad_wrap.addStretch(1)
         main_row.addLayout(pad_wrap, 0)
 
-        # ── Cockpit: live readout + 슬라이더 (가운데 컬럼) ──
+        # ── Cockpit: live readout + 슬라이더 ──
         cockpit = QVBoxLayout()
         cockpit.setSpacing(10)
         self.cmd_row = LiveReadout(self)
@@ -469,8 +471,7 @@ class TeleopCard(QWidget):
         self._save_btn.clicked.connect(self._on_save_waypoint)
         cockpit.addWidget(self._save_btn, 0)
 
-        cockpit.addStretch(1)
-        main_row.addLayout(cockpit, 3)
+        main_row.addLayout(cockpit, 1)
 
         body.addLayout(main_row)
 
