@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (sim 가제보 텔레포트 — SetGazeboPose.srv + sim_teleport_node + 적용 버튼이 SW override + 가제보 텔레포트 둘 다 호출. PoseDebugPanel 별도 widget 분리)
+마지막 업데이트: 2026-05-18 (텔레포트 RViz↔Gazebo 동기화 — `/debug/pose` 가 `/initialpose` 까지 같이 publish + sim_teleport_node 가 `/initialpose` 토픽 구독으로 자동 Gazebo 텔레포트. 맵 Shift+클릭과 TopBar Pose 양쪽 다 RViz/AMCL + Gazebo 동시 이동)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -151,14 +151,14 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | PoseSubscriber (real) | ✅ | [pose_subscriber.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/pose_subscriber.py) — `/amcl_pose` (geometry_msgs/PoseWithCovarianceStamped, **map frame**) 구독. AMCL 가 publisher. quaternion → yaw atan2 변환 → `Keys.ROBOT_POSE = {x, y, yaw}`. RViz 2D Pose Estimate 정상 영향. POSE_OVERRIDE_ACTIVE flag 체크 |
 | MapCache (real) | ✅ | [map_cache.py](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/map_cache.py) — `/map` (절대 경로, root namespace) OccupancyGrid 구독. **transient_local + reliable QoS** (nav2_map_server 와 일치). `is_outside(x, y)` 메서드 — 격자 박스 밖 또는 unknown 셀이면 True, 맵 미수신 시 None |
 | sim_battery_node | ✅ | [gogoping_bringup/sim_battery_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/sim_battery_node.py) — **sim 전용**. `/gogoping/battery` 1Hz publish + `/gogoping/sim/set_battery_level` srv. device-gogoping-sim.sh 가 자동 실행 |
-| sim_teleport_node | ✅ | [gogoping_bringup/sim_teleport_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/sim_teleport_node.py) — **sim 전용**. `/gogoping/sim/teleport_pose` srv → subprocess 로 `gz service -s /world/pingdergarten/set_pose` 호출 → 가제보 entity 텔레포트. ROS param `world_name` / `entity_name` / `z` / `timeout_ms` |
+| sim_teleport_node | ✅ | [gogoping_bringup/sim_teleport_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/sim_teleport_node.py) — **sim 전용**. `/gogoping/sim/teleport_pose` srv + `/initialpose` sub (PoseWithCovarianceStamped) → subprocess 로 `gz service -s /world/pingdergarten/set_pose` 호출 → 가제보 entity 텔레포트. `/initialpose` 미러로 admin UI 맵 Shift+클릭 / RViz 2D Pose Estimate 시 자동 Gazebo 동기화. ROS param `world_name` / `entity_name` / `z` / `timeout_ms` |
 | battery_publisher_node | 🟡 | [gogoping_bringup/battery_publisher_node.py](../../../gogoping-controller/src/gogoping/gogoping_bringup/gogoping_bringup/battery_publisher_node.py) — **Pi 운영용**. `pi.launch.py` 안 `PushRosNamespace("gogoping")` 그룹에 등록 → `/gogoping/battery` 1Hz. ROS param `source` 으로 `static`/`sysfs`/`uart` 선택. **현재 source=static (placeholder 100%)** — 진짜 ADC 통합은 하드웨어 spec 확정 후 TODO |
 | Control Service `/api/gogoping/debug/battery` | ✅ | BatteryDebugSlider → state_client → POST → ros_bridge.set_battery_level_sync → `SetBatteryLevel.srv` |
 | Admin UI BatteryDebugSlider | ✅ | BTStateInline 디버그 영역. QSlider(0-100) + 현재값 라벨 + 적용. 임계점 (low 20/25, full 70) 표시. sim 환경 전용 (실물엔 `service_unavailable`) |
 | Admin UI GogoPingDashboard 실 배터리 표시 | ✅ | header `battery_chip` (StatChip) + 시스템 카드 `battery` (BatteryBar) 둘 다 snapshot.battery_level 로 라이브 갱신. **실물에서도 동작** (BatterySubscriber → blackboard → snapshot → WS → dashboard) |
 | Admin UI MapStatusCard (좌표 + IN/OUT) | ✅ | ODOM 카드 옆 (slim) — 배지 (🟢 IN MAP / 🔴 OUT OF MAP / ⚪ UNKNOWN) + 좌표 (x/y/yaw) 표시만. [widgets/map_status_card.py](../../../../app/admin-app/widgets/map_status_card.py) |
 | Admin UI PoseDebugPanel | ✅ | BTStateInline 디버그 영역 (DebugStatePanel + BatteryDebugSlider 옆). x/y/yaw QDoubleSpinBox + 적용 + 원복. [widgets/pose_debug_panel.py](../../../../app/admin-app/widgets/pose_debug_panel.py) |
-| Debug 좌표 override (SetRobotPose + SetGazeboPose) | ✅ | admin UI 적용 → POST `/api/gogoping/debug/pose` → router 가 **둘 다 호출**: (1) `bridge.set_robot_pose_sync` → command_listener server (SW override, blackboard.ROBOT_POSE 강제 + POSE_OVERRIDE_ACTIVE=True). (2) `bridge.set_gazebo_pose_sync` → sim_teleport_node (가제보 entity 텔레포트, sim 만, 실물은 service_unavailable). 원복 = SW override 해제만 (가제보 텔레포트 skip). 4 시나리오 통과 |
+| Debug 좌표 override (SetRobotPose + SetGazeboPose + /initialpose) | ✅ | admin UI 적용 → POST `/api/gogoping/debug/pose` → router 가 **셋 다 호출**: (1) `bridge.set_robot_pose_sync` → command_listener server (SW override, blackboard.ROBOT_POSE 강제 + POSE_OVERRIDE_ACTIVE=True). (2) `bridge.set_gazebo_pose_sync` → sim_teleport_node (가제보 entity 텔레포트, sim 만, 실물은 service_unavailable). (3) `waypoints_bridge.set_initial_pose` → `/initialpose` publish (AMCL 재초기화 + RViz robot frame 이동, sim/실물 동일). 원복 = SW override 해제만 (Gazebo / `/initialpose` 둘 다 skip). |
 | server REST `/waypoints/route` `/waypoints/navigate` | ✅ | tests/test_waypoints_router.py 통과 |
 | admin UI lanes / route 시각화 | ✅ | graph map 모드 |
 | robot-web 음성 → goto_vertex | ✅ | "X로 가" / "복귀" 인식 + `/waypoints/navigate` 호출 (보조 모드 우회 통과). 분류기는 [service/ai-service/ai_service/hub.py](../../../../service/ai-service/ai_service/hub.py) `_try_goto_vertex` / `_is_return_text` |

@@ -233,8 +233,9 @@ _camera_pan_bridge = CameraPanBridge()
 _camera_pan_hub = install_camera_pan(app, _camera_pan_bridge)
 
 # gogoping FSM/BT — SetGoal srv client + /gogoping/state subscriber. /ws/robot-state fan-out.
+# waypoints_bridge 도 주입 — /debug/pose 에서 AMCL /initialpose 도 함께 publish (RViz 동기화).
 _gogoping_bridge = GogopingRosBridge()
-install_gogoping(app, _gogoping_bridge)
+install_gogoping(app, _gogoping_bridge, _waypoints_bridge)
 
 
 # NoriArm — ROS 미설정 환경에서도 import 자체는 성공해야 하므로 lazy 처리.

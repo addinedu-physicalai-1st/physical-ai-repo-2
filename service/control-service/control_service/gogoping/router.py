@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from .mode_to_goal import UnsupportedMode, mode_to_goal
 from .ros_bridge import GogopingRosBridge
+from ..waypoints.ros_bridge import WaypointsRosBridge
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +89,20 @@ class RobotPoseDebugResponse(BaseModel):
     # 가제보 텔레포트 결과 (sim 만 동작, 실물 service_unavailable)
     gazebo_accepted: bool = False
     gazebo_reason: str = ""
+    # AMCL /initialpose publish 결과 — RViz/AMCL 위치 추정 재초기화
+    amcl_published: bool = False
 
 
-def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
-    """app 에 라우터 부착. ``bridge`` 는 lifespan 에서 미리 ``start()`` 호출되어 있어야 함."""
+def install(
+    app: FastAPI,
+    bridge: GogopingRosBridge,
+    waypoints_bridge: WaypointsRosBridge,
+) -> None:
+    """app 에 라우터 부착. ``bridge`` / ``waypoints_bridge`` 는 lifespan 에서 미리
+    ``start()`` 호출되어 있어야 함.
+
+    ``waypoints_bridge`` 는 ``/debug/pose`` 가 AMCL ``/initialpose`` 도 같이 publish
+    하기 위해 필요 (RViz 와 Gazebo 동시 이동 — Step 1)."""
 
     router = APIRouter(prefix="/api/gogoping", tags=["gogoping"])
 
@@ -147,14 +158,16 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
 
     @router.post("/debug/pose", response_model=RobotPoseDebugResponse)
     async def set_robot_pose(req: RobotPoseDebugRequest) -> RobotPoseDebugResponse:
-        """[디버그] 로봇 좌표 강제 — SW override + gazebo 텔레포트 동시 호출.
+        """[디버그] 로봇 좌표 강제 — SW override + gazebo 텔레포트 + AMCL /initialpose 동시.
 
         - SW override (SetRobotPose.srv): sim + 실물 둘 다 동작. blackboard.ROBOT_POSE
           강제 + POSE_OVERRIDE_ACTIVE flag → PoseSubscriber 가 amcl_pose 무시.
         - 가제보 텔레포트 (SetGazeboPose.srv): sim 만. gz set_pose service 호출.
           실물엔 sim_teleport_node 없음 → service_unavailable (best-effort, 무시).
+        - AMCL /initialpose publish: RViz 의 robot frame 도 같은 위치로 이동
+          (waypoints_bridge.set_initial_pose 재사용). sim/실물 동일 동작.
 
-        clear=True 면 SW override 만 해제 (가제보 텔레포트 skip).
+        clear=True 면 SW override 만 해제 (가제보 텔레포트 + /initialpose skip).
         """
         accepted, reason = await asyncio.to_thread(
             bridge.set_robot_pose_sync, req.x, req.y, req.yaw, req.clear,
@@ -165,9 +178,10 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
                 f"clear={req.clear} reason={reason!r}"
             )
 
-        # clear=True 면 가제보 텔레포트 skip — 그냥 live amcl_pose 복원만
+        # clear=True 면 가제보 텔레포트 + /initialpose skip — 그냥 live amcl_pose 복원만
         gz_ok = False
         gz_reason = "skipped_on_clear"
+        amcl_published = False
         if not req.clear:
             gz_ok, gz_reason = await asyncio.to_thread(
                 bridge.set_gazebo_pose_sync, req.x, req.y, req.yaw,
@@ -178,9 +192,20 @@ def install(app: FastAPI, bridge: GogopingRosBridge) -> None:
                     f"SetGazeboPose (sim 전용) 응답: ok={gz_ok} reason={gz_reason!r}"
                 )
 
+            # AMCL /initialpose publish — sim/실물 동일. 실패해도 SetRobotPose override 가
+            # 이미 BB.ROBOT_POSE 를 잡고 있으므로 best-effort.
+            try:
+                await asyncio.to_thread(
+                    waypoints_bridge.set_initial_pose, req.x, req.y, req.yaw,
+                )
+                amcl_published = True
+            except Exception as e:
+                logger.warning(f"/initialpose publish 실패: {e!r}")
+
         return RobotPoseDebugResponse(
             accepted=accepted, reason=reason,
             gazebo_accepted=gz_ok, gazebo_reason=gz_reason,
+            amcl_published=amcl_published,
         )
 
     app.include_router(router)
