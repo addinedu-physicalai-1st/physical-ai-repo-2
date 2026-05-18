@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from control_service.config import settings
-from control_service.deps import require_parent, require_teacher
+from control_service.deps import require_device_token, require_parent, require_teacher
 from control_service.schemas import (
     ChildDetailOut,
     ChildOut,
@@ -60,6 +60,21 @@ async def list_children(
     _: User = Depends(require_teacher),
     session: AsyncSession = Depends(get_session),
 ) -> list[ChildOut]:
+    result = await session.execute(select(Child).order_by(Child.class_name, Child.name))
+    return [ChildOut.model_validate(c, from_attributes=True) for c in result.scalars()]
+
+
+@router.get(
+    "/children/roster",
+    response_model=list[ChildOut],
+    dependencies=[Depends(require_device_token)],
+)
+async def roster(
+    session: AsyncSession = Depends(get_session),
+) -> list[ChildOut]:
+    """robot-web 디바이스용 슬림 명단. SR-PLAY-004 무궁화꽃 게임 UI 가 진입 단계 face
+    recognition 매칭 전 placeholder 참가자 카드로 사용. 디바이스 토큰 (X-Device-Token)
+    인증으로 교사 세션 없이 호출 가능."""
     result = await session.execute(select(Child).order_by(Child.class_name, Child.name))
     return [ChildOut.model_validate(c, from_attributes=True) for c in result.scalars()]
 

@@ -54,3 +54,26 @@ def extract_embedding(image_bytes: bytes) -> Optional[list[float]]:
     )
     emb = faces[0].normed_embedding  # L2-normalized 512-d
     return emb.astype(float).tolist()
+
+
+def extract_embeddings_all(image_bytes: bytes) -> list[dict]:
+    """이미지에 보이는 모든 얼굴의 (embedding, bbox) 리스트.
+
+    각 dict 는 {'embedding': list[float] (512-d, L2-normalized),
+                'bbox': [x1, y1, x2, y2] (입력 이미지 pixel 좌표)}.
+
+    SR-PLAY-004 무궁화 진입 단계에서 한 프레임에 여러 명이 동시에 보일 때 사용.
+    bbox 는 클라이언트가 같은 프레임에서 얼굴 썸네일을 크롭하기 위한 정보.
+    """
+    try:
+        img = _decode_image(image_bytes)
+    except ValueError:
+        return []
+    faces = get_app().get(img)
+    return [
+        {
+            "embedding": f.normed_embedding.astype(float).tolist(),
+            "bbox": [float(x) for x in f.bbox],
+        }
+        for f in faces
+    ]

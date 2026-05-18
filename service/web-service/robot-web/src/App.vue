@@ -14,6 +14,8 @@ import AttendanceCamera from '@/eduping/AttendanceCamera.vue';
 import DanceManager from '@/eduping/DanceManager.vue';
 import DancePlayPopup from '@/eduping/DancePlayPopup.vue';
 import GreetingManager from '@/eduping/GreetingManager.vue';
+import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
+import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
 
 const mode = useModeStore();
@@ -36,6 +38,8 @@ const showOXQuiz = computed(() => robot.value.id === 'noriarm');
 const showDanceManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '율동 등록');
 const showDancePopup = computed(() => robot.value.id === 'eduping' && currentMode.value === '율동');
 const showGreetingManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '등하원 인사 설정');
+const showMugunghwaArm = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화 율동 등록');
+const showMugunghwa = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화꽃이 피었습니다');
 
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
@@ -70,6 +74,8 @@ function handleStart(): void {
     <DanceManager v-if="showDanceManager" />
     <DancePlayPopup v-if="showDancePopup" />
     <GreetingManager v-if="showGreetingManager" />
+    <MugunghwaArmManager v-if="showMugunghwaArm" />
+    <MugunghwaGame v-if="showMugunghwa" />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}

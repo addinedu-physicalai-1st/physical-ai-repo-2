@@ -102,6 +102,20 @@ class FaceRecognizeResult(BaseModel):
     distance: float | None = None  # 0=동일, 큼=다름
 
 
+# SR-PLAY-004 무궁화 진입 단계 — 한 프레임에 여러 명이 동시에 보일 때.
+class FaceRecognizeSingleMatch(BaseModel):
+    matched: bool
+    child_id: int | None = None
+    child_name: str | None = None
+    distance: float | None = None
+    # 같은 프레임 내 얼굴 위치 — 클라이언트가 등록 카드용 썸네일을 크롭할 때 사용.
+    bbox: list[float] | None = None  # [x1, y1, x2, y2] in image pixels
+
+
+class FaceRecognizeMultiResult(BaseModel):
+    matches: list[FaceRecognizeSingleMatch]
+
+
 class AttendanceCheckPayload(BaseModel):
     child_id: int
     type: Literal["IN", "OUT"]
