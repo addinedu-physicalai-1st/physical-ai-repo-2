@@ -85,7 +85,7 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── reverse_into_dock.py          # N초 동안 cmd_vel.linear.x 음수 publish (후진 진입) → docs/bt/behaviors/navigation.md#reverse_into_dock
         │   │   │   │                                 #   Used in: BT_return_sub
-        │   │   │   ├── verify_docking_contact.[py|/] # 도킹 접점 확인 → "docked" trigger [스켈레톤]
+        │   │   │   ├── verify_docking_contact.py    # ReverseIntoDock 완료 후 "docked" trigger 1회 발사 → CHARGING 전이 (접점 센서 미통합) → docs/bt/behaviors/navigation.md#verify_docking_contact
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── stop_base.[py|/]              # cmd_vel = 0 publish (모바일 베이스 즉시 정지)
         │   │   │   │                                 #   Used in: BT_follow_sub
@@ -164,7 +164,7 @@ controller/gogoping-controller/src/gogoping/
         │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
         │           ├── BT_lullaby_sub.py         # 자장가 — WaitForExit (UI 가 mp3 재생)
         │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 (1회 실행) — 숨기 → 카운트 → 탐색 → 복귀
-        │           └── BT_return_sub.py          # 도킹 복귀 — OneShot(Sequence(NavTo "충전소입구" → AlignToDock → ReverseIntoDock)). 빌더가 yaml 의 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 주입 → docs/bt/trees/BT_return_sub.md
+        │           └── BT_return_sub.py          # 도킹 복귀 — OneShot(Sequence(NavTo "충전소입구" → AlignToDock → ReverseIntoDock → VerifyDockingContact)). 마지막 단계가 docked trigger 자동 발사 → CHARGING. 빌더가 yaml 의 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 주입 → docs/bt/trees/BT_return_sub.md
         │
         ├── interfaces/                   # 외부 HW / ROS action·service·topic 호출 래퍼
         │   ├── __init__.py
