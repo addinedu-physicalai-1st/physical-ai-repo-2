@@ -2,14 +2,15 @@
 
 `LOW_BATTERY_RETURN` state 의 MainTree — 배터리 임계치 이하로 자동 진입한 **lockdown** 복귀.
 
-## Root composite (현재 walking skeleton)
+## Root composite
 
 ```
 Parallel(SuccessOnAll(synchronise=False))
-└─ MapBoundaryMonitor       common/map_boundary_monitor.md  (✅)
+├─ MapBoundaryMonitor       common/map_boundary_monitor.md  (✅)
+└─ ReturnSubTree            sub_trees/BT_return_sub.md      (✅)  ← OneShot(NavTo → Align → Reverse)
 ```
 
-> 현재는 안전 monitor 만 배치 — 사용자 명령 차단 (CommandListener 없음) + 진짜 ReturnSubTree 미작성. `docked` trigger 가 외부에서 발화되거나 `MapBoundaryMonitor` 가 fault 발화하면 다른 state 로 전이.
+> 안전 monitor + 복귀 SubTree. 사용자 명령 차단 (CommandListener 없음). `docked` trigger 가 외부에서 발화 (사람의 admin UI 디버그 버튼) 되거나 `MapBoundaryMonitor` 가 fault 발화하면 다른 state 로 전이.
 
 ## RETURNING 과의 차이
 
@@ -20,8 +21,8 @@ Parallel(SuccessOnAll(synchronise=False))
 | `CommandListener` | ✅ 배치 — 사용자 cancel 가능 | ❌ **없음** — 사용자 명령 차단 (lockdown) |
 | HardwareHealthMonitor | (추후) | (추후) — 동일 |
 | CollisionEventHandler | (추후) | (추후) — 동일 |
-| MapBoundaryMonitor | (추후) | (추후) — 동일 |
-| ReturnSubTree | (추후) | (추후) — 동일 |
+| MapBoundaryMonitor | ✅ | ✅ — 동일 |
+| ReturnSubTree | ✅ | ✅ — 동일 |
 | 이탈 경로 | `cancel` / 사용자 *_request / `docked` / `fault` | `docked` / `fault` 만 |
 
 ## Lockdown 정책 — "사용자 명령만 차단, 안전 monitor 는 정상 동작"
@@ -43,12 +44,12 @@ CommandListener 가 없으니 `SetGoal.srv` 호출 자체가 받을 server 없�
 ### 종료
 | Trigger | To | Source 발화 주체 |
 |---|---|---|
-| `docked` | CHARGING | `verify_docking_contact` (추후) — ReturnSubTree 마지막 노드 |
+| `docked` | CHARGING | **사람** (admin UI 디버그 버튼) — 자동 도킹 (`verify_docking_contact`) 은 발표 범위 외 |
 | `fault` | ERROR | `hardware_health_monitor` / `collision_event_handler` 등 |
 
 > 의도적으로 `cancel` / `*_request` source 에서 **제외**. ERROR 와 동일한 lockdown 정책.
 
 ## 상태
 
-- 코드: ✅ ([BT_low_battery_return_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_low_battery_return_main.py)) — `MapBoundaryMonitor` 배치
-- 의존 behavior: `MapBoundaryMonitor` (✅) — 추후 HardwareHealthMonitor, CollisionEventHandler, ReturnSubTree
+- 코드: ✅ ([BT_low_battery_return_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_low_battery_return_main.py)) — `MapBoundaryMonitor` + `ReturnSubTree` 배치
+- 의존 behavior: `MapBoundaryMonitor` (✅), `BT_return_sub` (✅) — 추후 HardwareHealthMonitor, CollisionEventHandler

@@ -111,7 +111,9 @@ class GogopingModes:
         root = build_main_tree(state, self.ctx)
         self.tree = py_trees.trees.BehaviourTree(root)
         try:
-            self.tree.setup(timeout=5.0)
+            # node 를 명시 전달 — NavigateToVertex 등 일부 behavior 가 setup(node=...) 를 요구.
+            # py_trees 의 composite/decorator 가 자식들에게 kwargs 를 전파한다.
+            self.tree.setup(timeout=5.0, node=self.node)
         except Exception as e:
             self._logger.error(f"BT setup failed for state={state}: {e}")
             raise

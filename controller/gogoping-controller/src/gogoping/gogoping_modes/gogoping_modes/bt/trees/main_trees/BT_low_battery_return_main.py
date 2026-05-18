@@ -16,7 +16,7 @@ lockdown 정책 정확히:
 - *사용자 명령* 차단 (CommandListener 없음)
 - *안전 monitor* 는 정상 배치 (MapBoundaryMonitor / HW / Collision) — 자율 ERROR 전이 가능
 
-현재 stub: MapBoundaryMonitor 만 배치. 나머지 monitor + ReturnSubTree 추후.
+현재 배치: MapBoundaryMonitor + ReturnSubTree. HW / Collision monitor 는 추후.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from py_trees.common import ParallelPolicy
 
 from ....context import Context
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
+from ..sub_trees.BT_return_sub import build_return_subtree
 
 
 def build(ctx: Context) -> py_trees.behaviour.Behaviour:
@@ -33,9 +34,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         children=[
             MapBoundaryMonitor("MapBoundaryMonitor", ctx),
-            # TODO 추후:
-            #   HardwareHealthMonitor, CollisionEventHandler,
-            #   ReturnSubTree (NavTo charging_dock_approach_key → AlignToDock →
-            #                  ApproachDock → VerifyDockingContact)
+            build_return_subtree(ctx),
+            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler
         ],
     )
