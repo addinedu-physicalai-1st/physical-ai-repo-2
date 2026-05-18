@@ -49,6 +49,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | `search_waypoints` | `list[str]` | config / `command_listener` | `navigate_to_pose` (loop) | 숨바꼭질 탐색 waypoint |
 | `home_position_key` | `str` | config | `navigate_to_pose` | 숨바꼭질 원위치 |
 | `charging_dock_approach_key` | `str` | config | `navigate_to_pose` | 도킹 접근 위치 |
+| `charging_dock_target_yaw` | `float` (rad) | SubTree 빌더 (graph 의 vertex.yaw) | `align_to_dock` | AlignToDock 의 target yaw — robot 이 도크 등진 자세로 정렬 |
 
 > 주: `search_waypoints` 는 BT 의 `command_listener` 가 control-server 의 `GET /waypoints/patrol/hide_and_seek_search` 에서 가져와 세팅한다. control-server 도달 실패 시 `${PINGDER_BT_CACHE_DIR:-/tmp/pingder}/hide_and_seek_search.json` 캐시 fallback. helper: `gogoping_modes.utils.waypoints_client.fetch_patrol`.
 
@@ -89,6 +90,7 @@ class Keys:
     SEARCH_WAYPOINTS = "search_waypoints"
     HOME_POSITION_KEY = "home_position_key"
     CHARGING_DOCK_APPROACH_KEY = "charging_dock_approach_key"
+    CHARGING_DOCK_TARGET_YAW = "charging_dock_target_yaw"
     # 에러
     ERROR_REASON = "error_reason"
     ERROR_SOURCE = "error_source"

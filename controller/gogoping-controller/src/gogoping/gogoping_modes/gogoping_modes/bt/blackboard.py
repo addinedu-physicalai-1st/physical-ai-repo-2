@@ -53,6 +53,7 @@ class Keys:
     SEARCH_WAYPOINTS = "search_waypoints"         # list[str]
     HOME_POSITION_KEY = "home_position_key"
     CHARGING_DOCK_APPROACH_KEY = "charging_dock_approach_key"
+    CHARGING_DOCK_TARGET_YAW = "charging_dock_target_yaw"  # float (rad) — AlignToDock 의 target yaw, SubTree 빌더가 graph 에서 vertex.yaw 로 채움
 
     # 에러 (fault 발화한 monitor 가 W)
     ERROR_REASON = "error_reason"                 # str — e.g., "lidar_timeout"
@@ -85,6 +86,7 @@ _DEFAULTS: dict[str, object] = {
     Keys.SEARCH_WAYPOINTS: [],
     Keys.HOME_POSITION_KEY: "",
     Keys.CHARGING_DOCK_APPROACH_KEY: "",
+    Keys.CHARGING_DOCK_TARGET_YAW: 0.0,
     # 에러
     Keys.ERROR_REASON: "",
     Keys.ERROR_SOURCE: "",
