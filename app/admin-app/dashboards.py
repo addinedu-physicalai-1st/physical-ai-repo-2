@@ -15,7 +15,9 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -220,6 +222,88 @@ class NoriArmDashboard(QWidget):
 
 
 # --------------------------------------------------------------------------
+# 디버그 사이드 서랍 — GogoPing 우측에 접고 펼치는 패널
+# --------------------------------------------------------------------------
+
+
+class DebugDrawer(QWidget):
+    """본문 우측에 붙는 접힘/펼침 사이드 서랍. 좌측 토글 버튼 + 우측 패널 컨테이너.
+
+    panel 안에는 DebugStatePanel / BatteryDebugSlider / PoseDebugPanel 3개가 세로
+    stack. 토글 버튼 (◂/▸) 클릭 시 panel 만 show/hide — 버튼 자체는 항상 노출되어
+    다시 펼칠 수 있다. 초기 상태: 펼침 (open=True).
+    """
+
+    PANEL_WIDTH = 300
+    TOGGLE_WIDTH = 36
+
+    def __init__(self, debug_panel, battery_debug, pose_debug, parent=None):
+        super().__init__(parent)
+        self.setObjectName("debugDrawer")
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        # 토글 버튼 — 강조색 배경 + 흰 글씨 + 세로 "DEBUG" 라벨. 항상 보임.
+        # 텍스트 구성: "◂\nD\nE\nB\nU\nG"  (펼침 상태 — 화살표가 닫는 방향을 가리킴)
+        self.toggle_btn = QPushButton(self._toggle_text(opened=True))
+        self.toggle_btn.setFixedWidth(self.TOGGLE_WIDTH)
+        self.toggle_btn.setCursor(Qt.PointingHandCursor)
+        accent = COLORS["warning"]
+        accent_hover = soften(accent, 0.80)
+        self.toggle_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: {accent};
+                border: none;
+                border-top-left-radius: 12px;
+                border-bottom-left-radius: 12px;
+                color: white;
+                font-size: 11pt;
+                font-weight: 900;
+                letter-spacing: 1px;
+                padding: 10px 4px;
+                text-align: center;
+            }}
+            QPushButton:hover {{ background: {accent_hover}; }}
+            QPushButton:pressed {{ background: {accent}; }}
+            """
+        )
+        self.toggle_btn.clicked.connect(self._toggle)
+        lay.addWidget(self.toggle_btn)
+
+        # panel 컨테이너 — 3개 디버그 위젯 세로 stack
+        self.panel = QWidget()
+        self.panel.setFixedWidth(self.PANEL_WIDTH)
+        panel_lay = QVBoxLayout(self.panel)
+        panel_lay.setContentsMargins(8, 0, 0, 0)
+        panel_lay.setSpacing(10)
+        panel_lay.addWidget(debug_panel)
+        panel_lay.addWidget(battery_debug)
+        panel_lay.addWidget(pose_debug)
+        panel_lay.addStretch(1)
+        lay.addWidget(self.panel)
+
+        self._open = True
+
+    def _toggle(self) -> None:
+        self._open = not self._open
+        self.panel.setVisible(self._open)
+        self.toggle_btn.setText(self._toggle_text(opened=self._open))
+
+    @staticmethod
+    def _toggle_text(opened: bool) -> str:
+        """세로 라벨 — 화살표 + DEBUG 5글자.
+
+        opened=True 면 ▸ (접기), False 면 ◂ (펼치기).
+        """
+        arrow = "▸" if opened else "◂"
+        return f"{arrow}\nD\nE\nB\nU\nG"
+
+
+# --------------------------------------------------------------------------
 # GogoPing — 자율주행
 # --------------------------------------------------------------------------
 
@@ -230,6 +314,15 @@ class GogoPingDashboard(QWidget):
     def __init__(self, parent=None, stream_client=None):
         super().__init__(parent)
         self._stream_client = stream_client
+
+        # 디버그 위젯 3종 — DebugDrawer 가 담을 예정. dashboard attribute 로 노출되어
+        # main.py 의 signal connect 가 self.dashboard.debug_panel 형태로 접근.
+        from widgets.battery_debug_slider import BatteryDebugSlider
+        from widgets.debug_state_panel import DebugStatePanel
+        from widgets.pose_debug_panel import PoseDebugPanel
+        self.debug_panel = DebugStatePanel()
+        self.battery_debug = BatteryDebugSlider()
+        self.pose_debug = PoseDebugPanel()
 
         # 창이 짧을 때 teleop 영역이 잘리지 않도록 전체를 스크롤 영역으로 감싼다.
         # 폭은 늘 채우고, 세로 컨텐츠가 창 높이를 초과하면 스크롤바가 등장한다.
@@ -246,10 +339,17 @@ class GogoPingDashboard(QWidget):
             "}"
         )
 
-        host_lay = QVBoxLayout(self)
+        # 우측 디버그 사이드 서랍 — 토글 시 panel 접힘/펼침
+        self.debug_drawer = DebugDrawer(
+            self.debug_panel, self.battery_debug, self.pose_debug,
+        )
+
+        # host: 좌측 스크롤 (대시보드 콘텐츠) + 우측 서랍
+        host_lay = QHBoxLayout(self)
         host_lay.setContentsMargins(0, 0, 0, 0)
         host_lay.setSpacing(0)
-        host_lay.addWidget(scroll)
+        host_lay.addWidget(scroll, 1)
+        host_lay.addWidget(self.debug_drawer, 0)
 
         content = QWidget()
         content.setObjectName("dashContent")
@@ -259,88 +359,18 @@ class GogoPingDashboard(QWidget):
         outer.setContentsMargins(28, 20, 28, 24)
         outer.setSpacing(14)
 
-        # ── 헤더 행: 로고 + 이름 | 시스템 stat 칩들 | 상태 뱃지 ───
-        # 칩을 헤더 빈 공간으로 흡수해 세로 공간을 카메라/맵에 양보.
+        # 본문 상단 chip 행은 제거 — 배터리는 TopBar 로 통합 (main.py).
+        # 다른 chip (CPU/LiDAR/위치신뢰도/오늘주행) 은 mock 데이터라 함께 제거.
         meta = ROBOTS[self.NAME]
-        accent = meta["color"]
-
-        header_row = QHBoxLayout()
-        header_row.setSpacing(14)
-
-        avatar = QWidget()
-        avatar.setFixedSize(56, 56)
-        avatar.setStyleSheet(
-            f"background: {meta['color_soft']}; border-radius: 28px;"
-        )
-        a_lay = QVBoxLayout(avatar)
-        a_lay.setContentsMargins(0, 0, 0, 0)
-        a_lay.addWidget(Icon(meta["icon"], size=30, color=accent),
-                        0, Qt.AlignCenter)
-        header_row.addWidget(avatar)
-
-        name_lbl = QLabel(meta["name"])
-        name_lbl.setStyleSheet(
-            f"font-size: 22px; font-weight: 800; color: {COLORS['text']};"
-        )
-        header_row.addWidget(name_lbl, 0, Qt.AlignVCenter)
-
-        # 칩들 — 헤더 옆 빈 공간을 채운다
-        self.battery_chip = StatChip(
-            "battery", "배터리", "74%", COLORS["mint"],
-            with_bar=True, battery=True,
-        )
-        self.battery_chip.set_pct(74)
-        self.cpu_chip = StatChip("cpu", "CPU", "31%", COLORS["warning"])
-        self.lidar_chip = StatChip("radar", "LiDAR", "12 Hz", COLORS["lavender"])
-        self.localizer_chip = StatChip(
-            "pin", "위치 신뢰도", "98%", COLORS["sky"],
-        )
-        self.distance_chip = StatChip(
-            "vehicle", "오늘 주행", "1.42 km", COLORS["sun"],
-        )
-        for chip in (self.battery_chip, self.cpu_chip, self.lidar_chip,
-                     self.localizer_chip, self.distance_chip):
-            chip.setMinimumHeight(60)
-            header_row.addWidget(chip, 1)
-
-        self.header_badge = StatusBadge("정상 작동", COLORS["success"])
-        header_row.addWidget(self.header_badge, 0, Qt.AlignVCenter)
-
-        outer.addLayout(header_row)
 
         from widgets.lidar_scan_view import LidarScanView
         from widgets.odom_compact import OdomCompact
 
-        # ── 4분면 2×2 grid ──
-        quad = QGridLayout()
-        quad.setHorizontalSpacing(14)
-        quad.setVerticalSpacing(14)
-
-        # 좌상: 카메라
-        self.camera_card = Card("전방 카메라")
-        if stream_client is not None:
-            self.camera = CameraStreamView(
-                robot=self.NAME, stream_client=stream_client, stream_id=0,
-            )
-        else:
-            self.camera = CameraView()
-        self.camera_card.body.addWidget(self.camera, 1)
-        quad.addWidget(self.camera_card, 0, 0)
-
-        # 우상: 실내 맵
         control_url = os.environ.get(
             "PINGDER_CONTROL_URL", "http://localhost:8000",
         )
-        self.map_card = WaypointMapCard(control_url=control_url)
-        quad.addWidget(self.map_card, 0, 1)
 
-        # 좌하: LiDAR 단독
-        self.lidar_view = LidarScanView()
-        self.lidar_card = Card("LiDAR · 실시간 스캔")
-        self.lidar_card.body.addWidget(self.lidar_view, 1)
-        quad.addWidget(self.lidar_card, 1, 0)
-
-        # 우하: ODOM (위) + Teleop + CameraPan (세로 stack) — 한 셀 안 분할
+        # Teleop / CameraPan client + card — 먼저 생성.
         from services.teleop_client import TeleopClient
         from widgets.teleop_card import TeleopCard
         self.teleop_client = TeleopClient()
@@ -358,41 +388,98 @@ class GogoPingDashboard(QWidget):
             get_health=self.camera_pan_client.get_health,
         )
 
+        # ── 좌우 컬럼 1:1 강제 — grid 의 columnStretch 보다 outer QHBoxLayout 이 더 신뢰 가능
+        # 좌측: 카메라 / Teleop·Pan / ODOM·MAP (세로 3 stack)
+        # 우측: 맵 (큰) / LiDAR (작음)
+
+        # 좌측 컬럼 — 각 카드 minimumHeight 명시해 페이지 세로 확장 (스크롤 허용).
+        self.camera_card = Card("전방 카메라")
+        if stream_client is not None:
+            self.camera = CameraStreamView(
+                robot=self.NAME, stream_client=stream_client, stream_id=0,
+            )
+        else:
+            self.camera = CameraView()
+        self.camera_card.body.addWidget(self.camera, 1)
+        # ODOM/MAP minHeight 줄여 확보한 세로 폭을 카메라로 양보.
+        self.camera_card.setMinimumHeight(420)
+
+        teleop_row_widget = QWidget()
+        teleop_row = QHBoxLayout(teleop_row_widget)
+        teleop_row.setContentsMargins(0, 0, 0, 0)
+        teleop_row.setSpacing(12)
+        teleop_row.addWidget(self.teleop_card, 1)
+        teleop_row.addWidget(self.camera_pan_card, 1)
+        # TeleopCard 와 CameraPanCard 내부가 세로 stack (D-pad 위, cockpit/readout 아래)
+        # 이라 합산 height ≈ D-pad(168) + spacing + cockpit(~180) + card padding ≈ 420.
+        teleop_row_widget.setMinimumHeight(440)
+
         self.odom_compact = OdomCompact()
         self.odom_card = Card("ODOM")
         self.odom_card.body.addWidget(self.odom_compact, 1)
-        # MAP 카드와 동일 minimum height 로 맞춤
-        self.odom_card.setMinimumHeight(160)
+        # 180 → 130 — 줄여서 카메라 세로폭에 양보.
+        self.odom_card.setMinimumHeight(130)
 
-        # MAP STATUS card — ODOM 옆 (현재 pose 가 맵 안인지 밖인지 + 좌표)
         from widgets.map_status_card import MapStatusCard
         self.map_status = MapStatusCard()
         self.map_status_card = Card("MAP")
         self.map_status_card.body.addWidget(self.map_status, 1)
-        # 배지 (icon + 라벨) + 좌표 3줄 모두 보이려면 ~ 160px 필요
-        self.map_status_card.setMinimumHeight(160)
+        self.map_status_card.setMinimumHeight(130)
 
-        # ODOM + MAP STATUS — 가로로 나란히
-        top_row = QHBoxLayout()
-        top_row.setContentsMargins(0, 0, 0, 0)
-        top_row.setSpacing(10)
-        top_row.addWidget(self.odom_card, 1)
-        top_row.addWidget(self.map_status_card, 1)
+        odom_map_widget = QWidget()
+        odom_map_row = QHBoxLayout(odom_map_widget)
+        odom_map_row.setContentsMargins(0, 0, 0, 0)
+        odom_map_row.setSpacing(12)
+        odom_map_row.addWidget(self.odom_card, 1)
+        odom_map_row.addWidget(self.map_status_card, 1)
 
-        rb_lay = QVBoxLayout()
-        rb_lay.setContentsMargins(0, 0, 0, 0)
-        rb_lay.setSpacing(10)
-        rb_lay.addLayout(top_row, 0)
-        rb_lay.addWidget(self.teleop_card, 1)
-        rb_lay.addWidget(self.camera_pan_card, 1)
-        quad.addLayout(rb_lay, 1, 1)
+        left_col = QVBoxLayout()
+        left_col.setContentsMargins(0, 0, 0, 0)
+        left_col.setSpacing(14)
+        # ODOM/MAP stretch 도 줄여 카메라로 양보 — camera 10→12, odom_map 3→2.
+        # 좌측 합 13 → 18, 카메라 fraction 46% → 67%.
+        left_col.addWidget(self.camera_card, 12)
+        left_col.addWidget(teleop_row_widget, 4)
+        left_col.addWidget(odom_map_widget, 2)
 
-        quad.setColumnStretch(0, 1)
-        quad.setColumnStretch(1, 1)
-        quad.setRowStretch(0, 1)
-        quad.setRowStretch(1, 1)
+        # 우측 컬럼
+        self.map_card = WaypointMapCard(control_url=control_url)
+        # 자녀 minimum width (400) 를 풀어줌 — 좌우 1:1 강제 시 영향 없게.
+        # 높이 minimum 은 유지 (320).
+        self.map_card.setMinimumWidth(0)
+        self.lidar_view = LidarScanView()
+        self.lidar_card = Card("LiDAR · 실시간 스캔")
+        self.lidar_card.body.addWidget(self.lidar_view, 1)
+        # polar 가 잘리지 않을 충분한 height 확보 — stat box(50*2) + spacing(16) +
+        # header(30) + outer margin(20) + card padding(30) + polar 정사각형 영역
+        # (~280) = 470 정도가 안전.
+        self.lidar_card.setMinimumHeight(480)
 
-        outer.addLayout(quad, 1)
+        right_col = QVBoxLayout()
+        right_col.setContentsMargins(0, 0, 0, 0)
+        right_col.setSpacing(14)
+        right_col.addWidget(self.map_card, 10)
+        right_col.addWidget(self.lidar_card, 8)
+
+        # 좌우 컨테이너 QWidget — sizePolicy horizontal=Ignored 로 자녀 sizeHint 무시,
+        # main_row 의 stretch 1:1 이 그대로 적용되어 카메라/맵 가로폭 동일하게 보장.
+        left_container = QWidget()
+        left_container.setLayout(left_col)
+        left_container.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        left_container.setMinimumWidth(0)
+
+        right_container = QWidget()
+        right_container.setLayout(right_col)
+        right_container.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        right_container.setMinimumWidth(0)
+
+        main_row = QHBoxLayout()
+        main_row.setContentsMargins(0, 0, 0, 0)
+        main_row.setSpacing(14)
+        main_row.addWidget(left_container, 1)
+        main_row.addWidget(right_container, 1)
+
+        outer.addLayout(main_row, 1)
 
         # WS state 라우팅 — Dashboard 가 단일 수신점
         self.teleop_client.connect_state_ws(self.on_state)
@@ -404,14 +491,9 @@ class GogoPingDashboard(QWidget):
         self._timer.start(60)
 
     def update_battery(self, level: float) -> None:
-        """``/gogoping/state`` snapshot 의 battery_level 을 받아 헤더 chip + 시스템 카드 바 갱신.
-
-        main.py 의 state_client 콜백이 snapshot.get("battery_level") 추출 후 호출.
-        """
-        pct = max(0, min(100, int(round(level))))
-        self.battery_chip.set_value(f"{pct}%")
-        self.battery_chip.set_pct(pct)
-        self.battery.set_pct(pct)
+        """배터리 표시는 TopBar 로 이동 — main.py 의 state_client 콜백이 topbar.update_battery
+        를 직접 호출. dashboard 쪽은 no-op (호환성 위해 메서드만 남김)."""
+        return
 
     def update_map_status(self, in_map: bool | None) -> None:
         """``/gogoping/state`` snapshot 의 in_map 을 받아 MAP 카드 갱신.
@@ -453,12 +535,6 @@ class GogoPingDashboard(QWidget):
                 list(ranges),
             )
             self.lidar_view.set_meta(hz, age_ms)
-            if age_ms > 500 or hz <= 0 or not ranges:
-                self.lidar_chip.set_value("—")
-            else:
-                self.lidar_chip.set_value(f"{hz:.1f} Hz")
-        else:
-            self.lidar_chip.set_value("—")
 
         odom = msg.get("odom") or {}
         if odom:
@@ -477,12 +553,6 @@ class GogoPingDashboard(QWidget):
         # 실 stream 위젯은 frame_received signal 로 자동 업데이트, mock CameraView 만 step 필요
         if isinstance(self.camera, CameraView):
             self.camera.step()
-
-        if self._tick % 30 == 0:
-            self.cpu_chip.set_value(f"{random.randint(28, 38)}%")
-            self.distance_chip.set_value(
-                f"{1.42 + (self._tick // 30) * 0.003:.2f} km"
-            )
 
 
 # --------------------------------------------------------------------------

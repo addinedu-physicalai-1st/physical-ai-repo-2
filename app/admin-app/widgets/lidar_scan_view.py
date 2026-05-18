@@ -101,7 +101,10 @@ class _PolarPlot(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(200, 200)
+        # ⚠ minimumSize 는 카드 가용 height 보다 작아야 함. 너무 크게 강제하면 widget
+        # logical rect 가 가용 영역 초과 → painter 가 visible 영역 밖에 그려 원이 잘림.
+        # 잘림 방지 = 카드 height 안 polar 가용 영역과 호환되는 작은 minimum.
+        self.setMinimumSize(160, 160)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._angle_min = 0.0
         self._angle_inc = 0.0
@@ -266,8 +269,10 @@ class LidarScanView(QWidget):
         grid.setRowStretch(0, 0)
         grid.setRowStretch(1, 1)
         grid.setRowStretch(2, 0)
-        grid.setColumnMinimumWidth(0, 96)
-        grid.setColumnMinimumWidth(2, 96)
+        # col 0/2 (좌·우 stat box) min 폭 축소 — polar 가 정사각형으로 차지할 공간 확보.
+        # 이전 96/96 이면 우측 컬럼 폭 ~350 에서 polar 가로폭이 ~100 으로 압축돼 원이 작음.
+        grid.setColumnMinimumWidth(0, 60)
+        grid.setColumnMinimumWidth(2, 60)
 
         outer.addLayout(grid, 1)
 

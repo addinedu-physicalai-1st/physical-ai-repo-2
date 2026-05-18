@@ -269,20 +269,12 @@ class BTStateInline(QWidget):
         self._main = _TreeCell("BT main", kind="main")
         self._sub = _TreeCell("BT sub", kind="sub")
 
-        # 디버그 패널 — BT sub 옆 (state + sub_task combo + 적용)
-        from .battery_debug_slider import BatteryDebugSlider
-        from .debug_state_panel import DebugStatePanel
-        from .pose_debug_panel import PoseDebugPanel
-        self.debug_panel = DebugStatePanel()
-        self.battery_debug = BatteryDebugSlider()
-        self.pose_debug = PoseDebugPanel()
-
+        # 디버그 패널 (DebugStatePanel / BatteryDebugSlider / PoseDebugPanel) 은
+        # GogoPingDashboard 의 우측 DebugDrawer 로 분리됨. BTStateInline 은 BT 상태
+        # 셀 3개 (state/main/sub) 만 유지.
         lay.addWidget(self._state, 0, Qt.AlignVCenter)
         lay.addWidget(self._main, 0, Qt.AlignVCenter)
         lay.addWidget(self._sub, 0, Qt.AlignVCenter)
-        lay.addWidget(self.debug_panel, 0, Qt.AlignVCenter)
-        lay.addWidget(self.battery_debug, 0, Qt.AlignVCenter)
-        lay.addWidget(self.pose_debug, 0, Qt.AlignVCenter)
 
     # ------------------------------------------------------------------ API
 
