@@ -14,12 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from control_service.auth import current_active_user
 from control_service.config import settings
 from control_service.deps import assert_my_child, require_device_token, require_teacher
-from control_service.face_recognition import extract_embedding
+from control_service.face_recognition import extract_embedding, extract_embeddings_all
 from control_service.schemas import (
     AttendanceCheckPayload,
     AttendanceCheckResult,
     AttendanceRecordOut,
+    FaceRecognizeMultiResult,
     FaceRecognizeResult,
+    FaceRecognizeSingleMatch,
 )
 from control_db.models import Attendance, Child, ChildFaceEmbedding, User
 from control_db.session import get_session
@@ -170,6 +172,60 @@ async def list_child_attendance(
 
 
 # ---- robot 디바이스 endpoint ----
+
+
+@router.post(
+    "/attendance/recognize-multi",
+    response_model=FaceRecognizeMultiResult,
+    dependencies=[Depends(require_device_token)],
+)
+async def recognize_faces_multi(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> FaceRecognizeMultiResult:
+    """이미지에서 감지된 모든 얼굴 각각에 대해 DB best match. SR-PLAY-004 무궁화 진입
+    단계에서 한 프레임에 여러 명이 동시에 보일 때 사용.
+
+    /attendance/recognize 와 같은 임계값 (face_match_threshold) 으로 매칭. 임계 초과
+    면 matched=False 로 결과에 포함 (얼굴은 봤지만 누군지 모름).
+    """
+    content = await file.read()
+    faces = extract_embeddings_all(content)
+    if not faces:
+        return FaceRecognizeMultiResult(matches=[])
+
+    matches: list[FaceRecognizeSingleMatch] = []
+    for face in faces:
+        emb = face["embedding"]
+        bbox = face["bbox"]
+        stmt = (
+            select(
+                ChildFaceEmbedding.child_id,
+                Child.name,
+                ChildFaceEmbedding.embedding.cosine_distance(emb).label("distance"),
+            )
+            .join(Child, Child.id == ChildFaceEmbedding.child_id)
+            .order_by("distance")
+            .limit(1)
+        )
+        row = (await session.execute(stmt)).first()
+        if row is None:
+            matches.append(FaceRecognizeSingleMatch(matched=False, bbox=bbox))
+            continue
+        child_id, child_name, distance = row
+        if distance > settings.face_match_threshold:
+            matches.append(FaceRecognizeSingleMatch(matched=False, distance=float(distance), bbox=bbox))
+        else:
+            matches.append(
+                FaceRecognizeSingleMatch(
+                    matched=True,
+                    child_id=child_id,
+                    child_name=child_name,
+                    distance=float(distance),
+                    bbox=bbox,
+                )
+            )
+    return FaceRecognizeMultiResult(matches=matches)
 
 
 @router.post(

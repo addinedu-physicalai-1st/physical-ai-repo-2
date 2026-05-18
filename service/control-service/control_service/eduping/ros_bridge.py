@@ -67,6 +67,7 @@ TOPIC_TRAJECTORY = "/eduping/joint_trajectory"
 # routine 타입
 KIND_DANCE = "dance"
 KIND_GREETING = "greeting"
+KIND_MUGUNGHWA = "mugunghwa"  # 무궁화꽃이 피었습니다 (SR-PLAY-004) 의 양팔 눈가리기 모션 단일 슬롯
 
 # --- 부드러운 시작 보간 파라미터 -------------------------------------------
 # 재생 시작 / 실물 동기화 켤 때 현재 pose ↔ 목표 pose 간 갭을 보고 ramp 를 끼움.
@@ -411,7 +412,7 @@ class EdupingRosBridge:
     # ---------- recording control (called from FastAPI handlers) -----------
 
     def start_recording(self, kind: str, name: str) -> dict:
-        if kind not in (KIND_DANCE, KIND_GREETING):
+        if kind not in (KIND_DANCE, KIND_GREETING, KIND_MUGUNGHWA):
             raise ValueError(f"invalid kind {kind!r}")
         with self._lock:
             if self._recording.active:
@@ -495,6 +496,7 @@ class EdupingRosBridge:
             build_keyframes,
             dance_motion_path,
             greeting_yaml_path,
+            mugunghwa_yaml_path,
             save_routine,
         )
 
@@ -509,6 +511,8 @@ class EdupingRosBridge:
         )
         if r.kind == KIND_GREETING:
             target_path = greeting_yaml_path(self._routines_root, r.name)
+        elif r.kind == KIND_MUGUNGHWA:
+            target_path = mugunghwa_yaml_path(self._routines_root)
         else:
             target_path = dance_motion_path(self._routines_root, r.name)
         save_routine(target_path, routine)
@@ -520,7 +524,13 @@ class EdupingRosBridge:
     # ---------- playback ----------------------------------------------------
 
     def play_routine(
-        self, kind: str, name: str, *, speed: float = 1.0, target: str = "sim"
+        self,
+        kind: str,
+        name: str,
+        *,
+        speed: float = 1.0,
+        target: str = "sim",
+        reverse: bool = False,
     ) -> dict:
         if speed <= 0:
             speed = 1.0
@@ -532,12 +542,15 @@ class EdupingRosBridge:
             dance_motion_path,
             greeting_yaml_path,
             load_routine,
+            mugunghwa_yaml_path,
         )
 
         if kind == KIND_GREETING:
             path = greeting_yaml_path(self._routines_root, name)
         elif kind == KIND_DANCE:
             path = dance_motion_path(self._routines_root, name)
+        elif kind == KIND_MUGUNGHWA:
+            path = mugunghwa_yaml_path(self._routines_root)
         else:
             raise ValueError(f"invalid kind {kind!r}")
         if not path.exists():
@@ -545,6 +558,17 @@ class EdupingRosBridge:
         routine = load_routine(path)
         if not routine.keyframes:
             raise ValueError(f"{path}: keyframes 비어있음")
+
+        if reverse:
+            # 같은 t 시퀀스를 유지하고 pos 만 역순으로 매핑 → 끝 자세 → 시작 자세 궤적.
+            # 무궁화 떼기 (눈 떼는) 모션을 별도 녹화 없이 같은 가리기 모션의 reverse 로 합성.
+            reversed_positions = [kf.pos for kf in reversed(routine.keyframes)]
+            from eduarm.routines_io import Keyframe  # type: ignore[import-not-found]
+
+            routine.keyframes = [
+                Keyframe(t=routine.keyframes[i].t, pos=list(reversed_positions[i]))
+                for i in range(len(routine.keyframes))
+            ]
 
         # 첫 keyframe 와 현재 follower pose 차이로 부드러운 ramp 시간 산출.
         ramp_s = self._compute_ramp_s(routine)

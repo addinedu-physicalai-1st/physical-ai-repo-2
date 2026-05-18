@@ -86,6 +86,12 @@ def greeting_yaml_path(routines_root: Path, slot: str) -> Path:
     return routines_root / "openarm_greeting" / f"{slot}.yaml"
 
 
+def mugunghwa_yaml_path(routines_root: Path) -> Path:
+    """무궁화꽃이 피었습니다 (SR-PLAY-004) 의 양팔 가리기 모션 단일 파일.
+    재생은 정방향 (가리기) + 역재생 (떼기) 두 번 — 별도 슬롯을 두지 않는다."""
+    return routines_root / "openarm_mugunghwa" / "motion.yaml"
+
+
 def dance_dir(routines_root: Path, slug: str) -> Path:
     if not SLUG_RE.match(slug):
         raise ValueError(f"invalid dance slug {slug!r}; must match {SLUG_RE.pattern}")
@@ -186,6 +192,24 @@ def list_dances(routines_root: Path) -> list[dict[str, Any]]:
         meta["has_motion"] = (d / "motion.yaml").exists()
         out.append(meta)
     return out
+
+
+def read_mugunghwa(routines_root: Path) -> dict[str, Any] | None:
+    """무궁화 단일 모션 메타 — 미녹화는 None."""
+    p = mugunghwa_yaml_path(routines_root)
+    if not p.exists():
+        return None
+    try:
+        r = load_routine(p)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("mugunghwa motion 읽기 실패: %s", exc)
+        return None
+    return {
+        "duration_s": round(r.duration_s, 3),
+        "keyframe_count": len(r.keyframes),
+        "recorded_at": r.recorded_at,
+        "sample_hz": r.sample_hz,
+    }
 
 
 def list_greetings(routines_root: Path) -> dict[str, dict[str, Any] | None]:

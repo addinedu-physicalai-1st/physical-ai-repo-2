@@ -15,7 +15,7 @@ import WarningModal from '@/common/WarningModal.vue';
 import Icon from '@/common/Icon.vue';
 
 const props = defineProps<{
-  kind: 'dance' | 'greeting';
+  kind: 'dance' | 'greeting' | 'mugunghwa';
   name: string;
   /** 비활성화 (예: name 미선택) */
   disabled?: boolean;

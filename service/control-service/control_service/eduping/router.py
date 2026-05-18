@@ -54,6 +54,7 @@ from control_service.eduping.ros_bridge import (
     EdupingRosBridge,
     KIND_DANCE,
     KIND_GREETING,
+    KIND_MUGUNGHWA,
     RecordingConflict,
     RecordingNotActive,
     ros_available,
@@ -106,6 +107,8 @@ class TeleopIn(BaseModel):
 class PlayIn(BaseModel):
     target: Literal["sim", "real"] = "sim"
     speed: float = Field(default=1.0, ge=0.1, le=2.0)
+    # reverse=True 는 현재 mugunghwa 단일 모션의 떼기 (눈 떼는) 재생용. 다른 kind 에서는 무시됨.
+    reverse: bool = Field(default=False)
 
 
 class ReturnHomeIn(BaseModel):
@@ -481,6 +484,59 @@ async def greeting_play(req: Request, slot: str, body: PlayIn) -> dict:
     bridge = _bridge(req)
     try:
         return bridge.play_routine(KIND_GREETING, slot, speed=body.speed, target=body.target)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e)) from e
+    except (ValueError, BridgeUnavailable) as e:
+        raise HTTPException(400, str(e)) from e
+
+
+# ---------------------------------------------------------------------------
+# slot — mugunghwa (단일 슬롯, SR-PLAY-004)
+# ---------------------------------------------------------------------------
+#
+# 무궁화꽃이 피었습니다 게임의 양팔 눈가리기 모션 한 개. 저장 경로는
+# shared/openarm_mugunghwa/motion.yaml. URL 의 {name} 은 항상 'motion' — 기존
+# RecorderControls 의 /api/eduping/{kind}/{name}/{action} 구조를 그대로 재사용
+# 하기 위한 placeholder (값은 무시).
+
+
+# 무궁화 모션은 단일 슬롯 — URL 의 {name} 은 RecorderControls 의 /api/eduping/{kind}/{name}/{action}
+# 패턴을 그대로 재사용하기 위한 placeholder (값 무시, bridge 가 고정 경로로 라우팅).
+
+
+@router.get("/mugunghwa")
+async def list_mugunghwa(req: Request) -> dict:
+    bridge = _bridge(req)
+    from eduarm.routines_io import read_mugunghwa
+
+    return {"motion": read_mugunghwa(bridge.routines_root)}
+
+
+@router.post("/mugunghwa/{name}/record/start")
+async def mugunghwa_record_start(req: Request, name: str) -> dict:
+    bridge = _bridge(req)
+    try:
+        return bridge.start_recording(KIND_MUGUNGHWA, name)
+    except RecordingConflict as e:
+        raise HTTPException(409, str(e)) from e
+
+
+@router.post("/mugunghwa/{name}/record/stop")
+async def mugunghwa_record_stop(req: Request, name: str, body: StopRecordIn) -> dict:
+    bridge = _bridge(req)
+    try:
+        return bridge.stop_recording(save=body.save)
+    except RecordingNotActive as e:
+        raise HTTPException(409, str(e)) from e
+
+
+@router.post("/mugunghwa/{name}/play")
+async def mugunghwa_play(req: Request, name: str, body: PlayIn) -> dict:
+    bridge = _bridge(req)
+    try:
+        return bridge.play_routine(
+            KIND_MUGUNGHWA, name, speed=body.speed, target=body.target, reverse=body.reverse,
+        )
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except (ValueError, BridgeUnavailable) as e:
