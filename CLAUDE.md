@@ -36,6 +36,7 @@ Addinedu 최종 프로젝트 — **pingdergarten**. 유치원에서 아이와 �
 - 새 의존성 추가 시 `pyproject.toml` 의 `[project.dependencies]` 에 추가한다.
 - `venv`, `uv` 등 별도 가상환경을 새로 생성하지 않는다. `.venv/`, `uv.lock` 파일을 만들지 않는다.
 - 서비스별 `requirements.txt` 나 `pyproject.toml` 을 새로 만들지 않는다.
+- **ROS Python 노드** (controller/* 의 ament_python 패키지) 는 `colcon build` 후 install 의 shebang 이 `#!/usr/bin/python3` 로 고정 — venv 와 무관하게 system python3 에서 실행된다. ROS 노드가 import 하는 비표준 패키지 (예: `pyserial`) 는 `sudo apt install python3-<pkg>` 로 system 에도 깔아둔다. 현재 필요 목록: `python3-serial`.
 
 ## 테스트
 
