@@ -151,7 +151,7 @@ const reachedCount = computed(
 );
 
 // ---- 노래 stage: tempo variation + 실 오디오 진행 추적 -----------------------
-// `mugunghwa-cue.mp3` (자연 속도 ~3.17s) 가 단일 진실의 원천 (single source of truth).
+// `yeonghui_mugunghwa.mp3` (자연 속도 ~4.6s) 가 단일 진실의 원천 (single source of truth).
 // `audio.currentTime / audio.duration` 으로 진행률을 그리고, `audio.ended` 가 발화하면
 // 짧은 꼬리 후 관찰 단계로 전이. 이전엔 TTS 발화 vs. 가상 타이머 두 경주를 돌리느라
 // 빠른 tempo 에서 가상 시간이 먼저 만료돼 "무궁화" 도중 끊기는 버그가 있었음.
@@ -163,17 +163,17 @@ const TEMPO_LABEL: Record<TempoPattern, string> = {
   fast_to_slow: '점점 느리게',
 };
 
-// 체감 차이가 확실하도록 넓힌 범위. 0.3 = 늘어진 슬로우모, 1.8 = 빠른 휘몰아침.
-// 이전 0.4/2.4 는 전체적으로 너무 빨라서 −25% 로 조정 (slow_to_fast 의 슬로우 구간이
-// 실제 슬로우모 처럼 늘어지도록).
-const RATE_MIN = 0.3;
-const RATE_MAX = 1.8;
+// 체감 차이가 확실하도록 넓힌 범위. 0.6 = 늘어진 슬로우모, 2.0 = 빠른 휘몰아침.
+// yeonghui_mugunghwa.mp3 가 이미 자연 속도부터 충분히 느리게 녹음돼 있어 RATE_MIN 을
+// 0.3 → 0.6 으로 올리고, RATE_MAX 도 1.8 → 2.0 로 소폭 상향.
+const RATE_MIN = 0.6;
+const RATE_MAX = 2.0;
 const RATE_MID = (RATE_MIN + RATE_MAX) / 2;
 // 'random' 패턴의 속도 갱신 간격도 무작위 — 일정 주기로 바뀌면 거기에 적응당함.
 const RANDOM_RATE_MIN_REFRESH_MS = 220;
 const RANDOM_RATE_MAX_REFRESH_MS = 700;
 const TICK_MS = 80;
-const SONG_AUDIO_URL = '/sounds/mugunghwa-cue.mp3';
+const SONG_AUDIO_URL = '/sounds/yeonghui_mugunghwa.mp3';
 
 const tempoPattern = ref<TempoPattern>('slow_to_fast');
 const currentRate = ref(1.0);

@@ -6,7 +6,7 @@
  * 떼기 녹화 없음. 저장 경로 shared/openarm_mugunghwa/motion.yaml. REST 경로
  * /api/eduping/mugunghwa/motion/{record/start,record/stop,play}.
  *
- * 박자 가이드 — `public/sounds/mugunghwa-cue.mp3` (자연 속도, ~3.17s). 런타임
+ * 박자 가이드 — `public/sounds/yeonghui_mugunghwa.mp3` (자연 속도, ~4.6s). 런타임
  * `audio.playbackRate = REFERENCE_PLAYBACK_RATE` 로 일정한 느린 속도 재생.
  * 등록 단계는 단일 템포여야 한다 — 교사가 한 박자에 맞춰 팔 동작을 녹화하면, 게임의
  * tempo pattern (느렸다가 빠르게 등) 이 그 한 녹화를 동적으로 변속해서 쓴다.
@@ -20,8 +20,8 @@ import RecorderControls from './RecorderControls.vue';
 
 const MOTION_NAME = 'motion';
 const REFERENCE_TTS_TEXT = '무궁화 꼬치 피었습니다';
-const REFERENCE_CUE_URL = '/sounds/mugunghwa-cue.mp3';
-const REFERENCE_PLAYBACK_RATE = 0.45;  // 0.6 → 0.45 (−25%) — 너무 빠르단 피드백 반영
+const REFERENCE_CUE_URL = '/sounds/yeonghui_mugunghwa.mp3';
+const REFERENCE_PLAYBACK_RATE = 0.8;  // yeonghui mp3 가 자연 속도부터 이미 느려서 0.45 는 과도 — 0.8 로 상향
 
 const referenceDurationS = ref(0);
 const referenceEffectiveDurationS = computed(
@@ -56,7 +56,7 @@ function startReferenceTts(): void {
       if (playToken !== myToken) return;
       const name = (err as { name?: string } | null)?.name;
       if (name === 'AbortError' || name === 'NotAllowedError') return;
-      console.warn('[mugunghwa-cue] play failed', err);
+      console.warn('[yeonghui-cue] play failed', err);
     });
   }
 }
@@ -168,12 +168,14 @@ onBeforeUnmount(() => {
           </p>
           <p class="tts-hint">
             <Icon name="music" :size="14" />
-            녹화·재생 시 <strong>"{{ REFERENCE_TTS_TEXT }}"</strong> 박자 가이드
-            <span v-if="referenceDurationS > 0">
-              (<strong>{{ Math.round(REFERENCE_PLAYBACK_RATE * 100) }}%</strong> 속도,
+            <span class="tts-hint-text">
+              녹화·재생 시 <strong>"{{ REFERENCE_TTS_TEXT }}"</strong> 박자 가이드<span
+                v-if="referenceDurationS > 0"
+              > (<strong>{{ Math.round(REFERENCE_PLAYBACK_RATE * 100) }}%</strong> 속도,
               <strong>{{ referenceEffectiveDurationS.toFixed(1) }}s</strong>)</span>
               가 재생됩니다. 이 박자에 맞춰 양팔로 눈을 가려주세요 —
               게임에서는 이 한 녹화를 빠르게/느리게 변속해 씁니다.
+            </span>
           </p>
 
           <div v-if="loading" class="muted">로딩…</div>
@@ -300,6 +302,12 @@ onBeforeUnmount(() => {
   color: #be185d;
   margin-top: 2px;
   flex-shrink: 0;
+}
+.tts-hint-text {
+  flex: 1;
+  min-width: 0;       /* flex item 이 텍스트 줄바꿈 허용하도록 */
+  word-break: keep-all; /* 한글 단어 단위 줄바꿈 — 음절 단위 자르기 방지 */
+  overflow-wrap: anywhere;
 }
 .tts-hint strong { color: #be185d; font-weight: 700; }
 .meta {
