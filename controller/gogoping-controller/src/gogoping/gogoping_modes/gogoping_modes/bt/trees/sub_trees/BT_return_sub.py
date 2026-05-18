@@ -28,6 +28,7 @@ from py_trees.common import Access
 from ...behaviors.navigation.align_to_dock import AlignToDock
 from ...behaviors.navigation.navigate_to_vertex import NavigateToVertex
 from ...behaviors.navigation.reverse_into_dock import ReverseIntoDock
+from ...behaviors.navigation.verify_docking_contact import VerifyDockingContact
 from ...blackboard import Keys
 
 if TYPE_CHECKING:
@@ -98,6 +99,7 @@ def build_return_subtree(ctx: "Context") -> py_trees.behaviour.Behaviour:
             ),
             AlignToDock("align_to_dock", ctx),
             ReverseIntoDock("reverse_into_dock", ctx),
+            VerifyDockingContact("verify_docking_contact", ctx),
         ],
     )
     return py_trees.decorators.OneShot(

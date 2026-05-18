@@ -52,13 +52,13 @@ def test_build_returns_oneshot_decorator():
     assert isinstance(root, py_trees.decorators.OneShot)
 
 
-def test_build_inner_is_sequence_with_three_children():
-    """OneShot 의 자식은 Sequence, 자식 3개."""
+def test_build_inner_is_sequence_with_four_children():
+    """OneShot 의 자식은 Sequence, 자식 4개 (NavTo, Align, Reverse, Verify)."""
     ctx = _Ctx()
     root = build_return_subtree(ctx)
     inner = root.decorated
     assert isinstance(inner, py_trees.composites.Sequence)
-    assert len(inner.children) == 3
+    assert len(inner.children) == 4
 
 
 def test_build_seeds_blackboard_with_approach_key_and_yaw():
@@ -76,11 +76,12 @@ def test_build_seeds_blackboard_with_approach_key_and_yaw():
     )
 
 
-def test_children_order_navigate_align_reverse():
-    """Sequence 자식 순서가 NavigateToVertex → AlignToDock → ReverseIntoDock."""
+def test_children_order_navigate_align_reverse_verify():
+    """Sequence 자식 순서가 NavigateToVertex → AlignToDock → ReverseIntoDock → VerifyDockingContact."""
     from gogoping_modes.bt.behaviors.navigation.align_to_dock import AlignToDock
     from gogoping_modes.bt.behaviors.navigation.navigate_to_vertex import NavigateToVertex
     from gogoping_modes.bt.behaviors.navigation.reverse_into_dock import ReverseIntoDock
+    from gogoping_modes.bt.behaviors.navigation.verify_docking_contact import VerifyDockingContact
 
     ctx = _Ctx()
     root = build_return_subtree(ctx)
@@ -88,3 +89,4 @@ def test_children_order_navigate_align_reverse():
     assert isinstance(inner.children[0], NavigateToVertex)
     assert isinstance(inner.children[1], AlignToDock)
     assert isinstance(inner.children[2], ReverseIntoDock)
+    assert isinstance(inner.children[3], VerifyDockingContact)

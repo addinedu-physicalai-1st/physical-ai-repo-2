@@ -15,9 +15,9 @@
 |---|---|---|
 | **Trees** | **9 / 13** | MainTree 8/8 ✅ · SubTree 1/5 (BT_return_sub ✅) |
 | **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
-| **Behaviors** | **10 / 33** | common 7/11 · navigation 3/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
+| **Behaviors** | **11 / 33** | common 7/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 0/2 · recovery 0/3 |
 | **Infrastructure** | **34 / 37** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). PoseSubscriber + MapCache + gogoping_camera_pan 5종 추가 |
-| **합계** | **54 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + align_to_dock + reverse_into_dock + BT_return_sub |
+| **합계** | **55 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + **return cycle (NavTo + Align + Reverse + VerifyDocked + BT_return_sub)** |
 
 ---
 
@@ -46,7 +46,7 @@
 | BT_follow_sub | ☐ | StubFollow 로 대체 중. 정상 ↔ Loss Recovery |
 | BT_lullaby_sub | ☐ | StubLullaby 로 대체 중. UI mp3 재생 + WaitForExit |
 | BT_hide_and_seek_sub | ☐ | StubHideseek 로 대체 중. 1회 실행 후 종료 |
-| BT_return_sub | ✅ | [BT_return_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py) — OneShot(Sequence([NavigateToVertex("충전소입구"), AlignToDock, ReverseIntoDock])). 빌더가 waypoints.yaml 의 충전소입구 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 로 자동 주입. 자동 도킹 (VerifyDockingContact) 은 범위 외 — 사람이 admin UI 디버그 버튼으로 docked trigger 발사. 6 빌더 테스트 통과 (tests/test_gogoping_return_subtree_builder.py) |
+| BT_return_sub | ✅ | [BT_return_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py) — OneShot(Sequence([NavigateToVertex("충전소입구"), AlignToDock, ReverseIntoDock, **VerifyDockingContact**])). 빌더가 waypoints.yaml 의 충전소입구 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 로 자동 주입. ReverseIntoDock 완료 후 VerifyDockingContact 가 `docked` trigger 자동 발사 → CHARGING 전이. 6 빌더 테스트 통과 (tests/test_gogoping_return_subtree_builder.py) |
 
 ### Stub (_stubs/) — 1 / 5 (+ 4 🟡)
 
@@ -88,7 +88,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | navigate_to_pose | ☐ | |
 | align_to_dock | ✅ | [align_to_dock.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/align_to_dock.py) — blackboard ROBOT_POSE.yaw vs CHARGING_DOCK_TARGET_YAW 비교 → cmd_vel.angular.z publish. 9 단위 테스트 통과 (tests/test_gogoping_align_to_dock.py) |
 | reverse_into_dock | ✅ | [reverse_into_dock.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/reverse_into_dock.py) — N초 동안 cmd_vel.linear.x 후진 publish → SUCCESS. 명세상 `approach_dock` 자리 (디자인상 이름 변경). 8 단위 테스트 통과 (tests/test_gogoping_reverse_into_dock.py) |
-| verify_docking_contact | ☐ | |
+| verify_docking_contact | ✅ | [verify_docking_contact.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/verify_docking_contact.py) — ReverseIntoDock 완료 후 `docked` trigger 1회 발사 → CHARGING 자동 전이. 자동 도킹 센서 미구현이라 현재 시간 기반 후진만으로 도킹 간주. 5 단위 테스트 통과 (tests/test_gogoping_verify_docking_contact.py) |
 | stop_base | ☐ | |
 | maintain_distance | ☐ | |
 | check_arrival | ☐ | |

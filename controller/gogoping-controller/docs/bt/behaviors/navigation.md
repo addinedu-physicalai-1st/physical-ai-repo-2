@@ -82,11 +82,21 @@ nav2 `NavigateToPose` 직접 호출 — vertex 그래프 무시, 임의 pose 로
 
 ---
 
-## verify_docking_contact {#verify_docking_contact}  *(스켈레톤)*
+## verify_docking_contact {#verify_docking_contact}
 
-도킹 접점 확인 → `"docked"` FSM trigger.
+[bt/behaviors/navigation/verify_docking_contact.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/verify_docking_contact.py)
 
-| Used in | BT_return_sub |
+ReverseIntoDock 완료 후 `docked` FSM trigger 발사 → RETURNING / LOW_BATTERY_RETURN → CHARGING 자동 전이. 자동 도킹 접점 센서는 미구현이라 현재 단순히 "후진 끝났으면 도크 도달 간주" 로 1tick SUCCESS + trigger 발사.
+
+| 항목 | 값 |
+|---|---|
+| FSM trigger | `docked` (idempotent — 잘못된 state 에서는 transitions 라이브러리가 무시) |
+| Blackboard read/write | — |
+| Status | SUCCESS (매 tick — trigger 는 _fired 플래그로 1회만 발사) |
+| terminate(INVALID) | cleanup 없음 |
+| Used in | BT_return_sub (Sequence 의 마지막 자식) |
+
+추후 확장: `blackboard.DOCKING_CONTACT` 가 True 일 때만 발사 + False 면 FAILURE 로 ReverseIntoDock 재시도 등.
 
 ---
 

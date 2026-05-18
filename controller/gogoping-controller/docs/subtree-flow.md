@@ -84,11 +84,16 @@ CarryGotoMode (Sequence)
           │           └─ AnnounceNotFound
           └─ NavigateToPose(home_position_key)
  -------------------------------------------------------------------------------
-ReturnSubTree (Sequence, memory=True)
-  ├─ NavigateToPose(charging_dock_approach_key)
-  ├─ AlignToDock                     (스켈레톤 — 시간 여유 시 구현)
-  ├─ ApproachDock                    (스켈레톤)
-  └─ VerifyDockingContact            (스켈레톤)
+ReturnSubTree = OneShot(ON_COMPLETION) of:
+  Sequence (memory=True)
+    ├─ NavigateToVertex(target_key="charging_dock_approach_key")  # "충전소입구" vertex 까지 graph routing
+    ├─ AlignToDock                                                 # CHARGING_DOCK_TARGET_YAW 까지 회전
+    ├─ ReverseIntoDock                                              # N초 후진
+    └─ VerifyDockingContact                                         # docked trigger 자동 발사 → CHARGING
+
+# 접점 센서는 미구현 — VerifyDockingContact 가 "후진 끝났으면 도킹 완료" 간주
+# 후 docked trigger 발사. 추후 docking_contact 토픽 통합 시 검증 추가.
+# 자세한 명세: docs/bt/trees/BT_return_sub.md
 ------------------------------------------------------------------------------- 
 1. CarrySubTree (운반)
 3가지 모드 중 사용자가 선택:
@@ -110,6 +115,6 @@ Follow — 사람 따라가기 (FollowSubTree 재사용)
 → 찾으면 "찾았다!", 다 돌았는데 못 찾으면 "못 찾았어요" → 원위치 복귀
 **한 번 실행 후 종료** (라운드/반복 개념 없음). 다시 하려면 사용자가 UI 에서 재요청.
 
-5. ReturnSubTree (도킹 복귀)
-도킹 근처로 이동 → 정렬 → 진입 → 접점 확인
-(정렬/진입/접점확인은 스켈레톤, 발표는 수동 도킹)                   
+5. ReturnSubTree (도킹 복귀) — 4단계
+graph_router 로 "충전소입구" vertex 까지 lane 따라 이동 → 도크 등진 yaw 로 제자리 회전 → N초 후진 → docked trigger 자동 발사 (VerifyDockingContact) → CHARGING 전이 → OneShot 잠금 (재실행 X).
+자동 도킹 접점 센서는 미구현 — 시간 기반 후진 끝나면 무조건 도킹 완료 간주.
