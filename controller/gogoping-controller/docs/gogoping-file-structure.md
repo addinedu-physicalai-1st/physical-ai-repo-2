@@ -83,7 +83,7 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_carry_sub (goto), BT_assist_main 의 named-pose 이동
         │   │   │   ├── align_to_dock.py              # blackboard target yaw 까지 cmd_vel.angular.z 로 제자리 회전 → docs/bt/behaviors/navigation.md#align_to_dock
         │   │   │   │                                 #   Used in: BT_return_sub
-        │   │   │   ├── approach_dock.[py|/]          # 저속 직진으로 도킹 진입 [스켈레톤]
+        │   │   │   ├── reverse_into_dock.py          # N초 동안 cmd_vel.linear.x 음수 publish (후진 진입) → docs/bt/behaviors/navigation.md#reverse_into_dock
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── verify_docking_contact.[py|/] # 도킹 접점 확인 → "docked" trigger [스켈레톤]
         │   │   │   │                                 #   Used in: BT_return_sub

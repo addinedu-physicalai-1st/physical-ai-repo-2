@@ -63,11 +63,22 @@ nav2 `NavigateToPose` 직접 호출 — vertex 그래프 무시, 임의 pose 로
 
 ---
 
-## approach_dock {#approach_dock}  *(스켈레톤)*
+## reverse_into_dock {#reverse_into_dock}
 
-저속 직진으로 도킹 진입. cmd_vel publish.
+[bt/behaviors/navigation/reverse_into_dock.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/reverse_into_dock.py)
 
+고정 시간 동안 cmd_vel.linear.x 음수 publish — 도크 등진 자세에서 단순 후진 진입. 자동 도킹 (접점 감지 등) 은 발표 범위 외라 시간 기반.
+
+| 항목 | 값 |
+|---|---|
+| Topic publish | `/gogoping/cmd_vel` (geometry_msgs/Twist) |
+| Blackboard read/write | — |
+| Status | RUNNING (elapsed < duration) / SUCCESS (elapsed ≥ duration, cmd_vel=0 publish 후) |
+| ROS param | `reverse_duration_sec` (기본 10.0 — 1m / 0.1 m/s), `reverse_linear_x` (기본 -0.1) |
+| terminate(INVALID) | cmd_vel = 0 publish |
 | Used in | BT_return_sub |
+
+> 명세상 `approach_dock` 으로 표기되었던 자리. 우리 디자인은 충전소입구 → 충전소 방향 후진이라 이름을 `reverse_into_dock` 으로 명확화.
 
 ---
 
