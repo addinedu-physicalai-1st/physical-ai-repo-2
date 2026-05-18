@@ -11,7 +11,7 @@ Blackboard 는 본 Context 에 두지 않는다 — py_trees 의 전역 blackboa
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import rclpy.node
@@ -47,3 +47,4 @@ class Context:
     db_logger: DBLogger
     pose: PoseSubscriber             # /amcl_pose 구독 → blackboard.ROBOT_POSE (map frame)
     map_cache: MapCache              # /map 구독 + is_outside(x,y) (map_boundary_monitor 가 사용)
+    cmd_vel_pub: Any = None          # /gogoping/cmd_vel publisher — AlignToDock / ReverseIntoDock 가 사용. main.py 가 주입. None 이면 behavior 가 직접 생성 (테스트 호환).

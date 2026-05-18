@@ -67,8 +67,14 @@ class ReverseIntoDock(py_trees.behaviour.Behaviour):
         self._started_at: float | None = None
 
     def setup(self, **kwargs: Any) -> None:
+        if self._cmd_vel_pub is not None:
+            return
+        shared = getattr(self.ctx, "cmd_vel_pub", None)
+        if shared is not None:
+            self._cmd_vel_pub = shared
+            return
         node = kwargs.get("node") or getattr(self.ctx, "node", None)
-        if node is None or self._cmd_vel_pub is not None:
+        if node is None:
             return
         try:
             from geometry_msgs.msg import Twist

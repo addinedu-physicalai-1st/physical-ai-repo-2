@@ -90,6 +90,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_pose_override.py \
   tests/test_gogoping_align_to_dock.py \
   tests/test_gogoping_reverse_into_dock.py \
+  tests/test_gogoping_return_subtree_builder.py \
   -v "$@"; then
   EXIT=1
 fi
