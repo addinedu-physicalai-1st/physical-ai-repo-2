@@ -1,6 +1,7 @@
 """ROS 직접 호출을 래핑하는 interfaces — behavior 가 rclpy 객체를 직접 만들지 않게.
 
-- ``UIPublisher`` / ``BatterySubscriber`` / ``PoseSubscriber`` / ``MapCache`` — 실 구현.
+- ``UIPublisher`` / ``BatterySubscriber`` / ``PoseSubscriber`` / ``MapCache`` /
+  ``BaseDriverClient`` — 실 구현.
 - 나머지 (``Nav2Client`` / ``CameraPanClient`` / ``CollisionSubscriber`` /
   ``DBLogger``) — 추후 구현 예정인 stub.
 
@@ -9,6 +10,7 @@
 """
 from __future__ import annotations
 
+from .base_driver_client import BaseDriverClient
 from .battery_subscriber import BatterySubscriber
 from .camera_pan_client import CameraPanClient
 from .collision_subscriber import CollisionSubscriber
@@ -19,6 +21,7 @@ from .pose_subscriber import PoseSubscriber
 from .ui_publisher import UIPublisher
 
 __all__ = [
+    "BaseDriverClient",
     "BatterySubscriber",
     "CameraPanClient",
     "CollisionSubscriber",
