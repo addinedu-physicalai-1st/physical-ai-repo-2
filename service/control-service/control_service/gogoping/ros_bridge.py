@@ -29,6 +29,7 @@ SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
 SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
 SERVICE_SET_ROBOT_POSE = "/gogoping/debug/set_robot_pose"
 SERVICE_SET_GAZEBO_POSE = "/gogoping/sim/teleport_pose"
+SERVICE_EMERGENCY_STOP = "/gogoping/emergency_stop"
 
 
 def ros_available() -> bool:
@@ -75,6 +76,7 @@ class GogopingRosBridge:
         self._set_battery_cli: Any = None  # SetBatteryLevel.srv client (sim 디버그 전용)
         self._set_robot_pose_cli: Any = None  # SetRobotPose.srv client (디버그 전용)
         self._set_gazebo_pose_cli: Any = None  # SetGazeboPose.srv client (sim 디버그 전용)
+        self._estop_cli: Any = None        # std_srvs/Trigger client — emergency_stop
         self._sub: Any = None              # /gogoping/state subscriber
         self._executor: Any = None
 
@@ -96,6 +98,7 @@ class GogopingRosBridge:
             ForceState, SetBatteryLevel, SetGazeboPose, SetGoal, SetRobotPose,
         )
         from std_msgs.msg import String
+        from std_srvs.srv import Trigger
 
         if "ROS_DOMAIN_ID" not in os.environ:
             raise BridgeUnavailable(
@@ -117,6 +120,9 @@ class GogopingRosBridge:
         )
         self._set_gazebo_pose_cli = self._node.create_client(
             SetGazeboPose, SERVICE_SET_GAZEBO_POSE,
+        )
+        self._estop_cli = self._node.create_client(
+            Trigger, SERVICE_EMERGENCY_STOP,
         )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
@@ -310,6 +316,36 @@ class GogopingRosBridge:
         result = future.result()
         return bool(result.accepted), str(result.reason)
 
+    # ----------------------------------------------------------- emergency_stop
+
+    def emergency_stop_sync(self) -> tuple[bool, str]:
+        """긴급정지 — ``/gogoping/emergency_stop`` (std_srvs/Trigger) 동기 호출.
+
+        gogoping_modes 의 command_listener 가 ``fsm.force_state("ERROR")`` 호출 →
+        BT_error_main 빌드 → StopAllMotors (cmd_vel=0 + torque OFF).
+
+        ERROR 는 terminal — 한 번 호출하면 robot 재시작해야 복구.
+        idempotent — 이미 ERROR 면 modes 가 no-op 처리 (Trigger 응답: success=True).
+        """
+        if not self._ros_ok or self._estop_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._estop_cli.service_is_ready():
+            if not self._estop_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from std_srvs.srv import Trigger
+        req = Trigger.Request()
+
+        future = self._estop_cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        return bool(result.success), str(result.message)
+
     # ----------------------------------------------------------- state pubsub
 
     def _on_state_msg(self, msg: Any) -> None:
@@ -356,5 +392,5 @@ __all__ = [
     "GogopingRosBridge", "BridgeUnavailable", "ros_available",
     "TOPIC_STATE", "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
     "SERVICE_SET_BATTERY_LEVEL", "SERVICE_SET_ROBOT_POSE",
-    "SERVICE_SET_GAZEBO_POSE",
+    "SERVICE_SET_GAZEBO_POSE", "SERVICE_EMERGENCY_STOP",
 ]

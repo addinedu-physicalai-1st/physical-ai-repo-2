@@ -2,7 +2,7 @@
 
 RETURNING 과 비교:
     RETURNING (사용자 명시 / idle_timeout)        LOW_BATTERY_RETURN (battery_low 자동)
-    ─ HardwareHealthMonitor                       ─ HardwareHealthMonitor   (동일)
+    ─ HardwareHealthMonitor (✅)                  ─ HardwareHealthMonitor   (✅ 동일)
     ─ CollisionEventHandler                       ─ CollisionEventHandler   (동일)
     ─ MapBoundaryMonitor                          ─ MapBoundaryMonitor      (동일)
     ─ CommandListener  ★ 사용자 cancel 가능       ─ CommandListener 없음    ★ 차단
@@ -16,7 +16,7 @@ lockdown 정책 정확히:
 - *사용자 명령* 차단 (CommandListener 없음)
 - *안전 monitor* 는 정상 배치 (MapBoundaryMonitor / HW / Collision) — 자율 ERROR 전이 가능
 
-현재 배치: MapBoundaryMonitor + ReturnSubTree. HW / Collision monitor 는 추후.
+현재 배치: MapBoundaryMonitor + HardwareHealthMonitor + ReturnSubTree. Collision monitor 는 추후.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ import py_trees
 from py_trees.common import ParallelPolicy
 
 from ....context import Context
+from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
 from ..sub_trees.BT_return_sub import build_return_subtree
 
@@ -34,7 +35,8 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         policy=ParallelPolicy.SuccessOnAll(synchronise=False),
         children=[
             MapBoundaryMonitor("MapBoundaryMonitor", ctx),
+            HardwareHealthMonitor("HardwareHealthMonitor", ctx),
             build_return_subtree(ctx),
-            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler
+            # TODO 추후: CollisionEventHandler
         ],
     )

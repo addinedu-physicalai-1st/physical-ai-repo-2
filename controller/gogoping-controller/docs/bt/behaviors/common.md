@@ -64,9 +64,28 @@ IDLE 상태에서 N초 무명령 시 `"idle_timeout"` FSM trigger 발화 — 무
 | 파일 | [`bt/behaviors/common/idle_timeout_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) |
 | 테스트 | 6 시나리오 (immediately no-fire / fire-after-timeout / no-double / initialise re-arm / default timeout / terminate idempotent) |
 
-## hardware_health_monitor  *(스켈레톤)*
+## hardware_health_monitor  *(구현됨)*
 
-센서/모터 응답 끊김 감지 → `"fault"` trigger.
+LIDAR / odom staleness 감지 → `"fault"` trigger.
+
+**MVP 단계 모니터링 대상**:
+- LIDAR `/gogoping/scan` (`sensor_msgs/LaserScan`) — 끊기면 nav2 / 충돌 회피 불가
+- odom `/gogoping/odom` (`nav_msgs/Odometry`) — 끊기면 pose 추정 / 추적 불가
+
+각 토픽의 마지막 수신 시각이 ROS param `hw_health_staleness_seconds` (기본 3.0s) 초과 시 `fsm.trigger("fault", reason="lidar_timeout" | "odom_timeout")` 발화. edge-triggered (`_fired` 플래그). LIDAR 우선 (안전상 더 critical) — 동시 stale 이면 lidar 로 보고.
+
+**부팅 grace period**: `initialise()` 가 한 번도 메시지를 못 받은 토픽의 `_last_*` 를 *현재 시각* 으로 세팅 → 부팅 직후 트리 진입 시 grace period (= staleness threshold) 이후에야 fault. 노드 시작 직후 LIDAR / odom publisher 가 늦게 뜨는 false-positive 회피.
+
+**배치**: CHARGING / IDLE / ASSIST / PLAY / RETURNING / LOW_BATTERY_RETURN (**6 트리**). **MANUAL/ERROR 제외** — MANUAL 은 사용자 직접 제어 중 자동 ERROR 차단 (battery/HW/collision 일관 정책). ERROR 는 terminal.
+
+**향후 확장**:
+- ZLAC 모터 통신 끊김 — vicpinky_bringup 이 `/gogoping/motor_health` (`diagnostic_msgs`) publish 하면 추가
+- IMU staleness — IMU 도입 시 추가
+
+| Used in | 6 트리 (CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN) |
+| 파일 | [`bt/behaviors/common/hardware_health_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/hardware_health_monitor.py) |
+| 의존 토픽 | `/gogoping/scan`, `/gogoping/odom` (직접 subscribe — 별도 interface 없음, ctx.node 사용) |
+| ROS param | `hw_health_staleness_seconds` (float, 기본 3.0) |
 
 ## collision_event_handler  *(스켈레톤)*
 

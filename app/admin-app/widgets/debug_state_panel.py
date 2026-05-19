@@ -52,6 +52,8 @@ class DebugStatePanel(QFrame):
 
     # 적용 버튼 클릭 시 emit. 인자: (target_state, sub_task)
     force_state_requested = pyqtSignal(str, str)
+    # 긴급정지 버튼 클릭 시 emit. 인자 없음.
+    emergency_stop_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -108,6 +110,23 @@ class DebugStatePanel(QFrame):
             f"letter-spacing: 0.8px;"
         )
         outer.addWidget(header)
+
+        # 긴급정지 — 별도 큰 빨간 버튼. 한 번 누르면 ERROR (terminal) 진입.
+        # std_srvs/Trigger 호출 → command_listener._on_emergency_stop_request →
+        # fsm.force_state("ERROR") → BT_error_main 의 StopAllMotors (cmd_vel=0 + torque OFF).
+        self._estop_btn = QPushButton("🛑 긴급정지")
+        self._estop_btn.setCursor(Qt.PointingHandCursor)
+        self._estop_btn.setStyleSheet(
+            f"QPushButton {{"
+            f"  background: {COLORS['danger']}; color: white; border: none;"
+            f"  border-radius: 8px; padding: 8px 12px; font-size: 11pt; font-weight: 900;"
+            f"  min-height: 34px;"
+            f"}}"
+            f"QPushButton:hover {{ background: {soften(COLORS['danger'], 0.80)}; }}"
+            f"QPushButton:pressed {{ background: {soften(COLORS['danger'], 0.50)}; }}"
+        )
+        self._estop_btn.clicked.connect(self._on_estop_clicked)
+        outer.addWidget(self._estop_btn)
 
         # 빠른 토글: [수동] [주행] — combo 거치지 않고 즉시 force-state.
         # state row 아래 일반 흐름은 그대로 유지 (정밀 선택용).
@@ -211,6 +230,14 @@ class DebugStatePanel(QFrame):
         )
         self.force_state_requested.emit(state, "")
 
+    def _on_estop_clicked(self) -> None:
+        """긴급정지 버튼 — 확인 없이 즉시 발사 (안전 우선)."""
+        self._last_result.setText("sending → EMERGENCY STOP ...")
+        self._last_result.setStyleSheet(
+            f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
+        )
+        self.emergency_stop_requested.emit()
+
     # --------------------------------------------------------------- public
 
     def set_last_result(self, state: str, ok: bool, reason: str = "") -> None:
@@ -222,6 +249,19 @@ class DebugStatePanel(QFrame):
             )
         else:
             self._last_result.setText(f"✗ {state}: {reason}")
+            self._last_result.setStyleSheet(
+                f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
+            )
+
+    def set_estop_result(self, ok: bool, reason: str = "") -> None:
+        """state_client 가 emergency_stop POST 응답 받은 후 호출."""
+        if ok:
+            self._last_result.setText("✓ EMERGENCY STOP — ERROR state")
+            self._last_result.setStyleSheet(
+                f"font-size: 8pt; font-weight: 800; color: {COLORS['danger']};"
+            )
+        else:
+            self._last_result.setText(f"✗ EMERGENCY STOP: {reason}")
             self._last_result.setStyleSheet(
                 f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
             )

@@ -6,11 +6,12 @@
 
 ```
 Parallel(SuccessOnAll(synchronise=False))
-├─ MapBoundaryMonitor       common/map_boundary_monitor.md  (✅)
-└─ ReturnSubTree            sub_trees/BT_return_sub.md      (✅)  ← OneShot(NavTo → Align → Reverse)
+├─ MapBoundaryMonitor       common/map_boundary_monitor.md     (✅)
+├─ HardwareHealthMonitor    common/hardware_health_monitor.md  (✅)  ← LIDAR/odom staleness
+└─ ReturnSubTree            sub_trees/BT_return_sub.md         (✅)  ← OneShot(NavTo → Align → Reverse)
 ```
 
-> 안전 monitor + 복귀 SubTree. 사용자 명령 차단 (CommandListener 없음). `docked` trigger 가 외부에서 발화 (사람의 admin UI 디버그 버튼) 되거나 `MapBoundaryMonitor` 가 fault 발화하면 다른 state 로 전이.
+> 안전 monitor + 복귀 SubTree. 사용자 명령 차단 (CommandListener 없음). `docked` trigger 가 외부에서 발화 (사람의 admin UI 디버그 버튼) 되거나 `MapBoundaryMonitor`/`HardwareHealthMonitor` 가 fault 발화하면 다른 state 로 전이.
 
 ## RETURNING 과의 차이
 
@@ -19,7 +20,7 @@ Parallel(SuccessOnAll(synchronise=False))
 | 진입 trigger | `return_request` / `idle_timeout` | `battery_low` |
 | 진입 source | IDLE / ASSIST / PLAY / MANUAL | IDLE / ASSIST / PLAY / **RETURNING** (RETURNING 도중에도 배터리 떨어지면 escalation) |
 | `CommandListener` | ✅ 배치 — 사용자 cancel 가능 | ❌ **없음** — 사용자 명령 차단 (lockdown) |
-| HardwareHealthMonitor | (추후) | (추후) — 동일 |
+| HardwareHealthMonitor | ✅ | ✅ — 동일 |
 | CollisionEventHandler | (추후) | (추후) — 동일 |
 | MapBoundaryMonitor | ✅ | ✅ — 동일 |
 | ReturnSubTree | ✅ | ✅ — 동일 |
@@ -32,7 +33,7 @@ CommandListener 가 없으니 `SetGoal.srv` 호출 자체가 받을 server 없�
 - `utils/goal_reconciler.py` 가 `current_state == "LOW_BATTERY_RETURN"` 이면 `accepted=False`, `reason="fsm_in_low_battery_return"` 으로 거부 (control-service 가 이 reason 받으면 UI 에 토스트 표시).
 - `force_state` debug 는 별도 — admin 의 DebugStatePanel 에서 직접 `LOW_BATTERY_RETURN → IDLE` 등 강제 전이 가능 (개발 디버그 용도).
 
-**안전 monitor 는 정상 배치** — `MapBoundaryMonitor` (✅), HardwareHealthMonitor / CollisionEventHandler (추후). 사용자 명령은 차단하되 자율 fault 감지는 유지 (안전 > UX). 따라서 `fault` trigger 도 LOW_BATTERY_RETURN 의 유효 이탈 경로.
+**안전 monitor 는 정상 배치** — `MapBoundaryMonitor` (✅), `HardwareHealthMonitor` (✅), CollisionEventHandler (추후). 사용자 명령은 차단하되 자율 fault 감지는 유지 (안전 > UX). 따라서 `fault` trigger 도 LOW_BATTERY_RETURN 의 유효 이탈 경로.
 
 ## FSM trigger
 
@@ -51,5 +52,5 @@ CommandListener 가 없으니 `SetGoal.srv` 호출 자체가 받을 server 없�
 
 ## 상태
 
-- 코드: ✅ ([BT_low_battery_return_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_low_battery_return_main.py)) — `MapBoundaryMonitor` + `ReturnSubTree` 배치
-- 의존 behavior: `MapBoundaryMonitor` (✅), `BT_return_sub` (✅) — 추후 HardwareHealthMonitor, CollisionEventHandler
+- 코드: ✅ ([BT_low_battery_return_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_low_battery_return_main.py)) — `MapBoundaryMonitor` + `HardwareHealthMonitor` + `ReturnSubTree` 배치
+- 의존 behavior: `MapBoundaryMonitor` (✅), `HardwareHealthMonitor` (✅), `BT_return_sub` (✅) — 추후 CollisionEventHandler
