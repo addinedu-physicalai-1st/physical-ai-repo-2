@@ -11,9 +11,20 @@ from pathlib import Path
 from typing import Any
 
 import rclpy
+from rclpy.action import ActionClient
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+# control_msgs 는 GripperCommand action 을 위해서만 필요 — runner 전체 import 가
+# control_msgs 미설치 환경에서 깨지지 않게 lazy 로 두지 않고 가드.
+try:
+    from control_msgs.action import GripperCommand  # type: ignore[import-not-found]
+
+    _HAS_GRIPPER_ACTION = True
+except ImportError:  # noqa: BLE001
+    GripperCommand = None  # type: ignore[assignment, misc]
+    _HAS_GRIPPER_ACTION = False
 
 from noriarm_framework.manifest import ArmSpec, GameConfig
 from noriarm_framework.policy import (
@@ -93,6 +104,22 @@ class GameRunner(Node):
                 )
             self._arm_publishers[arm.id] = pub
 
+        # OMX-F bringup 의 gripper_controller 는 JointTrajectoryController 가 아니라
+        # GripperActionController — `/gripper_controller/gripper_cmd` action 만 받는다.
+        # 따라서 arm_controller 로 보내는 trajectory 의 6번째 컬럼 (gripper) 은
+        # 자동으로 잘려나가고 손가락은 명령을 받지 못한다. replay 시 첫 프레임의 gripper
+        # 값을 한 번 action goal 로 보내 closed-pose 진입시킨다 (animation 없음).
+        self._gripper_action_name = "/gripper_controller/gripper_cmd"
+        if _HAS_GRIPPER_ACTION:
+            self._gripper_client: ActionClient | None = ActionClient(
+                self, GripperCommand, self._gripper_action_name,
+            )
+        else:
+            self._gripper_client = None
+            self.get_logger().warn(
+                "control_msgs.action.GripperCommand import 실패 — 그리퍼 명령 비활성화"
+            )
+
     def run(self) -> None:
         ctx = GameContext(
             game_name=self._cfg.config.name,
@@ -104,6 +131,10 @@ class GameRunner(Node):
             f"게임 시작: name={self._cfg.config.name} target={self._cfg.target} "
             f"rate_hz={self._cfg.config.runtime.rate_hz} inputs={self._cfg.inputs}"
         )
+        # 게임 시작 시점에 그리퍼를 한 번 닫는다 — 사용자가 첫 답을 누르기 전부터 closed pose.
+        # 이전 세션이 open 으로 끝났거나 bringup 직후 초기 0.0 rad (사용자 보드에선 미닫힘)
+        # 인 상태를 보정. action 서버 미연결이면 경고만, 게임은 계속 진행.
+        self._send_gripper_close(context="game-start")
 
         period = 1.0 / self._cfg.config.runtime.rate_hz
         deadline = time.monotonic() + self._cfg.config.runtime.episode_timeout_s
@@ -148,11 +179,93 @@ class GameRunner(Node):
         if mode == "joint_state":
             self._replay_as_joint_states(arm, traj)
         else:
+            # 실 하드웨어 — arm trajectory 발사 전에 gripper closed-pose 한 번 보낸다.
+            # JointTrajectory 는 5축만 받고 gripper 는 별도 action 으로 가야 한다.
+            self._maybe_send_initial_gripper(arm, traj)
             self._replay_as_trajectory(arm, traj)
+
+    # OMX-F 그리퍼 closed pose (rad).
+    # 업스트림 GUI 는 0.0=close / 1.0=open 으로 명목값을 쓰지만 dynamixel_hardware_interface
+    # 가 URDF 라디안 → 모터 raw ticks 변환에 오프셋을 넣기 때문에 실제 "닫힘"이 잡히는
+    # URDF 라디안은 캘리브레이션에 따라 다르다 (이 보드는 0.0 으로는 잡 안 닫혀짐 확인).
+    # 모터 16 은 Operating Mode 5 (current-based position) + Current Limit 600 mA 라서
+    # **닫힘 한계점을 지나는 라디안을 줘도 모터가 stall 검출 → 안전 정지**.
+    # -1.0 으로 보내 jaws 가 닿을 때까지 강제 — 닿으면 600 mA 에 막혀 그 자리 유지.
+    # 만약 이 방향이 오히려 열리면 +1.5 로 부호 뒤집어서 시도.
+    GRIPPER_CLOSED_RAD = -1.0
+
+    # arm_controller 가 소유할 수 있는 그리퍼 joint 이름. omx_f_follower_ai 구성에서
+    # arm_controller 는 [joint1..joint5, gripper_joint_1] 6축을 소유 — 별도 gripper_controller
+    # 가 없다. 이 이름이 controller_joint_names 에 포함돼 있으면 inline 오버라이드 경로,
+    # 아니면 _maybe_send_initial_gripper 로 별도 action 호출 (omx_f 구성).
+    _GRIPPER_JOINT_NAME = "gripper_joint_1"
+
+    # max_effort 0.0 은 controller 에 따라 "토크 0 = 안 움직임" 으로 해석되기도 한다.
+    # OMX-F dynamixel xl330 의 명시적 안전한 값 — current_based_position 모드에서
+    # 충분한 토크지만 사람 손 잡으면 멈출 정도. params_.max_effort 가 노드 설정에서
+    # 0 이면 우리 값으로 덮어쓴다.
+    GRIPPER_MAX_EFFORT = 5.0
+
+    def _send_gripper_close(self, *, context: str) -> None:
+        """그리퍼 action server 에 닫힘 goal 한 번 송신 (omx_f 구성용).
+
+        context 는 로그 prefix — 'game-start' / 'replay' / 'tune' 등.
+        action 서버 미연결·거부·타임아웃은 경고만 남기고 진행 — 게임을 막지 않는다.
+        """
+        if self._gripper_client is None or GripperCommand is None:
+            return
+        log = self.get_logger()
+        log.info(
+            f"[gripper:{context}] 닫기 시도: action='{self._gripper_action_name}' "
+            f"position={self.GRIPPER_CLOSED_RAD:.3f} rad max_effort={self.GRIPPER_MAX_EFFORT}"
+        )
+        if not self._gripper_client.wait_for_server(timeout_sec=2.0):
+            log.warn(
+                f"[gripper:{context}]   ✗ action server '{self._gripper_action_name}' 미확인 (2s) — "
+                f"controller_manager 의 gripper_controller 가 spawn 됐는지 확인:\n"
+                f"     ros2 control list_controllers"
+            )
+            return
+        goal = GripperCommand.Goal()
+        goal.command.position = float(self.GRIPPER_CLOSED_RAD)
+        goal.command.max_effort = float(self.GRIPPER_MAX_EFFORT)
+        send_future = self._gripper_client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(self, send_future, timeout_sec=2.0)
+        goal_handle = send_future.result() if send_future.done() else None
+        if goal_handle is None or not goal_handle.accepted:
+            log.warn(f"[gripper:{context}]   ✗ goal 거부됨 (handle={goal_handle})")
+            return
+        log.info(f"[gripper:{context}]   ✓ goal accepted — 결과 대기 (최대 5s)")
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=5.0)
+        if result_future.done():
+            res = result_future.result()
+            log.info(
+                f"[gripper:{context}]   ✓ 닫기 완료: status={res.status} "
+                f"reached={res.result.reached_goal} stalled={res.result.stalled} "
+                f"position={res.result.position:.3f} effort={res.result.effort:.3f}"
+            )
+        else:
+            log.warn(f"[gripper:{context}]   ⚠ 5s 안에 결과 안 옴 — 진행")
+
+    def _maybe_send_initial_gripper(self, arm: ArmSpec, traj) -> None:
+        """replay 직전 그리퍼 닫기 — 게임 중에 살짝 열리는 일이 있으면 매 답마다 재 닫음.
+
+        그리퍼가 arm_controller 의 joint 로 들어가 있는 구성 (omx_f_follower_ai) 에선
+        `_replay_as_trajectory` 가 컬럼 오버라이드로 처리하므로 여기서는 스킵 —
+        존재하지 않는 action server 를 2초 기다리는 낭비 방지.
+        """
+        if self._GRIPPER_JOINT_NAME in arm.controller_joint_names:
+            return
+        n_arm = len(arm.controller_joint_names)
+        if traj.num_columns <= n_arm:
+            return  # gripper column 없음 (5축 traj)
+        self._send_gripper_close(context="replay")
 
     def _replay_as_trajectory(self, arm: ArmSpec, traj) -> None:
         """ros2_control 의 JointTrajectoryController 로 한 번에 전송."""
         msg = build_joint_trajectory(traj, arm.controller_joint_names)
+        self._override_gripper_column_if_present(msg, arm)
         publisher = self._arm_publishers[arm.id]
         if not self._wait_for_subscriber(publisher):
             self.get_logger().error(
@@ -166,6 +279,29 @@ class GameRunner(Node):
         end = time.monotonic() + traj.duration_s + 0.5
         while rclpy.ok() and time.monotonic() < end:
             rclpy.spin_once(self, timeout_sec=0.05)
+
+    def _override_gripper_column_if_present(self, msg: JointTrajectory, arm: ArmSpec) -> None:
+        """JointTrajectory 의 gripper_joint_1 컬럼을 GRIPPER_CLOSED_RAD 로 덮어쓴다.
+
+        omx_f_follower_ai 구성에서 arm_controller 가 gripper 까지 6축 소유 — 녹화된
+        lerobot range_0_100 정규값은 deg_to_rad 로 잘못 변환되므로 무시하고, 모든
+        포인트에 동일한 닫힘 각도를 박는다. 그리퍼가 controller_joint_names 에 없으면
+        no-op (5축 구성에서는 이 함수가 아무 일도 하지 않는다).
+        """
+        try:
+            idx = list(msg.joint_names).index(self._GRIPPER_JOINT_NAME)
+        except ValueError:
+            return  # 그리퍼 미포함 — 별도 action 경로가 처리.
+        for point in msg.points:
+            # JointTrajectoryPoint.positions 는 array.array — 새 list 로 교체.
+            positions = list(point.positions)
+            if idx < len(positions):
+                positions[idx] = float(self.GRIPPER_CLOSED_RAD)
+                point.positions = positions
+        self.get_logger().info(
+            f"gripper 컬럼 (idx={idx}, name={self._GRIPPER_JOINT_NAME}) 을 "
+            f"{self.GRIPPER_CLOSED_RAD:.3f} rad 으로 덮어썼다 (frames={len(msg.points)})"
+        )
 
     def _replay_as_joint_states(self, arm: ArmSpec, traj) -> None:
         """/joint_states 로 frame-by-frame publish — three.js URDF 뷰어용 경량 경로."""

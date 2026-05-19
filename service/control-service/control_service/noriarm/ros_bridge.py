@@ -48,6 +48,7 @@ class BridgeUnavailable(RuntimeError):
 
 try:
     import rclpy  # noqa: F401
+    from rclpy.action import ActionClient
     from rclpy.node import Node
     from sensor_msgs.msg import JointState
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -56,6 +57,16 @@ try:
 except Exception as _e:  # pragma: no cover - env-specific
     _ROS_AVAILABLE = False
     _ROS_IMPORT_ERROR = _e
+
+# control_msgs (그리퍼 액션) 는 별도 try — 환경에 따라 ros_control 만 있고 control_msgs
+# 가 빠진 경우가 있어 분리. 없으면 그리퍼 동작은 no-op.
+try:
+    from control_msgs.action import GripperCommand  # type: ignore[import-not-found]
+
+    _HAS_GRIPPER_ACTION = True
+except Exception:  # pragma: no cover - env-specific
+    GripperCommand = None  # type: ignore[assignment, misc]
+    _HAS_GRIPPER_ACTION = False
 
 
 def ros_available() -> bool:
@@ -127,6 +138,7 @@ class NoriarmRosBridge:
         self._js_sub = None
         self._js_pub = None
         self._jt_pub = None  # real arm_controller 용 JointTrajectory publisher
+        self._gripper_client: Any = None  # real omx_f 의 GripperActionController action client
         self._target: str = "sim"  # start() 에서 자동 감지
         self._controller_joint_names: list[str] = []
         self._spin_thread: threading.Thread | None = None
@@ -171,6 +183,20 @@ class NoriarmRosBridge:
                 f"real 타깃 감지 ({real_port}) — JointTrajectory pub: "
                 f"{controller_topic} joints={controller_joints}"
             )
+            # omx_f bringup 의 gripper_controller 는 별도 GripperActionController —
+            # arm_controller 가 받는 trajectory 의 gripper 컬럼은 어차피 잘리기 때문에
+            # gripper 는 직접 액션으로 닫아준다.
+            if _HAS_GRIPPER_ACTION and GripperCommand is not None:
+                self._gripper_client = ActionClient(
+                    self._node, GripperCommand, self.GRIPPER_ACTION_NAME,
+                )
+                logger.info(
+                    f"GripperActionController client 준비: {self.GRIPPER_ACTION_NAME}"
+                )
+            else:
+                logger.warning(
+                    "control_msgs.action.GripperCommand import 실패 — 그리퍼 동작 비활성화"
+                )
         else:
             logger.info(f"sim 타깃 (real_port={real_port}, exists={bool(real_port and Path(real_port).exists())})")
 
@@ -185,6 +211,168 @@ class NoriarmRosBridge:
         self._stopping.clear()
         self._spin_thread = threading.Thread(target=self._spin_loop, daemon=True)
         self._spin_thread.start()
+
+        # bridge 가 올라온 직후 그리퍼를 학습 데이터의 시작 자세로 옮긴다 — 닫힘 강제가
+        # 아니라 trained 첫 프레임 그대로 (OX 퀴즈 학습은 시작이 open). 매 답마다 trajectory
+        # 전체를 그리퍼 컬럼대로 다시 재생하므로 본 startup 명령은 "ready pose" 역할.
+        if self._target == "real" and self._gripper_client is not None:
+            initial_rad = self._bridge_start_gripper_initial_rad()
+            if initial_rad is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self._send_gripper_goal(
+                        context="bridge-start", position=initial_rad,
+                    ),
+                    loop,
+                )
+            else:
+                logger.info(
+                    "bridge-start 그리퍼 자세 스킵 — trained 데이터에서 시작 자세를 못 구함"
+                )
+
+    # --------------------------------------------------- 그리퍼 (real omx_f)
+    # 그리퍼 목표 각도는 절대 하드코딩하지 않는다 — 학습된 trajectory 의 그리퍼 컬럼을
+    # 그대로 재생한다. trained 패턴 (예: OX 퀴즈) 은 open → close → open 의 자연스러운
+    # 흐름인데 한 값으로 강제하면 그 흐름이 깨진다.
+    GRIPPER_MAX_EFFORT = 5.0  # 모터 안전 한도 — 학습 데이터 외 ROS-level 상수.
+    GRIPPER_ACTION_NAME = "/gripper_controller/gripper_cmd"
+
+    def _gripper_column_to_rad(self, traj: Any) -> list[float] | None:
+        """trajectory 의 그리퍼 컬럼 전체를 URDF rad 리스트로. 없으면 None."""
+        n_arm = len(self._controller_joint_names)
+        if traj.num_columns <= n_arm:
+            return None
+        gripper_idx = n_arm
+        modes = list(self._arm.sim.get("joint_norm_modes") or [])
+        mode = modes[gripper_idx] if gripper_idx < len(modes) else "range_0_100"
+        convert = _norm_to_rad(mode)
+        return [convert(row[gripper_idx]) for row in traj.frames_deg]
+
+    def _bridge_start_gripper_initial_rad(self) -> float | None:
+        """bridge-start 의 그리퍼 초기 자세 — manifest 의 첫 trajectory 의 frame 0 값.
+
+        학습 데이터의 시작 pose 그대로 — OX 퀴즈에선 open. 못 구하면 None → 스킵.
+        """
+        try:
+            tmap = self._config.policy.extra.get("trajectory_map") or {}
+        except AttributeError:
+            return None
+        if not isinstance(tmap, dict) or not tmap:
+            return None
+        first_name = next(iter(tmap.values()))
+        traj_path = self._manifest_path.parent / str(first_name)
+        try:
+            traj = self._fw["load_trajectory"](traj_path)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"bridge-start gripper 초기 자세 로드 실패 ({traj_path}): {e}")
+            return None
+        rads = self._gripper_column_to_rad(traj)
+        if not rads:
+            return None
+        return rads[0]  # 학습 데이터의 첫 프레임 = trained 시작 자세
+
+    async def _send_gripper_goal(self, *, context: str, position: float) -> None:
+        """GripperCommand action goal 한 번 송신 — 결과까지 대기 (bridge-start 단발용).
+
+        position 은 호출자가 trained 데이터에서 가져온다 (하드코딩 X).
+        spin thread 가 future 를 완료시키므로 asyncio 측에서는 폴링만 한다.
+        action server 미연결·거부·타임아웃은 경고만, 트레이젝토리 재생 등 다른 흐름 차단 X.
+        """
+        if self._gripper_client is None or GripperCommand is None:
+            return
+        target_rad = float(position)
+        log_prefix = f"[gripper:{context}]"
+        logger.info(
+            f"{log_prefix} 자세 시도: action={self.GRIPPER_ACTION_NAME} "
+            f"position={target_rad:.3f} rad max_effort={self.GRIPPER_MAX_EFFORT}"
+        )
+        # wait_for_server 는 동기 + 짧게.
+        ready = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self._gripper_client.wait_for_server(timeout_sec=2.0),
+        )
+        if not ready:
+            logger.warning(
+                f"{log_prefix}   ✗ action server '{self.GRIPPER_ACTION_NAME}' 미확인 (2s) — "
+                "controller_manager 의 gripper_controller 가 spawn 됐는지 확인 "
+                "(`ros2 control list_controllers`)"
+            )
+            return
+        goal = GripperCommand.Goal()
+        goal.command.position = target_rad
+        goal.command.max_effort = float(self.GRIPPER_MAX_EFFORT)
+        send_future = self._gripper_client.send_goal_async(goal)
+        if not await self._await_rclpy_future(send_future, timeout_s=2.0):
+            logger.warning(f"{log_prefix}   ✗ send_goal 응답 타임아웃")
+            return
+        goal_handle = send_future.result()
+        if goal_handle is None or not goal_handle.accepted:
+            logger.warning(f"{log_prefix}   ✗ goal 거부됨 (handle={goal_handle})")
+            return
+        logger.info(f"{log_prefix}   ✓ goal accepted — 결과 대기 (최대 5s)")
+        result_future = goal_handle.get_result_async()
+        if not await self._await_rclpy_future(result_future, timeout_s=5.0):
+            logger.warning(f"{log_prefix}   ⚠ 5s 안에 결과 안 옴 — 진행")
+            return
+        res = result_future.result()
+        logger.info(
+            f"{log_prefix}   ✓ 완료: status={res.status} "
+            f"reached={res.result.reached_goal} stalled={res.result.stalled} "
+            f"position={res.result.position:.3f} effort={res.result.effort:.3f}"
+        )
+
+    def _send_gripper_goal_fire_forget(self, *, position: float) -> None:
+        """fire-and-forget GripperCommand — 결과 대기 없음. trajectory 재생용.
+
+        action server 미준비면 조용히 스킵. send_goal_async 가 던지는 예외도 흡수
+        (재생 도중 한 keyframe 이 미스되더라도 다음 keyframe 이 곧 따라옴).
+        """
+        if self._gripper_client is None or GripperCommand is None:
+            return
+        if not self._gripper_client.server_is_ready():
+            return
+        goal = GripperCommand.Goal()
+        goal.command.position = float(position)
+        goal.command.max_effort = float(self.GRIPPER_MAX_EFFORT)
+        try:
+            self._gripper_client.send_goal_async(goal)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"gripper send_goal_async 실패 (무시): {e}")
+
+    async def _replay_gripper_trajectory(self, traj: Any) -> None:
+        """학습 trajectory 의 그리퍼 컬럼을 녹화 hz 그대로 fire-and-forget 으로 재생.
+
+        arm trajectory 는 한 message 로 controller 에 모두 넘어가지만 GripperAction-
+        Controller 는 한 번에 하나의 goal 만 받는다 → 매 프레임 send_goal_async.
+        sample rate 도 학습 데이터 (traj.hz) 에서 가져온다 — 자체 keyframe rate 를
+        고르면 그게 또 하드코딩이고 transient 를 잘라먹어 stepped 모션이 보인다.
+        """
+        rads = self._gripper_column_to_rad(traj)
+        if not rads:
+            return
+        n = len(rads)
+        if traj.hz <= 0:
+            return
+        period = 1.0 / traj.hz
+        logger.info(
+            f"[gripper:replay-stream] 시작: frames={n} hz={traj.hz} "
+            f"first={rads[0]:.3f} last={rads[-1]:.3f}"
+        )
+        for i in range(n):
+            if self._stopping.is_set():
+                return
+            self._send_gripper_goal_fire_forget(position=rads[i])
+            await asyncio.sleep(period)
+        logger.info("[gripper:replay-stream] 완료")
+
+    async def _await_rclpy_future(self, future: Any, *, timeout_s: float) -> bool:
+        """rclpy.task.Future 가 spin thread 에서 완료되길 폴링으로 기다린다."""
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout_s
+        while not future.done():
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(0.05)
+        return True
 
     def stop(self) -> None:
         if self._node is None:
@@ -310,11 +498,19 @@ class NoriarmRosBridge:
 
         arm_controller (joint_trajectory_controller) 가 spline 보간으로 실행. 이렇게 하면
         프레임 단위 publish latency 없이 controller 가 RT 루프에서 정확한 타이밍 보장.
+
+        arm trajectory 발사 직전에 그리퍼를 다시 닫는다 — 게임 중 미세하게 열리거나
+        이전 답에서 jaws 가 풀린 경우 보정.
         """
         n = len(self._controller_joint_names)
         if n == 0:
             logger.error("controller_joint_names 가 매니페스트에 없음 — 재생 취소")
             return
+        # 그리퍼는 학습 trajectory 의 그리퍼 컬럼대로 재생 — 한 자세로 강제하지 않는다.
+        # 학습 곡선이 open→close→open 이면 그대로 따라간다. arm 재생과 병렬로 실행.
+        gripper_task: asyncio.Task | None = None
+        if self._target == "real" and self._gripper_client is not None:
+            gripper_task = asyncio.create_task(self._replay_gripper_trajectory(traj))
         # controller 는 arm 만 받음 (gripper 별도 controller). joint_norm_modes 의 앞 n 개 사용.
         modes = list(self._arm.sim.get("joint_norm_modes") or ["degrees"] * n)[:n]
         converters = [_norm_to_rad(m) for m in modes]
@@ -340,6 +536,15 @@ class NoriarmRosBridge:
         )
         # arm_controller 가 알아서 실행 — 우리는 duration 만큼 idle 대기 (다음 답 전).
         await asyncio.sleep(sliced.duration_s)
+        # 그리퍼 trajectory 재생이 끝났는지 확인 — keyframe pacing 으로 거의 동시에 끝나지만
+        # subsampling 의 마지막 sleep 잔여가 있을 수 있어 살짝 더 대기. 예외도 surface.
+        if gripper_task is not None:
+            try:
+                await asyncio.wait_for(gripper_task, timeout=1.0)
+            except asyncio.TimeoutError:
+                logger.warning("gripper replay 가 1s 안에 안 끝남 — 다음 답으로")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"gripper replay 에서 예외: {e}")
         logger.info("trajectory 재생 완료, 정책 reset")
 
     # ---------------------------------------------- 정보 조회
