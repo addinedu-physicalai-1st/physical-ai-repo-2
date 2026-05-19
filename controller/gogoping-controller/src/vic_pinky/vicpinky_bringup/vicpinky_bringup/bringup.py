@@ -8,6 +8,7 @@ import time
 from geometry_msgs.msg import Twist, TransformStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32
 from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler
 
@@ -18,6 +19,8 @@ from vicpinky_bringup.zlac_driver import ZLACDriver
 TWIST_SUB_TOPIC_NAME = "cmd_vel"
 ODOM_PUB_TOPIC_NAME = "odom"
 JOINT_PUB_TOPIC_NAME = "joint_states"
+VOLTAGE_PUB_TOPIC_NAME = "battery_voltage"   # 상대 — gogoping namespace 가 prefix
+VOLTAGE_PUB_HZ = 1.0
 ODOM_FRAME_ID = "odom"
 ODOM_CHILD_FRAME_ID = "base_footprint"
 
@@ -118,9 +121,11 @@ class VicPinky(Node):
             
         self.odom_pub = self.create_publisher(Odometry, ODOM_PUB_TOPIC_NAME, 10)
         self.joint_pub = self.create_publisher(JointState, JOINT_PUB_TOPIC_NAME, 10)
+        self.voltage_pub = self.create_publisher(Float32, VOLTAGE_PUB_TOPIC_NAME, 10)
         self.twist_sub = self.create_subscription(Twist, TWIST_SUB_TOPIC_NAME, self.twist_callback, 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         self.timer = self.create_timer(1.0 / 30.0, self.update_and_publish)
+        self.voltage_timer = self.create_timer(1.0 / VOLTAGE_PUB_HZ, self._publish_voltage)
 
         self.x = 0.0
         self.y = 0.0
@@ -278,6 +283,15 @@ class VicPinky(Node):
         ]
         joint_msg.velocity = [vel_l_rads, vel_r_rads]
         self.joint_pub.publish(joint_msg)
+
+    def _publish_voltage(self):
+        """1Hz ZLAC bus voltage publish on /gogoping/battery_voltage (Float32)."""
+        v = self.driver.get_voltage()
+        if v is None:
+            return  # serial / CRC fail — 다음 tick 재시도
+        msg = Float32()
+        msg.data = float(v)
+        self.voltage_pub.publish(msg)
 
     def on_shutdown(self):
         self.get_logger().info("Shutting down, terminating motor driver...")
