@@ -44,10 +44,11 @@ class BatteryPublisherNode(Node):
         self.declare_parameter("source", "static")
         self.declare_parameter("level", 100.0)
         self.declare_parameter("sysfs_path", "/sys/class/power_supply/BAT0/capacity")
-        # voltage_topic source 용 — 24V 시스템 가정. 다른 배터리는 launch arg override.
+        # voltage_topic source 용. 다른 배터리는 launch arg override.
+        # GogoPing (Vic Pinky): 만충 28V / cutoff 24V (4V span).
         self.declare_parameter("voltage_topic", "battery_voltage")
-        self.declare_parameter("voltage_min", 22.0)   # 0% 기준 (cutoff)
-        self.declare_parameter("voltage_max", 27.0)   # 100% 기준 (full)
+        self.declare_parameter("voltage_min", 24.0)   # 0% 기준 (cutoff)
+        self.declare_parameter("voltage_max", 28.0)   # 100% 기준 (full)
 
         self._pub = self.create_publisher(BatteryState, "battery", 10)
         self.create_timer(1.0 / _PUBLISH_HZ, self._tick)
