@@ -1,6 +1,3 @@
-[submodule "controller/gogoping-controller/src/vic_pinky"]
-	path = controller/gogoping-controller/src/vic_pinky
-	url = https://github.com/pinklab-art/vic_pinky.git
 [submodule "controller/noriarm-controller/src/open_manipulator"]
 	path = controller/noriarm-controller/src/open_manipulator
 	url = https://github.com/robotis-git/open_manipulator.git
