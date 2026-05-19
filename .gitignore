@@ -30,15 +30,3 @@ docs/superpowers/*
 # 모델 가중치 — ultralytics 가 첫 실행 시 자동 다운로드
 service/ai-service/ai_service/models/*.pt
 service/ai-service/ai_service/models/*.onnx
-logs
-data/*
-# 학습용 hard negative 단어 list 는 commit (curated source, audio data 와 별개)
-!data/wake_training/
-data/wake_training/*
-!data/wake_training/hard_neg_words.txt
-# plan / spec 에서 참조하는 superpowers 영역도 commit
-!docs/superpowers/plans/
-!docs/superpowers/plans/**
-# wakeword 로컬 mic 래퍼 (device id 가 머신마다 다름)
-scripts/wakeword/record.sh
-

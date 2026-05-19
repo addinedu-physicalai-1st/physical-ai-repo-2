@@ -187,10 +187,11 @@ def test_voice_tts_empty_text() -> None:
 
 
 def test_voice_tts_edge_returns_mpeg(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_mp3(_text: str) -> bytes:
-        return b"\xff" * 320
+    async def fake_stream(_text: str):
+        yield b"\xff" * 160
+        yield b"\xff" * 160
 
-    monkeypatch.setattr(hub_mod, "synthesize_edge_mp3", fake_mp3)
+    monkeypatch.setattr(hub_mod, "synthesize_edge_mp3_stream", fake_stream)
     r = client.get("/voice/tts", params={"text": "테스트"})
     assert r.status_code == 200
     assert r.headers.get("content-type", "").startswith("audio/mpeg")

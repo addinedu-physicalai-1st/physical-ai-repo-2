@@ -251,17 +251,17 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
     if (isRunning.value) return;
     try {
       await loadModels();
-      // 학습 데이터는 raw 16kHz (sounddevice + librosa.resample) 으로 만들어졌으므로
-      // 브라우저 audio processing (AEC/NS/AGC) 가 wake word 의 spectral 분포를
-      // 변형시키면 모델이 다른 도메인으로 인식해 score 가 0 에 머무른다.
-      // 전부 false 로 raw 신호 → 학습 도메인 매칭. TTS 자기 feedback 은 useVoiceController
-      // 의 wakeAck/isSpeaking/echoGuard 가드로 차단.
+      // AEC/NS/AGC 셋 다 true — 학습 데이터가 raw 16kHz (sounddevice +
+      // librosa.resample) 라 이론적으로 NS/AGC 가 mel 분포를 비틀 우려가 있지만
+      // 실측 결과 wake score 정상. AEC 가 TTS 자기 feedback 까지 제거해 별도
+      // echo 가드 (suppressUntil / speakerEchoGuard / isLikelyEchoOfRobotReply)
+      // 필요 없음.
       stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
         },
       });
       audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });

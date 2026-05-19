@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import oxQuizData from '../../../../../shared/ox_quiz.json';
 import UrdfViewer from '@/noriarm/UrdfViewer.vue';
 import OXVisionPreview from '@/noriarm/OXVisionPreview.vue';
 import IntegratedCameraPreview from '@/noriarm/IntegratedCameraPreview.vue';
-import { useTTS } from '@/composables/useTTS';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 
-const tts = useTTS();
+const voiceController = inject(VOICE_CONTROLLER_KEY);
+const tts = {
+  speak: (text: string) => { voiceController?.speak(text); return Promise.resolve(); },
+  cancel: () => { voiceController?.cancelSpeak(); },
+};
 
 interface OXQuestion {
   id: string;

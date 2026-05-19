@@ -11,7 +11,6 @@ from ai_service.prompts.shared_chat_guardrails import (
     CHILD_SAFE_CURRENT_EVENTS_BLOCK,
     honesty_nonsense_block,
 )
-from ai_service.robots import modes_for
 
 _REGISTRY: dict[str, ModuleType] = {
     "eduping": eduping,
@@ -29,10 +28,6 @@ def _module(robot: str) -> ModuleType:
 
 def display_name(robot: str) -> str:
     return _module(robot).DISPLAY_NAME
-
-
-def classify_system(robot: str) -> str:
-    return _module(robot).CLASSIFY_SYSTEM.format(modes_csv=", ".join(modes_for(robot)))
 
 
 def chat_system(robot: str, *, context_block: str, emotions_block: str) -> str:

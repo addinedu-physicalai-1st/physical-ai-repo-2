@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue';
+import { computed, inject, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
-import { VOICE_CONTROLLER_KEY, VOICE_UI_SESSION_KEY } from '@/composables/voiceControllerKey';
-import { useAudioLevel } from '@/composables/useAudioLevel';
-import { usePhoneViewport } from '@/common/usePhoneViewport';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { faceAccent } from '@/config/colors';
 import CommandBar from './CommandBar.vue';
 import SiriBlob from './SiriBlob.vue';
@@ -21,40 +19,14 @@ const controller = inject(VOICE_CONTROLLER_KEY);
 if (!controller) throw new Error('VOICE_CONTROLLER_KEY not provided');
 const ctrl = controller;
 
-const voiceUiSession = inject(VOICE_UI_SESSION_KEY, ref(false));
-
-const audio = useAudioLevel();
-const isPhone = usePhoneViewport();
-
-/** SiriBlob 에 줄 audio level — phone 은 useServerSTT 의 stream RMS, 데스크톱은 useAudioLevel. */
-const micLevel = computed(() => (isPhone.value ? ctrl.micLevel.value : audio.level.value));
+/** SiriBlob 에 줄 audio level — STT 백엔드 (서버 STT) 가 노출하는 stream RMS 재사용. */
+const micLevel = computed(() => ctrl.micLevel.value);
 
 // voiceMode 토글 — STT on/off 전환 (초기 시작은 App.vue handleStart 가 처리)
 watch(voiceMode, (next, prev) => {
   if (next === 'voice' && prev === 'text') ctrl.start();
   else if (next === 'text' && prev === 'voice') ctrl.stop();
 });
-
-// 시각화용 mic 스트림 — listening 상태에서만 켠다. idle / speaking / dispatching
-// 동안은 SiriBlob 자체가 안 보이므로 RAF + Web Audio 비용 절감.
-// phone 은 useServerSTT 의 stream RMS 를 재사용하므로 audio-level 의 두 번째
-// getUserMedia 가 필요 없음 (실제로 STT 마이크 입력을 굶기는 부작용도 있음).
-watch(
-  [voiceMode, voiceUiSession, state],
-  async ([vm, session, st]) => {
-    const shouldRun = !isPhone.value && vm === 'voice' && session && st === 'listening';
-    if (shouldRun) {
-      try {
-        await audio.start();
-      } catch (e) {
-        console.warn('[Mic] Failed to start audio visualization:', e);
-      }
-    } else {
-      audio.stop();
-    }
-  },
-  { immediate: true },
-);
 
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'

@@ -50,6 +50,10 @@ dependencies = [
   "transitions>=0.9",
   # GogoPing BT 본체 — py_trees 2.2.x (py-trees-spike.md 의 spike 가 2.2 기준)
   "py-trees>=2.2,<2.3",
+  # WebRTC — control-service 가 브라우저와 PeerConnection 으로 양방향 audio + DataChannel.
+  # Opus 디코딩/인코딩에 av (pyav) 의존.
+  "aiortc>=1.9",
+  "av>=12",
 ]
 
 [dependency-groups]

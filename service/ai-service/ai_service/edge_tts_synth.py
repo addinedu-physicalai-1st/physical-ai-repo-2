@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import AsyncIterator
 
 import edge_tts
 
@@ -90,12 +91,8 @@ def rate_setting_or_default(rate: str) -> str:
     return "+0%"
 
 
-async def synthesize_edge_mp3(text: str) -> bytes:
-    """Return MP3 bytes (full clip).
-
-    Microsoft 쪽으로는 ``Communicate.stream()`` 으로 **청크 단위**로 받지만,
-    Hub 는 전부 모아서 한 번에 ``Response`` 로 내려주므로 **HTTP 스트리밍은 아님**.
-    """
+def _build_communicate(text: str) -> tuple[edge_tts.Communicate, str]:
+    """공통 normalize + Communicate 생성. (인스턴스, 정규화된 텍스트) 반환."""
     text = normalize_text_for_korean_piper(text).strip()
     if not text:
         raise ValueError("empty text")
@@ -104,13 +101,22 @@ async def synthesize_edge_mp3(text: str) -> bytes:
         raise ValueError(f"invalid edge_tts_voice: {voice!r}")
     pitch_h = pitch_setting_to_communicate_hz(settings.edge_tts_pitch_pct)
     rate_s = rate_setting_or_default(settings.edge_tts_rate)
-    communicate = edge_tts.Communicate(text, voice, pitch=pitch_h, rate=rate_s)
-    out = bytearray()
+    return edge_tts.Communicate(text, voice, pitch=pitch_h, rate=rate_s), voice
+
+
+async def synthesize_edge_mp3_stream(text: str) -> AsyncIterator[bytes]:
+    """Yield MP3 chunks as Microsoft 쪽 ``Communicate.stream()`` 에서 도착하는 대로.
+
+    HTTP `StreamingResponse` 의 source 로 그대로 사용. 클라이언트가 첫 chunk 부터
+    재생 시작할 수 있어 첫 음성까지의 latency 가 전체 합성을 기다리는 것보다 단축됨.
+    """
+    communicate, voice = _build_communicate(text)
+    total = 0
     async for chunk in communicate.stream():
         if chunk["type"] == "audio" and chunk.get("data"):
-            out.extend(chunk["data"])
-    data = bytes(out)
-    if len(data) < 64:
-        logging.error("[edge_tts] empty or tiny response for voice=%s", voice)
-        raise RuntimeError("Edge TTS returned no audio")
-    return data
+            data = chunk["data"]
+            total += len(data)
+            yield data
+    if total < 64:
+        # 스트리밍 중에는 raise 해도 클라이언트로 status 전달 불가 — 로그만.
+        logging.error("[edge_tts] empty or tiny stream for voice=%s (total=%d)", voice, total)

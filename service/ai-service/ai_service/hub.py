@@ -12,7 +12,7 @@ from typing import Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -30,7 +30,7 @@ from ai_service.context import (
     try_whereabouts_first_reply,
 )
 from ai_service.llm import LLMError, generate_chat, generate_report
-from ai_service.edge_tts_synth import synthesize_edge_mp3
+from ai_service.edge_tts_synth import synthesize_edge_mp3_stream
 from ai_service.config import settings as ai_settings
 
 from ai_service import prompts
@@ -493,12 +493,16 @@ async def post_report_generate(req: ReportGenerateRequest) -> dict:
 
 @app.get("/voice/tts")
 async def get_tts(text: str):
-    """TTS — Edge neural MP3 (인터넷)."""
+    """TTS — Edge neural MP3 스트리밍. chunk 단위로 흘려보내 첫 음성 latency 단축."""
     if not text.strip():
         raise HTTPException(status_code=400, detail="text is required")
     try:
-        mp3 = await synthesize_edge_mp3(text)
-        return Response(content=mp3, media_type="audio/mpeg")
+        return StreamingResponse(
+            synthesize_edge_mp3_stream(text),
+            media_type="audio/mpeg",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Edge TTS failed: {exc}") from exc
 
