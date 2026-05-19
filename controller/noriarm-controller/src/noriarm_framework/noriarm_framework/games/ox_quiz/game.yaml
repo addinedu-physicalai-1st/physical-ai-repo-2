@@ -24,7 +24,9 @@ hardware:
       # open_manipulator_bringup 의 controller manifest 가 양쪽 동일하게 'arm_controller' 사용.
       controller_topic: /arm_controller/joint_trajectory
       # arm_controller 가 소유한 5축 (gripper 는 별도). trajectory JSON 의 6번째 컬럼(gripper)
-      # 은 자동으로 제거된다.
+      # 은 자동으로 제거된다. omx_f 구성에서는 gripper_controller (GripperActionController)
+      # 가 /gripper_controller/gripper_cmd 액션으로 별도 명령을 받는다 — _ros_runner 의
+      # _maybe_send_initial_gripper 가 처리.
       controller_joint_names: [joint1, joint2, joint3, joint4, joint5]
       sim:
         # joint_state_only: ros2_control / Gazebo 없이 /joint_states 만 frame-by-frame
