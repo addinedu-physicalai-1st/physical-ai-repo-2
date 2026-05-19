@@ -8,8 +8,8 @@
 
   sim_with_nav2.launch.xml 과의 차이:
    * gazebo include 없음 (실 로봇이 LIDAR / 휠 odom 직접 발행)
-   * planner / controller / bt_navigator / waypoint_follower / velocity_smoother 없음
-     (현재 단계엔 nav2 navigation 미사용 — localization 만)
+   * planner / controller / bt_navigator / waypoint_follower / velocity_smoother 는
+     navigation_real.launch.xml 이 별도로 담당 (이 launch 는 localization 전용)
    * use_sim_time = False (실 시계)
    * 기본 map = real_lidar_map.yaml (실 SLAM 결과)
 

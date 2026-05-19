@@ -503,7 +503,8 @@ class GogoPingDashboard(QWidget):
         self.map_status.set_status(in_map)
 
     def update_pose(self, pose: dict | None) -> None:
-        """``/gogoping/state`` snapshot 의 robot_pose 를 받아 ODOM 카드 + MAP 카드 갱신.
+        """``/gogoping/state`` snapshot 의 robot_pose 를 받아 ODOM 카드 + MAP 카드
+        + 큰 graph map (WaypointMapCard) 의 로봇 마커 갱신.
 
         /teleop/state 의 odom 과 ODOM 카드 widget 공유 — 둘 다 갱신. (/teleop/state 는
         30Hz, /gogoping/state 는 1Hz 라 /teleop/state 가 더 자주 갱신하지만 양쪽 호환).
@@ -513,12 +514,12 @@ class GogoPingDashboard(QWidget):
             self.map_status.set_pose(None)
             return
         try:
-            self.odom_compact.set_odom(
-                float(pose.get("x", 0.0)),
-                float(pose.get("y", 0.0)),
-                float(pose.get("yaw", 0.0)),
-            )
+            x = float(pose.get("x", 0.0))
+            y = float(pose.get("y", 0.0))
+            yaw = float(pose.get("yaw", 0.0))
+            self.odom_compact.set_odom(x, y, yaw)
             self.map_status.set_pose(pose)
+            self.map_card.update_robot(x, y, yaw)
         except (TypeError, ValueError):
             pass
 
