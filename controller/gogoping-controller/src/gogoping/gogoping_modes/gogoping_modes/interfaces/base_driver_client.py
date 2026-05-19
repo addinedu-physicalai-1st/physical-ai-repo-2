@@ -6,8 +6,15 @@
 
 ManualTorqueHold behavior 가 initialise() 에서 release, terminate() 에서 enable 호출.
 
-idempotent — driver 가 같은 상태 재호출 시 무해 (재 enable / 재 disable 모두 OK).
-service 응답 안 와도 timeout 으로 차단되지 않게 짧은 wait 후 best-effort 보고.
+## Fire-and-forget 패턴
+
+main.py 가 ``rclpy.spin(node)`` (SingleThreadedExecutor) 를 사용하므로 BT tick callback
+안에서 service call 의 응답을 동기 wait 하면 같은 thread 가 spin 못 해 future 가
+영원히 complete 안 됨 → 모든 BT 동작 굳음. 그래서 ``call_async`` 후 응답 안 기다리고
+바로 리턴 — request 는 rmw 큐에 들어가서 spin 시 자동 송신됨.
+
+실 동작 확인은 Pi bringup 의 ``[set_torque] torque ON/OFF`` 로그 또는 모터 응답으로.
+idempotent — 같은 상태 재호출 무해.
 """
 from __future__ import annotations
 
@@ -20,12 +27,10 @@ if TYPE_CHECKING:
 
 
 _SERVICE_NAME = "/gogoping/set_torque"
-_WAIT_TIMEOUT_S = 0.5     # service availability wait
-_CALL_TIMEOUT_S = 2.0     # 응답 timeout (실 호출 sync wait)
 
 
 class BaseDriverClient:
-    """std_srvs/SetBool 클라이언트 — torque on/off 동기 호출."""
+    """std_srvs/SetBool 클라이언트 — torque on/off fire-and-forget."""
 
     def __init__(self, node: "rclpy.node.Node"):
         self.node = node
@@ -33,37 +38,15 @@ class BaseDriverClient:
         self._logger = node.get_logger()
 
     def release_torque(self) -> bool:
-        """Motor disable (free-wheel). 성공 시 True, 실패/timeout 시 False."""
+        """Motor disable (free-wheel). request 큐 등록 성공 = True."""
         return self._call(False)
 
     def enable_torque(self) -> bool:
-        """Motor enable (cmd_vel 다시 동작). 성공 시 True, 실패/timeout 시 False."""
+        """Motor enable (cmd_vel 다시 동작). request 큐 등록 성공 = True."""
         return self._call(True)
 
     def _call(self, data: bool) -> bool:
-        if not self._client.wait_for_service(timeout_sec=_WAIT_TIMEOUT_S):
-            self._logger.warn(
-                f"BaseDriverClient: {_SERVICE_NAME} 서비스 없음 — torque {'ON' if data else 'OFF'} skip"
-            )
-            return False
         req = SetBool.Request()
         req.data = data
-        future = self._client.call_async(req)
-        # py_trees behavior 의 initialise/terminate 안에서 호출 — node.spin 없이 future complete 기다림.
-        # MultiThreadedExecutor 환경이라 별 thread 가 spin 해주는 걸 기대.
-        import time
-        deadline = time.monotonic() + _CALL_TIMEOUT_S
-        while not future.done() and time.monotonic() < deadline:
-            time.sleep(0.01)
-        if not future.done():
-            self._logger.warn(
-                f"BaseDriverClient: torque {'ON' if data else 'OFF'} 응답 timeout ({_CALL_TIMEOUT_S}s)"
-            )
-            return False
-        result = future.result()
-        if result is None or not result.success:
-            self._logger.warn(
-                f"BaseDriverClient: torque {'ON' if data else 'OFF'} 실패 — {getattr(result, 'message', 'no response')}"
-            )
-            return False
+        self._client.call_async(req)   # fire-and-forget — 응답 안 기다림
         return True

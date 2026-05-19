@@ -310,7 +310,7 @@ class VicPinky(Node):
             self.driver.set_vel_mode()
             time.sleep(0.05)
             ok = self.driver.enable()
-            time.sleep(0.05)
+            time.sleep(0.3)              # enable 후 motor controller 가 cmd_vel 받을 준비까지 wait
             self.driver.set_double_rpm(0, 0)
             response.success = bool(ok)
             response.message = "torque ON" if ok else "enable() failed"
