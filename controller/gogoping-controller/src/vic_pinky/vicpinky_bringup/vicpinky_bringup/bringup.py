@@ -301,16 +301,23 @@ class VicPinky(Node):
 
         ManualTorqueHold behavior 가 initialise() 에서 False, terminate() 에서 True 호출.
         idempotent — 같은 상태 재호출 시 driver 가 무해하게 처리.
+
+        Enable sequence 는 init 의 sequence 와 동일: set_vel_mode → enable → set_rpm(0).
+        ZLAC 가 disable 후 vel mode 를 잃을 수 있어서 vel_mode 재설정 필수.
         """
         if request.data:
-            # 안전: enable 전 RPM 0 보장
-            self.driver.set_double_rpm(0, 0)
+            # init 과 동일 sequence — 잃었을 수 있는 mode/RPM 복원
+            self.driver.set_vel_mode()
+            time.sleep(0.05)
             ok = self.driver.enable()
+            time.sleep(0.05)
+            self.driver.set_double_rpm(0, 0)
             response.success = bool(ok)
             response.message = "torque ON" if ok else "enable() failed"
         else:
             # 정지 → torque OFF (motor free-wheel)
             self.driver.set_double_rpm(0, 0)
+            time.sleep(0.05)
             ok = self.driver.disable()
             response.success = bool(ok)
             response.message = "torque OFF" if ok else "disable() failed"
