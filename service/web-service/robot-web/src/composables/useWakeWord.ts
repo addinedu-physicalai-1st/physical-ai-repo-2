@@ -257,47 +257,9 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
         },
       });
       audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-      // eslint-disable-next-line no-console
-      console.log(
-        `[wake-init] requested sr=${SAMPLE_RATE} actual sr=${audioContext.sampleRate} state=${audioContext.state}`,
-      );
       await audioContext.audioWorklet.addModule(WORKLET_PATH);
       sourceNode = audioContext.createMediaStreamSource(stream);
       workletNode = new AudioWorkletNode(audioContext, 'wake-pcm-worklet');
-      // 디버그 — 콘솔에서 window.__dumpWakeAudio() 호출 시 현재 ring (2.7s) 을
-      // WAV 로 다운로드. miss 직후 호출하면 브라우저가 무엇을 들었는지 그대로 캡쳐.
-      (window as unknown as { __dumpWakeAudio?: () => void }).__dumpWakeAudio = () => {
-        const buf = audioRing.snapshot();
-        if (!buf.length) {
-          // eslint-disable-next-line no-console
-          console.warn('[wake-dump] ring empty');
-          return;
-        }
-        const sr = 16000;
-        const pcm = new Int16Array(buf.length);
-        for (let i = 0; i < buf.length; i++) {
-          const v = buf[i];
-          pcm[i] = Math.max(-32768, Math.min(32767, Math.round(v * 32767)));
-        }
-        const byteLen = 44 + pcm.length * 2;
-        const wav = new ArrayBuffer(byteLen);
-        const dv = new DataView(wav);
-        const w = (off: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
-        w(0, 'RIFF'); dv.setUint32(4, byteLen - 8, true); w(8, 'WAVE');
-        w(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-        dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
-        w(36, 'data'); dv.setUint32(40, pcm.length * 2, true);
-        new Int16Array(wav, 44).set(pcm);
-        const blob = new Blob([wav], { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `wake_ring_${Date.now()}.wav`;
-        a.click();
-        URL.revokeObjectURL(url);
-        // eslint-disable-next-line no-console
-        console.log(`[wake-dump] saved ${buf.length} samples (${(buf.length / sr).toFixed(2)}s)`);
-      };
       workletNode.port.onmessage = (ev: MessageEvent<Float32Array>) => {
         const chunk = ev.data;
         if (!chunk || chunk.length !== HOP_SAMPLES) return;

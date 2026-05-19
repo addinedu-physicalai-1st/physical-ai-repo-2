@@ -107,23 +107,11 @@ export function useVoiceController(robot: RobotConfig): {
   let speakerEchoGuardUntil = 0;
   const SPEAKER_ECHO_GUARD_MS = 800;
 
-  // 디버그 — score ≥ 0.5 일 때만 spike 로그. threshold 근접 모니터링용.
   const wakeWord = useWakeWord({
     robotIds: [robot.id],
     thresholds: { [robot.id]: WAKE_THRESHOLDS[robot.id] ?? 0.99 },
     cooldownMs: 2500,
-    onScore: (scores) => {
-      const s = scores[robot.id] ?? 0;
-      if (s >= 0.5) {
-        // eslint-disable-next-line no-console
-        console.log(`[wake] spike score=${s.toFixed(3)} state=${voice.state}`);
-      }
-    },
-    onWake: (hit) => {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[wake] HIT score=${hit.score.toFixed(3)} state=${voice.state} speaking=${voice.isSpeaking} ack=${wakeAckInProgress} echoGuard=${Math.max(0, speakerEchoGuardUntil - Date.now())}ms`,
-      );
+    onWake: () => {
       // wake ack 재생 도중 ONNX 가 자기 자신 또는 user 의 추가 발화로 트리거되는
       // 경우 무시 — 같은 호출이 여러 번 잡혀 무한 루프 되는 것 방지.
       if (wakeAckInProgress) return;
@@ -133,7 +121,6 @@ export function useVoiceController(robot: RobotConfig): {
       // TTS 끝난 직후 잔향 그레이스
       if (Date.now() < speakerEchoGuardUntil) return;
       void bargeIn('').catch((e) => voice.setError((e as Error).message));
-      void hit;
     },
     onError: (msg) => voice.setError(`wake: ${msg}`),
   });
