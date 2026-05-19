@@ -101,7 +101,7 @@ async function submit() {
   margin-bottom: var(--space-5);
 }
 .login__title { font-size: var(--font-size-3xl); margin-bottom: var(--space-3); }
-.login__lead { color: var(--color-text-on-inverse-muted); max-width: 380px; line-height: var(--line-height-relaxed); }
+.login__lead { color: var(--color-text-on-inverse-muted); max-width: 500px; line-height: var(--line-height-relaxed); }
 .login__features {
   margin-top: var(--space-7);
   list-style: none;
