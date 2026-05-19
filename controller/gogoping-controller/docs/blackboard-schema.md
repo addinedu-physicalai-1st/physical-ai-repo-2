@@ -57,8 +57,8 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `error_reason` | `str` | (fault trigger 호출한 monitor) | `notify_admin_ui`, `log_error_to_db` | ERROR 진입 사유 (e.g., `"lidar_timeout"`) |
-| `error_source` | `str` | (fault trigger 호출한 monitor) | `notify_admin_ui`, `log_error_to_db` | 발화 주체 식별 (e.g., `"HardwareHealthMonitor"`) — multi-writer 디버깅용 |
+| `error_reason` | `str` | (fault trigger 호출한 monitor), `command_listener` (emergency_stop 시 `"user_emergency_stop"`) | `notify_admin_ui`, `log_error_to_db` | ERROR 진입 사유 (e.g., `"lidar_timeout"`, `"out_of_map"`, `"user_emergency_stop"`) |
+| `error_source` | `str` | (fault trigger 호출한 monitor), `command_listener` (`"emergency_stop_service"`) | `notify_admin_ui`, `log_error_to_db` | 발화 주체 식별 (e.g., `"HardwareHealthMonitor"`, `"emergency_stop_service"`) — multi-writer 디버깅용 |
 
 > 현재 FSM state 는 blackboard 키가 아니다. `context.fsm.current_state` (transitions 라이브러리 기본 속성) 를 직접 읽는다.
 
