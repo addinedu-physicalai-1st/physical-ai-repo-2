@@ -236,6 +236,26 @@ class V4L2VideoStreamer:
                 self._send_sock = None
 
 
+def _parse_positive_int_env(name: str) -> Optional[int]:
+    """환경변수를 양수 정수로 파싱. 미설정·비정수·0 이하면 경고 후 None 반환."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    try:
+        val = int(raw)
+    except ValueError:
+        logging.getLogger("video.v4l2").warning(
+            "env %s='%s' 는 정수가 아님 — 무시하고 기본값 사용", name, raw,
+        )
+        return None
+    if val <= 0:
+        logging.getLogger("video.v4l2").warning(
+            "env %s=%d 은 양수여야 함 — 무시하고 기본값 사용", name, val,
+        )
+        return None
+    return val
+
+
 def parse_args() -> Config:
     p = argparse.ArgumentParser(
         description="Pingdergarten 카메라 UDP 송출 — v4l2 직접 (저지연 모드)",
@@ -265,8 +285,11 @@ def parse_args() -> Config:
         "--camera-device",
         default=os.environ.get("CAMERA_DEVICE", "/dev/video0"),
     )
-    p.add_argument("--width", type=int, default=640)
-    p.add_argument("--height", type=int, default=480)
+    # CAMERA_WIDTH / CAMERA_HEIGHT env override (UDP 단일 패킷 적합한 ~25KB/frame 위해 640×480 권장).
+    _env_width = _parse_positive_int_env("CAMERA_WIDTH")
+    _env_height = _parse_positive_int_env("CAMERA_HEIGHT")
+    p.add_argument("--width", type=int, default=_env_width if _env_width is not None else 640)
+    p.add_argument("--height", type=int, default=_env_height if _env_height is not None else 480)
     p.add_argument("--fps", type=int, default=25)
     p.add_argument(
         "--jpeg-quality", type=int, default=60,
