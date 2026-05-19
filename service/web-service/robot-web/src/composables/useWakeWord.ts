@@ -64,6 +64,13 @@ export interface UseWakeWordOptions {
   onScore?: (scores: Record<string, number>) => void;
   /** 에러 콜백. */
   onError?: (msg: string) => void;
+  /**
+   * 매 inference step 직전에 호출. false 반환 시 mel/embed/classifier 전부 skip.
+   * 호출자가 voice.state 기반으로 wake_detected/speaking/dispatching 동안
+   * 메인 thread 를 비워 robot motion / TTS 재생이 부드럽게 흐르도록 제어.
+   * mic ring 은 계속 채워지므로 다음에 inference 재개 시 끊김 없음.
+   */
+  isEnabled?: () => boolean;
 }
 
 export interface UseWakeWordReturn {
@@ -152,6 +159,7 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
   async function runStep(): Promise<void> {
     if (!melspecSess || !embedSess || !audioRing.isReady()) return;
     if (inflight) return; // 이전 step 진행 중이면 skip (CPU 따라잡지 못한 경우)
+    if (options.isEnabled && !options.isEnabled()) return; // 외부에서 pause 요청
     inflight = true;
     try {
       const audio = audioRing.snapshot(); // 43200 samples (2.7s)

@@ -111,6 +111,9 @@ export function useVoiceController(robot: RobotConfig): {
     robotIds: [robot.id],
     thresholds: { [robot.id]: WAKE_THRESHOLDS[robot.id] ?? 0.99 },
     cooldownMs: 2500,
+    // wake_detected / speaking / dispatching 동안 inference skip — 어차피 hit
+    // 무시되는 시점이고 메인 thread 를 비워야 motion / TTS 가 안 끊김.
+    isEnabled: () => (voice.state === 'idle' || voice.state === 'listening') && !wakeAckInProgress,
     onWake: () => {
       // wake ack 재생 도중 ONNX 가 자기 자신 또는 user 의 추가 발화로 트리거되는
       // 경우 무시 — 같은 호출이 여러 번 잡혀 무한 루프 되는 것 방지.
