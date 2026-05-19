@@ -252,12 +252,15 @@ class VideoStreamer:
     def _open_camera(self) -> None:
         if self._cap is not None and self._cap.isOpened():
             return
-        cap = cv2.VideoCapture(self._config.camera_device)
-        # MJPEG fourcc 강제 — HW 압축 사용
+        # CAP_V4L2 + FOURCC=MJPG 강제 — default backend 는 raw YUYV 떨어져 tearing.
+        # FOURCC 는 width/height 보다 먼저 set 해야 V4L2 fmt 협상 정상.
+        cap = cv2.VideoCapture(self._config.camera_device, cv2.CAP_V4L2)
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._config.width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._config.height)
         cap.set(cv2.CAP_PROP_FPS, self._config.fps)
+        # default 4 frame → ~160ms 지연. 2 로 줄여 latency 최소화 (~80ms).
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
         if not cap.isOpened():
             raise RuntimeError(
                 f"카메라를 열 수 없습니다: {self._config.camera_device}"
@@ -266,9 +269,17 @@ class VideoStreamer:
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         actual_fps = cap.get(cv2.CAP_PROP_FPS)
+        actual_fourcc_int = int(cap.get(cv2.CAP_PROP_FOURCC))
+        actual_fourcc = "".join(
+            chr((actual_fourcc_int >> (8 * i)) & 0xFF) for i in range(4)
+        )
+        if actual_fourcc != "MJPG":
+            self._log.warning(
+                "camera fourcc=%s (MJPG 아님) — tearing 가능", actual_fourcc,
+            )
         self._log.info(
-            "camera opened: %s %dx%d @ %.1ffps",
-            self._config.camera_device, actual_w, actual_h, actual_fps,
+            "camera opened: %s %dx%d @ %.1ffps fourcc=%s",
+            self._config.camera_device, actual_w, actual_h, actual_fps, actual_fourcc,
         )
 
     def _release_camera(self) -> None:
