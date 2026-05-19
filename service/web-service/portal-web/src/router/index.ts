@@ -38,7 +38,6 @@ const routes = [
       { path: 'menu',       component: () => import('@/views/parent/Menu.vue') },
       { path: 'photos',     component: () => import('@/views/parent/Photos.vue') },
       { path: 'report',     component: () => import('@/views/parent/Report.vue') },
-      { path: 'schedule',   component: () => import('@/views/parent/Schedule.vue') },
       { path: 'settings',   component: () => import('@/views/parent/Settings.vue') },
     ],
   },

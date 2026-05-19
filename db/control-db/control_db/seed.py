@@ -1,11 +1,11 @@
-"""DB seed — 교사·학부모·자녀 + 31일 메뉴 + 오늘자 등하원/보고서 (학부모 포털 데모용).
+"""DB seed — 교사·학부모·자녀 + 31일 메뉴.
 
 사용:
     python -m control_db.seed                  # 추가만 (idempotent)
 """
 import asyncio
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from pathlib import Path
 from typing import Sequence
 
@@ -13,10 +13,8 @@ from fastapi_users.password import PasswordHelper
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from control_db.models import Attendance, Child, Menu, ParentChild, Report, User
+from control_db.models import Child, Menu, ParentChild, User
 from control_db.session import async_session_maker
-
-_KST = timezone(timedelta(hours=9))
 
 SEED_PASSWORD = "1234"
 
@@ -199,99 +197,6 @@ async def seed_menu(session: AsyncSession) -> None:
     print(f"[seed] menu embedding {len(missing)}건 생성 완료")
 
 
-# 학부모 포털 Attendance / Report 탭이 비어 보이지 않도록, 자녀별로 오늘자
-# 등(09:05 KST) / 하원(16:10 KST) + 평문 보고서를 채워준다. UNIQUE 제약
-# (attendance: child_id+date+type, report: child_id+date) 으로 재실행 시 skip.
-# 보고서는 평문 — parent Report.vue 는 split('\n'), teacher Reports.vue 는 JSON
-# 파싱 실패 시 summary 에 그대로 떨어뜨려 양쪽 모두 정상 렌더된다.
-_REPORT_SUMMARY_BY_NAME: dict[str, str] = {
-    "박우림": "오늘은 친구들 앞에서 율동을 멋지게 발표했어요. 새로운 노래도 빠르게 따라 불렀습니다.",
-    "최민성": "활동 시간 동안 에너지가 넘쳤어요. 낮잠 시간에는 옆 친구의 도움으로 잘 누워 있었습니다.",
-    "이정우": "오전에는 조용히 책을 읽다가, OX 퀴즈 시간에 가장 큰 목소리로 답을 외쳤어요.",
-    "이지수": "엘리베이터 놀이를 친구들과 함께 즐겼고, 정리 정돈도 잘 도와주었습니다.",
-    "이강택": "바깥놀이 시간에 축구를 가장 즐겼고, 친구들에게 패스도 잘 해주었어요.",
-    "노영주": "낮잠 후 컨디션이 좋았고, 점심 시간에 새로운 반찬도 잘 먹었습니다.",
-}
-
-
-async def seed_attendance(session: AsyncSession, child_ids: dict[str, int]) -> None:
-    today = datetime.now(_KST).date()
-    check_in_time = datetime.combine(today, datetime.min.time(), _KST).replace(hour=9, minute=5)
-    check_out_time = datetime.combine(today, datetime.min.time(), _KST).replace(hour=16, minute=10)
-
-    added = 0
-    for name, cid in child_ids.items():
-        for att_type, time_val in (("IN", check_in_time), ("OUT", check_out_time)):
-            existing = (
-                await session.execute(
-                    select(Attendance).where(
-                        Attendance.child_id == cid,
-                        Attendance.date == today,
-                        Attendance.type == att_type,
-                    )
-                )
-            ).scalar_one_or_none()
-            if existing:
-                continue
-            session.add(Attendance(child_id=cid, date=today, type=att_type, time=time_val))
-            added += 1
-    await session.commit()
-    print(f"[seed] attendance {added}건 추가 (오늘 {today.isoformat()} 기준 IN/OUT)")
-
-
-def _seed_report_content(name: str) -> str:
-    """JSON {events, summary} — 교사 보고서 포맷과 동일. 백엔드 polish 가 평문은
-    한 줄로 합쳐버려 학부모 타임라인이 1개 항목으로 보이는 문제 회피용."""
-    summary = _REPORT_SUMMARY_BY_NAME.get(name, "오늘 하루도 즐겁게 보냈습니다.")
-    events = [
-        {"time": "09:05", "photo_id": None, "text": "등원 후 친구들과 인사를 나눴어요."},
-        {"time": "10:30", "photo_id": None, "text": "자유 놀이 시간에 블럭을 쌓으며 놀았어요."},
-        {"time": "12:00", "photo_id": None, "text": "점심 식사 시간 — 골고루 잘 먹었어요."},
-        {"time": "13:00", "photo_id": None, "text": "낮잠 시간 동안 차분히 휴식했어요."},
-        {"time": "15:00", "photo_id": None, "text": "OX 퀴즈 활동에 활발히 참여했어요."},
-        {"time": "16:10", "photo_id": None, "text": "하원 인사를 마쳤어요."},
-    ]
-    return json.dumps({"events": events, "summary": summary}, ensure_ascii=False)
-
-
-async def seed_reports(session: AsyncSession, child_ids: dict[str, int]) -> None:
-    """오늘자 보고서 upsert. 기존 행이 JSON 이 아니면(이전 평문 seed) 덮어쓴다 —
-    교사·학부모가 직접 편집한 JSON 본문은 건드리지 않는다."""
-    today = datetime.now(_KST).date()
-    now_utc = datetime.now(timezone.utc)
-
-    added = 0
-    upgraded = 0
-    for name, cid in child_ids.items():
-        existing = (
-            await session.execute(
-                select(Report).where(Report.child_id == cid, Report.date == today)
-            )
-        ).scalar_one_or_none()
-        if existing is not None:
-            if existing.content.strip().startswith("{"):
-                continue
-            existing.content = _seed_report_content(name)
-            existing.updated_at = now_utc
-            upgraded += 1
-            continue
-        session.add(
-            Report(
-                child_id=cid,
-                date=today,
-                content=_seed_report_content(name),
-                created_at=now_utc,
-                updated_at=None,
-            )
-        )
-        added += 1
-    await session.commit()
-    print(
-        f"[seed] report {added}건 추가 + {upgraded}건 평문→JSON 업그레이드 "
-        f"(오늘 {today.isoformat()})"
-    )
-
-
 async def main() -> None:
     helper = PasswordHelper()
     async with async_session_maker() as session:
@@ -299,8 +204,6 @@ async def main() -> None:
         child_ids = await seed_children(session)
         await seed_parents(session, helper, child_ids)
         await seed_menu(session)
-        await seed_attendance(session, child_ids)
-        await seed_reports(session, child_ids)
 
 
 if __name__ == "__main__":

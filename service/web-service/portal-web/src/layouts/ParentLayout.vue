@@ -17,7 +17,6 @@ const items = [
   { to: '/parent/menu',       icon: 'utensils',      label: '메뉴' },
   { to: '/parent/photos',     icon: 'images',        label: '사진첩' },
   { to: '/parent/report',     icon: 'file-text',     label: '보고서' },
-  { to: '/parent/schedule',   icon: 'calendar',      label: '일과표' },
 ]
 
 const drawerOpen = ref(false)
