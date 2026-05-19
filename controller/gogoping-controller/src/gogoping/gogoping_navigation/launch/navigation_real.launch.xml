@@ -1,0 +1,92 @@
+<?xml version="1.0" ?>
+<!--
+  실물 노트북용 nav2 navigation stack — controller + planner + behavior +
+  bt_navigator + waypoint_follower + velocity_smoother + lifecycle_manager_navigation.
+
+  목적: graph_router 가 호출하는 /navigate_through_poses + /navigate_to_pose action
+  server 를 제공해 admin-ui 의 웨이포인트 클릭이 실제 로봇 이동까지 이어지게 함.
+
+  전제 (별도로 떠 있어야 함):
+   * localization_real.launch.xml — map_server + AMCL + lifecycle_manager_localization
+   * Pi 의 device-gogoping-pi.sh — vicpinky_bringup (/gogoping/odom, /gogoping/scan,
+     /gogoping/cmd_vel subscribe, /tf 발행)
+   * gogoping_modes — graph_router 와 BT
+
+  sim_with_nav2.launch.xml 과의 차이:
+   * gazebo include 없음 (실 로봇)
+   * map_server + AMCL 없음 (localization_real.launch.xml 이 담당)
+   * use_sim_time = False
+   * frame_id 들 namespace 없음 (vicpinky_bringup 가 root frame 사용)
+
+  토픽 경로 (모두 절대):
+   * controller_server cmd_vel out → /gogoping/cmd_vel_nav
+   * velocity_smoother cmd_vel in   → /gogoping/cmd_vel_nav
+   * velocity_smoother cmd_vel out  → /gogoping/cmd_vel (vicpinky_bringup 가 subscribe)
+
+  사용:
+    ros2 launch gogoping_navigation navigation_real.launch.xml
+    # 또는 device-gogoping-laptop.sh 의 nav2 window 가 자동 호출
+-->
+<launch>
+    <arg name="params_file"
+         default="$(find-pkg-share gogoping_navigation)/params/nav2_params_real.yaml"/>
+    <arg name="use_sim_time" default="false"/>
+    <arg name="autostart" default="true"/>
+    <arg name="log_level" default="info"/>
+
+    <!-- controller_server — cmd_vel out 을 /gogoping/cmd_vel_nav 로 (velocity_smoother 가 받음) -->
+    <node pkg="nav2_controller" exec="controller_server" name="controller_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
+    </node>
+
+    <node pkg="nav2_planner" exec="planner_server" name="planner_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <node pkg="nav2_behaviors" exec="behavior_server" name="behavior_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <node pkg="nav2_bt_navigator" exec="bt_navigator" name="bt_navigator"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <node pkg="nav2_waypoint_follower" exec="waypoint_follower"
+          name="waypoint_follower" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- velocity_smoother — controller cmd_vel_nav → vicpinky 가 받는 /gogoping/cmd_vel -->
+    <node pkg="nav2_velocity_smoother" exec="velocity_smoother"
+          name="velocity_smoother" output="screen"
+          args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
+        <remap from="cmd_vel_smoothed" to="/gogoping/cmd_vel"/>
+    </node>
+
+    <!-- lifecycle_manager_navigation — 위 6 노드 autostart -->
+    <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"
+          name="lifecycle_manager_navigation" output="screen">
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+        <param name="autostart" value="$(var autostart)"/>
+        <param name="node_names" value="['controller_server',
+                                         'planner_server',
+                                         'behavior_server',
+                                         'bt_navigator',
+                                         'waypoint_follower',
+                                         'velocity_smoother']"/>
+    </node>
+</launch>

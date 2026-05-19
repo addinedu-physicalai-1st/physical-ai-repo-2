@@ -75,45 +75,8 @@ case "$ACTION" in
       exit 1
     fi
 
-    # multicast 차단/미동작 환경에서 ROS 2 DDS discovery 를 unicast 로 우회.
-    # ROS_PEER_HOST env (사용자 .zshrc 에 상대 머신 hostname) 의 hostname 을
-    # shared/machine_ips.json 에서 IP lookup → Fast DDS XML profile 동적 생성.
-    # 예: laptop .zshrc 에 `export ROS_PEER_HOST=vic` → Pi unicast 발견.
-    MACHINE_IPS="$REPO_ROOT/shared/machine_ips.json"
-    if [[ -n "${ROS_PEER_HOST:-}" ]] && [[ -f "$MACHINE_IPS" ]] && command -v jq &>/dev/null; then
-      _peer_ips=()
-      _IFS_orig="$IFS"; IFS=','
-      for _host in $ROS_PEER_HOST; do
-        _host="${_host// /}"
-        [[ -z "$_host" ]] && continue
-        _ip=$(jq -r ".${_host}.ip // empty" "$MACHINE_IPS" 2>/dev/null)
-        if [[ -n "$_ip" ]]; then
-          _peer_ips+=("$_ip")
-        else
-          echo "[device-gogoping-laptop] machine_ips.json 에 '$_host' 없음 — 건너뜀" >&2
-        fi
-      done
-      IFS="$_IFS_orig"
-      if [[ ${#_peer_ips[@]} -gt 0 ]]; then
-        _domain="${ROS_DOMAIN_ID:-0}"
-        _port=$(( 7400 + 250 * _domain ))
-        _xml_path="/tmp/fastdds_peers_${USER}_${_domain}.xml"
-        {
-          echo '<?xml version="1.0" encoding="UTF-8" ?>'
-          echo '<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">'
-          echo '  <participant profile_name="participant_default" is_default_profile="true">'
-          echo '    <rtps><builtin><initialPeersList>'
-          for _ip in "${_peer_ips[@]}"; do
-            echo "      <locator><udpv4><address>$_ip</address><port>$_port</port></udpv4></locator>"
-          done
-          echo '    </initialPeersList></builtin></rtps>'
-          echo '  </participant>'
-          echo '</profiles>'
-        } > "$_xml_path"
-        export FASTRTPS_DEFAULT_PROFILES_FILE="$_xml_path"
-        echo "[device-gogoping-laptop] Fast DDS profile: $_xml_path (peers: ${_peer_ips[*]}, port: $_port)"
-      fi
-    fi
+    # DDS discovery 는 ~/.zshrc 의 RMW_IMPLEMENTATION + CYCLONEDDS_URI (cyclonedds peers)
+    # 로 처리한다. multicast 차단 환경에선 zshrc 의 <Peers> 안 IP 가 unicast 발견 담당.
 
     SOURCE_ENV="source $ROS_SETUP && source $WS_SETUP"
 
@@ -215,7 +178,14 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n localization -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation localization_real.launch.xml map:=$LOCALIZATION_MAP"
 
-    # window 2: gogoping_modes (FSM + BT 본체)
+    # window 2: nav2 navigation stack (controller + planner + bt_navigator + behavior +
+    # waypoint_follower + velocity_smoother + lifecycle_manager_navigation).
+    # localization 의 /amcl_pose + map → odom TF 위에서 동작.
+    # admin-ui 의 graph_router 가 /navigate_through_poses action 호출 → 실제 이동.
+    tmux new-window -t "$SESSION" -n nav2 -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation navigation_real.launch.xml"
+
+    # window 3: gogoping_modes (FSM + BT 본체)
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes"
 
@@ -250,7 +220,7 @@ case "$ACTION" in
 
     echo "[device-gogoping-laptop] 세션 '$SESSION' 시작 — attach"
     echo "[device-gogoping-laptop] ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-<unset>}"
-    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / modes / camera / camera-pan / rviz' 클릭으로 전환"
+    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / nav2 / modes / camera / camera-pan / rviz' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)
@@ -262,6 +232,8 @@ case "$ACTION" in
     fi
     _patterns=(
       "ros2 launch gogoping_navigation graph_router"
+      "ros2 launch gogoping_navigation localization_real"
+      "ros2 launch gogoping_navigation navigation_real"
       "ros2 run gogoping_modes"
       "ros2 launch gogoping_camera camera_stream"
       "ros2 launch gogoping_camera_pan camera_pan"
