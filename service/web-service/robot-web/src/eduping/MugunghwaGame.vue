@@ -17,7 +17,10 @@ import { FaceMesh, type Results as FaceResults } from '@mediapipe/face_mesh';
 import type { EmotionId } from '@/config/robots';
 import { useModeStore } from '@/stores/mode';
 import { useTTS } from '@/composables/useTTS';
+import { useEmotionCapture } from '@/composables/useEmotionCapture';
+import { pickExternalCamera } from '@/composables/selectExternalCamera';
 import OpenarmViewer from './OpenarmViewer.vue';
+import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 
 type Stage = 'entry' | 'ready' | 'song' | 'observation' | 'eliminationWait' | 'end';
 
@@ -150,6 +153,67 @@ const reachedCount = computed(
   () => participants.value.filter((p) => p.registered && p.reached).length,
 );
 
+// ---- 가리기 모션 (registration 으로 녹화된 양팔 모션) -----------------------------
+// 노래 단계: 정방향 (가리기) — audio progress (audio.currentTime / duration) 에 lock 된
+//   motion progress 로 keyframe 보간. 노래의 slow_to_fast 패턴이면 audio 가 느릴 때
+//   motion 도 느려지고, 빨라질 때 같이 빨라짐 — playbackRate 가 audio 와 motion 양쪽에
+//   동일 적용된 효과.
+// 관찰 단계: 역재생 (떼기) — observationRemainingMs / dur 비율로 motion 시간을 거꾸로.
+// 다른 단계에서는 externalSnapshot=null 로 두어 follower WS 채널이 viewer 를 그리게 한다.
+interface MotionKeyframe { t: number; pos: number[] }
+interface MotionData {
+  duration_s: number;
+  sample_hz: number;
+  joint_names: string[];
+  keyframes: MotionKeyframe[];
+}
+const motion = ref<MotionData | null>(null);
+const armSnapshot = ref<StreamJointSnapshot | null>(null);
+
+// 게임 시작 (entry/ready) 시 양팔을 자연 하강 자세 (모든 joint = 0) 로 강제. follower WS
+// 가 직전 세션의 잔존 pose (가리기 자세 등) 를 들고 있어도 viewer 가 거기에 끌려가지
+// 않도록 — 사용자가 명시적으로 "처음에는 이 [하강] 자세" 라고 요청.
+const REST_JOINT_NAMES: readonly string[] = [
+  'openarm_right_joint1', 'openarm_right_joint2', 'openarm_right_joint3', 'openarm_right_joint4',
+  'openarm_right_joint5', 'openarm_right_joint6', 'openarm_right_joint7', 'openarm_right_finger_joint1',
+  'openarm_left_joint1', 'openarm_left_joint2', 'openarm_left_joint3', 'openarm_left_joint4',
+  'openarm_left_joint5', 'openarm_left_joint6', 'openarm_left_joint7', 'openarm_left_finger_joint1',
+];
+function makeRestSnapshot(): StreamJointSnapshot {
+  return {
+    jointNames: [...REST_JOINT_NAMES],
+    positions: new Float32Array(REST_JOINT_NAMES.length),  // all zeros
+    tMs: 0,
+  };
+}
+
+async function loadMotion(): Promise<void> {
+  try {
+    const res = await fetch('/api/eduping/mugunghwa/motion/data');
+    if (!res.ok) return;
+    motion.value = (await res.json()) as MotionData;
+  } catch {
+    /* motion 없이도 게임은 동작 — 외부 snapshot 없으면 viewer 가 follower WS 폴백 */
+  }
+}
+
+function interpolateMotion(t: number): StreamJointSnapshot | null {
+  const m = motion.value;
+  if (!m || m.keyframes.length === 0) return null;
+  const tt = Math.max(0, Math.min(m.duration_s, t));
+  const kfs = m.keyframes;
+  // 선형 탐색 (1~2K keyframe 정도면 충분히 빠름; 필요시 binary search 로 교체)
+  let i = 0;
+  while (i < kfs.length - 1 && kfs[i + 1].t <= tt) i++;
+  const a = kfs[i];
+  const b = kfs[Math.min(i + 1, kfs.length - 1)];
+  const span = b.t - a.t;
+  const r = span > 0 ? (tt - a.t) / span : 0;
+  const positions = new Float32Array(a.pos.length);
+  for (let k = 0; k < a.pos.length; k++) positions[k] = a.pos[k] + (b.pos[k] - a.pos[k]) * r;
+  return { jointNames: m.joint_names, positions, tMs: tt * 1000 };
+}
+
 // ---- 노래 stage: tempo variation + 실 오디오 진행 추적 -----------------------
 // `yeonghui_mugunghwa.mp3` (자연 속도 ~4.6s) 가 단일 진실의 원천 (single source of truth).
 // `audio.currentTime / audio.duration` 으로 진행률을 그리고, `audio.ended` 가 발화하면
@@ -163,11 +227,11 @@ const TEMPO_LABEL: Record<TempoPattern, string> = {
   fast_to_slow: '점점 느리게',
 };
 
-// 체감 차이가 확실하도록 넓힌 범위. 0.6 = 늘어진 슬로우모, 2.0 = 빠른 휘몰아침.
-// yeonghui_mugunghwa.mp3 가 이미 자연 속도부터 충분히 느리게 녹음돼 있어 RATE_MIN 을
-// 0.3 → 0.6 으로 올리고, RATE_MAX 도 1.8 → 2.0 로 소폭 상향.
+// 0.6 = 늘어진 슬로우모, 1.1 = 자연 속도 + 10%. 실물 로봇팔 안전상 RATE_MAX 는
+// 자연 속도 110% 를 넘기지 않는다 — 모터 부하·관성 우려 + 어린이 손이 닿는 거리.
+// 슬로우 쪽은 모터에 무해하므로 RATE_MIN 은 충분히 낮게 유지.
 const RATE_MIN = 0.6;
-const RATE_MAX = 2.0;
+const RATE_MAX = 1.1;
 const RATE_MID = (RATE_MIN + RATE_MAX) / 2;
 // 'random' 패턴의 속도 갱신 간격도 무작위 — 일정 주기로 바뀌면 거기에 적응당함.
 const RANDOM_RATE_MIN_REFRESH_MS = 220;
@@ -218,6 +282,10 @@ function startSongStage(): void {
     tempoPattern.value === 'fast_to_slow' ? RATE_MAX
     : tempoPattern.value === 'slow_to_fast' ? RATE_MIN
     : RATE_MID;
+  // 노래 시작 = t=0 keyframe (≈ 팔 내림 자세) 부터 시작. 직전 관찰 단계에서 가리기
+  // 자세로 멈춰있던 viewer 가 갑자기 점프하지 않도록 즉시 reset — 첫 songTick 까지의
+  // 80ms 갭에서 발생하던 visual jump 제거.
+  armSnapshot.value = interpolateMotion(0);
 
   const audio = ensureSongAudio();
   try { audio.pause(); } catch { /* noop */ }
@@ -272,6 +340,13 @@ function songTick(): void {
   const dur = audio.duration;
   if (Number.isFinite(dur) && dur > 0) {
     songProgressRatio.value = Math.min(1, audio.currentTime / dur);
+  }
+
+  // 가리기 모션 정방향 — audio progress 에 lock 된 motion 시간으로 keyframe 보간.
+  // audio.playbackRate 가 동적으로 변하면 audio.currentTime 도 같은 속도로 변하므로
+  // motion 도 자동으로 같은 tempo 로 재생됨.
+  if (motion.value) {
+    armSnapshot.value = interpolateMotion(motion.value.duration_s * songProgressRatio.value);
   }
 
   // 패턴별 rate. slow_to_fast / fast_to_slow 는 **quintic** 커브 (t⁵) — 실제 무궁화꽃이
@@ -436,6 +511,31 @@ const cameraError = ref('');
 const cameraExpanded = ref(false);
 let cameraStream: MediaStream | null = null;
 
+// 카메라 선택 — AttendanceCamera/IntegratedCameraPreview 와 동일 패턴.
+// 기본은 외장 USB (회의실 카메라 등) 가 있으면 그 첫 후보를, 없으면 첫 video device.
+// 사용자가 dropdown 으로 직접 바꿀 수 있다 — 기본 선택이 실패한 경우 (다른 앱이 점유,
+// 권한 거부 등) 사용자가 다른 카메라로 즉시 전환 가능.
+const cameras = ref<MediaDeviceInfo[]>([]);
+const selectedDeviceId = ref<string>('');
+const hasCameras = computed(() => cameras.value.length > 0);
+
+// 자연 촬영 — 진행 단계(노래/관찰/탈락 대기)에서 PIP 비디오 위에 5fps 추론을 얹어
+// happy/sad 표정 캡처 → /api/photos/natural 업로드. 보고서는 같은 child_id+date 의
+// 모든 photo 를 모아 AI 가 합성하므로 별도 서버 변경 불필요. OXQuiz 와 동일한 흐름.
+const captureArmed = computed(
+  () =>
+    stage.value === 'song'
+    || stage.value === 'observation'
+    || stage.value === 'eliminationWait',
+);
+const naturalShotCount = ref(0);
+const emotionCapture = useEmotionCapture({
+  robot: 'eduping',
+  mode: 'mugunghwa',
+  enabled: () => captureArmed.value,
+  onCaptured: () => { naturalShotCount.value += 1; },
+});
+
 function toggleCamera(): void {
   if (!cameraReady.value && !cameraError.value) return;
   cameraExpanded.value = !cameraExpanded.value;
@@ -464,24 +564,95 @@ watch([cameraExpanded, cameraReady], async ([expanded, ready]) => {
   }
 });
 
+async function listCameras(): Promise<void> {
+  try {
+    let devs = await navigator.mediaDevices.enumerateDevices();
+    if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
+      // 라벨이 비어 있으면 권한 트리거 후 다시 enumerate.
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+        tmp.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* 권한 거부해도 enumerate 는 가능 (라벨 빈 채로) */
+      }
+      devs = await navigator.mediaDevices.enumerateDevices();
+    }
+    cameras.value = devs.filter((d) => d.kind === 'videoinput');
+    const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
+    if (!selectedDeviceId.value || !stillValid) {
+      // 기본은 외장 USB — 무궁화 놀이에선 노트북 내장 카메라보다 큰 외장이 보통 더 적합.
+      const ext = await pickExternalCamera();
+      selectedDeviceId.value = ext?.deviceId ?? cameras.value[0]?.deviceId ?? '';
+    }
+  } catch (e) {
+    cameraError.value = `카메라 목록 실패: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
 async function setupCamera(): Promise<void> {
+  cameraError.value = '';
+  if (!selectedDeviceId.value) {
+    await listCameras();
+  }
+  if (!selectedDeviceId.value) {
+    cameraError.value = '사용 가능한 카메라가 없어요';
+    return;
+  }
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
       // 얼굴 인식이 작은 얼굴도 잡을 수 있도록 640x480 로. PIP CSS 가 축소 표시.
-      video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      video: {
+        deviceId: { exact: selectedDeviceId.value },
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      },
       audio: false,
     });
     if (videoRef.value) {
       videoRef.value.srcObject = cameraStream;
       await videoRef.value.play();
       cameraReady.value = true;
+      emotionCapture.attach(videoRef.value);
     }
   } catch (e) {
     cameraError.value = (e as Error).message || '카메라 접근 실패';
   }
 }
 
+async function restartStream(): Promise<void> {
+  // device 변경 시 — emotion capture detach + 기존 track stop → 새 device 로 재시작.
+  emotionCapture.detach();
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((t) => t.stop());
+    cameraStream = null;
+  }
+  cameraReady.value = false;
+  // expanded 모달의 video element 도 srcObject 가 무효해지므로 다음 watch 사이클에서 재 attach.
+  if (expandedVideoRef.value) expandedVideoRef.value.srcObject = null;
+  await setupCamera();
+}
+
+async function onCameraChange(): Promise<void> {
+  await restartStream();
+}
+
+async function rescanCameras(): Promise<void> {
+  await listCameras();
+}
+
+let deviceChangeDebounce: number | null = null;
+function scheduleListCamerasOnDeviceChange(): void {
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+  }
+  deviceChangeDebounce = window.setTimeout(() => {
+    deviceChangeDebounce = null;
+    void listCameras();
+  }, 400);
+}
+
 function teardownCamera(): void {
+  emotionCapture.detach();
   if (cameraStream) {
     cameraStream.getTracks().forEach((t) => t.stop());
     cameraStream = null;
@@ -928,6 +1099,7 @@ const observationCountdownSec = computed(
 );
 let observationTimer: number | null = null;
 let observationEndAt = 0;
+let observationDur = 0;  // 이 관찰 라운드의 총 duration (역재생 비율 계산용)
 let observationEliminatedBefore = 0;
 
 function countEliminated(): number {
@@ -937,9 +1109,9 @@ function countEliminated(): number {
 function startObservationCountdown(): void {
   stopObservationCountdown();
   observationEliminatedBefore = countEliminated();
-  const dur = OBS_DURATION_MIN_MS + Math.random() * (OBS_DURATION_MAX_MS - OBS_DURATION_MIN_MS);
-  observationEndAt = performance.now() + dur;
-  observationRemainingMs.value = dur;
+  observationDur = OBS_DURATION_MIN_MS + Math.random() * (OBS_DURATION_MAX_MS - OBS_DURATION_MIN_MS);
+  observationEndAt = performance.now() + observationDur;
+  observationRemainingMs.value = observationDur;
   observationTimer = window.setInterval(() => {
     const remaining = observationEndAt - performance.now();
     if (remaining <= 0) {
@@ -949,6 +1121,8 @@ function startObservationCountdown(): void {
       setStage(eliminatedDuring > 0 ? 'eliminationWait' : 'song');
     } else {
       observationRemainingMs.value = remaining;
+      // 관찰 중에는 팔 정지 — 실물 안전 + 음악만으로 정지/움직임 신호. armSnapshot 은
+      // 노래 끝의 가리기 자세에서 그대로 멈춘다 (update 안 함).
     }
   }, 100);
 }
@@ -1054,14 +1228,29 @@ watch(stage, (s, prev) => {
   else if (prev === 'eliminationWait') stopEliminationWait();
 });
 
+// 단계별 viewer 입력:
+//   entry / ready / end / eliminationWait — rest snapshot (자연 하강 자세). follower WS
+//     가 잔존 pose 를 들고 있어도 명시적으로 zero pose 로 덮어쓴다.
+//   song — 음악 진행률에 lock 된 모션 보간 (songTick 에서 갱신)
+//   observation — 노래 끝 자세 (가리기) 에서 정지 (update 안 함)
+watch(stage, (s) => {
+  if (s === 'entry' || s === 'ready' || s === 'end' || s === 'eliminationWait') {
+    armSnapshot.value = makeRestSnapshot();
+  }
+});
+
 const isDev = import.meta.env.DEV;
 
 onMounted(() => {
   mode.currentEmotion = STAGE_META[stage.value].emotion;
   void loadRoster();
-  // 마운트 시 노래 오디오 preload — 첫 song stage 진입 시 디코딩 지연 없게.
+  // 마운트 시 노래 오디오 + 가리기 모션 데이터 preload — 첫 song stage 진입 시 지연 없게.
   ensureSongAudio();
+  void loadMotion();
+  // 첫 mount 단계가 entry 면 stage watch 가 한 번 안 돌므로 직접 rest pose 적용.
+  armSnapshot.value = makeRestSnapshot();
   void setupCamera();
+  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
   // 첫 mount 시 단계가 'entry' 면 watch 가 한 번 안 돌므로 직접 확대 트리거.
   if (STAGES_WITH_AUTO_CAMERA.includes(stage.value)) cameraExpanded.value = true;
   // 마찬가지로 첫 mount 가 entry 면 recognition 도 시작.
@@ -1087,6 +1276,11 @@ onUnmounted(() => {
   if (faceMesh) {
     try { faceMesh.close(); } catch { /* noop */ }
     faceMesh = null;
+  }
+  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+    deviceChangeDebounce = null;
   }
   teardownCamera();
 });
@@ -1117,22 +1311,75 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div
-              class="camera-pip"
-              :class="{ ready: cameraReady, error: !!cameraError, motion: motionDetected }"
-              :title="motionDetected ? '⚠ 움직임 감지!' : (cameraError || (cameraReady ? '카메라 작동 중 (클릭으로 확대)' : '카메라 준비 중…'))"
-              @click="toggleCamera"
-            >
-              <video ref="videoRef" muted playsinline />
-              <div v-if="!cameraReady && !cameraError" class="cam-overlay">준비 중…</div>
-              <div v-if="cameraError" class="cam-overlay err">⚠ {{ cameraError }}</div>
-              <button
-                v-if="cameraReady"
-                type="button"
-                class="cam-toggle"
-                aria-label="카메라 확대"
-                @click.stop="toggleCamera"
-              >⤢</button>
+            <div class="camera-pip-wrap">
+              <div class="camera-picker" @click.stop>
+                <select
+                  v-model="selectedDeviceId"
+                  :disabled="!hasCameras"
+                  class="camera-picker__select"
+                  aria-label="카메라 선택"
+                  @change="onCameraChange"
+                >
+                  <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+                  <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+                    {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  class="camera-picker__rescan"
+                  aria-label="카메라 다시 스캔"
+                  title="카메라 다시 스캔"
+                  @click="rescanCameras"
+                >↻</button>
+              </div>
+              <div
+                class="camera-pip"
+                :class="{ ready: cameraReady, error: !!cameraError, motion: motionDetected, captured: emotionCapture.captured.value }"
+                :title="motionDetected ? '⚠ 움직임 감지!' : (cameraError || (cameraReady ? '카메라 작동 중 (클릭으로 확대)' : '카메라 준비 중…'))"
+                @click="toggleCamera"
+              >
+                <video ref="videoRef" muted playsinline />
+                <div v-if="!cameraReady && !cameraError" class="cam-overlay">준비 중…</div>
+                <div v-if="cameraError" class="cam-overlay err">⚠ {{ cameraError }}</div>
+                <!-- 셔터 플래시 — 캡처 직후 1회. -->
+                <div
+                  v-if="emotionCapture.flashTick.value > 0"
+                  :key="emotionCapture.flashTick.value"
+                  class="cam-shutter"
+                />
+                <!-- 마지막 캡처 감정 라벨 — 짧게 표시. -->
+                <div
+                  v-if="emotionCapture.lastEmotion.value !== null"
+                  class="cam-emotion-tag"
+                  :class="`is-${emotionCapture.lastEmotion.value}`"
+                >
+                  📸 {{ emotionCapture.lastEmotion.value === 'happy' ? '활짝!' : '시무룩' }}
+                </div>
+                <!-- 라이브 HUD — armed 상태에서 얼굴 검출/감정 % 표시 (디버깅 + 사용자 피드백). -->
+                <div
+                  v-if="captureArmed && cameraReady && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
+                  class="cam-live-hud"
+                  :class="{ 'has-face': emotionCapture.faceDetected.value }"
+                >
+                  <template v-if="!emotionCapture.faceDetected.value">얼굴 찾는 중…</template>
+                  <template v-else>
+                    웃음 {{ (emotionCapture.liveHappy.value * 100).toFixed(0) }}%
+                    · 슬픔 {{ (emotionCapture.liveSad.value * 100).toFixed(0) }}%
+                  </template>
+                </div>
+                <!-- 누적 캡처 수 — 사용자가 한 게임에서 몇 번 잡혔는지. -->
+                <div v-if="naturalShotCount > 0" class="cam-shot-count">
+                  📸 {{ naturalShotCount }}
+                </div>
+                <button
+                  v-if="cameraReady"
+                  type="button"
+                  class="cam-toggle"
+                  aria-label="카메라 확대"
+                  @click.stop="toggleCamera"
+                >⤢</button>
+              </div>
             </div>
 
             <button type="button" class="btn-icon close-btn" aria-label="닫기" @click="close">×</button>
@@ -1141,7 +1388,11 @@ onUnmounted(() => {
           <!-- 메인: arm viewer + 노래 HUD 오버레이 -->
           <main class="main-area">
             <div class="arm-wrap">
-              <OpenarmViewer source="follower" />
+              <OpenarmViewer
+                source="follower"
+                :external-snapshot="armSnapshot"
+                :extra-yaw-deg="-45"
+              />
               <div v-if="stage === 'song'" class="arm-overlay">
                 <div class="tempo-badge" :class="`tempo-${tempoPattern}`">
                   <span class="tempo-name">{{ TEMPO_LABEL[tempoPattern] }}</span>
@@ -1326,6 +1577,27 @@ onUnmounted(() => {
                 <header class="cam-expanded-head">
                   <div class="cam-expanded-title">
                     <span class="rec-dot" /> 카메라 미리보기
+                  </div>
+                  <div class="cam-expanded-picker">
+                    <select
+                      v-model="selectedDeviceId"
+                      :disabled="!hasCameras"
+                      class="cam-expanded-select"
+                      aria-label="카메라 선택"
+                      @change="onCameraChange"
+                    >
+                      <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+                      <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+                        {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+                      </option>
+                    </select>
+                    <button
+                      type="button"
+                      class="cam-expanded-rescan"
+                      aria-label="카메라 다시 스캔"
+                      title="카메라 다시 스캔"
+                      @click="rescanCameras"
+                    >↻</button>
                   </div>
                   <button
                     type="button"
@@ -1551,6 +1823,48 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
+.camera-pip-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 160px;
+}
+.camera-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.camera-picker__select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 11px;
+  font-family: inherit;
+  background: white;
+  color: #1f3a4d;
+  cursor: pointer;
+}
+.camera-picker__select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.camera-picker__rescan {
+  flex-shrink: 0;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  color: #5b7a8c;
+}
+.camera-picker__rescan:hover { background: #f1f5f9; }
+
 .camera-pip {
   position: relative;
   width: 160px;
@@ -1593,6 +1907,65 @@ onUnmounted(() => {
   border-color: #dc2626;
   animation: motion-flash 0.55s ease-in-out infinite;
 }
+.camera-pip.captured { box-shadow: 0 0 0 3px #f0c042 inset; }
+
+.cam-shutter {
+  position: absolute;
+  inset: 0;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  animation: cam-shutter-flash 0.6s ease-out;
+  animation-iteration-count: 1;
+}
+@keyframes cam-shutter-flash {
+  0%   { opacity: 0; }
+  10%  { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+.cam-emotion-tag {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: white;
+  pointer-events: none;
+}
+.cam-emotion-tag.is-happy { background: rgba(45, 139, 87, 0.92); }
+.cam-emotion-tag.is-sad   { background: rgba(193, 69, 69, 0.92); }
+.cam-live-hud {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 22px;
+  z-index: 2;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(30, 45, 58, 0.7);
+  pointer-events: none;
+  line-height: 1.2;
+  text-align: center;
+}
+.cam-live-hud.has-face { background: rgba(45, 110, 75, 0.8); }
+.cam-shot-count {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
 @keyframes motion-flash {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.65), 0 2px 8px rgba(15, 23, 42, 0.18);
@@ -2352,6 +2725,42 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
 }
+.cam-expanded-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  max-width: 320px;
+  margin: 0 12px;
+}
+.cam-expanded-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f3a4d;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.cam-expanded-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.cam-expanded-rescan {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  color: #5b7a8c;
+}
+.cam-expanded-rescan:hover { background: white; }
 .cam-expanded-body {
   flex: 1;
   background: #000;
@@ -2558,6 +2967,7 @@ onUnmounted(() => {
   .top-bar { padding: 10px 12px; gap: 10px; min-height: 80px; }
   .stage-label { font-size: 22px; }
   .stage-helper { font-size: 11px; }
+  .camera-pip-wrap { width: 120px; }
   .camera-pip { width: 120px; height: 68px; }
   .btn-icon { width: 44px; height: 44px; border-radius: 12px; }
   .arm-wrap { margin: 12px 12px 0; }

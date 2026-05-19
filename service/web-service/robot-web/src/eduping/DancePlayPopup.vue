@@ -13,6 +13,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
+import IntegratedCameraPreview from '@/noriarm/IntegratedCameraPreview.vue';
 import { useDanceStream } from './useDanceStream';
 
 interface DanceItem {
@@ -34,6 +35,12 @@ const error = ref('');
 const playingSlug = ref<string>('');
 const playingItem = computed(() => items.value.find((i) => i.slug === playingSlug.value) ?? null);
 const pendingItem = ref<DanceItem | null>(null);  // 재생 확인 대기 중
+
+// 자연 촬영 — 율동 재생 중에만 캡처. 곡 시작마다 resetKey 증가시켜 직전 세션 락 해제.
+// OXQuiz 와 동일한 패턴: /api/photos/natural 로 happy/sad 프레임 업로드 → 같은 child_id+date
+// 의 photo_events 가 보고서 합성에 자동 포함.
+const captureArmed = computed(() => playingSlug.value !== '');
+const captureResetKey = ref(0);
 
 const playDurationS = computed(() => stream.durationMs.value / 1000);
 const playElapsedS = computed(() => stream.elapsedMs.value / 1000);
@@ -75,6 +82,7 @@ function confirmPlay(): void {
   pendingItem.value = null;
   if (!item) return;
   playingSlug.value = item.slug;
+  captureResetKey.value += 1;
   error.value = '';
   stream.play(item.slug);
 }
@@ -118,6 +126,14 @@ onUnmounted(() => {
           <div class="popup-body">
             <div class="viewer-pane">
               <OpenarmViewer source="follower" :external-snapshot="stream.currentSnapshot.value" />
+              <div class="emotion-pip">
+                <IntegratedCameraPreview
+                  :armed="captureArmed"
+                  :reset-key="captureResetKey"
+                  robot="eduping"
+                  mode="dance"
+                />
+              </div>
               <div v-if="playingItem" class="now-playing">
                 <div class="np-name">
                   <Icon name="music" :size="16" />
@@ -257,6 +273,13 @@ onUnmounted(() => {
 .viewer-pane > :first-child {
   flex: 1;
   min-height: 0;
+}
+
+.emotion-pip {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 4;
 }
 
 .now-playing {

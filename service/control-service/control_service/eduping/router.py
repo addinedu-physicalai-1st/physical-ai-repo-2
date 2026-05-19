@@ -512,6 +512,28 @@ async def list_mugunghwa(req: Request) -> dict:
     return {"motion": read_mugunghwa(bridge.routines_root)}
 
 
+@router.get("/mugunghwa/motion/data")
+async def mugunghwa_motion_data(req: Request) -> dict:
+    """전체 keyframe 포함 motion data — 브라우저측에서 노래/관찰 단계 동안 audio
+    progress 에 맞춰 직접 interpolate 해 OpenarmViewer 의 externalSnapshot 으로
+    주입한다. 메타데이터만 필요한 등록 UI 는 GET /mugunghwa 유지."""
+    bridge = _bridge(req)
+    from eduarm.routines_io import load_routine, mugunghwa_yaml_path
+
+    p = mugunghwa_yaml_path(bridge.routines_root)
+    if not p.exists():
+        raise HTTPException(404, "no recorded motion")
+    r = load_routine(p)
+    return {
+        "duration_s": r.duration_s,
+        "sample_hz": r.sample_hz,
+        "joint_names": list(r.joint_names),
+        "keyframes": [
+            {"t": float(k.t), "pos": [float(x) for x in k.pos]} for k in r.keyframes
+        ],
+    }
+
+
 @router.post("/mugunghwa/{name}/record/start")
 async def mugunghwa_record_start(req: Request, name: str) -> dict:
     bridge = _bridge(req)

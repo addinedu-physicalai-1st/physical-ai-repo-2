@@ -144,8 +144,17 @@ class WaypointsRosBridge:
         - 연결 안 되어 있으면 wait_for_server 로 재연결 시도
         - 연결되어 있다 끊기면 다음 사이클에서 감지 → 재연결
         - 변화 시 ROS log 에 기록
+        - rclpy 컨텍스트가 다른 곳에서 (예: noriarm framework run_with_ros 종료 시)
+          shutdown 되면 wait_for_server 가 "rcl node's context is invalid" 던진다 —
+          매 사이클 noise 만 남기므로 rclpy.ok() 체크로 silent skip.
         """
+        import rclpy
+
         while not self._stop_evt.is_set():
+            if not rclpy.ok():
+                # 글로벌 context 가 죽은 상태 — 로그 없이 다음 사이클까지 대기.
+                self._stop_evt.wait(RECONNECT_INTERVAL_S)
+                continue
             try:
                 with self._lock:
                     was_available = self._nav_available
@@ -171,6 +180,10 @@ class WaypointsRosBridge:
                             "nav action server lost — will retry in next cycle"
                         )
             except Exception as e:
+                # rclpy context 가 사이클 도중 죽었으면 silent — 위의 ok() 체크 race 보완.
+                if not rclpy.ok():
+                    self._stop_evt.wait(RECONNECT_INTERVAL_S)
+                    continue
                 if self._node is not None:
                     self._node.get_logger().error(f"reconnect loop error: {e}")
             self._stop_evt.wait(RECONNECT_INTERVAL_S)

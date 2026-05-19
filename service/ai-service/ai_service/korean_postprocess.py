@@ -963,6 +963,24 @@ def _mode_display_korean(mode: str) -> str:
     m = _norm_session_token(mode)
     if m in ("oxquiz", "ox-quiz"):
         return "OX 퀴즈"
+    if m == "mugunghwa":
+        return "무궁화꽃이 피었습니다"
+    if m == "dance":
+        return "율동"
+    if m == "attendance":
+        return "등하원 인사"
+    if m in ("checkup", "check-up"):
+        return "진찰 놀이"
+    if m == "blocks":
+        return "블럭 쌓기"
+    if m == "shop":
+        return "가게 놀이"
+    if m in ("hideseek", "hide-seek"):
+        return "숨바꼭질"
+    if m == "lullaby":
+        return "자장가"
+    if m == "greeting":
+        return "인사"
     if not m or m == "unknown":
         return "놀이"
     raw = (mode or "").strip().replace("_", "-")
@@ -1208,6 +1226,144 @@ def merge_same_session_photo_clusters_to_single_rows(
     out.extend(merged_rows)
     out.sort(key=lambda e: str(e.get("time", "")))
     return out
+
+
+def rewrite_photo_event_texts_with_emotion(
+    events: list[dict[str, Any]],
+    photo_events: list[dict[str, Any]],
+    address_name: str,
+) -> list[dict[str, Any]]:
+    """photo_id 가 있는 이벤트의 text 를 게임·감정 데이터로 결정론적으로 다시 쓴다.
+
+    LLM 이 사진 시각이 일과표 (낮잠 등) 안에 들어가면 사진과 무관한 슬롯 텍스트
+    ("자리를 정리하고 충분한 낮잠으로 오전의 피로를 풀었다") 를 생성하는 사례 방지.
+    이름 fuzzy-fix 등 모든 후처리가 끝난 뒤 마지막에 호출 — 따라서 결과가 그대로 출력된다.
+
+    입력:
+      events: skeleton 단계에서 만들어진 타임라인 row 목록. photo_id / photo_ids 가 들어 있다.
+      photo_events: 같은 자녀·날짜의 사진 메타. {photo_id, time, robot, mode, emotion, score}.
+      address_name: 호칭 (조사 처리용).
+    """
+    call = (address_name or "").strip()
+    if not call or not events:
+        return [dict(e) for e in events]
+
+    pe_by_id: dict[int, dict[str, Any]] = {}
+    for p in photo_events or []:
+        try:
+            pid = int(p.get("photo_id"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        pe_by_id[pid] = p
+    if not pe_by_id:
+        return [dict(e) for e in events]
+
+    topic = topic_particle_phrase(call)
+
+    out: list[dict[str, Any]] = []
+    for ev in events:
+        new_ev = dict(ev)
+        pid = new_ev.get("photo_id")
+        pids_raw = new_ev.get("photo_ids") or []
+        ids: list[int] = []
+        for x in pids_raw:
+            try:
+                ids.append(int(x))
+            except (TypeError, ValueError):
+                continue
+        if not ids and isinstance(pid, int):
+            ids = [pid]
+        cluster = [pe_by_id[i] for i in ids if i in pe_by_id]
+        if not cluster:
+            out.append(new_ev)
+            continue
+
+        # 모드: 가장 흔한 mode 채택 (한 클러스터는 보통 단일 모드지만 안전망).
+        mode_counts: dict[str, int] = {}
+        for p in cluster:
+            m = str(p.get("mode", "")).strip().lower()
+            if m:
+                mode_counts[m] = mode_counts.get(m, 0) + 1
+        main_mode = max(mode_counts, key=mode_counts.get) if mode_counts else ""  # type: ignore[arg-type]
+        mode_ko = _mode_display_korean(main_mode)
+
+        emotions = [str(p.get("emotion", "")).strip().lower() for p in cluster]
+        n_happy = sum(1 for e in emotions if e == "happy")
+        n_sad = sum(1 for e in emotions if e == "sad")
+        n_total = len(cluster)
+
+        first_t = str(cluster[0].get("time", "")).strip()
+        last_t = str(cluster[-1].get("time", "")).strip()
+        same_time = first_t == last_t
+
+        activity_phrase = f"{mode_ko} 시간" if mode_ko != "놀이" else "활동 시간"
+
+        if n_total == 1:
+            emo = emotions[0]
+            if emo == "happy":
+                text = f"{topic} {activity_phrase}에 환하게 웃는 모습이 카메라에 한 장 담겼다."
+            elif emo == "sad":
+                text = f"{topic} {activity_phrase}에 잠시 시무룩한 표정이 카메라에 한 장 담겼다."
+            else:
+                text = f"{topic} {activity_phrase}의 표정이 카메라에 한 장 담겼다."
+        else:
+            span = (
+                f"{first_t}"
+                if same_time
+                else f"{first_t}부터 {last_t}까지"
+            )
+            if n_sad == 0 and n_happy > 0:
+                text = (
+                    f"{topic} {span} {activity_phrase}에 푹 빠져, "
+                    f"환하게 웃는 표정이 {n_happy}번이나 카메라에 담겼다."
+                )
+            elif n_happy == 0 and n_sad > 0:
+                text = (
+                    f"{topic} {span} {activity_phrase}에 참여하는 동안, "
+                    f"시무룩한 표정이 {n_sad}번 카메라에 담겼다."
+                )
+            elif n_happy > 0 and n_sad > 0:
+                text = (
+                    f"{topic} {span} {activity_phrase}을 즐기며, "
+                    f"환하게 웃는 모습이 {n_happy}번, 잠시 시무룩한 표정도 {n_sad}번 담겼다."
+                )
+            else:
+                text = (
+                    f"{topic} {span} {activity_phrase}의 표정이 {n_total}장 기록되었다."
+                )
+
+        new_ev["text"] = text
+        out.append(new_ev)
+    return out
+
+
+def rewrite_photo_event_texts_in_json(
+    content_json: str,
+    photo_events: list[dict[str, Any]],
+    address_name: str,
+) -> str:
+    """JSON 문자열 (events + summary) 안의 photo_id 가 있는 row 의 text 를 다시 쓴다.
+
+    `polish_report_json_content` 가 이름 fuzzy-fix 로 `정리` → `정우` 같은 변형을
+    일으키기도 해서, polish 가 끝난 *뒤* 결정론적 텍스트를 박아 넣는 마지막 단계.
+    JSON 이 아니거나 events 가 list 가 아니면 원본 반환.
+    """
+    s = (content_json or "").strip()
+    if not s:
+        return s
+    try:
+        data = json.loads(s)
+    except json.JSONDecodeError:
+        return s
+    if not isinstance(data, dict):
+        return s
+    events = data.get("events")
+    if not isinstance(events, list):
+        return s
+    ev_dicts = [ev for ev in events if isinstance(ev, dict)]
+    rewritten = rewrite_photo_event_texts_with_emotion(ev_dicts, photo_events, address_name)
+    data["events"] = rewritten
+    return json.dumps(data, ensure_ascii=False)
 
 
 def _schedule_slots_sorted(schedule: dict[str, str]) -> list[tuple[str, int, int, str]]:

@@ -96,7 +96,6 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
   let sustainCount = 0;
   let sustainEmotion: 'happy' | 'sad' | null = null;
   let inflight = false;
-  let sessionId = crypto.randomUUID();
   let captureCooldownUntil = 0;
   let cooldownClearTimer: number | null = null;
 
@@ -144,10 +143,14 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
     const nowMs = Date.now();
     const inCooldown = nowMs < captureCooldownUntil;
     try {
+      // inputSize 416: 작은 얼굴(무궁화·율동처럼 아이가 카메라에서 떨어져 있는 경우)도
+      // 잡히게 함. 320 → 416 으로 추론 비용은 ~1.7× 늘지만 5fps 라 무리 없음.
+      // scoreThreshold 0.25: 옆모습·부분 가림 등 약한 신호도 후보로 — emotion 임계는
+      // 별도 (HAPPY/SAD_THRESHOLD) 라 false-positive 영향 적음.
       const result = await api
         .detectSingleFace(
           video,
-          new api.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }),
+          new api.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.25 }),
         )
         .withFaceExpressions();
       if (!result) {
@@ -234,7 +237,10 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       form.append('mode', options.mode);
       form.append('emotion', emotion);
       form.append('score', String(score));
-      form.append('session_id', sessionId);
+      // 매 캡처마다 fresh UUID — 한 게임 안에서 happy/sad 가 여러 번 잡힐 때 각각 다른 Photo 행으로
+      // 저장되어야 한다. 같은 sessionId 를 재사용하면 backend 가 trigger_session_id idempotency
+      // 로 이전 행만 돌려줘서 한 게임당 1장만 DB 에 남는 사고가 있었음.
+      form.append('session_id', crypto.randomUUID());
       const r = await fetch('/api/photos/natural', { method: 'POST', body: form });
       if (!r.ok) {
         uploadError.value = `사진 저장 실패 (${r.status})`;
@@ -301,7 +307,6 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       window.clearTimeout(cooldownClearTimer);
       cooldownClearTimer = null;
     }
-    sessionId = crypto.randomUUID();
   }
 
   const ready = computed(() => modelLoaded.value);

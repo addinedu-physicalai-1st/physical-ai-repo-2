@@ -22,8 +22,11 @@ from control_db.session import get_session
 router = APIRouter(prefix="/api", tags=["photos"])
 
 # 자연 촬영 업로드 시 face matching cutoff — InsightFace L2-normalized 임베딩의 cosine 거리.
-# 0.55 ≈ similarity 0.45. 같은 사람: 보통 0.3~0.5 (안전 마진 + 각도 변화 흡수), 타인: 0.7+.
-_FACE_MATCH_MAX_DISTANCE = 0.55
+# 같은 사람: 보통 0.3~0.5 (안전 마진 + 각도 변화 흡수), 타인: 0.7+.
+# OXQuiz·무궁화 같은 게임 중에는 옆모습·찡그림·부분 가림이 잦아 distance 가 0.55~0.75
+# 구간으로 튀어 같은 아이의 사진이 unmatched 로 떨어지는 사례가 다수. 0.75 로 올리면
+# 같은 아이의 변형 frame 을 거의 다 잡되 타인 (0.7+) 의 일부도 들어올 수 있는 trade-off.
+_FACE_MATCH_MAX_DISTANCE = 0.75
 
 # 파일명 안에 들어가는 슬러그 sanitize — 모드명에 한글이 들어와도 안전한 ASCII slug 로.
 _SLUG_RE = re.compile(r"[^a-zA-Z0-9._-]+")

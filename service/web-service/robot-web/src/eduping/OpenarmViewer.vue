@@ -20,8 +20,11 @@ const props = withDefaults(
   defineProps<{
     source?: 'leader' | 'follower';
     externalSnapshot?: StreamJointSnapshot | null;
+    /** 로봇을 월드 Y축 기준으로 추가 회전 (degrees, CW from top-down = negative).
+     * 무궁화 게임에서 카메라 정면을 향하도록 -45 사용. */
+    extraYawDeg?: number;
   }>(),
-  { source: 'leader', externalSnapshot: null },
+  { source: 'leader', externalSnapshot: null, extraYawDeg: 0 },
 );
 
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -36,9 +39,12 @@ let robot: any = null;
 let animationId = 0;
 let resizeObserver: ResizeObserver | null = null;
 
-// OpenArm 은 OMX-F 보다 크다 — 카메라 거리 ~1m.
+// OpenArm 은 OMX-F 보다 크다. 좁은 portrait viewport (mugunghwa 게임 카드 안) 에서도
+// 양팔 + 베이스 + 그리퍼 끝까지 다 보이도록 카메라를 1.6m → 2.4m 로 더 멀리.
+// FOV 45° 기준, target=(0,0.4,0) 에서 거리 ~2.4m → horizontal half-angle ~22.5° →
+// 화면 양옆 ~1m 의 margin 확보.
 const VIEW_TARGET = new THREE.Vector3(0.0, 0.4, 0.0);
-const CAMERA_POSITION = new THREE.Vector3(1.2, 0.7, 1.0);
+const CAMERA_POSITION = new THREE.Vector3(1.8, 1.05, 1.5);
 
 // 백엔드와 URDF 둘 다 동일 명명 (openarm_{right|left}_joint1..7, openarm_{right|left}_finger_joint1).
 // 변환 레이어 없이 setJointValue 에 그대로 전달.
@@ -86,7 +92,12 @@ function loadUrdf(): void {
     (loaded: any) => {
       // ROS URDF 는 Z-up — three.js Y-up 로 회전.
       loaded.rotation.x = -Math.PI / 2;
-      scene!.add(loaded);
+      // 추가 yaw — 모델 좌표축 (Z-up 그대로) 안에서의 회전이 world Y 회전이 되도록
+      // wrapper Group 으로 감싸 외부에서 yaw 만 따로 적용.
+      const wrapper = new THREE.Group();
+      wrapper.add(loaded);
+      wrapper.rotation.y = (props.extraYawDeg * Math.PI) / 180;
+      scene!.add(wrapper);
       robot = loaded;
       status.value = 'ready';
     },

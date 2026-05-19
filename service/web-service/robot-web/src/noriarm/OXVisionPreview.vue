@@ -609,13 +609,14 @@ function redraw(): void {
     const sy = c.height / fh;
     for (const b of lastInfer.boxes) {
       if (b.parts) {
-        // 현재 손가락이 있는 영역은 두껍게 강조
+        // 현재 손가락이 있는 영역은 두껍게 강조. confidence 점수는 운영자에게
+        // 의미가 적어 라벨에서 제거 — 깔끔하게 'O' / 'X' 만.
         const oW = currentRegion.value === 'O' ? 5 : 2;
         const xW = currentRegion.value === 'X' ? 5 : 2;
-        drawBox(ctx, b.parts.O, sx, sy, '#22dd55', `O ${b.score.toFixed(2)}`, oW);
-        drawBox(ctx, b.parts.X, sx, sy, '#ff5544', `X ${b.score.toFixed(2)}`, xW);
+        drawBox(ctx, b.parts.O, sx, sy, '#22dd55', 'O', oW);
+        drawBox(ctx, b.parts.X, sx, sy, '#ff5544', 'X', xW);
       } else {
-        drawBox(ctx, b.bbox, sx, sy, '#3a8fc2', `${b.label ?? ''} ${b.score.toFixed(2)}`);
+        drawBox(ctx, b.bbox, sx, sy, '#3a8fc2', `${b.label ?? ''}`);
       }
     }
   }
