@@ -306,14 +306,23 @@ class VicPinky(Node):
         ZLAC 가 disable 후 vel mode 를 잃을 수 있어서 vel_mode 재설정 필수.
         """
         if request.data:
-            # init 과 동일 sequence — 잃었을 수 있는 mode/RPM 복원
+            # init 의 enable sequence 완전 복제 — set_vel_mode → enable → 1s wait → verify → set_rpm.
+            # 1s wait + get_rpm verify 가 ZLAC controller ready 보장.
             self.driver.set_vel_mode()
-            time.sleep(0.05)
+            time.sleep(0.1)
             ok = self.driver.enable()
-            time.sleep(0.3)              # enable 후 motor controller 가 cmd_vel 받을 준비까지 wait
-            self.driver.set_double_rpm(0, 0)
+            time.sleep(1.0)              # init 과 동일 — controller ready wait
+            if ok:
+                rpm_l, _ = self.driver.get_rpm()
+                if rpm_l is None:
+                    ok = False
+                    response.message = "controller unresponsive after enable"
+                else:
+                    self.driver.set_double_rpm(0, 0)
+                    response.message = "torque ON"
+            else:
+                response.message = "enable() failed"
             response.success = bool(ok)
-            response.message = "torque ON" if ok else "enable() failed"
         else:
             # 정지 → torque OFF (motor free-wheel)
             self.driver.set_double_rpm(0, 0)
