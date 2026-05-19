@@ -72,6 +72,46 @@ case "$ACTION" in
       exit 1
     fi
 
+    # multicast 차단/미동작 환경에서 ROS 2 DDS discovery 를 unicast 로 우회.
+    # ROS_PEER_HOST env (사용자 .zshrc 에 상대 머신 hostname) 의 hostname 을
+    # shared/machine_ips.json 에서 IP lookup → Fast DDS XML profile 동적 생성.
+    # 예: laptop .zshrc 에 `export ROS_PEER_HOST=vic` → Pi unicast 발견.
+    MACHINE_IPS="$REPO_ROOT/shared/machine_ips.json"
+    if [[ -n "${ROS_PEER_HOST:-}" ]] && [[ -f "$MACHINE_IPS" ]] && command -v jq &>/dev/null; then
+      _peer_ips=()
+      _IFS_orig="$IFS"; IFS=','
+      for _host in $ROS_PEER_HOST; do
+        _host="${_host// /}"
+        [[ -z "$_host" ]] && continue
+        _ip=$(jq -r ".${_host}.ip // empty" "$MACHINE_IPS" 2>/dev/null)
+        if [[ -n "$_ip" ]]; then
+          _peer_ips+=("$_ip")
+        else
+          echo "[device-gogoping-laptop] machine_ips.json 에 '$_host' 없음 — 건너뜀" >&2
+        fi
+      done
+      IFS="$_IFS_orig"
+      if [[ ${#_peer_ips[@]} -gt 0 ]]; then
+        _domain="${ROS_DOMAIN_ID:-0}"
+        _port=$(( 7400 + 250 * _domain ))
+        _xml_path="/tmp/fastdds_peers_${USER}_${_domain}.xml"
+        {
+          echo '<?xml version="1.0" encoding="UTF-8" ?>'
+          echo '<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">'
+          echo '  <participant profile_name="participant_default" is_default_profile="true">'
+          echo '    <rtps><builtin><initialPeersList>'
+          for _ip in "${_peer_ips[@]}"; do
+            echo "      <locator><udpv4><address>$_ip</address><port>$_port</port></udpv4></locator>"
+          done
+          echo '    </initialPeersList></builtin></rtps>'
+          echo '  </participant>'
+          echo '</profiles>'
+        } > "$_xml_path"
+        export FASTRTPS_DEFAULT_PROFILES_FILE="$_xml_path"
+        echo "[device-gogoping-laptop] Fast DDS profile: $_xml_path (peers: ${_peer_ips[*]}, port: $_port)"
+      fi
+    fi
+
     SOURCE_ENV="source $ROS_SETUP && source $WS_SETUP"
 
     # /dev/arduino-camera (camera-pan 서보용 symlink) 없으면 udev rule 자동 install — 1회만, sudo 묻음.
@@ -161,8 +201,10 @@ case "$ACTION" in
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n graph-router \
       -c "$REPO_ROOT" "sleep infinity"
     tmux set-option -t "$SESSION" -g remain-on-exit on
+    # graph-router: base_frame:=base_link — Pi 가 unprefixed frame (base_link) 발행하므로 매칭.
+    # sim 은 launch.xml default ('gogoping/base_link') 그대로 (이 스크립트 안 거침).
     tmux respawn-pane -k -t "$SESSION:graph-router" -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml base_frame:=base_link"
 
     # window 1: localization (map_server + AMCL + lifecycle_manager_localization)
     tmux new-window -t "$SESSION" -n localization -c "$REPO_ROOT" \
