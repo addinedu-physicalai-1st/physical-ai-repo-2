@@ -340,6 +340,17 @@ const progressLabel = computed(
           </div>
         </div>
 
+        <!-- 우상단 — OX 퀴즈 모드 나가기. 항상 노출되어 done 화면이 아니어도 즉시 종료 가능. -->
+        <div class="panel-zone panel-top-right">
+          <button
+            type="button"
+            class="exit-btn"
+            aria-label="OX 퀴즈 종료"
+            title="OX 퀴즈 종료"
+            @click="exitToIdle"
+          >×</button>
+        </div>
+
         <!-- 표정(자연 촬영) — 좌상단. pill 은 항상 노출 — 카메라 컴포넌트는 panel 이
              열린 동안에만 mount/probe 한다. 카메라가 없으면 panel 안에서 에러로 표시. -->
         <div class="panel-zone panel-top-left">
@@ -490,8 +501,36 @@ const progressLabel = computed(
   pointer-events: auto;
 }
 .panel-top-left    { top: 24px; left: 24px; }
+.panel-top-right   { top: 24px; right: 24px; }
 .panel-bottom-left { bottom: 24px; left: 24px; }
 .panel-bottom-right { bottom: 24px; right: 24px; }
+
+/* 종료 (×) 버튼 — 다른 panel 들과 동일한 클릭 가능 영역 크기 (44px) 로 키워서 터치/마우스
+ * 양쪽에서 안정. 빨강 톤으로 destructive action 강조. */
+.exit-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(193, 69, 69, 0.35);
+  background: white;
+  color: #c14545;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(40, 110, 160, 0.18);
+  padding: 0;
+  font-family: inherit;
+}
+.exit-btn:hover { background: #fbeaea; color: #a83b3b; }
+.exit-btn:active { transform: scale(0.92); }
+.exit-btn:focus-visible {
+  outline: 3px solid rgba(193, 69, 69, 0.4);
+  outline-offset: 3px;
+}
 
 .panel-box {
   position: relative;
