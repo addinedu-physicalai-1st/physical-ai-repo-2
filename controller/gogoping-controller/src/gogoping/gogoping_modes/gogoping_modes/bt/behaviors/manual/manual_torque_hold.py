@@ -53,6 +53,8 @@ class ManualTorqueHold(py_trees.behaviour.Behaviour):
 
     def terminate(self, new_status: Status) -> None:
         """MANUAL 나감 — torque ON 복원. idempotent."""
+        # 디버그 — terminate 가 실제로 호출되는지 추적
+        self.logger.info(f"ManualTorqueHold.terminate(new_status={new_status}) — calling enable_torque")
         ok = self._enable()
         self.bb.set(Keys.MANUAL_TORQUE_ACTIVE, False)
         if not ok:

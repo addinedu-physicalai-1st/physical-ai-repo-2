@@ -107,8 +107,17 @@ class GogopingModes:
         self._build_tree_for_state(new_state)
 
     def _build_tree_for_state(self, state: str) -> None:
-        """이전 트리 shutdown + 새 트리 build + setup."""
+        """이전 트리 shutdown + 새 트리 build + setup.
+
+        ``tree.shutdown()`` 단독으로는 RUNNING 자식의 ``terminate(INVALID)`` 가 호출 안 됨
+        (py_trees 의 shutdown 은 cleanup 만). ``root.stop(INVALID)`` 를 먼저 호출해서
+        명시적으로 자식 terminate 전파 — ManualTorqueHold 의 enable 복원 보장 등 필수.
+        """
         if self.tree is not None:
+            try:
+                self.tree.root.stop(py_trees.common.Status.INVALID)
+            except Exception as e:
+                self._logger.warning(f"root.stop(INVALID) failed: {e}")
             self.tree.shutdown()
         root = build_main_tree(state, self.ctx)
         self.tree = py_trees.trees.BehaviourTree(root)
