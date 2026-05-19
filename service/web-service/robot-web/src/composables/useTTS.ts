@@ -272,38 +272,66 @@ export function useTTS(options: UseTTSOptions = {}): {
     }
   }
 
+  // wakeAck 는 한 번 로드한 element 를 재사용 — cloneNode 는 src 만 복사하고
+  // 매번 다시 fetch 해서 dev server 첫 응답 지연으로 hang. 원본을 reset+replay.
+  // lipsync graph 도 createMediaElementSource 가 element 당 1회만 허용되므로
+  // 첫 graph 만들 때 한 번 attach. listener 도 처음 한 번만 attach 하고
+  // detach 안 함 — graph 의 source.disconnect() 가 호출되면 다음 재생이
+  // destination 에 연결 안 돼 무음이 되기 때문.
+  let wakeAckGraph: LipSyncGraph | null = null;
+  let wakeAckGraphTried = false;
+  let wakeAckLipsyncAttached = false;
+
   function primeWakeAck(): void {
     if (typeof window === 'undefined') return;
     if (wakeAckAudio) return;
     wakeAckAudio = new Audio(WAKE_ACK_AUDIO_PATH);
     wakeAckAudio.preload = 'auto';
+    wakeAckAudio.playbackRate = TTS_PLAYBACK_RATE;
     wakeAckAudio.load();
+  }
+
+  async function ensureWakeAckGraph(): Promise<LipSyncGraph | null> {
+    if (wakeAckGraphTried) return wakeAckGraph;
+    wakeAckGraphTried = true;
+    if (!wakeAckAudio) return null;
+    wakeAckGraph = await tryCreateLipSyncGraph(wakeAckAudio);
+    return wakeAckGraph;
   }
 
   function playWakeAck(): Promise<void> {
     return new Promise((resolve) => {
-      if (typeof window === 'undefined') {
-        resolve();
-        return;
-      }
-      cancel();
+      if (typeof window === 'undefined') { resolve(); return; }
       primeWakeAck();
+      const audio = wakeAckAudio;
+      if (!audio) { resolve(); return; }
+
+      // 이전 wake_ack 재생 중이면 정지하고 처음부터.
+      const prevDone = pendingDone;
+      pendingDone = null;
+      prevDone?.();
+      try { audio.pause(); } catch { /* ignore */ }
+      audio.currentTime = 0;
 
       void (async () => {
-        const audio = wakeAckAudio
-          ? (wakeAckAudio.cloneNode(true) as HTMLAudioElement)
-          : new Audio(WAKE_ACK_AUDIO_PATH);
-        audio.playbackRate = TTS_PLAYBACK_RATE;
+        const graph = await ensureWakeAckGraph();
         currentAudio = audio;
-        const graph = await tryCreateLipSyncGraph(audio);
-        lipsyncDetach = attachSpeechLipsync(audio, WAKE_ACK_LIPSYNC_TEXT, voiceStore, graph);
-        let settled = false;
+        // wakeAck lipsync 은 첫 호출 시 한 번만 attach. attachSpeechLipsync 가
+        // audio.addEventListener 로 'playing'/'pause'/'ended' 핸들러를 다는
+        // 구조라 element 가 영속되는 한 매 재생마다 자동 작동.
+        if (!wakeAckLipsyncAttached) {
+          attachSpeechLipsync(audio, WAKE_ACK_LIPSYNC_TEXT, voiceStore, graph);
+          wakeAckLipsyncAttached = true;
+        }
 
+        let settled = false;
         const finish = () => {
           if (settled) return;
           settled = true;
           if (pendingDone === finish) pendingDone = null;
-          clearLipsync();
+          // wakeAck graph 는 detach 안 함. 잔여 시각화 상태만 clear.
+          voiceStore.setCurrentChar('');
+          voiceStore.setSpeechEnvelope(0);
           isSpeaking.value = false;
           voiceStore.setSpeaking(false);
           if (currentAudio === audio) currentAudio = null;
@@ -312,26 +340,30 @@ export function useTTS(options: UseTTSOptions = {}): {
         };
         pendingDone = finish;
 
+        // 안전망 — 1.5s 안에 ended 안 오면 강제 finish. audio 도 pause 해서
+        // 뒤늦게 onplaying 가 isSpeaking=true 로 되돌리는 거 차단.
+        const safety = window.setTimeout(() => {
+          try { audio.pause(); } catch { /* ignore */ }
+          finish();
+        }, 1500);
+        const clearSafety = () => window.clearTimeout(safety);
+
         audio.onplaying = () => {
+          if (settled) return; // safety 이미 발동 후엔 isSpeaking 갱신 안 함
           isSpeaking.value = true;
           voiceStore.setSpeaking(true);
           options.onStart?.('네!');
         };
-        audio.onended = finish;
+        audio.onended = () => { clearSafety(); finish(); };
         audio.onerror = async () => {
-          // static mp3 서빙/디코딩 실패 시 허브 TTS 로 degrade
-          try {
-            await speakFromHub(WAKE_ACK_LIPSYNC_TEXT);
-          } finally {
-            finish();
-          }
+          clearSafety();
+          try { await speakFromHub(WAKE_ACK_LIPSYNC_TEXT); }
+          finally { finish(); }
         };
         audio.play().catch(async () => {
-          try {
-            await speakFromHub(WAKE_ACK_LIPSYNC_TEXT);
-          } finally {
-            finish();
-          }
+          clearSafety();
+          try { await speakFromHub(WAKE_ACK_LIPSYNC_TEXT); }
+          finally { finish(); }
         });
       })();
     });
