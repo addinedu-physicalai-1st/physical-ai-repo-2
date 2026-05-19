@@ -22,6 +22,7 @@ class ZLACDriver:
         self.SET_L_RPM = 0x2088
         self.GET_RPM = 0x20AB
         self.GET_ENCODER_PULSE = 0x20A6
+        self.GET_VOLTAGE = 0x20A0    # ZLAC bus voltage register (raw / 10 = Volts)
 
     def _calculate_crc(self, data: bytearray) -> bytes:
         """Calculates CRC-16 for Modbus."""
@@ -111,6 +112,20 @@ class ZLACDriver:
             encoder_r = -struct.unpack('>i', response[9:13])[0]
             return encoder_l, encoder_r
         return None, None
+
+    def get_voltage(self):
+        """Bus voltage in Volts (float). None on serial / CRC failure.
+
+        ZLAC register 0x20A0 returns raw integer in mV (0.001V) units
+        (예: 25.253V → raw 25253). Modbus READ 1 register → 7-byte response
+        (ID + func + bytecount + 2 data + 2 CRC).
+        """
+        cmd_body = struct.pack('>BBHH', self.modbus_id, self.READ, self.GET_VOLTAGE, 1)
+        response = self._send_command(cmd_body + self._calculate_crc(cmd_body), 7)
+        if response:
+            raw = struct.unpack('>H', response[3:5])[0]
+            return raw / 1000.0
+        return None
         
     def terminate(self):
         """Stops and disables the motor, then closes the port."""

@@ -57,13 +57,18 @@ def generate_launch_description() -> LaunchDescription:
 
     # 배터리 publisher — /gogoping/battery 1Hz (sensor_msgs/BatteryState).
     # 상대 토픽 "battery" 사용 → GroupAction 의 PushRosNamespace 가 /gogoping/ prefix.
-    # source=static 기본 (placeholder 100%). 진짜 ADC 통합 시 source=sysfs 또는 uart.
+    # source=voltage_topic: vic_pinky_bringup 이 발행하는 /gogoping/battery_voltage (Float32)
+    # 를 구독해서 voltage_min ~ voltage_max 로 0~100% 선형 변환.
+    # 빅핑키 = 24V 시스템 (full ~26.5V). 다른 배터리면 launch arg 로 override.
     battery_publisher = Node(
         package="gogoping_bringup",
         executable="battery_publisher_node",
         parameters=[{
-            "source": "static",   # TODO 하드웨어 spec 확정 후 "sysfs" or "uart"
-            "level": 100.0,
+            "source": "voltage_topic",
+            "voltage_topic": "battery_voltage",   # 상대 — gogoping namespace 자동 prefix
+            "voltage_min": 22.0,
+            "voltage_max": 27.0,
+            "level": 100.0,                       # voltage 미수신 시 fallback
         }],
     )
 

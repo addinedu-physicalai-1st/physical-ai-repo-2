@@ -10,15 +10,11 @@ sim 전용 ``sim_battery_node`` 와의 차이:
 
 ## 하드웨어 소스 (ROS param `source`)
 
-| source 값         | 동작                                                                                  |
-|------------------|--------------------------------------------------------------------------------------|
-| ``static`` (기본) | ROS param ``level`` (기본 100.0) 그대로 publish. 진짜 ADC 미연동 시 placeholder.        |
-| ``sysfs``        | ROS param ``sysfs_path`` (예: ``/sys/class/power_supply/BAT0/capacity``) 의 정수 % 읽음. |
-| ``uart``         | TODO — Vic Pinky base controller 의 UART 프레임에서 배터리 필드 추출.                   |
-
-진짜 ADC 통합은 [docs/bt/behaviors/common.md#battery_low_monitor] 의 TODO 참조. 하드웨어
-인터페이스 spec (UART 패킷 포맷 / GPIO ADC 채널 등) 확정 후 본 파일의 ``_read_*``
-함수 구현.
+| source 값             | 동작                                                                                              |
+|----------------------|--------------------------------------------------------------------------------------------------|
+| ``voltage_topic``    | ROS topic ``voltage_topic`` (default ``battery_voltage``, Float32 V) 구독 → ``voltage_min`` / ``voltage_max`` 로 0~100% 선형 변환. **실 Pi 운영 권장**. vic_pinky_bringup 이 ZLAC register 0x20A0 에서 1Hz 발행. |
+| ``sysfs``            | ROS param ``sysfs_path`` (예: ``/sys/class/power_supply/BAT0/capacity``) 의 정수 % 읽음.            |
+| ``static`` (기본)     | ROS param ``level`` (기본 100.0) 그대로 publish. 디버그 / fallback 용.                              |
 
 ## 절대 토픽 박지 말 것
 
@@ -32,6 +28,7 @@ from __future__ import annotations
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import BatteryState
+from std_msgs.msg import Float32
 
 
 _PUBLISH_HZ = 1.0
@@ -43,25 +40,39 @@ class BatteryPublisherNode(Node):
     def __init__(self) -> None:
         super().__init__("battery_publisher_node")
 
-        # ROS params — 하드웨어 spec 확정되면 default 변경 또는 launch arg 로 override
+        # ROS params
         self.declare_parameter("source", "static")
         self.declare_parameter("level", 100.0)
         self.declare_parameter("sysfs_path", "/sys/class/power_supply/BAT0/capacity")
+        # voltage_topic source 용 — 24V 시스템 가정. 다른 배터리는 launch arg override.
+        self.declare_parameter("voltage_topic", "battery_voltage")
+        self.declare_parameter("voltage_min", 22.0)   # 0% 기준 (cutoff)
+        self.declare_parameter("voltage_max", 27.0)   # 100% 기준 (full)
 
         self._pub = self.create_publisher(BatteryState, "battery", 10)
         self.create_timer(1.0 / _PUBLISH_HZ, self._tick)
 
+        self._latest_voltage: float | None = None
         source = self.get_parameter("source").get_parameter_value().string_value
+        if source == "voltage_topic":
+            topic = self.get_parameter("voltage_topic").get_parameter_value().string_value
+            self.create_subscription(Float32, topic, self._on_voltage, 10)
+
         self.get_logger().info(
             f"battery_publisher_node ready — pub /gogoping/battery @ {_PUBLISH_HZ}Hz, "
             f"source={source!r}"
         )
+
+    def _on_voltage(self, msg: Float32) -> None:
+        self._latest_voltage = float(msg.data)
 
     def _tick(self) -> None:
         level = self._read_level()
         msg = BatteryState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.percentage = level / 100.0  # BatteryState.percentage 는 0.0~1.0
+        if self._latest_voltage is not None:
+            msg.voltage = float(self._latest_voltage)
         msg.present = True
         msg.power_supply_status = BatteryState.POWER_SUPPLY_STATUS_DISCHARGING
         msg.power_supply_health = BatteryState.POWER_SUPPLY_HEALTH_GOOD
@@ -71,12 +82,10 @@ class BatteryPublisherNode(Node):
     def _read_level(self) -> float:
         """source param 에 따라 배터리 % 반환. 실패 시 마지막 정상 값 (또는 0.0)."""
         source = self.get_parameter("source").get_parameter_value().string_value
+        if source == "voltage_topic":
+            return self._read_voltage_topic()
         if source == "sysfs":
             return self._read_sysfs()
-        if source == "uart":
-            # TODO 하드웨어 spec 확정 후 구현 — Vic Pinky base controller UART 패킷에서 추출
-            self.get_logger().warn("source=uart 미구현 — static 값으로 fallback", once=True)
-            return self._read_static()
         return self._read_static()
 
     def _read_static(self) -> float:
@@ -92,6 +101,20 @@ class BatteryPublisherNode(Node):
                 f"sysfs read 실패 ({path}): {e} — static 값으로 fallback", once=True
             )
             return self._read_static()
+
+    def _read_voltage_topic(self) -> float:
+        """battery_voltage 토픽의 마지막 voltage 를 voltage_min/max 로 0~100% 선형 변환."""
+        if self._latest_voltage is None:
+            self.get_logger().warn(
+                "voltage_topic 메시지 미수신 — static 값으로 fallback", once=True
+            )
+            return self._read_static()
+        v_min = self.get_parameter("voltage_min").get_parameter_value().double_value
+        v_max = self.get_parameter("voltage_max").get_parameter_value().double_value
+        if v_max <= v_min:
+            return self._read_static()
+        pct = (self._latest_voltage - v_min) / (v_max - v_min) * 100.0
+        return max(0.0, min(100.0, pct))
 
 
 def main() -> None:
