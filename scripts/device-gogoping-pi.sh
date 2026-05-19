@@ -91,21 +91,45 @@ case "$ACTION" in
         # Fast DDS PDP multicast meta port = 7400 + 250 * domain
         _domain="${ROS_DOMAIN_ID:-0}"
         _port=$(( 7400 + 250 * _domain ))
+        # 본인 IP — $USER 가 machine_ips.json 의 hostname key 와 일치한다고 가정.
+        # 다른 인터페이스 (docker bridge 등) 가 locator 로 announce 되지 않도록 whitelist.
+        _my_ip=$(jq -r ".${USER}.ip // empty" "$MACHINE_IPS" 2>/dev/null)
         _xml_path="/tmp/fastdds_peers_${USER}_${_domain}.xml"
         {
           echo '<?xml version="1.0" encoding="UTF-8" ?>'
           echo '<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">'
+          if [[ -n "$_my_ip" ]]; then
+            echo '  <transport_descriptors>'
+            echo '    <transport_descriptor>'
+            echo '      <transport_id>udp_local</transport_id>'
+            echo '      <type>UDPv4</type>'
+            echo '      <interfaceWhiteList>'
+            echo "        <address>$_my_ip</address>"
+            echo '      </interfaceWhiteList>'
+            echo '    </transport_descriptor>'
+            echo '  </transport_descriptors>'
+          fi
           echo '  <participant profile_name="participant_default" is_default_profile="true">'
-          echo '    <rtps><builtin><initialPeersList>'
+          echo '    <rtps>'
+          if [[ -n "$_my_ip" ]]; then
+            echo '      <userTransports>'
+            echo '        <transport_id>udp_local</transport_id>'
+            echo '      </userTransports>'
+            echo '      <useBuiltinTransports>false</useBuiltinTransports>'
+          fi
+          echo '      <builtin>'
+          echo '        <initialPeersList>'
           for _ip in "${_peer_ips[@]}"; do
-            echo "      <locator><udpv4><address>$_ip</address><port>$_port</port></udpv4></locator>"
+            echo "          <locator><udpv4><address>$_ip</address><port>$_port</port></udpv4></locator>"
           done
-          echo '    </initialPeersList></builtin></rtps>'
+          echo '        </initialPeersList>'
+          echo '      </builtin>'
+          echo '    </rtps>'
           echo '  </participant>'
           echo '</profiles>'
         } > "$_xml_path"
         export FASTRTPS_DEFAULT_PROFILES_FILE="$_xml_path"
-        echo "[device-gogoping-pi] Fast DDS profile: $_xml_path (peers: ${_peer_ips[*]}, port: $_port)"
+        echo "[device-gogoping-pi] Fast DDS profile: $_xml_path (peers: ${_peer_ips[*]}, port: $_port, my_ip: ${_my_ip:-(not whitelisted)})"
       fi
     fi
 
