@@ -12,6 +12,7 @@ from ...behaviors._stubs import StubHideseek
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
 from ...behaviors.common.check_task import CheckTask
 from ...behaviors.common.command_listener import CommandListener
+from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
 from ...blackboard import Keys
 
@@ -40,8 +41,9 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         children=[
             BatteryLowMonitor("BatteryLowMonitor", ctx),
             MapBoundaryMonitor("MapBoundaryMonitor", ctx),
+            HardwareHealthMonitor("HardwareHealthMonitor", ctx),
             CommandListener("CommandListener", ctx),
             task_sel,
-            # TODO 추후: HardwareHealthMonitor, CollisionEventHandler
+            # TODO 추후: CollisionEventHandler
         ],
     )

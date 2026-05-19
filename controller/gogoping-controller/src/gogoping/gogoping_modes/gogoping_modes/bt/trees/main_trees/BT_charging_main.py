@@ -1,7 +1,11 @@
 """CHARGING state MainTree — 도크에서 충전 중.
 
-현재 stub: CommandListener + BatteryFullMonitor.
-추후 추가될 monitor: HardwareHealthMonitor, DockingContactCheck.
+Parallel 자식:
+- BatteryFullMonitor     (✅ ≥70% → battery_full → IDLE)
+- MapBoundaryMonitor     (✅ 맵 밖 → fault → ERROR)
+- HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault → ERROR)
+- CommandListener        (✅)
+- DockingContactCheck    (스켈레톤)
 
 BatteryFullMonitor 가 핵심 — 부팅 직후 CHARGING → IDLE 전이를 자동화. 추후 에선
 BatterySubscriber stub 이라 BATTERY_LEVEL 이 init 값 (100.0) 이라 첫 tick 에 즉시 fire,
@@ -15,6 +19,7 @@ from py_trees.common import ParallelPolicy
 from ....context import Context
 from ...behaviors.common.battery_full_monitor import BatteryFullMonitor
 from ...behaviors.common.command_listener import CommandListener
+from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
 
 
@@ -25,7 +30,8 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         children=[
             BatteryFullMonitor("BatteryFullMonitor", ctx),
             MapBoundaryMonitor("MapBoundaryMonitor", ctx),
+            HardwareHealthMonitor("HardwareHealthMonitor", ctx),
             CommandListener("CommandListener", ctx),
-            # TODO 추후: HardwareHealthMonitor, DockingContactCheck
+            # TODO 추후: DockingContactCheck
         ],
     )

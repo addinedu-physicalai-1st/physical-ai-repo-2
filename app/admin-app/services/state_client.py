@@ -184,6 +184,42 @@ class StateClient:
 
         threading.Thread(target=_run, name=f"battery_level_{level:.0f}", daemon=True).start()
 
+    def post_emergency_stop(
+        self,
+        on_result: Callable[[bool, str], None] | None = None,
+    ) -> None:
+        """긴급정지 — ``POST /api/gogoping/emergency_stop``.
+
+        별도 thread 에서 HTTP 호출. 응답 시 ``on_result(ok, reason)`` 콜백.
+        Admin UI 의 e-stop 버튼이 호출. 호출 후 FSM 은 ERROR (terminal) 진입 →
+        robot 재시작해야 복구.
+        """
+        url = f"{self._base}/api/gogoping/emergency_stop"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(url)
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(ok, reason)
+                except Exception as e:
+                    logger.warning(f"emergency_stop on_result 콜백 오류: {e}")
+
+        threading.Thread(target=_run, name="emergency_stop", daemon=True).start()
+
     def post_robot_pose(
         self,
         x: float,

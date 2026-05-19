@@ -93,6 +93,11 @@ class RobotPoseDebugResponse(BaseModel):
     amcl_published: bool = False
 
 
+class EmergencyStopResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+
+
 def install(
     app: FastAPI,
     bridge: GogopingRosBridge,
@@ -208,6 +213,19 @@ def install(
             amcl_published=amcl_published,
         )
 
+    @router.post("/emergency_stop", response_model=EmergencyStopResponse)
+    async def emergency_stop() -> EmergencyStopResponse:
+        """긴급정지 — Admin UI / 외부 안전 시스템 호출.
+
+        ``/gogoping/emergency_stop`` (std_srvs/Trigger) 로 gogoping_modes 의 FSM 을
+        ERROR (terminal) 로 강제 전이. BT_error_main 의 StopAllMotors 가 cmd_vel=0 +
+        torque OFF 실행. ERROR 는 사용자가 robot 재시작해야 복구 가능.
+        """
+        accepted, reason = await asyncio.to_thread(bridge.emergency_stop_sync)
+        if not accepted:
+            logger.warning(f"EmergencyStop 거부: reason={reason!r}")
+        return EmergencyStopResponse(accepted=accepted, reason=reason)
+
     app.include_router(router)
 
     # WS /ws/robot-state — admin-app 이 구독
@@ -255,4 +273,5 @@ __all__ = [
     "ForceStateRequest", "ForceStateResponse",
     "BatteryDebugRequest", "BatteryDebugResponse",
     "RobotPoseDebugRequest", "RobotPoseDebugResponse",
+    "EmergencyStopResponse",
 ]

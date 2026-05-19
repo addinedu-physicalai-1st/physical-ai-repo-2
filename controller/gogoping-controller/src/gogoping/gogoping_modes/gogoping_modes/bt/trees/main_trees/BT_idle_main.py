@@ -1,13 +1,11 @@
 """IDLE state MainTree — 명령 대기.
 
-현재 stub: CommandListener + BatteryLowMonitor + IdleTimeoutMonitor (HW monitor 는 추후).
-
-진짜 추후 모양 (``docs/state-bt.md``):
-    Parallel
-      ├─ BatteryLowMonitor      (✅ ≤20% → battery_low → RETURNING)
-      ├─ IdleTimeoutMonitor     (✅ idle_timeout_seconds 경과 → idle_timeout → RETURNING)
-      ├─ HardwareHealthMonitor  (추후)
-      └─ CommandListener        (✅)
+Parallel 자식:
+- BatteryLowMonitor      (✅ ≤20% → battery_low → RETURNING)
+- IdleTimeoutMonitor     (✅ idle_timeout_seconds 경과 → idle_timeout → RETURNING)
+- MapBoundaryMonitor     (✅ 맵 밖 → fault → ERROR)
+- HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault → ERROR)
+- CommandListener        (✅)
 """
 from __future__ import annotations
 
@@ -17,6 +15,7 @@ from py_trees.common import ParallelPolicy
 from ....context import Context
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
 from ...behaviors.common.command_listener import CommandListener
+from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
 from ...behaviors.common.idle_timeout_monitor import IdleTimeoutMonitor
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
 
@@ -29,7 +28,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
             BatteryLowMonitor("BatteryLowMonitor", ctx),
             IdleTimeoutMonitor("IdleTimeoutMonitor", ctx),
             MapBoundaryMonitor("MapBoundaryMonitor", ctx),
+            HardwareHealthMonitor("HardwareHealthMonitor", ctx),
             CommandListener("CommandListener", ctx),
-            # TODO 추후: HardwareHealthMonitor
         ],
     )

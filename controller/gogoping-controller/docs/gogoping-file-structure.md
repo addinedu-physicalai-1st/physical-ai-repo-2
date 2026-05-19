@@ -57,9 +57,11 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   MapCache.is_outside(x,y) — 격자 박스 + unknown 셀 체크.
         │   │   │   │                                 #   Used in: 7 트리 (CHARGING/IDLE/ASSIST/PLAY/MANUAL/
         │   │   │   │                                 #            RETURNING/LOW_BATTERY_RETURN, ERROR 만 제외)
-        │   │   │   ├── hardware_health_monitor.[py|/] # 센서/모터 응답 끊김 감지 → "fault" trigger
-        │   │   │   │                                 #   Used in: BT_charging_main, BT_idle_main, BT_assist_main,
-        │   │   │   │                                 #            BT_play_main, BT_returning_main
+        │   │   │   ├── hardware_health_monitor.py    # LIDAR/odom staleness → "fault" trigger (✅)
+        │   │   │   │                                 #   /gogoping/scan + /gogoping/odom 직접 sub.
+        │   │   │   │                                 #   ROS param hw_health_staleness_seconds (기본 3.0s).
+        │   │   │   │                                 #   Used in: 6 트리 (CHARGING/IDLE/ASSIST/PLAY/RETURNING/
+        │   │   │   │                                 #            LOW_BATTERY_RETURN — MANUAL/ERROR 제외)
         │   │   │   ├── collision_event_handler.[py|/] # Nav2 Collision Monitor 비정상 상태 → "fault" trigger
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main, BT_returning_main
         │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → blackboard 세팅 + fsm.trigger 호출

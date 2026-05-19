@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-18 (텔레포트 RViz↔Gazebo 동기화 — `/debug/pose` 가 `/initialpose` 까지 같이 publish + sim_teleport_node 가 `/initialpose` 토픽 구독으로 자동 Gazebo 텔레포트. 맵 Shift+클릭과 TopBar Pose 양쪽 다 RViz/AMCL + Gazebo 동시 이동)
+마지막 업데이트: 2026-05-19 (HardwareHealthMonitor 구현 — LIDAR `/gogoping/scan` + odom `/gogoping/odom` staleness ROS param `hw_health_staleness_seconds` (기본 3.0s) 경과 시 `fault` trigger 발화. 6 트리 배치 (CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN — MANUAL/ERROR 제외). Admin UI DebugStatePanel 에 별도 e-stop 빨간 버튼 + Control Service `/api/gogoping/emergency_stop` REST → `bridge.emergency_stop_sync` → `/gogoping/emergency_stop` (std_srvs/Trigger))
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -15,9 +15,9 @@
 |---|---|---|
 | **Trees** | **9 / 13** | MainTree 8/8 ✅ · SubTree 1/5 (BT_return_sub ✅) |
 | **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
-| **Behaviors** | **13 / 34** | common 7/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
+| **Behaviors** | **14 / 34** | common 8/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
 | **Infrastructure** | **34 / 37** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). PoseSubscriber + MapCache + gogoping_camera_pan 5종 추가 |
-| **합계** | **55 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + **return cycle (NavTo + Align + Reverse + VerifyDocked + BT_return_sub)** |
+| **합계** | **56 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + return cycle + **hardware_health (LIDAR/odom staleness) + admin UI e-stop 버튼** |
 
 ---
 
@@ -27,13 +27,13 @@
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
-| BT_charging_main | ✅ | Parallel(BatteryFullMonitor + MapBoundaryMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
-| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + MapBoundaryMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
-| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
-| BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
+| BT_charging_main | ✅ | Parallel(BatteryFullMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
+| BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
+| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
+| BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
 | BT_manual_main | ✅ | Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON 라이프사이클 ✅. battery·HW·collision monitor 미배치 — 위치 안전(MapBoundary)만 예외적 배치. docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
-| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + CommandListener + **ReturnSubTree**). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. ReturnSubTree = OneShot(NavTo "충전소입구" → AlignToDock → ReverseIntoDock) |
-| BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor + **ReturnSubTree**) — lockdown (CommandListener 없음, 사용자 명령 차단). ReturnSubTree 동일 (RETURNING 과 공유). docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
+| BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + **ReturnSubTree**). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. ReturnSubTree = OneShot(NavTo "충전소입구" → AlignToDock → ReverseIntoDock) |
+| BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor + HardwareHealthMonitor + **ReturnSubTree**) — lockdown (CommandListener 없음, 사용자 명령 차단). ReturnSubTree 동일 (RETURNING 과 공유). docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 사람이 재시작. docs — [trees/BT_error_main.md](trees/BT_error_main.md) |
 
 > **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree (carry/follow/lullaby/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
@@ -64,14 +64,14 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ## Behaviors
 
-### common/ — 7 / 11
+### common/ — 8 / 11
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
 | battery_full_monitor | ✅ | [battery_full_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) — BT_charging_main 에 배치, 부팅 시 CHARGING → IDLE 자동 전이 (BATTERY_LEVEL init=100.0 가정) |
 | battery_low_monitor | ✅ | [battery_low_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_low_monitor.py) — hysteresis 20% 진입 / 25% 진출, edge-triggered. BT_idle/assist/play/returning_main 4개 배치 (RETURNING 은 LOW_BATTERY_RETURN escalation). 5 시나리오 통과 |
 | idle_timeout_monitor | ✅ | [idle_timeout_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) — IDLE 진입 후 ROS param `idle_timeout_seconds` (기본 60s) 경과 시 `idle_timeout` trigger. edge-triggered, `initialise()` 에서 timer 리셋. BT_idle_main 만 배치. 6 시나리오 통과 |
-| hardware_health_monitor | ☐ | |
+| hardware_health_monitor | ✅ | [hardware_health_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/hardware_health_monitor.py) — LIDAR `/gogoping/scan` + odom `/gogoping/odom` 두 토픽 직접 subscribe. 마지막 수신 시각 ROS param `hw_health_staleness_seconds` (기본 3.0s) 초과 시 `fault(reason="lidar_timeout" / "odom_timeout")` 발화. **6 트리 배치** (CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN — MANUAL/ERROR 제외). `initialise()` 가 _last_* 를 *현재 시각* 으로 초기화해 부팅 직후 grace period 보장 + edge-triggered (`_fired` 플래그). blackboard ERROR_REASON / ERROR_SOURCE W |
 | collision_event_handler | ☐ | |
 | map_boundary_monitor | ✅ | [map_boundary_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) — blackboard.ROBOT_POSE 읽고 `map_cache.is_outside(x, y)` → 박스 밖 또는 unknown 셀이면 `fault(reason="out_of_map")` 발화. **7 트리 배치** (CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN, ERROR 만 제외). MANUAL 은 다른 monitor 와 달리 위치 안전 예외로 포함. 발화 시 blackboard.ERROR_REASON / ERROR_SOURCE 도 세팅. 7 시나리오 통과 |
 | command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — `SetGoal.srv` + `ForceState.srv` 2개 서버 호스팅. SetGoal → `goal_reconciler` 호출. ForceState → `fsm.force_state()` + sub_task blackboard 세팅 (ASSIST→assist_task, PLAY→play_task). unit test 7 + reconciler 13 |
@@ -170,7 +170,8 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | Control Service `GogopingRosBridge` | ✅ | SetGoal + ForceState 클라이언트 + `/gogoping/state` 토픽 구독 |
 | Control Service `/ws/robot-state` | ✅ | gogoping state WS fan-out |
 | Admin UI BTStateInline | ✅ | 3 cell (state/main/sub) + 임베디드 DebugStatePanel |
-| Admin UI DebugStatePanel | ✅ | state combo + sub combo + 적용 버튼. state 의존 sub 옵션 (ASSIST→carry/follow/lullaby, PLAY→hideseek) |
+| Admin UI DebugStatePanel | ✅ | 🛑 긴급정지 빨간 버튼 (별도 row, 확인 없이 즉시) + 빠른 토글 [수동]/[주행] + state combo + sub combo + 적용 버튼. state 의존 sub 옵션 (ASSIST→carry/follow/lullaby, PLAY→hideseek) |
+| Control Service `/api/gogoping/emergency_stop` | ✅ | DebugStatePanel 의 e-stop 버튼 → state_client.post_emergency_stop → POST → ros_bridge.emergency_stop_sync → `/gogoping/emergency_stop` (std_srvs/Trigger) → command_listener._on_emergency_stop_request → fsm.force_state("ERROR") → BT_error_main 의 StopAllMotors (cmd_vel=0 + torque OFF) |
 | Robot-web shared/robots.json | ✅ | gogoping 모드 — 대기 / 보조▾(추종/운반/자장가) / 놀이▾(숨바꼭질) / 수동 / 복귀 |
 | gogoping_camera_pan `servo_bridge` node | ✅ | [servo_bridge.py](../../src/gogoping/gogoping_camera_pan/gogoping_camera_pan/servo_bridge.py) + [firmware](../../src/gogoping/gogoping_camera_pan/firmware/servo_bridge/servo_bridge.ino) — Arduino Uno + MG995 ×2 (pan D9, tilt D10). 시리얼 (`/dev/arduino-camera`, 115200, `PT:`/`OK:` 라인) ↔ `~/cmd_pan`/`~/cmd_tilt` (Float32) 구독, `~/state` (JointState) publish. clamp (pan 5~175°, tilt 30~150°) + rate_limit + 20Hz state 재송신 (펌웨어 1000ms watchdog 대응). 패키지 문서 — [src/gogoping/gogoping_camera_pan/CLAUDE.md](../../src/gogoping/gogoping_camera_pan/CLAUDE.md) |
 | gogoping_camera_pan `keyboard_teleop` node | ✅ | [keyboard_teleop.py](../../src/gogoping/gogoping_camera_pan/gogoping_camera_pan/keyboard_teleop.py) — 터미널 raw stdin teleop (a/d=pan, w/s=tilt, space=center, [/]=step 조절). TTY 필요해서 `ros2 run` 으로 실행. BT 통합 전 수동 보정용 |

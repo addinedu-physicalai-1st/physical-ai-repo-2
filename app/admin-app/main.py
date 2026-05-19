@@ -195,6 +195,13 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # 긴급정지 버튼 → state_client.post_emergency_stop
+        self.dashboard.debug_panel.emergency_stop_requested.connect(
+            lambda: self.state_client.post_emergency_stop(
+                on_result=self.dashboard.debug_panel.set_estop_result,
+            )
+        )
+
         # 배터리 디버그 슬라이더 → state_client.post_battery_level
         self.dashboard.battery_debug.battery_level_requested.connect(
             lambda level: self.state_client.post_battery_level(
