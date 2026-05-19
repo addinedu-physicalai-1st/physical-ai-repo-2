@@ -1,0 +1,77 @@
+
+[evaluate] === eduping ===  model=/home/woolim/pingdergarten/service/ai-service/ai_service/models/wakeword/eduping.onnx
+  positive: total=2040 hold-out=408 (seed=1234)
+  positive: 408 clips, score mean=0.913 max=1.000
+  neg/cafe: 10695 windows, mean=0.0093 max=0.989 >0.5 ratio=0.0008
+  neg/hard_3syl: 540 windows, mean=0.0191 max=0.987 >0.5 ratio=0.0037
+  neg/speech_kr: 6921 windows, mean=0.0334 max=0.999 >0.5 ratio=0.0147
+  noise/esc50: 6000 windows, mean=0.0448 max=0.999 >0.5 ratio=0.0137
+  cross/gogoping: 6120 windows, mean=0.0110 max=0.785 >0.5 ratio=0.0013
+  cross/noriarm: 5850 windows, mean=0.0062 max=0.700 >0.5 ratio=0.0002
+  total negative: 36126 windows = 11560s = 3.21h (streaming 환산)
+
+   threshold      FRR     FAR/hr   FA count
+  ---------- -------- ---------- ----------
+       0.300    0.000      98.72        317
+       0.500    0.000      63.53        204
+       0.700    0.000      43.60        140
+       0.900    0.000      21.80         70
+       0.950    0.000      16.82         54
+       0.990    0.012       6.23         20
+
+  [hard-neg breakdown]
+                  source     N    τ=0.5 trig%    τ=0.9 trig%   τ=0.99 trig%
+  ---------------------- ----- -------------- -------------- --------------
+               hard_3syl   180           6.7%           3.3%           0.6%
+
+[evaluate] === gogoping ===  model=/home/woolim/pingdergarten/service/ai-service/ai_service/models/wakeword/gogoping.onnx
+  positive: total=2040 hold-out=408 (seed=1234)
+  positive: 408 clips, score mean=0.886 max=1.000
+  neg/cafe: 10695 windows, mean=0.0173 max=0.997 >0.5 ratio=0.0017
+  neg/hard_3syl: 540 windows, mean=0.0454 max=0.834 >0.5 ratio=0.0074
+  neg/speech_kr: 6921 windows, mean=0.0375 max=0.999 >0.5 ratio=0.0183
+  noise/esc50: 6000 windows, mean=0.0506 max=0.999 >0.5 ratio=0.0152
+  cross/eduping: 6120 windows, mean=0.0100 max=0.713 >0.5 ratio=0.0007
+  cross/noriarm: 5850 windows, mean=0.0084 max=0.557 >0.5 ratio=0.0002
+  total negative: 36126 windows = 11560s = 3.21h (streaming 환산)
+
+   threshold      FRR     FAR/hr   FA count
+  ---------- -------- ---------- ----------
+       0.300    0.005     129.86        417
+       0.500    0.005      76.30        245
+       0.700    0.005      49.20        158
+       0.900    0.007      27.40         88
+       0.950    0.010      19.62         63
+       0.990    0.012      10.90         35
+
+  [hard-neg breakdown]
+                  source     N    τ=0.5 trig%    τ=0.9 trig%   τ=0.99 trig%
+  ---------------------- ----- -------------- -------------- --------------
+               hard_3syl   180           4.4%           0.6%           0.0%
+
+[evaluate] === noriarm ===  model=/home/woolim/pingdergarten/service/ai-service/ai_service/models/wakeword/noriarm.onnx
+  positive: total=1950 hold-out=390 (seed=1234)
+  positive: 390 clips, score mean=0.882 max=1.000
+  neg/cafe: 10695 windows, mean=0.0299 max=0.997 >0.5 ratio=0.0053
+  neg/hard_3syl: 540 windows, mean=0.2325 max=0.999 >0.5 ratio=0.1519
+  neg/speech_kr: 6921 windows, mean=0.0470 max=0.998 >0.5 ratio=0.0113
+  noise/esc50: 6000 windows, mean=0.1476 max=0.997 >0.5 ratio=0.0595
+  cross/eduping: 6120 windows, mean=0.0081 max=0.669 >0.5 ratio=0.0007
+  cross/gogoping: 6120 windows, mean=0.0101 max=0.614 >0.5 ratio=0.0003
+  total negative: 36396 windows = 11647s = 3.24h (streaming 환산)
+
+   threshold      FRR     FAR/hr   FA count
+  ---------- -------- ---------- ----------
+       0.300    0.000     380.81       1232
+       0.500    0.000     179.28        580
+       0.700    0.005     102.93        333
+       0.900    0.010      40.18        130
+       0.950    0.013      23.18         75
+       0.990    0.018       7.11         23
+
+  [hard-neg breakdown]
+                  source     N    τ=0.5 trig%    τ=0.9 trig%   τ=0.99 trig%
+  ---------------------- ----- -------------- -------------- --------------
+               hard_3syl   180          50.6%          25.6%           5.0%
+
+[evaluate] DONE
