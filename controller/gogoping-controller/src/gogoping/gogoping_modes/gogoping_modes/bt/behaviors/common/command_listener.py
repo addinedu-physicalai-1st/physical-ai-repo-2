@@ -55,6 +55,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
     SERVICE_NAME = "set_goal"           # 상대 path — node namespace 가 /gogoping 으로 prefix
     FORCE_STATE_SERVICE_NAME = "debug/force_state"
     SET_ROBOT_POSE_SERVICE_NAME = "debug/set_robot_pose"
+    EMERGENCY_STOP_SERVICE_NAME = "emergency_stop"   # /gogoping/emergency_stop (Trigger)
 
     def __init__(self, name: str, context: "Context"):
         super().__init__(name)
@@ -62,6 +63,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
         self._srv = None
         self._force_state_srv = None
         self._set_pose_srv = None
+        self._estop_srv = None
         self._bb_writer: _BlackboardWriter | None = None
         self._pose_bb: py_trees.blackboard.Client | None = None
 
@@ -69,6 +71,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
         """py_trees 가 트리 setup 시 1회 호출 — 서비스 서버 + blackboard 권한 등록."""
         # lazy import — ROS sourcing 안 된 환경에서도 본 모듈 import 가능하게
         from gogoping_msgs.srv import ForceState, SetGoal, SetRobotPose
+        from std_srvs.srv import Trigger
 
         self._srv = self.ctx.node.create_service(
             SetGoal, self.SERVICE_NAME, self._on_set_goal_request,
@@ -78,6 +81,9 @@ class CommandListener(py_trees.behaviour.Behaviour):
         )
         self._set_pose_srv = self.ctx.node.create_service(
             SetRobotPose, self.SET_ROBOT_POSE_SERVICE_NAME, self._on_set_robot_pose_request,
+        )
+        self._estop_srv = self.ctx.node.create_service(
+            Trigger, self.EMERGENCY_STOP_SERVICE_NAME, self._on_emergency_stop_request,
         )
 
         # blackboard writer — reconciler 에 주입할 wrapper.
@@ -179,6 +185,32 @@ class CommandListener(py_trees.behaviour.Behaviour):
         response.reason = "" if ok else "invalid_state"
         self.ctx.node.get_logger().info(
             f"ForceState target={target!r} sub_task={sub_task!r} → accepted={ok}, "
+            f"current_state={self.ctx.fsm.current_state!r}"
+        )
+        return response
+
+    # ------------------------------------------------------------ Emergency stop callback
+
+    def _on_emergency_stop_request(self, request, response):
+        """``std_srvs/Trigger`` 콜백 — 긴급정지.
+
+        Admin UI 의 e-stop 버튼 / 외부 안전 시스템이 호출. FSM 을 ERROR (terminal) 로
+        강제 전이 → BT_error_main 빌드 → StopAllMotors 가 cmd_vel=0 + torque OFF 실행.
+
+        ERROR 는 terminal — 사용자가 robot 재시작해야 복구 가능.
+        idempotent — 이미 ERROR 인 상태에서 또 호출돼도 무해 (force_state 가 no-op).
+        """
+        from ...blackboard import Keys as _Keys
+
+        # blackboard 에 사유 기록 — admin UI / DB log 가 활용
+        self._bb_writer.set(_Keys.ERROR_REASON, "user_emergency_stop")
+        self._bb_writer.set(_Keys.ERROR_SOURCE, "emergency_stop_service")
+
+        ok = self.ctx.fsm.force_state("ERROR")
+        response.success = bool(ok)
+        response.message = "ERROR state entered" if ok else "force_state failed"
+        self.ctx.node.get_logger().warning(
+            f"EmergencyStop invoked → accepted={ok}, "
             f"current_state={self.ctx.fsm.current_state!r}"
         )
         return response

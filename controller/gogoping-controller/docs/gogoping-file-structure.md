@@ -131,7 +131,11 @@ controller/gogoping-controller/src/gogoping/
         │   │   │
         │   │   ├── recovery/
         │   │   │   ├── __init__.py
-        │   │   │   ├── stop_all_motors.[py|/]        # cmd_vel = 0 (안전 정지)
+        │   │   │   ├── stop_all_motors.[py|/]        # cmd_vel=0 + torque OFF (긴급정지) (✅)
+        │   │   │   │                                 #   ctx.cmd_vel_pub + ctx.base_driver 사용.
+        │   │   │   │                                 #   /gogoping/emergency_stop (Trigger srv) →
+        │   │   │   │                                 #   fsm.force_state("ERROR") → BT_error_main 빌드 →
+        │   │   │   │                                 #   initialise 1회.
         │   │   │   │                                 #   Used in: BT_error_main
         │   │   │   ├── notify_admin_ui.[py|/]        # WebSocket 으로 에러 alert publish
         │   │   │   │                                 #   Used in: BT_error_main
@@ -158,9 +162,9 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(carry/follow/lullaby stubs)
         │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek stub)
         │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON ✅
+        │       │   ├── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
         │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
-        │       │   ├── BT_low_battery_return_main.py    # LOW_BATTERY_RETURN — 빈 lockdown (CommandListener 없음)
-        │       │   └── BT_error_main.py                  # ERROR — 빈 terminal (reset 없음)
+        │       │   └── BT_low_battery_return_main.py    # LOW_BATTERY_RETURN — 빈 lockdown (CommandListener 없음)
         │       │
         │       └── sub_trees/            # 작업별 SubTree (총 5개)
         │           ├── __init__.py

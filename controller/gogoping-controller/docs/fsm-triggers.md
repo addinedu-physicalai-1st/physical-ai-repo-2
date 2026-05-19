@@ -29,7 +29,7 @@
 | `idle_timeout` | — | `idle_timeout_monitor` (✅) | IDLE → RETURNING | IDLE 진입 시 timer 시작, ROS param `idle_timeout_seconds` (기본 60s) 경과 시 발화 — 무인 자율 복귀 |
 | `battery_full` | — | `battery_full_monitor` | CHARGING → IDLE | hysteresis: 70% 진입 |
 | `docked` | — | `verify_docking_contact` | RETURNING / LOW_BATTERY_RETURN → CHARGING | BT_return_sub Sequence 의 마지막 자식이 ReverseIntoDock 완료 직후 자동 발사. 접점 센서 미통합 — 시간 기반 후진 끝났으면 도킹 완료 간주 |
-| `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN → ERROR** (ERROR 만 제외 — terminal). MANUAL 은 MapBoundaryMonitor 만 예외 배치 — 다른 monitor (battery/hw/collision) 는 MANUAL 미배치 정책 유지 | `blackboard.error_reason = reason` 세팅. ERROR 는 terminal — reset trigger 없음 |
+| `fault` | `reason: str` | `hardware_health_monitor`, `collision_event_handler`, **`map_boundary_monitor`** (예: `reason="out_of_map"`), **`command_listener`** (`/gogoping/emergency_stop` Trigger srv 수신 시 `reason="user_emergency_stop"`), 기타 monitor | **CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN → ERROR** (ERROR 만 제외 — terminal). MANUAL 은 MapBoundaryMonitor 만 예외 배치 — 다른 monitor (battery/hw/collision) 는 MANUAL 미배치 정책 유지 | `blackboard.error_reason = reason` 세팅. ERROR 는 terminal — reset trigger 없음. 외부 인입 경로: `/gogoping/emergency_stop` (std_srvs/Trigger) — admin UI e-stop 버튼 / 안전 시스템 |
 
 ## 상태 전이 다이어그램
 

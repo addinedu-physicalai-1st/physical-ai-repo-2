@@ -52,8 +52,18 @@ class ManualTorqueHold(py_trees.behaviour.Behaviour):
         return Status.RUNNING
 
     def terminate(self, new_status: Status) -> None:
-        """MANUAL 나감 — torque ON 복원. idempotent."""
-        # 디버그 — terminate 가 실제로 호출되는지 추적
+        """MANUAL 나감 — torque ON 복원. idempotent.
+
+        ERROR 진입 (긴급정지) 시엔 enable_torque 호출 skip — BT_error_main 의
+        StopAllMotors 가 곧 release_torque 를 다시 부르는데, enable→disable 시퀀스
+        사이에 Pi 의 enable 처리 (~1초 wait) 가 끼면 e-stop 응답 시간이 지연됨.
+        """
+        if self.ctx.fsm.current_state == "ERROR":
+            # 긴급정지 — torque ON 복원 skip. StopAllMotors 가 처리.
+            self.bb.set(Keys.MANUAL_TORQUE_ACTIVE, False)
+            self.logger.info("ManualTorqueHold.terminate: ERROR 진입 — enable_torque skip (StopAllMotors handles)")
+            return
+        # 일반 전이 — torque 복원
         self.logger.info(f"ManualTorqueHold.terminate(new_status={new_status}) — calling enable_torque")
         ok = self._enable()
         self.bb.set(Keys.MANUAL_TORQUE_ACTIVE, False)
