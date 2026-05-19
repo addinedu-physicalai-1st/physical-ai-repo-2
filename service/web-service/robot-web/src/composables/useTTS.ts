@@ -171,7 +171,6 @@ export function useTTS(options: UseTTSOptions = {}): {
   let lipsyncDetach: (() => void) | null = null;
   let currentAudio: HTMLAudioElement | null = null;
   let currentObjectUrl: string | null = null;
-  let wakeAckAudio: HTMLAudioElement | null = null;
   let ttsFetchAbort: AbortController | null = null;
   // cancel() 이 in-flight speak/playWakeAck 의 outer Promise 를 해소할 수 있게
   // 현재 재생 단계의 finish 콜백을 보관. pause() 는 ended/error 를 발생시키지
@@ -272,54 +271,37 @@ export function useTTS(options: UseTTSOptions = {}): {
     }
   }
 
-  // wakeAck 는 한 번 로드한 element 를 재사용. Web Audio graph (createMediaElementSource)
-  // 는 안 거침 — Chrome 의 AudioContext 자동 suspend 가 user gesture 없이 resume
-  // 안 될 때 graph routing 무음이 됨. native audio output 으로 흘려 신뢰성 확보.
-  // 대신 mouth envelope 은 attachSpeechLipsync 의 graph=null fallback (synthetic
-  // wobble) 으로 처리. "네!" 짧은 ack 라 시각 손실 미미.
-  let wakeAckLipsyncAttached = false;
-
-  function primeWakeAck(): void {
-    if (typeof window === 'undefined') return;
-    if (wakeAckAudio) return;
-    wakeAckAudio = new Audio(WAKE_ACK_AUDIO_PATH);
-    wakeAckAudio.preload = 'auto';
-    wakeAckAudio.playbackRate = TTS_PLAYBACK_RATE;
-    wakeAckAudio.load();
-  }
+  // wakeAck 는 매 호출마다 fresh Audio element 생성. 재사용 시 발생하던
+  // "playing 으로 표시되는데 무음" 증상 (createMediaElementSource 잔존 또는
+  // element internal sink 손상) 회피. 9KB MP3 라 HTTP cache 히트가 거의 instant.
+  // Web Audio graph 안 거치므로 ctx suspend 영향 없음.
 
   function playWakeAck(): Promise<void> {
     return new Promise((resolve) => {
       if (typeof window === 'undefined') { resolve(); return; }
-      primeWakeAck();
-      const audio = wakeAckAudio;
-      if (!audio) { resolve(); return; }
 
       // 이전 wake_ack 의 finish 가 아직 살아있으면 마무리시키고 새로 시작
       const prevDone = pendingDone;
       pendingDone = null;
       prevDone?.();
 
-      // 직전 재생 중일 때만 pause — 이미 ended/paused 인 audio 에 pause 호출하면
-      // 일부 Chrome 빌드에서 다음 play() 가 AbortError 로 거절될 수 있음
-      if (!audio.paused) {
-        try { audio.pause(); } catch { /* ignore */ }
-      }
-      audio.currentTime = 0;
+      // 매 호출마다 새 element — 재사용 시 발생하던 무음 재생 (browser cache 가
+      // src 를 알아도 element 내부 audio output sink 가 silent 한 상태) 회피.
+      // 9KB MP3 라 fresh fetch 도 HTTP cache 에서 instant.
+      const audio = new Audio(WAKE_ACK_AUDIO_PATH);
+      audio.preload = 'auto';
+      audio.playbackRate = TTS_PLAYBACK_RATE;
+      audio.volume = 1.0;
+      audio.muted = false;
 
       currentAudio = audio;
-      // lipsync envelope 은 graph=null 로 attach → synthetic wobble fallback.
-      // Web Audio routing 안 거치므로 ctx suspend 영향 없음.
-      if (!wakeAckLipsyncAttached) {
-        attachSpeechLipsync(audio, WAKE_ACK_LIPSYNC_TEXT, voiceStore, null);
-        wakeAckLipsyncAttached = true;
-      }
 
       let settled = false;
       const finish = () => {
         if (settled) return;
         settled = true;
         if (pendingDone === finish) pendingDone = null;
+        try { audio.pause(); } catch { /* ignore */ }
         voiceStore.setCurrentChar('');
         voiceStore.setSpeechEnvelope(0);
         isSpeaking.value = false;
@@ -330,11 +312,8 @@ export function useTTS(options: UseTTSOptions = {}): {
       };
       pendingDone = finish;
 
-      // 안전망 — 어떤 이벤트도 안 와도 1.5s 뒤 강제 finish.
-      const safety = window.setTimeout(() => {
-        try { audio.pause(); } catch { /* ignore */ }
-        finish();
-      }, 1500);
+      // 안전망 — 어떤 이벤트도 안 와도 2s 뒤 강제 finish.
+      const safety = window.setTimeout(() => finish(), 2000);
       const clearSafety = () => window.clearTimeout(safety);
 
       audio.onplaying = () => {
@@ -393,6 +372,5 @@ export function useTTS(options: UseTTSOptions = {}): {
     cancel();
   });
 
-  primeWakeAck();
   return { speak, playWakeAck, cancel, isSpeaking };
 }
