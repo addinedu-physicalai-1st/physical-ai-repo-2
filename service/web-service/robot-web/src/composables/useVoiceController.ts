@@ -124,7 +124,7 @@ export function useVoiceController(robot: RobotConfig): {
       if (voice.isSpeaking) return;
       // TTS 끝난 직후 잔향 그레이스
       if (Date.now() < speakerEchoGuardUntil) return;
-      void bargeIn('').catch((e) => voice.setError((e as Error).message));
+      void enterWakeDetected().catch((e) => voice.setError((e as Error).message));
     },
     onError: (msg) => voice.setError(`wake: ${msg}`),
   });
@@ -165,50 +165,6 @@ export function useVoiceController(robot: RobotConfig): {
     if (voice.isSpeaking && !wakeAckInProgress && voice.state !== 'speaking') return true;
     if (Date.now() < suppressUntil) return true;
     return false;
-  }
-
-  /**
-   * ONNX 가 wake 감지 시 호출. 진행 중 작업 (fetch / TTS / 타이머) 모두 취소하고 새 흐름 시작.
-   * remainder 는 텍스트 매칭 시절의 잔여 발화 — ONNX 경로에서는 항상 빈 문자열.
-   */
-  async function bargeIn(remainder: string): Promise<void> {
-    const duringRobotSpeech =
-      voice.state === 'speaking' || wakeAckInProgress || voice.isSpeaking;
-
-    if (dispatchAbort) {
-      dispatchAbort.abort();
-      dispatchAbort = null;
-    }
-    tts.cancel();
-    clearListeningTimer();
-    clearCooldownTimer();
-    lastListeningInterim = '';
-    bestListeningText = '';
-    voice.setSpeaking(false);
-    suppressUntil = 0;
-    if (duringRobotSpeech) {
-      voice.setRobotReply('');
-      voice.setState('wake_detected');
-      mode.setEmotionTransient('hello', 800);
-      wakeAckInProgress = true;
-      try {
-        await tts.playWakeAck();
-      } finally {
-        wakeAckInProgress = false;
-      }
-      if (voice.state !== 'wake_detected') return;
-      voice.setState('listening');
-      allowRestrictedBypassOnce = true;
-      bestListeningText = '';
-      lastListeningInterim = '';
-      armListeningTimer();
-      if (remainder.trim().length > 0) {
-        clearListeningTimer();
-        await enterDispatching(remainder);
-      }
-      return;
-    }
-    await enterWakeDetected(remainder);
   }
 
   async function handleSttResult(result: STTResult): Promise<void> {
@@ -298,12 +254,18 @@ export function useVoiceController(robot: RobotConfig): {
     }
   }
 
-  async function enterWakeDetected(remainder: string): Promise<void> {
+  /** Wake 감지 시 호출되는 단일 진입점. idle 에서만 도달 (onWake 가 가드). */
+  async function enterWakeDetected(): Promise<void> {
+    // 방어적 cleanup — idle 진입 시 이미 비어있어야 하지만 보장.
+    clearListeningTimer();
+    clearCooldownTimer();
+    suppressUntil = 0;
+    lastListeningInterim = '';
+    bestListeningText = '';
+
     voice.setRobotReply('');
     voice.setState('wake_detected');
-    suppressUntil = 0;
-
-    mode.setEmotionTransient('hello', 1500);
+    mode.setEmotionTransient('hello', 1000);
 
     wakeAckInProgress = true;
     try {
@@ -312,22 +274,20 @@ export function useVoiceController(robot: RobotConfig): {
       wakeAckInProgress = false;
     }
 
-    if (voice.state !== 'wake_detected') {
-      return;
-    }
+    // playWakeAck 도중 STT wake-ack interrupt 가 state 를 'listening' 으로 옮긴
+    // 경우 (handleSttResult 의 wake_ack 분기) 이중 전이 안 함.
+    if (voice.state !== 'wake_detected') return;
 
     voice.setState('listening');
     allowRestrictedBypassOnce = true;
-    lastListeningInterim = '';
-    bestListeningText = '';
     armListeningTimer();
-    if (remainder.trim().length > 0) {
-      clearListeningTimer();
-      await enterDispatching(remainder);
-    }
   }
 
   async function enterDispatching(text: string): Promise<void> {
+    // 들어오는 모든 경로 (listening final / processCommand / wake_ack interrupt) 에서
+    // 잔여 타이머가 dispatching/speaking 중 idle 로 덮어쓰는 걸 방지.
+    clearListeningTimer();
+    clearCooldownTimer();
     if (!text.trim()) {
       enterCooldown();
       return;
