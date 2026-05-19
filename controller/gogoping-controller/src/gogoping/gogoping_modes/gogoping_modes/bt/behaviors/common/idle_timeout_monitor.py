@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from ....context import Context
 
 
-_DEFAULT_TIMEOUT_S = 60.0
+_DEFAULT_TIMEOUT_S = 86400.0
 _PARAM_NAME = "idle_timeout_seconds"
 
 
