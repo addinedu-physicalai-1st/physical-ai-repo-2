@@ -260,6 +260,8 @@ class _BlackboardWriter:
     _WRITE_KEYS = (
         "assist_task", "play_task", "carry_mode",
         "destination_key", "target_person_id",
+        # _on_emergency_stop_request 가 fault reason 기록용으로 W
+        "error_reason", "error_source",
     )
 
     def __init__(self, behaviour_name: str):
