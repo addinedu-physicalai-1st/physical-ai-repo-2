@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   // /api/* 는 Control Service 로. Control 이 AI Hub / DB / ROS2 분기.
   const controlTarget = env.CONTROL_URL ?? 'http://localhost:8000';
+  const streamingTarget = env.STREAMING_URL ?? 'http://localhost:8100';
   // VITE_USE_MOCK=true 면 Vite middleware 가 mock 으로 응답 (Control 안 띄울 때)
   const useMock = env.VITE_USE_MOCK === 'true';
   // 기본은 HTTPS (vite-plugin-mkcert) — kiosk·데스크톱.
@@ -48,11 +49,23 @@ export default defineConfig(({ mode }) => {
               target: controlTarget,
               changeOrigin: true,
             },
+            // GogoPing 수동 모드 — pan/tilt REST + state WS (control_service.main, port 8000)
+            '/camera_pan': {
+              target: controlTarget,
+              changeOrigin: true,
+              ws: true,
+            },
+            // GogoPing 영상 stream (control_service.streaming.app, port 8100, 별도 uvicorn)
+            '/ws/video-stream': {
+              target: streamingTarget,
+              changeOrigin: true,
+              ws: true,
+            },
           },
     },
-    // Pure 유틸 (wakeMatcher 등) 만 테스트하므로 jsdom 불필요. globals 도 import 로 명시.
     test: {
-      environment: 'node',
+      // jsdom — WebSocket / Blob / URL.createObjectURL / DOM 이벤트가 필요한 composable 테스트.
+      environment: 'jsdom',
       include: ['tests/**/*.test.ts'],
     },
   };
