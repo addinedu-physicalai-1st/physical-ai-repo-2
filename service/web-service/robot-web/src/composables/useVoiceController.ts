@@ -63,8 +63,20 @@ export function useVoiceController(robot: RobotConfig): {
   let skipTtsEndCleanupOnce = false;
   let wakeAckInProgress = false;
   let wakeAckStartedAt = 0;
+  // listening 진입 시각 — Web Speech 가 wake word 발화 자체를 늦게 final 로
+  // emit 해서 첫 명령으로 잘못 dispatch 되는 걸 막기 위한 echo grace 기준점.
+  let listeningStartedAt = 0;
   // wake 직후 첫 발화는 restricted mode 제한을 1회 우회
   let allowRestrictedBypassOnce = false;
+
+  // STT 가 wake word 자체를 잡은 거면 echo 로 간주해 drop. canonical + alias.
+  const wakeWordVariants = new Set(
+    [robot.wakeWord, ...robot.wakeWordAliases].map((s) => normalizeSpeechText(s)),
+  );
+  function isWakeWordEcho(text: string): boolean {
+    const norm = normalizeSpeechText(text);
+    return wakeWordVariants.has(norm);
+  }
 
   function baseEmotionForCurrentMode(): EmotionId {
     return mode.robot.defaultEmotionByMode[mode.currentMode] ?? 'basic';
@@ -190,6 +202,7 @@ export function useVoiceController(robot: RobotConfig): {
       voice.setSpeaking(false);
       voice.setRobotReply('');
       voice.setState('listening');
+      listeningStartedAt = Date.now();
       allowRestrictedBypassOnce = true;
       lastListeningInterim = '';
       bestListeningText = trimmed;
@@ -219,6 +232,12 @@ export function useVoiceController(robot: RobotConfig): {
     // idle / wake_detected / dispatching / cooldown — wake 감지는 ONNX 가 담당.
     // STT 결과는 listening 상태에서 command 로만 처리.
     if (voice.state !== 'listening') return;
+
+    // Web Speech 가 wake word 발화 자체를 늦게 final 로 내뱉는 경우 — listening
+    // 진입 직후 1.5s 안에 도착한 wake-word echo 는 drop.
+    if (Date.now() - listeningStartedAt < 1500 && isWakeWordEcho(trimmed)) {
+      return;
+    }
 
     if (result.isFinal) {
       clearListeningTimer();
@@ -279,6 +298,7 @@ export function useVoiceController(robot: RobotConfig): {
     if (voice.state !== 'wake_detected') return;
 
     voice.setState('listening');
+    listeningStartedAt = Date.now();
     allowRestrictedBypassOnce = true;
     armListeningTimer();
   }
