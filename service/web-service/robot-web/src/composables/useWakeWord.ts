@@ -268,10 +268,19 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       await audioContext.audioWorklet.addModule(WORKLET_PATH);
       sourceNode = audioContext.createMediaStreamSource(stream);
       workletNode = new AudioWorkletNode(audioContext, 'wake-pcm-worklet');
+      // 무음 chunk 에서는 inference skip — 마이크 noise floor RMS ≈ 0.003,
+      // 발화 시 ≥ 0.01. 0.005 임계값으로 발화 시작 전까지 mel/embed/clf 전부 건너뜀.
+      // 발화 도중에는 매 chunk RMS > threshold 라 inference 정상 동작.
+      // wake word 가 ring 에 들어있어도 무음 후속 chunk 에서는 skip — 이미 검출
+      // 직후 cooldown 2.5s 가 작동하므로 손실 없음.
+      const SILENCE_RMS_THRESHOLD = 0.005;
       workletNode.port.onmessage = (ev: MessageEvent<Float32Array>) => {
         const chunk = ev.data;
         if (!chunk || chunk.length !== HOP_SAMPLES) return;
         audioRing.push(chunk);
+        let s2 = 0;
+        for (let i = 0; i < chunk.length; i++) s2 += chunk[i] * chunk[i];
+        if (Math.sqrt(s2 / chunk.length) < SILENCE_RMS_THRESHOLD) return;
         void runStep();
       };
       sourceNode.connect(workletNode);
