@@ -12,7 +12,10 @@
         <arg name="use_sim_time" value="$(var use_sim_time)"/>
     </include>
 
+    <!-- serial_port=/dev/rplidar — udev rule (99-vic-pinky.rules) 의 symlink.
+         USB 재할당돼도 항상 같은 path. -->
     <include file="$(find-pkg-share sllidar_ros2)/launch/sllidar_c1_launch.py">
+        <arg name="serial_port" value="/dev/rplidar"/>
     </include>
 
     <node pkg="vicpinky_bringup" exec="bringup">
