@@ -76,6 +76,25 @@ function handleNaturalShot(): void {
 // reveal/playback 단계 동안 중복 클릭 방지.
 const submitting = ref(false);
 
+// 3개 패널 각각 독립 토글 — 사용자가 필요한 것만 켤 수 있도록 (햄버거 일괄 토글 X).
+// 기본은 전부 숨김. 각 코너에 작은 pill 버튼이 항상 떠 있고, 클릭하면 그 자리에서
+// 패널이 펼쳐진다. localStorage 로 세션 간 사용자 선호도 유지.
+function makeToggle(key: string) {
+  const r = ref(typeof window !== 'undefined' && window.localStorage.getItem(key) === '1');
+  return {
+    ref: r,
+    toggle: () => {
+      r.value = !r.value;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, r.value ? '1' : '0');
+      }
+    },
+  };
+}
+const faceCam = makeToggle('oxquiz.panel.face');
+const boardCam = makeToggle('oxquiz.panel.board');
+const simView = makeToggle('oxquiz.panel.sim');
+
 const isCorrect = computed(
   () => userClicked.value !== null && currentQuestion.value?.answer === userClicked.value,
 );
@@ -321,58 +340,112 @@ const progressLabel = computed(
           </div>
         </div>
 
-        <!-- 좌측 스택 — 카메라·시뮬레이션은 모두 왼쪽에 둔다 (우측 ModeSelectorFab 사이드바를 가리지 않도록).
-             flex column 으로 자연 스택. 위→아래: 표정 카메라 / 보드 카메라 / sim 뷰어(또는 실물 연결 배지). -->
-        <div class="left-stack">
-          <!-- 표정(자연 촬영) — 내장 등 첫 videoinput. -->
-          <div v-show="integratedCameraAvailable === true" class="capture-float">
-            <IntegratedCameraPreview
-              :armed="captureArmed"
-              :reset-key="captureResetKey"
-              robot="noriarm"
-              mode="ox-quiz"
-              @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
-              @captured="handleNaturalShot"
-            />
-            <p class="capture-caption">표정 촬영 (내장 카메라)</p>
-          </div>
-
-          <!-- 보드 카메라 — USB/외장. YOLO WebSocket + mediapipe Hands.
-               enumerate 순서의 첫 번째가 내장이면 기본 선택은 2번째(보드) 쪽으로 잡히도록 OXVisionPreview 내부에서 처리.
-               내장이 표정을 담당하면 여기서는 emotion-armed 를 끈다. -->
-          <div v-show="usbCameraAvailable === true" class="vision-float">
-            <OXVisionPreview
-              :armed="phase === 'question' && !submitting"
-              :emotion-armed="captureArmed && oxPanelEmotionEnabled"
-              :emotion-reset-key="captureResetKey"
-              robot="noriarm"
-              mode="ox-quiz"
-              @select="(r: 'O' | 'X') => void selectAnswer(r)"
-              @usb-available="(v: boolean) => (usbCameraAvailable = v)"
-              @emotion-captured="handleNaturalShot"
-            />
-            <p class="vision-caption">
-              <span class="status-dot status-vision" />
-              <template v-if="integratedCameraAvailable === true">
-                보드·손 인식 (YOLO)
-              </template>
-              <template v-else>
-                보드 인식 · 첫 카메라는 표정 · 문제·생각·해설 단계에서만 인식
-              </template>
-            </p>
-          </div>
-
-          <!-- sim 일 때 URDF 뷰어, real 일 때 연결 배지 -->
-          <div v-if="showSimViewer" class="viewer-float sim">
-            <div class="viewer-float-canvas">
-              <UrdfViewer />
+        <!-- 표정(자연 촬영) — 좌상단. pill 은 항상 노출 — 카메라 컴포넌트는 panel 이
+             열린 동안에만 mount/probe 한다. 카메라가 없으면 panel 안에서 에러로 표시. -->
+        <div class="panel-zone panel-top-left">
+          <button
+            v-if="!faceCam.ref.value"
+            type="button"
+            class="panel-pill"
+            aria-label="표정 카메라 열기"
+            @click="faceCam.toggle"
+          >
+            📷 <span class="pill-label">표정</span>
+          </button>
+          <div v-else class="panel-open">
+            <button
+              type="button"
+              class="panel-close"
+              aria-label="표정 카메라 닫기"
+              @click="faceCam.toggle"
+            >×</button>
+            <div class="panel-box">
+              <IntegratedCameraPreview
+                :armed="captureArmed"
+                :reset-key="captureResetKey"
+                robot="noriarm"
+                mode="ox-quiz"
+                @integrated-available="(v: boolean) => (integratedCameraAvailable = v)"
+                @captured="handleNaturalShot"
+              />
+              <p class="panel-caption">표정 촬영 (내장 카메라)</p>
             </div>
-            <p class="viewer-float-caption">
-              <span class="status-dot status-sim" />
-              노리암 시뮬레이션
-            </p>
           </div>
-          <div v-else class="viewer-float real">
+        </div>
+
+        <!-- 보드 카메라 — 좌하단. -->
+        <div class="panel-zone panel-bottom-left">
+          <button
+            v-if="!boardCam.ref.value"
+            type="button"
+            class="panel-pill"
+            aria-label="보드 카메라 열기"
+            @click="boardCam.toggle"
+          >
+            🎯 <span class="pill-label">보드</span>
+          </button>
+          <div v-else class="panel-open">
+            <button
+              type="button"
+              class="panel-close"
+              aria-label="보드 카메라 닫기"
+              @click="boardCam.toggle"
+            >×</button>
+            <div class="panel-box">
+              <OXVisionPreview
+                :armed="phase === 'question' && !submitting"
+                :emotion-armed="captureArmed && oxPanelEmotionEnabled"
+                :emotion-reset-key="captureResetKey"
+                robot="noriarm"
+                mode="ox-quiz"
+                @select="(r: 'O' | 'X') => void selectAnswer(r)"
+                @usb-available="(v: boolean) => (usbCameraAvailable = v)"
+                @emotion-captured="handleNaturalShot"
+              />
+              <p class="panel-caption">
+                <span class="status-dot status-vision" />
+                <template v-if="integratedCameraAvailable === true">
+                  보드·손 인식 (YOLO)
+                </template>
+                <template v-else>
+                  보드 인식 · 첫 카메라는 표정 · 문제·생각·해설 단계에서만 인식
+                </template>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- sim 또는 실물 배지 — 우하단. -->
+        <div class="panel-zone panel-bottom-right">
+          <template v-if="showSimViewer">
+            <button
+              v-if="!simView.ref.value"
+              type="button"
+              class="panel-pill"
+              aria-label="시뮬레이션 열기"
+              @click="simView.toggle"
+            >
+              🤖 <span class="pill-label">시뮬</span>
+            </button>
+            <div v-else class="panel-open">
+              <button
+                type="button"
+                class="panel-close"
+                aria-label="시뮬레이션 닫기"
+                @click="simView.toggle"
+              >×</button>
+              <div class="panel-box">
+                <div class="sim-canvas-wrap">
+                  <UrdfViewer />
+                </div>
+                <p class="panel-caption">
+                  <span class="status-dot status-sim" />
+                  노리암 시뮬레이션
+                </p>
+              </div>
+            </div>
+          </template>
+          <div v-else class="real-badge">
             <span class="status-dot status-real" />
             실물 노리암 연결됨
           </div>
@@ -404,47 +477,99 @@ const progressLabel = computed(
   min-width: 480px;
   max-width: 720px;
 }
-/* 좌측 스택 컨테이너 — 카메라·시뮬레이션 패널을 전부 모아 둠. 우측 ModeSelectorFab(200px) 와 안 겹침. */
-.left-stack {
+/* ── 카메라·시뮬 패널 ───────────────────────────────────────────────────────
+ * 3개 패널 (표정 카메라 / 보드 카메라 / sim 뷰어) 가 동일한 box 크기로 모서리에
+ * 배치된다 — 좌상 (표정) / 좌하 (보드) / 우하 (sim). 우측 ModeSelectorFab 사이드바와
+ * 안 겹치게 마진 확보. `:deep()` 으로 내부 컴포넌트의 자체 width/height 를 일괄 override
+ * 해 세 패널이 시각적으로 동일 frame 으로 보이게 함.
+ * 우상단은 닫기 (×) 버튼 자리라 비워둠. */
+/* 코너 zone 컨테이너 — pill (닫힌 상태) 또는 panel-box (열린 상태) 가 들어감. */
+.panel-zone {
   position: absolute;
-  top: 24px;
-  bottom: 24px;
-  left: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   z-index: 19;
-  align-items: flex-start;
-  pointer-events: none;
-  /* 화면이 짧으면 위에서부터 보이고 나머지는 스크롤 — UI 깨짐보다 낫다 */
-  overflow-y: auto;
-}
-.left-stack > * {
   pointer-events: auto;
-  flex-shrink: 0;
 }
+.panel-top-left    { top: 24px; left: 24px; }
+.panel-bottom-left { bottom: 24px; left: 24px; }
+.panel-bottom-right { bottom: 24px; right: 24px; }
 
-/* 카드 위에 떠있는 뷰어 패널 (sim 또는 real 배지). flex column 안에 들어가 자동 스택. */
-.viewer-float {
+.panel-box {
+  position: relative;
   background: white;
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
-  padding: 8px 8px 6px;
+  padding: 10px;
+  width: 320px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
 }
-.viewer-float.sim {
-  width: 320px;
+
+/* 닫혀있을 때 코너에 떠 있는 작은 pill 토글. 클릭 시 panel 로 펼쳐짐. */
+.panel-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(58, 143, 194, 0.3);
+  background: white;
+  box-shadow: 0 4px 14px rgba(40, 110, 160, 0.18);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3a8fc2;
+  font-family: inherit;
 }
-.viewer-float-canvas {
+.panel-pill:hover { background: #f5fbff; }
+.panel-pill:active { transform: scale(0.96); }
+.pill-label { font-size: 13px; }
+
+/* 열린 패널 wrapper — close 버튼을 panel-box 위 (above) 에 띄움. OXVisionPreview 의
+ * 우상단 refresh ↻ 버튼과 충돌하지 않도록 box 안이 아니라 box 위 (별도 row) 로 배치. */
+.panel-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;  /* close 버튼 오른쪽 정렬 — pill 위치와 시각적으로 일관 */
+  gap: 6px;
+}
+.panel-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(58, 143, 194, 0.3);
+  background: white;
+  color: #3a8fc2;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(40, 110, 160, 0.18);
+  font-family: inherit;
+  padding: 0;
+}
+.panel-close:hover { background: #f5fbff; }
+.panel-close:active { transform: scale(0.92); }
+
+/* 내부 컴포넌트 사이즈 일괄 통일 — 세 패널이 동일한 box 로 보이게.
+ * IntegratedCameraPreview, OXVisionPreview, UrdfViewer 가 각자 자체 CSS 로 다른
+ * width/height 를 갖고 있어 :deep() 으로 override. */
+.panel-box :deep(.cam-panel) { width: 100%; }
+.panel-box :deep(.cam-panel video) { height: 200px; }
+.panel-box :deep(.vision-panel) { width: 100%; }
+.panel-box :deep(.vision-canvas) { height: 200px; }
+.panel-box .sim-canvas-wrap {
   width: 100%;
-  height: 240px;
+  height: 200px;
   border-radius: 12px;
   overflow: hidden;
 }
-.viewer-float-caption {
+
+.panel-caption {
   margin: 0;
   color: #5b7a8c;
   font-size: 13px;
@@ -452,14 +577,20 @@ const progressLabel = computed(
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  text-align: center;
+  line-height: 1.3;
 }
-.viewer-float.real {
+
+.real-badge {
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
   padding: 10px 18px;
   color: #2d8b57;
   font-size: 14px;
   font-weight: 700;
   display: inline-flex;
-  flex-direction: row;
+  align-items: center;
   gap: 8px;
 }
 .status-dot {
@@ -479,41 +610,6 @@ const progressLabel = computed(
 .status-dot.status-vision {
   background: #3a8fc2;
   box-shadow: 0 0 0 3px rgba(58, 143, 194, 0.18);
-}
-.vision-float {
-  background: white;
-  border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
-  padding: 10px 10px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.capture-float {
-  background: white;
-  border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(40, 110, 160, 0.25);
-  padding: 10px 10px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.capture-caption {
-  margin: 0;
-  color: #5b7a8c;
-  font-size: 12px;
-  font-weight: 600;
-}
-.vision-caption {
-  margin: 0;
-  color: #5b7a8c;
-  font-size: 13px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 .card h1 {
   margin: 0 0 16px;

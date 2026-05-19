@@ -31,6 +31,7 @@ from ai_service.korean_postprocess import (
     merge_same_session_photo_clusters_to_single_rows,
     polish_report_json_content,
     retain_top_k_photo_timeline,
+    rewrite_photo_event_texts_in_json,
     remove_timeline_raw_emotion_dump_lines,
     rewrite_class_collective_subject_to_child,
     rewrite_class_scope_timeline_child_topic,
@@ -713,10 +714,14 @@ async def generate_report(
         (registered_full_name or "").strip() or None,
         class_name=cls,
     )
+    # 사진이 붙은 row 의 text 를 게임·감정으로 결정론적 재작성. polish 의 이름 fuzzy-fix
+    # 가 본문을 또 건드리지 않도록 마지막에 박는다 (LLM 이 사진 시각을 일과표 슬롯으로
+    # 끌어 「낮잠으로 피로를 풀었습니다」 같이 사진과 무관한 문장을 만드는 사고 방지).
+    polished = rewrite_photo_event_texts_in_json(polished, photo_events, call)
     if not settings.ollama_report_validate_enabled:
         return polished
     try:
-        return await _validate_polished_daily_report_json(
+        validated = await _validate_polished_daily_report_json(
             polished,
             address_name=call,
             registered_full_name=(registered_full_name or "").strip() or None,
@@ -726,6 +731,8 @@ async def generate_report(
     except LLMError as exc:
         logging.warning("[llm] report validator skipped, using draft: %s", exc)
         return polished
+    # validator 도 사진 row 텍스트를 손댈 수 있으니 한 번 더.
+    return rewrite_photo_event_texts_in_json(validated, photo_events, call)
 
 
 def _truthy_pass(val: Any) -> bool:

@@ -7,6 +7,7 @@ import {
   TARGET_ORDER,
   TARGET_HINTS,
 } from '@/lib/headPose'
+import { pickExternalCamera } from '@/lib/selectExternalCamera'
 import Icon from '@/components/common/Icon.vue'
 
 const props = withDefaults(defineProps<{
@@ -82,7 +83,10 @@ async function listCameras() {
   }
   const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value)
   if (!selectedDeviceId.value || !stillValid) {
-    selectedDeviceId.value = cameras.value[0].deviceId
+    // 기본 외장 USB — 없으면 첫 후보. 노트북 내장 카메라는 보통 위치·각도가 안 맞아
+    // 얼굴 등록 정확도가 낮다.
+    const ext = await pickExternalCamera()
+    selectedDeviceId.value = ext?.deviceId ?? cameras.value[0].deviceId
   }
 }
 

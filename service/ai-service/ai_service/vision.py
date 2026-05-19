@@ -119,11 +119,14 @@ class OXBoardTask(VisionTask):
     """OX 보드 단일 클래스 검출 + bbox 좌우 색 평균으로 O/X 분할."""
 
     name = "ox-board"
-    classes = ("printed red blue OX sign board",)
-    # 인쇄된 색 채움 보드가 시각적으로 매우 강한 신호 — false positive 줄이려 0.9 로 높게.
-    # 손이 일부 가려서 일시 미검출 되어도 UI 측 freeze (손이 bbox 안에 있으면 갱신 X) 가
-    # 깜빡임 방지.
-    conf = 0.9
+    # YOLO-World 는 짧은 명사구 + 색 키워드에 더 잘 반응한다. 이전 "printed red blue OX
+    # sign board" 는 너무 길어 CLIP txt_feats 가 약한 매칭을 만들어 0.9 conf 를 절대
+    # 못 넘었음. "red and blue sign" 정도가 시각 신호 (큰 빨강·파랑 면) 와 잘 정렬.
+    classes = ("red and blue sign",)
+    # 0.9 → 0.35. YOLO-World text-grounded 는 보통 0.3~0.6 영역에서 동작.
+    # 거짓 양성 (배경 포스터 등) 은 UI 측 freeze + 손 추적 영역 검증으로 충분히 거른다.
+    conf = 0.05
+
 
     def postprocess(self, frame: np.ndarray, results) -> list[dict]:
         out: list[dict] = []
