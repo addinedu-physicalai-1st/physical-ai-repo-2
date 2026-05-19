@@ -59,9 +59,6 @@ watch(
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'
 );
-const showBlob = computed(
-  () => voiceMode.value === 'voice' && state.value === 'listening'
-);
 
 function switchToText(): void {
   voice.setVoiceMode('text');
@@ -79,7 +76,7 @@ function switchToText(): void {
       <div v-else key="voice" class="voice-area">
         <div class="anim-slot">
           <DispatchingLoader v-if="showLoader" />
-          <SiriBlob v-else-if="showBlob" :level="micLevel" :state="state" />
+          <SiriBlob v-else :level="micLevel" :state="state" />
           <button class="text-mode-btn" @click="switchToText" aria-label="타이핑 모드로 전환">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="6" width="20" height="12" rx="2" />
