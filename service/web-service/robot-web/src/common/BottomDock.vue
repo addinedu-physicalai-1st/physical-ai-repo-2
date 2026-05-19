@@ -35,20 +35,15 @@ watch(voiceMode, (next, prev) => {
   else if (next === 'text' && prev === 'voice') ctrl.stop();
 });
 
-// 마이크(getUserMedia)는 음성 상태마다 켰다 끄면 OS 인디케이터가 깜빡임.
-// 시작 제스처 이후·음성 모드인 동안만 한 스트림 유지, 타이핑 모드로 바꿀 때만 해제.
-//
-// 휴대전화에서는 audio-level 의 두 번째 getUserMedia 가 webkitSpeechRecognition 의 마이크
-// 입력을 굶겨 STT 가 무음으로 동작하지 않는다 (Chrome Android 한정). STT 가 더 중요하므로
-// phone 에서는 시각화 mic stream 생략, 인디케이터 깜빡임은 감수.
+// 시각화용 mic 스트림 — listening 상태에서만 켠다. idle / speaking / dispatching
+// 동안은 SiriBlob 자체가 안 보이므로 RAF + Web Audio 비용 절감.
+// phone 은 useServerSTT 의 stream RMS 를 재사용하므로 audio-level 의 두 번째
+// getUserMedia 가 필요 없음 (실제로 STT 마이크 입력을 굶기는 부작용도 있음).
 watch(
-  [voiceMode, voiceUiSession],
-  async ([vm, session]) => {
-    if (isPhone.value) {
-      audio.stop();
-      return;
-    }
-    if (vm === 'voice' && session) {
+  [voiceMode, voiceUiSession, state],
+  async ([vm, session, st]) => {
+    const shouldRun = !isPhone.value && vm === 'voice' && session && st === 'listening';
+    if (shouldRun) {
       try {
         await audio.start();
       } catch (e) {
@@ -63,6 +58,9 @@ watch(
 
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'
+);
+const showBlob = computed(
+  () => voiceMode.value === 'voice' && state.value === 'listening'
 );
 
 function switchToText(): void {
@@ -81,7 +79,7 @@ function switchToText(): void {
       <div v-else key="voice" class="voice-area">
         <div class="anim-slot">
           <DispatchingLoader v-if="showLoader" />
-          <SiriBlob v-else :level="micLevel" :state="state" />
+          <SiriBlob v-else-if="showBlob" :level="micLevel" :state="state" />
           <button class="text-mode-btn" @click="switchToText" aria-label="타이핑 모드로 전환">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="6" width="20" height="12" rx="2" />
