@@ -165,6 +165,23 @@ def evaluate_robot(
         far_per_hr = fa_count / max(neg_hours, 1e-9)
         print(f"  {tau:>10.3f} {frr:>8.3f} {far_per_hr:>10.2f} {fa_count:>10d}")
 
+    # --- hard-neg 분리 보고 ---
+    hard_sources = ("hard_3syl", "hard_3syl_realworld")
+    print(f"\n  [hard-neg breakdown]")
+    print(f"  {'source':>22} {'N':>5} {'τ=0.5 trig%':>14} {'τ=0.9 trig%':>14} {'τ=0.99 trig%':>14}")
+    print(f"  {'-'*22} {'-'*5} {'-'*14} {'-'*14} {'-'*14}")
+    for src in hard_sources:
+        arr = features["negative"].get(src)
+        if arr is None:
+            continue
+        w, owner = slice_windows_with_owner(arr, window, stride=1)
+        s = _predict(sess, w)
+        n_clips = arr.shape[0]
+        clip_max = np.zeros(n_clips, dtype=np.float32)
+        np.maximum.at(clip_max, owner, s)
+        trig = lambda t: f"{(clip_max > t).mean() * 100:>11.1f}%"
+        print(f"  {src:>22} {n_clips:>5} {trig(0.5):>14} {trig(0.9):>14} {trig(0.99):>14}")
+
 
 def main() -> int:
     args = parse_args()
