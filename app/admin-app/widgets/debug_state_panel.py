@@ -109,6 +109,36 @@ class DebugStatePanel(QFrame):
         )
         outer.addWidget(header)
 
+        # 빠른 토글: [수동] [주행] — combo 거치지 않고 즉시 force-state.
+        # state row 아래 일반 흐름은 그대로 유지 (정밀 선택용).
+        quick_row = QHBoxLayout()
+        quick_row.setSpacing(4)
+        quick_row.setContentsMargins(0, 0, 0, 0)
+        quick_label = QLabel("quick")
+        quick_label.setStyleSheet(
+            f"font-size: 8pt; color: {COLORS['text_soft']}; min-width: 28px;"
+        )
+        quick_row.addWidget(quick_label)
+        self._quick_manual_btn = QPushButton("수동")
+        self._quick_manual_btn.setCursor(Qt.PointingHandCursor)
+        self._quick_manual_btn.setStyleSheet(
+            f"background: {COLORS['primary']}; color: white; border: none;"
+            f" border-radius: 6px; padding: 4px 10px; font-size: 9pt; font-weight: 800;"
+            f" min-height: 24px;"
+        )
+        self._quick_manual_btn.clicked.connect(lambda: self._quick_apply("MANUAL"))
+        quick_row.addWidget(self._quick_manual_btn, 1)
+        self._quick_drive_btn = QPushButton("주행")
+        self._quick_drive_btn.setCursor(Qt.PointingHandCursor)
+        self._quick_drive_btn.setStyleSheet(
+            f"background: {COLORS['mint']}; color: {COLORS['text']}; border: none;"
+            f" border-radius: 6px; padding: 4px 10px; font-size: 9pt; font-weight: 800;"
+            f" min-height: 24px;"
+        )
+        self._quick_drive_btn.clicked.connect(lambda: self._quick_apply("IDLE"))
+        quick_row.addWidget(self._quick_drive_btn, 1)
+        outer.addLayout(quick_row)
+
         # state row
         state_row = QHBoxLayout()
         state_row.setSpacing(4)
@@ -172,6 +202,14 @@ class DebugStatePanel(QFrame):
             f"font-size: 8pt; font-weight: 600; color: {COLORS['text_soft']};"
         )
         self.force_state_requested.emit(state, sub_task)
+
+    def _quick_apply(self, state: str) -> None:
+        """수동/주행 빠른 토글 — sub_task 없이 즉시 force-state. combo 동기화 안 함."""
+        self._last_result.setText(f"sending → {state} (quick) ...")
+        self._last_result.setStyleSheet(
+            f"font-size: 8pt; font-weight: 600; color: {COLORS['text_soft']};"
+        )
+        self.force_state_requested.emit(state, "")
 
     # --------------------------------------------------------------- public
 
