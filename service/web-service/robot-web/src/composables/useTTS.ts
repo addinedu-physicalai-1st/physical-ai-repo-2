@@ -315,6 +315,11 @@ export function useTTS(options: UseTTSOptions = {}): {
 
       void (async () => {
         const graph = await ensureWakeAckGraph();
+        // lipsync ctx 는 idle 시 Chrome 이 자동 suspend → graph routing 무음.
+        // 매 재생 직전 명시적 resume (running 이면 no-op).
+        if (lipSyncAudioContext && lipSyncAudioContext.state === 'suspended') {
+          try { await lipSyncAudioContext.resume(); } catch { /* ignore */ }
+        }
         currentAudio = audio;
         // wakeAck lipsync 은 첫 호출 시 한 번만 attach. attachSpeechLipsync 가
         // audio.addEventListener 로 'playing'/'pause'/'ended' 핸들러를 다는
