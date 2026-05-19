@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, provide, ref, type Ref } from 'vue';
+import { computed, onBeforeUnmount, provide, ref, type Ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
@@ -17,6 +17,10 @@ import GreetingManager from '@/eduping/GreetingManager.vue';
 import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
 import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
+import { useCameraPan } from '@/gogoping/composables/useCameraPan';
+import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
+import CameraView from '@/gogoping/CameraView.vue';
+import PanTiltControl from '@/gogoping/PanTiltControl.vue';
 
 const mode = useModeStore();
 const voice = useVoiceStore();
@@ -40,6 +44,16 @@ const showDancePopup = computed(() => robot.value.id === 'eduping' && currentMod
 const showGreetingManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '등하원 인사 설정');
 const showMugunghwaArm = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화 율동 등록');
 const showMugunghwa = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화꽃이 피었습니다');
+
+const showGogopingManual = computed(
+  () => robot.value.id === 'gogoping' && currentMode.value === '수동'
+);
+
+// gogoping 일 때만 useCameraPan 인스턴스를 생성해서 두 컴포넌트 공유
+const cameraPan = robot.value.id === 'gogoping' ? useCameraPan() : null;
+if (cameraPan) provide(CAMERA_PAN_KEY, cameraPan);
+
+onBeforeUnmount(() => { cameraPan?.stop(); });
 
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
@@ -76,6 +90,8 @@ function handleStart(): void {
     <GreetingManager v-if="showGreetingManager" />
     <MugunghwaArmManager v-if="showMugunghwaArm" />
     <MugunghwaGame v-if="showMugunghwa" />
+    <CameraView v-if="showGogopingManual" />
+    <PanTiltControl v-if="showGogopingManual" />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}
