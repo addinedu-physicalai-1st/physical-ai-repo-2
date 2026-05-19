@@ -29,6 +29,7 @@ from .bt.trees.main_trees import build_main_tree
 from .context import Context
 from .fsm.robot_fsm import RobotFSM
 from .interfaces import (
+    BaseDriverClient,
     BatterySubscriber,
     CameraPanClient,
     CollisionSubscriber,
@@ -72,6 +73,7 @@ class GogopingModes:
             db_logger=DBLogger(node),
             pose=PoseSubscriber(node),
             map_cache=MapCache(node),
+            base_driver=BaseDriverClient(node),
             cmd_vel_pub=node.create_publisher(Twist, "/gogoping/cmd_vel", 10),
         )
 

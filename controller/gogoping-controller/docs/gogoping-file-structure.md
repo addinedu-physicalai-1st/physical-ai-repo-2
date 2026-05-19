@@ -120,6 +120,10 @@ controller/gogoping-controller/src/gogoping/
         │   │   │
         │   │   ├── manual/
         │   │   │   ├── __init__.py
+        │   │   │   ├── manual_torque_hold.[py|/]     # MANUAL 진입 시 motor torque OFF → 사용자 직접 밀기 가능 (✅)
+        │   │   │   │                                 #   initialise=release, terminate=enable. blackboard MANUAL_TORQUE_ACTIVE W.
+        │   │   │   │                                 #   ctx.base_driver (BaseDriverClient → /gogoping/set_torque) 사용.
+        │   │   │   │                                 #   Used in: BT_manual_main 만
         │   │   │   ├── enable_manual_control.[py|/]  # camera_pan 우선순위 manual 전환 (terminate 시 auto 복원)
         │   │   │   │                                 #   Used in: BT_carry_sub (manual mode)
         │   │   │   └── wait_for_exit.[py|/]          # carry_mode 변경 / cancel 명령까지 RUNNING
@@ -153,7 +157,7 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_idle_main.py                   # IDLE — CommandListener
         │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(carry/follow/lullaby stubs)
         │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek stub)
-        │       │   ├── BT_manual_main.py                 # MANUAL — CommandListener (torque off 는 추후)
+        │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON ✅
         │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
         │       │   ├── BT_low_battery_return_main.py    # LOW_BATTERY_RETURN — 빈 lockdown (CommandListener 없음)
         │       │   └── BT_error_main.py                  # ERROR — 빈 terminal (reset 없음)
@@ -171,6 +175,8 @@ controller/gogoping-controller/src/gogoping/
         │   ├── nav2_client.py            # Nav2 NavigateToPose 액션 클라이언트  (stub)
         │   ├── camera_pan_client.py      # gogoping_camera_pan 토픽 publish 래퍼 (/camera_pan/auto)  (stub)
         │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish  (✅ 실 구현 — `/gogoping/state` 1Hz)
+        │   ├── base_driver_client.py     # vic_pinky_bringup 의 /gogoping/set_torque (SetBool) 클라이언트
+        │   │                             #   release_torque() / enable_torque() — ManualTorqueHold 가 사용 (✅)
         │   ├── battery_subscriber.py     # /gogoping/battery 구독 (sensor_msgs/BatteryState)
         │   │                             #   → blackboard.BATTERY_LEVEL 갱신 (✅)
         │   ├── pose_subscriber.py       # /amcl_pose 구독 (geometry_msgs/PoseWithCovarianceStamped, map frame)

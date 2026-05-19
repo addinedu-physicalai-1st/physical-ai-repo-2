@@ -9,6 +9,7 @@ from geometry_msgs.msg import Twist, TransformStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32
+from std_srvs.srv import SetBool
 from tf2_ros import TransformBroadcaster
 from tf_transformations import quaternion_from_euler
 
@@ -21,6 +22,7 @@ ODOM_PUB_TOPIC_NAME = "odom"
 JOINT_PUB_TOPIC_NAME = "joint_states"
 VOLTAGE_PUB_TOPIC_NAME = "battery_voltage"   # 상대 — gogoping namespace 가 prefix
 VOLTAGE_PUB_HZ = 1.0
+SET_TORQUE_SRV_NAME = "set_torque"           # 상대 — /gogoping/set_torque 로 노출
 ODOM_FRAME_ID = "odom"
 ODOM_CHILD_FRAME_ID = "base_footprint"
 
@@ -123,6 +125,7 @@ class VicPinky(Node):
         self.joint_pub = self.create_publisher(JointState, JOINT_PUB_TOPIC_NAME, 10)
         self.voltage_pub = self.create_publisher(Float32, VOLTAGE_PUB_TOPIC_NAME, 10)
         self.twist_sub = self.create_subscription(Twist, TWIST_SUB_TOPIC_NAME, self.twist_callback, 10)
+        self.set_torque_srv = self.create_service(SetBool, SET_TORQUE_SRV_NAME, self._on_set_torque)
         self.tf_broadcaster = TransformBroadcaster(self)
         self.timer = self.create_timer(1.0 / 30.0, self.update_and_publish)
         self.voltage_timer = self.create_timer(1.0 / VOLTAGE_PUB_HZ, self._publish_voltage)
@@ -292,6 +295,27 @@ class VicPinky(Node):
         msg = Float32()
         msg.data = float(v)
         self.voltage_pub.publish(msg)
+
+    def _on_set_torque(self, request: SetBool.Request, response: SetBool.Response) -> SetBool.Response:
+        """data=False → torque OFF (manual push 가능), data=True → torque ON.
+
+        ManualTorqueHold behavior 가 initialise() 에서 False, terminate() 에서 True 호출.
+        idempotent — 같은 상태 재호출 시 driver 가 무해하게 처리.
+        """
+        if request.data:
+            # 안전: enable 전 RPM 0 보장
+            self.driver.set_double_rpm(0, 0)
+            ok = self.driver.enable()
+            response.success = bool(ok)
+            response.message = "torque ON" if ok else "enable() failed"
+        else:
+            # 정지 → torque OFF (motor free-wheel)
+            self.driver.set_double_rpm(0, 0)
+            ok = self.driver.disable()
+            response.success = bool(ok)
+            response.message = "torque OFF" if ok else "disable() failed"
+        self.get_logger().info(f"[set_torque] {response.message}")
+        return response
 
     def on_shutdown(self):
         self.get_logger().info("Shutting down, terminating motor driver...")

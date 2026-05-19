@@ -3,28 +3,21 @@
 `MANUAL` state 의 MainTree — 사용자가 로봇 본체를 직접 밀어서 이동할 수 있도록
 모터 torque 를 해제한 상태에서 안전 모니터링만 수행.
 
-## Root composite (현재 walking skeleton)
+## Root composite
 
 ```
 Parallel(SuccessOnAll(synchronise=False))
+├─ ManualTorqueHold         manual/manual_torque_hold.md   (✅ torque OFF/ON 라이프사이클)
 ├─ MapBoundaryMonitor       common/map_boundary_monitor.md  (✅ 위치 안전 예외)
 └─ CommandListener          common/command_listener.md       (✅ cancel / *_request / return_request)
 ```
 
-> `ManualTorqueHold` 는 추후 — Vic Pinky base driver 의 torque service spec 확정 후 추가. 추후 모양:
->
-> ```
-> Parallel(SuccessOnAll(synchronise=False))
-> ├─ ManualTorqueHold     (추후 — initialise 에서 torque OFF, terminate 에서 ON 복원)
-> ├─ MapBoundaryMonitor   (✅)
-> └─ CommandListener      (✅)
-> ```
->
-> Parallel 정책은 `BT_idle_main` 과 동일 — root SUCCESS 는 task 완료 의미가 아님.
-> state 전이:
-> - 사용자 명령: `cancel` / `return_request` / 다른 `*_request`
-> - 자동 fault: `MapBoundaryMonitor` 발화 (`fault(reason="out_of_map")` → ERROR)
-> sub tree 없음.
+Parallel 정책은 `BT_idle_main` 과 동일 — root SUCCESS 는 task 완료 의미가 아님.
+state 전이:
+- 사용자 명령: `cancel` / `return_request` / 다른 `*_request`
+- 자동 fault: `MapBoundaryMonitor` 발화 (`fault(reason="out_of_map")` → ERROR)
+
+sub tree 없음.
 
 ### Monitor 배치 정책 — "위치 안전만 예외"
 
@@ -45,15 +38,15 @@ Parallel(SuccessOnAll(synchronise=False))
 
 | Behavior | 책임 | 상세 |
 |---|---|---|
-| **`ManualTorqueHold`** (추후) | `initialise()` 에서 torque OFF service 호출, `terminate()` 에서 torque ON 복원. 매 tick RUNNING 유지 — 트리 살아있는 동안 torque off 상태 유지 | manual/manual_torque_hold.md |
+| **`ManualTorqueHold`** (✅) | `initialise()` 에서 torque OFF service 호출 (`/gogoping/set_torque` data=False), `terminate()` 에서 torque ON 복원. 매 tick RUNNING. blackboard `MANUAL_TORQUE_ACTIVE` W | [manual/manual_torque_hold](../behaviors/manual.md#manual_torque_hold) |
 | `MapBoundaryMonitor` (✅) | 로봇 pose 가 맵 영역 밖이면 `fault(reason="out_of_map")` 발화 → ERROR | [common/map_boundary_monitor.md](../behaviors/common.md#map_boundary_monitor) |
 | `CommandListener` (✅) | UI / Control Server 명령 수신 | MANUAL 에서는 `cancel` / `return_request` / 다른 active mode 로의 `*_request` 가 valid |
 
 ### `ManualTorqueHold` 의 lifecycle 규약
 
-- `initialise()`:  Vic Pinky base driver 의 `release_torque` service 호출 (또는 동등 명령). 성공 시 blackboard 에 `manual_torque_active=True` 표기.
-- `update()`: 항상 `Status.RUNNING` 리턴 (다른 monitor 와 동일). torque service 의 health 도 체크 가능 — 끊겼으면 `fault` 발화.
-- `terminate(new_status)`: **idempotent** torque ON 복원 (`enable_torque` service). new_status 에 관계없이 무조건 호출. blackboard 의 `manual_torque_active=False`.
+- `initialise()`: `ctx.base_driver.release_torque()` 호출 → `/gogoping/set_torque` (SetBool, data=False) → `vicpinky_bringup` 이 `zlac_driver.disable()` 실행. blackboard 의 `MANUAL_TORQUE_ACTIVE=True` 표기.
+- `update()`: 항상 `Status.RUNNING` 리턴 (다른 monitor 와 동일).
+- `terminate(new_status)`: **idempotent** `enable_torque()` 호출 (driver enable 복원). `new_status` 무관 무조건 호출. blackboard 의 `MANUAL_TORQUE_ACTIVE=False`.
 
 > **왜 별도 behavior 인가** — torque 제어는 *시간-구속* (반드시 cleanup 보장 필요). `MANUAL` state 의 trigger 가 무엇이든 (cancel / battery_low / fault / return_request) py_trees 의 `terminate()` 가 호출되어 torque 복원 보장.
 
@@ -78,14 +71,12 @@ Parallel(SuccessOnAll(synchronise=False))
 
 ## 안전 관련 주의
 
-1. `ManualTorqueHold.terminate()` 가 호출되지 않을 경우 torque 가 풀린 채로 다른 state 에 진입할 수 있다.
-   `tree.shutdown()` 시 py_trees 가 모든 RUNNING 자식의 terminate 를 호출하는지 `py-trees-spike.md` Test 3 로 검증 후 운영.
+1. `main.py:_build_tree_for_state` 가 state 전이 시 `tree.shutdown()` 명시 호출 → py_trees 가 RUNNING 자식의 `terminate()` 전파 → `ManualTorqueHold.terminate()` 가 호출되어 enable 복원. (참고: `py-trees-spike.md` Test 3 정식 검증은 미실시지만 명시 호출로 안전망 확보.)
 2. MANUAL 상태에서 로봇이 *물리적으로* 위험한 곳에 있을 수 있음 (계단 근처 등) — `CollisionEventHandler` 가 nav2 collision monitor 의 keep-out zone 체크 유지.
-3. `battery_low` 진입 시 torque 가 자동 복원되어 도크로 자율 주행 — 사용자가 로봇을 들고 있는 상태였다면 *놓아야* 안전.
-   → admin UI 의 BTStateInline 이 MANUAL 알약 표시 시 "battery 20% 미만이면 자동 복귀합니다" 안내 문구 권장.
+3. battery_low 는 MANUAL 에서 자동 trigger 안 됨 — 사용자가 admin UI 보고 직접 `cancel` / `return_request` 해야 함.
 
 ## 상태
 
-- 코드: ✅ ([BT_manual_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_manual_main.py)) — `MapBoundaryMonitor` + `CommandListener` 배치
-- 의존 behavior: `MapBoundaryMonitor` (✅) + `CommandListener` (✅). `ManualTorqueHold` 는 추후 — torque service spec 확정 후
-- 자세한 신규 behavior 명세: [`bt/behaviors/manual.md`](../behaviors/manual.md) 의 `manual_torque_hold` 항목 (추후)
+- 코드: ✅ ([BT_manual_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_manual_main.py))
+- 의존 behavior: `ManualTorqueHold` (✅) + `MapBoundaryMonitor` (✅) + `CommandListener` (✅)
+- 자세한 신규 behavior 명세: [`bt/behaviors/manual.md`](../behaviors/manual.md) 의 `manual_torque_hold` 항목

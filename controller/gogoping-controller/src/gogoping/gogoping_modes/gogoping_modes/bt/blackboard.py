@@ -59,6 +59,9 @@ class Keys:
     ERROR_REASON = "error_reason"                 # str — e.g., "lidar_timeout"
     ERROR_SOURCE = "error_source"                 # str — 발화 주체 이름
 
+    # 수동 모드 (manual_torque_hold 가 W)
+    MANUAL_TORQUE_ACTIVE = "manual_torque_active" # bool — True 면 motor torque OFF 상태 (사용자 직접 밀기 가능). admin UI 표시용
+
 
 # 부팅 시 초기값 — 사용 전 writer 가 없을 가능성이 있는 키만.
 # 무엇이 어떤 시점에 쓰이는지는 docs/blackboard-schema.md 의 R/W 매트릭스.
@@ -90,6 +93,8 @@ _DEFAULTS: dict[str, object] = {
     # 에러
     Keys.ERROR_REASON: "",
     Keys.ERROR_SOURCE: "",
+    # 수동 모드
+    Keys.MANUAL_TORQUE_ACTIVE: False,
     # 주: TARGET_POSE / TARGET_FACE_BBOX 는 perception writer 가 세팅 전까지
     # 미정의 — reader 가 hasattr / try-except 로 staleness 판정.
 }

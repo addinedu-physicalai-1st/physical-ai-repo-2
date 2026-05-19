@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 from .fsm.robot_fsm import RobotFSM
 from .interfaces import (
+    BaseDriverClient,
     BatterySubscriber,
     CameraPanClient,
     CollisionSubscriber,
@@ -47,4 +48,5 @@ class Context:
     db_logger: DBLogger
     pose: PoseSubscriber             # /amcl_pose 구독 → blackboard.ROBOT_POSE (map frame)
     map_cache: MapCache              # /map 구독 + is_outside(x,y) (map_boundary_monitor 가 사용)
+    base_driver: BaseDriverClient = None   # /gogoping/set_torque (SetBool) — ManualTorqueHold 가 사용. None 이면 behavior 가 skip.
     cmd_vel_pub: Any = None          # /gogoping/cmd_vel publisher — AlignToDock / ReverseIntoDock 가 사용. main.py 가 주입. None 이면 behavior 가 직접 생성 (테스트 호환).
