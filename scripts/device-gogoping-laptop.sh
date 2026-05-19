@@ -6,7 +6,7 @@
 #   노트북       — Nav2·modes·vision (본 스크립트)
 #
 # 동작:
-#   - tmux 세션 'gogoping-laptop' 안에 window 3개:
+#   - tmux 세션 'gogoping-laptop' 안에 window 6개:
 #       graph-router : gogoping_navigation graph_router.launch.xml
 #                      (vertex 그래프 + 다익스트라 + nav2 위임)
 #       localization : gogoping_navigation localization_real.launch.xml
@@ -14,6 +14,9 @@
 #                      map → odom TF 발행. map_boundary_monitor / PoseSubscriber 가 사용.
 #       modes        : gogoping_modes (FSM + BT 본체 — /gogoping/state publish,
 #                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
+#       camera       : USB 웹캠 → UDP MJPEG 송출 (gogoping_camera camera_stream, SR-CAM-001).
+#       camera-pan   : Arduino 시리얼 MG995 ×2 pan/tilt (gogoping_camera_pan).
+#       rviz         : rviz2 -d gogoping_view.rviz (Map + TF + RobotModel + LaserScan 시각화)
 #
 # 향후 추가될 window:
 #   - nav2-full : planner + controller + bt_navigator (자율 주행) — 추후
@@ -207,8 +210,10 @@ case "$ACTION" in
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml base_frame:=base_link"
 
     # window 1: localization (map_server + AMCL + lifecycle_manager_localization)
+    # map:= 로 default (real_lidar_map.yaml) 대신 map.yaml (도면 + SLAM 정합) 사용.
+    LOCALIZATION_MAP="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/maps/map.yaml"
     tmux new-window -t "$SESSION" -n localization -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch gogoping_navigation localization_real.launch.xml"
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation localization_real.launch.xml map:=$LOCALIZATION_MAP"
 
     # window 2: gogoping_modes (FSM + BT 본체)
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
@@ -228,6 +233,12 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
+    # window 5: rviz2 (Map + TF + RobotModel + LaserScan)
+    # config 는 install/share 의 symlink (--symlink-install 가정).
+    RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
+    tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
+
     # 마우스 + status bar 설정
     tmux set-option -t "$SESSION" -g mouse on
     tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
@@ -239,7 +250,7 @@ case "$ACTION" in
 
     echo "[device-gogoping-laptop] 세션 '$SESSION' 시작 — attach"
     echo "[device-gogoping-laptop] ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-<unset>}"
-    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / modes / camera / camera-pan' 클릭으로 전환"
+    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / modes / camera / camera-pan / rviz' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)
@@ -254,6 +265,7 @@ case "$ACTION" in
       "ros2 run gogoping_modes"
       "ros2 launch gogoping_camera camera_stream"
       "ros2 launch gogoping_camera_pan camera_pan"
+      "rviz2 -d .*gogoping_view"
     )
     for p in "${_patterns[@]}"; do
       pkill -TERM -f "$p" 2>/dev/null || true
