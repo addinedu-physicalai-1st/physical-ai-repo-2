@@ -12,7 +12,7 @@ import {
   normalizeWakeText as normalizeSpeechText,
 } from './wakeMatcher';
 
-const LISTENING_WINDOW_MS = 8000;
+const LISTENING_WINDOW_MS = 5000;
 // 명령 처리 후 UI 가 잠시 쉬는 상태 cooldown.
 const COOLDOWN_MS = 1500;
 // TTS 가 끝난 뒤 echo (스피커 → 마이크) 가 STT 결과로 새는 걸 막기 위한 짧은 그레이스.
