@@ -24,9 +24,11 @@ from ai_service.context import (
     build_chat_context,
     fetch_registered_children_labels,
     load_school_schedule_dict,
-    try_attendance_first_reply,
     try_report_first_reply,
     try_schedule_first_reply,
+)
+from ai_service.capabilities.db_attendance import (
+    try_attendance_first_reply,
     try_whereabouts_first_reply,
 )
 from ai_service.llm import LLMError, generate_chat, generate_report

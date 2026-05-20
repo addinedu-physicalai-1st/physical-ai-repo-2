@@ -4,19 +4,21 @@ from ai_service.capabilities.db_menu import (
     _ida_polite_copula_after,
     parse_menu_query_calendar_day,
 )
-from ai_service.context import (
+from ai_service.capabilities.db_attendance import (
     _is_bare_name_attendance_utterance,
+    _looks_like_whereabouts_query,
+    _whereabouts_name_candidates,
+    bare_name_attendance_reply,
+    whereabouts_attendance_reply,
+)
+from ai_service.context import (
     _looks_like_menu_query,
     _looks_like_report_query,
     _looks_like_schedule_query,
-    _looks_like_whereabouts_query,
     _report_name_candidates,
     _should_inject_attendance,
-    _whereabouts_name_candidates,
-    bare_name_attendance_reply,
     child_call_name,
     try_schedule_first_reply,
-    whereabouts_attendance_reply,
 )
 
 
