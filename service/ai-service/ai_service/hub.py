@@ -298,69 +298,7 @@ async def voice_intent(req: IntentRequest) -> dict:
                 extra={"robot": req.robot, "handler": handler.name},
             )
             return result.model_dump()
-
-    text = req.text.strip()
-
-    # ── 디스패처가 아직 매칭 못 한 케이스는 아래 기존 if-블록이 처리 ──
-    # (앞으로 핸들러를 옮기면서 한 블록씩 삭제)
-
-    # 복귀 / 충전 (gogoping 만 의미 있음 — 다른 로봇은 ignored)
-    if req.robot == "gogoping" and _is_return_text(text):
-        return {"kind": "sub_command", "action": "return"}
-
-    # vertex 이동 ("X로 가") — gogoping 보조 모드 전용. graph_router 가 처리.
-    # mode_change 매칭 전에 시도 (vertex 이름이 mode 와 겹치지 않으면 안전).
-    if req.robot == "gogoping":
-        vname = _try_goto_vertex(text)
-        if vname is not None:
-            return {"kind": "goto_vertex", "name": vname}
-
-    # 분류 안 됨 → 잡담 응답 시도. 컨텍스트 + 명단 DB 는 병렬로 가져와 레이턴시 절감
-    ctx: dict[str, str] = {}
-    db_roster: str | None = None
-    c_out, roster_out = await asyncio.gather(
-        build_chat_context(text, req.robot),
-        fetch_registered_children_labels(),
-        return_exceptions=True,
-    )
-    if not isinstance(c_out, BaseException):
-        ctx = c_out
-    if not isinstance(roster_out, BaseException):
-        db_roster = roster_out
-    if db_roster:
-        ctx["registered_children"] = db_roster
-    elif req.class_roster:
-        ctx["registered_children"] = ", ".join(req.class_roster)
-
-    cap = float(ai_settings.voice_chat_llm_max_wait_s or 0.0)
-    try:
-        if cap > 0:
-            chat = await asyncio.wait_for(
-                generate_chat(text, req.robot, ctx),
-                timeout=cap,
-            )
-        else:
-            chat = await generate_chat(text, req.robot, ctx)
-    except asyncio.TimeoutError:
-        return {
-            "kind": "chat",
-            "reply": teacher_idk_line(prompts.display_name(req.robot)),
-            "emotion": "basic",
-        }
-    except LLMError:
-        name = prompts.display_name(req.robot)
-        return {
-            "kind": "chat",
-            "reply": f"{name}에게 잠깐 연결 문제가 생겼어요. 다시 한번 말해줄래요?",
-            "emotion": "basic",
-        }
-    if _needs_chat_fallback(text, chat.get("reply", "")):
-        return {
-            "kind": "chat",
-            "reply": "알겠어요! 도와달라는 말로 이해했어요. 무엇이 필요한지 한 번만 더 말해줄래요?",
-            "emotion": "interest",
-        }
-    return {"kind": "chat", "reply": chat["reply"], "emotion": chat["emotion"]}
+    raise RuntimeError("no handler matched — ChatFallback missing?")
 
 
 class ReportPhotoEvent(BaseModel):

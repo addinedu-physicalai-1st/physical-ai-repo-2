@@ -16,6 +16,8 @@ from ai_service.intents.common.report import ReportHandler
 from ai_service.intents.common.schedule import ScheduleHandler
 from ai_service.intents.common.stop import StopHandler
 from ai_service.intents.common.whereabouts import WhereaboutsHandler
+from ai_service.intents.gogoping.goto_vertex import GotoVertexHandler
+from ai_service.intents.gogoping.return_ import ReturnHandler
 
 PIPELINES: dict[str, list[IntentHandler]] = {
     "eduping": [
@@ -31,10 +33,10 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         AttendanceHandler(),
         ChatFallbackHandler(),
     ],
-    # gogoping: ChatFallback 은 Task 4 에서 ReturnHandler/GotoVertexHandler 와 함께 등록.
-    # 지금 등록하면 legacy `_is_return_text` / `_try_goto_vertex` 가 hub.py 의 dispatcher 뒤에 있어 unreachable 됨.
     "gogoping": [
         StopHandler(),
+        ReturnHandler(),
+        GotoVertexHandler(),
         MenuHandler(),
         HelloHandler(),
         GenderHandler(),
@@ -44,6 +46,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         WhereaboutsHandler(),
         ReportHandler(),
         AttendanceHandler(),
+        ChatFallbackHandler(),
     ],
     "noriarm": [
         StopHandler(),
