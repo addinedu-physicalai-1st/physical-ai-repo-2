@@ -3,18 +3,23 @@
     <xacro:arg name="namespace" default=""/>
     <xacro:property name="prefix" value="$(arg namespace)"/>
 
+    <xacro:property name="dims_path" value="$(find vicpinky_description)/config/robot_dims.yaml"/>
+    <xacro:property name="dims" value="${xacro.load_yaml(dims_path)}"/>
+
     <xacro:include filename="inertial_macros.xacro"/>
-    
-    <xacro:property name="wheel_separation" value="0.4288"/>
+
+    <xacro:property name="wheel_radius" value="${dims['wheel']['radius']}"/>
+    <xacro:property name="wheel_thickness" value="${dims['wheel']['thickness']}"/>
+    <xacro:property name="wheel_separation" value="${dims['wheel']['separation']}"/>
+    <xacro:property name="wheel_x_offset" value="${dims['wheel']['x_offset']}"/>
+    <xacro:property name="wheel_z_offset" value="${dims['wheel']['z_offset']}"/>
 
     <xacro:property name="chassis_length" value="0.6"/>
     <xacro:property name="chassis_width" value="0.5"/>
     <xacro:property name="chassis_height" value="0.128"/>
     <xacro:property name="chassis_mass" value="50.0"/>
     <xacro:property name="chassis_z_offset" value="0.087"/>
-    
-    <xacro:property name="wheel_radius" value="0.0825"/>
-    <xacro:property name="wheel_thickness" value="0.05"/>
+
     <xacro:property name="wheel_mass" value="0.05"/>
     
     <xacro:property name="caster_wheel_radius" value="${chassis_z_offset/2}"/>
@@ -68,7 +73,7 @@
     <joint name="${prefix}left_wheel_joint" type="continuous">
         <parent link="${prefix}base_link"/>
         <child link="${prefix}left_wheel"/>
-        <origin xyz="0 ${wheel_separation/2} -0.0048" rpy="-${pi/2} 0 0"/>
+        <origin xyz="${wheel_x_offset} ${wheel_separation/2} ${wheel_z_offset}" rpy="-${pi/2} 0 0"/>
         <axis xyz="0 0 1"/>
     </joint>
 
@@ -94,7 +99,7 @@
     <joint name="${prefix}right_wheel_joint" type="continuous">
         <parent link="${prefix}base_link"/>
         <child link="${prefix}right_wheel"/>
-        <origin xyz="0 ${-1 * wheel_separation/2} -0.0048" rpy="${pi/2} 0 0"/>
+        <origin xyz="${wheel_x_offset} ${-1 * wheel_separation/2} ${wheel_z_offset}" rpy="${pi/2} 0 0"/>
         <axis xyz="0 0 -1"/>
     </joint>
 
@@ -172,7 +177,8 @@
     <joint name="${prefix}lidar_mount_fixed_joint" type="fixed">
         <parent link="${prefix}base_link"/>
         <child link="${prefix}lidar_mount"/>
-        <origin xyz="0.185 0.0 0.12" rpy="0 0 0"/>
+        <origin xyz="${dims['lidar']['mount_x']} ${dims['lidar']['mount_y']} ${dims['lidar']['mount_z']}"
+                rpy="${dims['lidar']['mount_roll']} ${dims['lidar']['mount_pitch']} ${dims['lidar']['mount_yaw']}"/>
     </joint>
 
     <link name="${prefix}laser_link"/>
@@ -180,7 +186,8 @@
     <joint name="${prefix}laser_link_fixed_joint" type="fixed">
         <parent link="${prefix}lidar_mount"/>
         <child link="${prefix}laser_link"/>
-        <origin xyz="0.0 0 0.03" rpy="0 0 ${pi}"/>
+        <origin xyz="${dims['lidar']['laser_x']} ${dims['lidar']['laser_y']} ${dims['lidar']['laser_z']}"
+                rpy="${dims['lidar']['laser_roll']} ${dims['lidar']['laser_pitch']} ${dims['lidar']['laser_yaw']}"/>
     </joint>
 
 </robot>
