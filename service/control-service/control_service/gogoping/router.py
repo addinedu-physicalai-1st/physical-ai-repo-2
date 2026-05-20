@@ -30,7 +30,7 @@ class GogopingModeRequest(BaseModel):
     """robot-web 이 mode 클릭 시 POST 하는 payload."""
 
     robot: str = Field(default="gogoping")
-    mode: str  # 한국어 라벨 ("추종" / "운반" / "수동" / ...)
+    mode: str  # 한국어 라벨 ("추종" / "이동" / "수동" / ...)
 
 
 class GogopingModeResponse(BaseModel):
