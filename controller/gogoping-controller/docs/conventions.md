@@ -237,7 +237,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
 
 > **규칙**
 > - 빌더는 **순수 함수** — `Context` 와 인자만으로 트리 생성. 전역 상태 참조 금지
-> - 빌더가 합성하는 SubTree 는 다른 빌더 호출로 가져옴 (예: `from gogoping_modes.bt.trees.sub_trees.BT_carry_sub import build as build_carry`)
+> - 빌더가 합성하는 SubTree 는 다른 빌더 호출로 가져옴 (예: `from gogoping_modes.bt.trees.sub_trees.BT_goto_sub import build as build_goto`)
 
 ### 4.1 동적 빌드 패턴 — `HideAndSeekSubTree`
 

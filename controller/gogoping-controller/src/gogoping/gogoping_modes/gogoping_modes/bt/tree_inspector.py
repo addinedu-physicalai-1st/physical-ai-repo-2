@@ -8,14 +8,14 @@ snapshot 구조::
     {
       "robot_id": "gogoping",
       "fsm_state": "ASSIST",
-      "assist_task": "lullaby",  # blackboard.ASSIST_TASK ("" / "carry" / "follow" / "lullaby")
+      "assist_task": "lullaby",  # blackboard.ASSIST_TASK ("" / "goto" / "follow" / "lullaby")
       "play_task": "",            # blackboard.PLAY_TASK ("" / "hideseek")
       "main_tree": {
         "name": "BT_assist_main",
         "children": [
           {"name": "CommandListener",                       "status": "RUNNING"},
-          {"name": "CheckTask(assist_task=='carry')",       "status": "SUCCESS"},
-          {"name": "StubCarry",                             "status": "RUNNING"},
+          {"name": "CheckTask(assist_task=='goto')",        "status": "SUCCESS"},
+          {"name": "BT_goto_sub",                           "status": "RUNNING"},
           {"name": "CheckTask(assist_task=='follow')",      "status": "INVALID"},
           {"name": "StubFollow",                            "status": "INVALID"},
           ...
@@ -35,8 +35,7 @@ snapshot 구조::
   leaves (SUCCESS/FAILURE/INVALID) 도 포함해서 진행도 표시 (admin 위젯이 status 별
   시각 차별 적용).
 - **sub_tree**: ``BT_*_sub`` naming convention 으로 식별. + 진짜 SubTree 가 생기면
-  자동으로 잡힘. 현재 단계 의 stub 들 (StubCarry 등) 은 BT_*_sub 이름이
-  아니라 *main_tree.children* 에 그대로 평탄화됨.
+  자동으로 잡힘. BT_*_sub 이름이 아닌 노드는 *main_tree.children* 에 그대로 평탄화됨.
 """
 from __future__ import annotations
 
@@ -150,7 +149,7 @@ def snapshot(
     return {
         "robot_id": robot_id,
         "fsm_state": fsm_state,
-        "assist_task": _read_str_key(Keys.ASSIST_TASK),   # "" / "carry" / "follow" / "lullaby"
+        "assist_task": _read_str_key(Keys.ASSIST_TASK),   # "" / "goto" / "follow" / "lullaby"
         "play_task": _read_str_key(Keys.PLAY_TASK),       # "" / "hideseek"
         "main_tree": main_block,
         "sub_tree": sub_block,

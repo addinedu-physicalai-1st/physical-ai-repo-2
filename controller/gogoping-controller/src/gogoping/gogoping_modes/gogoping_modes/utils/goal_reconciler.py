@@ -14,16 +14,16 @@ UI 는 trigger 이름 (assist_request, manual_request, ...) 을 모른다. 대�
 ## reconcile() 의 책임
 
 1. Goal validation — mode / task 조합이 valid 한지
-2. blackboard 세팅 — assist_task / play_task / carry_mode / destination_key / target_id
+2. blackboard 세팅 — assist_task / play_task / destination_key / target_id
 3. FSM trigger 발화 — current_state ↔ desired mode 차이에 따라
 
 invalid goal 은 ``ReconcileResult(accepted=False, reason="...")`` 반환 — trigger 미발화.
 
 ## current_state 와 동일 mode 재요청
 
-idempotent — trigger 미발화 + accepted=True 반환. blackboard 의 task / carry_mode /
+idempotent — trigger 미발화 + accepted=True 반환. blackboard 의 task /
 destination_key / target_id 는 *덮어쓸 수도* 있고 *유지할 수도* 있다 (지금은 덮어씀 —
-같은 ASSIST 안에서 carry → follow 미세 전환 가능).
+같은 ASSIST 안에서 goto → follow 미세 전환 가능).
 """
 from __future__ import annotations
 
@@ -67,9 +67,8 @@ class ReconcileResult:
 
 _VALID_MODES = ("IDLE", "ASSIST", "PLAY", "MANUAL", "RETURNING")
 
-_ASSIST_TASKS = ("carry", "follow", "lullaby")
+_ASSIST_TASKS = ("goto", "follow", "lullaby")
 _PLAY_TASKS = ("hideseek",)
-_CARRY_MODES = ("manual", "goto", "follow")
 
 
 # ---------------------------------------------------------------- Blackboard keys
@@ -78,7 +77,6 @@ _CARRY_MODES = ("manual", "goto", "follow")
 
 _K_ASSIST_TASK = "assist_task"
 _K_PLAY_TASK = "play_task"
-_K_CARRY_MODE = "carry_mode"
 _K_DESTINATION_KEY = "destination_key"
 _K_TARGET_PERSON_ID = "target_person_id"
 
@@ -106,16 +104,9 @@ def _validate(goal: dict) -> str | None:
             return "invalid_task_for_mode"
 
         # 추가 필드 검증
-        if mode == "ASSIST" and task == "carry":
-            carry_mode = goal.get("carry_mode", "")
-            if not carry_mode:
-                return "missing_carry_mode"
-            if carry_mode not in _CARRY_MODES:
-                return "invalid_carry_mode"
-            if carry_mode == "goto" and not goal.get("destination_key"):
+        if mode == "ASSIST" and task == "goto":
+            if not goal.get("destination_key"):
                 return "missing_destination"
-            if carry_mode == "follow" and not goal.get("target_id"):
-                return "missing_target_id"
 
         if mode == "ASSIST" and task == "follow" and not goal.get("target_id"):
             return "missing_target_id"
@@ -139,7 +130,7 @@ def reconcile(
     Parameters
     ----------
     goal : dict
-        ``Goal.msg`` 의 필드 — ``mode`` / ``task`` / ``carry_mode`` /
+        ``Goal.msg`` 의 필드 — ``mode`` / ``task`` /
         ``destination_key`` / ``target_id``. 빠진 필드는 빈 문자열로 간주.
     fsm : RobotFSM-like
         ``current_state`` property + ``trigger(name, **kwargs)`` method 노출.
@@ -159,7 +150,7 @@ def reconcile(
     mode = goal["mode"]
     current = fsm.current_state
 
-    # 1) 같은 mode 재요청 — idempotent. blackboard 의 task 관련 키는 갱신 (carry → follow 전환).
+    # 1) 같은 mode 재요청 — idempotent. blackboard 의 task 관련 키는 갱신 (goto → follow 전환).
     if current == mode:
         _set_task_blackboard(goal, blackboard)
         return ReconcileResult(accepted=True, reason="same_mode")
@@ -221,16 +212,14 @@ def reconcile(
 
 
 def _set_task_blackboard(goal: dict, blackboard: _BlackboardProto) -> None:
-    """ASSIST / PLAY 시 task / carry_mode / destination_key / target_id 를 blackboard 에."""
+    """ASSIST / PLAY 시 task / destination_key / target_id 를 blackboard 에."""
     mode = goal["mode"]
     task = goal.get("task", "")
 
     if mode == "ASSIST":
         blackboard.set(_K_ASSIST_TASK, task)
-        if task == "carry":
-            blackboard.set(_K_CARRY_MODE, goal.get("carry_mode", ""))
+        if task == "goto":
             blackboard.set(_K_DESTINATION_KEY, goal.get("destination_key", ""))
-            blackboard.set(_K_TARGET_PERSON_ID, goal.get("target_id", ""))
         elif task == "follow":
             blackboard.set(_K_TARGET_PERSON_ID, goal.get("target_id", ""))
         # lullaby 는 추가 키 없음

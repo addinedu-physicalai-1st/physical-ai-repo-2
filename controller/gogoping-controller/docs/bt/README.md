@@ -20,7 +20,7 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | [behaviors/navigation.md](behaviors/navigation.md) | nav2 / graph_router 호출 (navigate_to_pose, **navigate_to_vertex**, docking 등) |
 | [behaviors/perception.md](behaviors/perception.md) | gogoping_vision 토픽 → blackboard 어댑터 (yolo / face / load stability) |
 | [behaviors/follow.md](behaviors/follow.md) | 카메라 pan + 추종 (face tracking, sweep, raise) |
-| [behaviors/manual.md](behaviors/manual.md) | 수동 모드 carry (manual control / wait_for_exit) |
+| [behaviors/manual.md](behaviors/manual.md) | 수동 모드 (ManualTorqueHold — torque ON/OFF) |
 | [behaviors/recovery.md](behaviors/recovery.md) | 안전 정지 + alert + log (BT_error_main 전용) |
 
 ## Trees
@@ -28,14 +28,14 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | 파일 | 트리 |
 |---|---|
 | [trees/BT_idle_main.md](trees/BT_idle_main.md) | IDLE state — 명령 대기 + battery 감시 |
-| [trees/BT_assist_main.md](trees/BT_assist_main.md) | ASSIST — TaskSelector → carry/follow/lullaby + return_request listener |
+| [trees/BT_assist_main.md](trees/BT_assist_main.md) | ASSIST — TaskSelector → goto/follow/lullaby + return_request listener |
 | [trees/BT_play_main.md](trees/BT_play_main.md) | PLAY — TaskSelector → hideseek + return_request listener |
 | [trees/BT_manual_main.md](trees/BT_manual_main.md) | MANUAL — torque off 모드, 사용자가 직접 밀어 이동. monitor + ManualTorqueHold + cancel/return listener |
 | [trees/BT_charging_main.md](trees/BT_charging_main.md) | CHARGING — battery_full 감지 + 도킹 접점 감시 |
 | [trees/BT_returning_main.md](trees/BT_returning_main.md) | RETURNING — BT_return_sub 호출 |
 | [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) | LOW_BATTERY_RETURN — 배터리 자동 복귀 lockdown (CommandListener 없음) |
 | [trees/BT_error_main.md](trees/BT_error_main.md) | ERROR — terminal (StopAll → Notify → Log) |
-| [trees/BT_carry_sub.md](trees/BT_carry_sub.md) | 운반 — manual / goto / follow 3 mode |
+| [trees/BT_goto_sub.md](trees/BT_goto_sub.md) | 이동 — Sequence(NavigateToVertex + UIPublish). 운반은 follow + goto chain |
 | [trees/BT_follow_sub.md](trees/BT_follow_sub.md) | 추종 — 정상 ↔ Loss Recovery |
 | [trees/BT_lullaby_sub.md](trees/BT_lullaby_sub.md) | 자장가 — UI mp3 재생, WaitForExit |
 | [trees/BT_hide_and_seek_sub.md](trees/BT_hide_and_seek_sub.md) | 숨바꼭질 1회 (숨기 → 카운트 → 탐색 → 복귀) |

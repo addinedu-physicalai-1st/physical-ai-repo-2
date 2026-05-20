@@ -20,11 +20,3 @@ torque 복원 보장: `main.py:_build_tree_for_state` 가 state 전이 시 `tree
 | Blackboard write | `MANUAL_TORQUE_ACTIVE: bool` |
 | 테스트 | 6 시나리오 — initialise 호출 / update RUNNING / terminate 호출 / release 실패 / enable 실패 / driver None |
 
----
-
-## (추후) carry 수동 모드 behaviors
-
-수동 carry 모드 (사용자가 들고 옮기는 carry/manual) 전용 — 별개의 작업. 모두 *(스켈레톤)*.
-
-- **enable_manual_control** — camera_pan 우선순위 manual 전환 (terminate 시 auto 복원). Used in: BT_carry_sub (manual mode)
-- **wait_for_exit** — `carry_mode` 변경 / cancel 명령까지 RUNNING. Used in: BT_carry_sub (manual mode)

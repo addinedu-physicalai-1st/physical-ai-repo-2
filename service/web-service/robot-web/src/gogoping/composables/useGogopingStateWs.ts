@@ -34,7 +34,7 @@ function snapshotToModeLabel(snap: GogopingSnapshot): string | null {
   if (fsm === 'RETURNING' || fsm === 'LOW_BATTERY_RETURN') return '복귀';
   if (fsm === 'ASSIST') {
     switch (snap.assist_task) {
-      case 'carry':   return '운반';
+      case 'goto':    return '이동';
       case 'follow':  return '추종';
       case 'lullaby': return '자장가';
       default:        return null;  // ASSIST 진입했는데 task 미세팅 — 잠시 후 다음 snapshot 으로

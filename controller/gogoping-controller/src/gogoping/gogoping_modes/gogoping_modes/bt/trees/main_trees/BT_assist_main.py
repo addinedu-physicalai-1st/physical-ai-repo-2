@@ -1,13 +1,12 @@
-"""ASSIST state MainTree — 교사 보조 (carry / follow / lullaby).
+"""ASSIST state MainTree — 교사 보조 (goto / follow / lullaby).
 
-현재 stub: CommandListener + TaskSelector (stub 자식들).
-추후: 배터리/HW/충돌/맵바운더리 monitor 추가.
-추후: stub 4개를 진짜 SubTree 호출로 교체.
+현재: CommandListener + 4 monitor + TaskSelector (goto ✅ / follow stub / lullaby ✅).
+추후: stub follow 를 진짜 SubTree 호출로 교체.
 
 TaskSelector 동작:
-    blackboard.assist_task == "carry"   → CheckTask("carry")    SUCCESS → StubCarry
-    blackboard.assist_task == "follow"  → CheckTask("follow")   SUCCESS → StubFollow
-    blackboard.assist_task == "lullaby" → CheckTask("lullaby")  SUCCESS → BT_lullaby_sub (LullabyAudio)
+    blackboard.assist_task == "goto"    → CheckTask("goto")    SUCCESS → BT_goto_sub
+    blackboard.assist_task == "follow"  → CheckTask("follow")  SUCCESS → StubFollow
+    blackboard.assist_task == "lullaby" → CheckTask("lullaby") SUCCESS → BT_lullaby_sub (LullabyAudio)
 
 Selector(memory=False) — 매 tick assist_task 다시 평가 → mode 변경 즉시 반영.
 """
@@ -17,7 +16,8 @@ import py_trees
 from py_trees.common import ParallelPolicy
 
 from ....context import Context
-from ...behaviors._stubs import StubCarry, StubFollow
+from ...behaviors._stubs import StubFollow
+from ..sub_trees.BT_goto_sub import build_goto_subtree
 from ..sub_trees.BT_lullaby_sub import build_lullaby_subtree
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
 from ...behaviors.common.check_task import CheckTask
@@ -34,10 +34,10 @@ def _task_selector(ctx: Context) -> py_trees.behaviour.Behaviour:
         memory=False,
         children=[
             py_trees.composites.Sequence(
-                name="carry_branch", memory=True,
+                name="goto_branch", memory=True,
                 children=[
-                    CheckTask(Keys.ASSIST_TASK, "carry"),
-                    StubCarry(),    # STUB with build_carry(ctx)
+                    CheckTask(Keys.ASSIST_TASK, "goto"),
+                    build_goto_subtree(ctx),
                 ],
             ),
             py_trees.composites.Sequence(

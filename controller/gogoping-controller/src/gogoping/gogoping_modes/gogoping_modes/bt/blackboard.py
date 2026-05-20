@@ -20,7 +20,7 @@ from py_trees.common import Access
 
 
 class Keys:
-    """Blackboard 변수 이름 상수 — 25개.
+    """Blackboard 변수 이름 상수 — 23개.
 
     **문자열 직접 사용 금지** — 항상 ``Keys.<NAME>`` 형태로만 참조.
     """
@@ -34,9 +34,8 @@ class Keys:
     POSE_OVERRIDE_ACTIVE = "pose_override_active" # bool — True 면 PoseSubscriber 가 W skip (디버그 좌표 강제 시)
 
     # 명령 / 모드 (command_listener 가 W)
-    ASSIST_TASK = "assist_task"                   # "carry" / "follow" / "lullaby" / ""
+    ASSIST_TASK = "assist_task"                   # "goto" / "follow" / "lullaby" / ""
     PLAY_TASK = "play_task"                       # "hideseek" / ""
-    CARRY_MODE = "carry_mode"                     # "manual" / "goto" / "follow"
     TARGET_PERSON_ID = "target_person_id"         # str (ReID / face_id)
 
     # Perception (vision 토픽 어댑터가 W)
@@ -45,7 +44,6 @@ class Keys:
     TARGET_FACE_BBOX = "target_face_bbox"         # tuple[int, int, int, int]
     TARGET_SEEN_AT = "target_seen_at"             # float (epoch sec)
     FOUND = "found"                               # bool — 숨바꼭질 아이 발견
-    LOAD_DROPPED = "load_dropped"                 # bool
 
     # Navigation 타겟 (config 또는 command_listener 가 W)
     DESTINATION_KEY = "destination_key"           # str — DB named_pose
@@ -76,13 +74,11 @@ _DEFAULTS: dict[str, object] = {
     # 명령
     Keys.ASSIST_TASK: "",
     Keys.PLAY_TASK: "",
-    Keys.CARRY_MODE: "",
     Keys.TARGET_PERSON_ID: "",
     # Perception
     Keys.TARGET_VISIBLE: False,
     Keys.TARGET_SEEN_AT: 0.0,
     Keys.FOUND: False,
-    Keys.LOAD_DROPPED: False,
     # Navigation
     Keys.DESTINATION_KEY: "",
     Keys.HIDE_POSITION_KEY: "",

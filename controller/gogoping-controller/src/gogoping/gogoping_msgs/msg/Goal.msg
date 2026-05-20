@@ -3,7 +3,7 @@
 # 의미:
 #   mode="IDLE"             — 대기 (작업 없음). ASSIST/PLAY/MANUAL 중에 발행하면 task 취소 후 IDLE.
 #                              ERROR 중에는 무시 (ERROR 는 terminal — robot 재시작 필요).
-#   mode="ASSIST", task=*   — 교사 보조 (carry / follow / lullaby)
+#   mode="ASSIST", task=*   — 교사 보조 (goto / follow / lullaby)
 #   mode="PLAY",   task=*   — 아이 놀이 (hideseek)
 #   mode="MANUAL"           — 토크 OFF, 사람이 직접 밀어서 이동. task 불필요.
 #                              cancel / battery_low / fault / return_request 시 torque 자동 ON.
@@ -17,7 +17,6 @@
 # 즉 UI 는 FSM trigger 이름 (assist_request, manual_request, fault 등) 을 몰라도 됨.
 
 string mode             # "IDLE" / "ASSIST" / "PLAY" / "MANUAL" / "RETURNING"
-string task             # "carry" / "follow" / "lullaby" / "hideseek" — mode=ASSIST/PLAY 시
-string carry_mode       # "manual" / "goto" / "follow" — task=carry 시  (※ UI 의 "수동" mode 와 다름 — 운반 의 carry_mode)
-string destination_key  # named_pose 키 — carry+goto 시
-string target_id        # child_id / teacher_id — follow / hideseek / carry+follow 시
+string task             # "goto" / "follow" / "lullaby" / "hideseek" — mode=ASSIST/PLAY 시
+string destination_key  # named_pose 키 — task=goto 시
+string target_id        # child_id / teacher_id — follow / hideseek 시

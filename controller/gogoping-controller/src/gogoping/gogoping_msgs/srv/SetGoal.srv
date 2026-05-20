@@ -21,8 +21,7 @@ string reason          # accepted=false 시 사유:
                        #   "invalid_mode" — mode 가 IDLE/ASSIST/PLAY/RETURNING 외
                        #   "missing_task" — mode=ASSIST/PLAY 인데 task 비어있음
                        #   "invalid_task_for_mode" — task 가 mode 와 안 맞음 (예: ASSIST+hideseek)
-                       #   "missing_carry_mode" — task=carry 인데 carry_mode 비어있음
-                       #   "missing_destination" — carry+goto 인데 destination_key 비어있음
-                       #   "missing_target_id" — follow / hideseek / carry+follow 인데 target_id 비어있음
+                       #   "missing_destination" — task=goto 인데 destination_key 비어있음
+                       #   "missing_target_id" — follow / hideseek 인데 target_id 비어있음
                        #   "fsm_in_charging" — CHARGING 상태에서 ASSIST/PLAY/RETURNING 요청
                        #                       (battery_full 으로 IDLE 진입 대기 필요)

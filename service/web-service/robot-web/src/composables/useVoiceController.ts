@@ -217,7 +217,10 @@ export function useVoiceController(robot: RobotConfig): {
     }
     let confirmation = '';
     try {
-      const r = await fetch('/waypoints/navigate', {
+      // ASSIST/goto 진입 — Control 의 /api/gogoping/goto_vertex 호출.
+      // SetGoal.srv → FSM trigger 경로라 robot 이동 + state ASSIST 전이 둘 다 발생.
+      // (직접 graph_router action 호출인 /waypoints/navigate 는 FSM 우회 — admin 디버그 전용.)
+      const r = await fetch('/api/gogoping/goto_vertex', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -232,12 +235,15 @@ export function useVoiceController(robot: RobotConfig): {
   async function handleReturn(): Promise<void> {
     let confirmation = '';
     try {
-      const r = await fetch('/waypoints/navigate', {
+      // 복귀 = FSM RETURNING 진입 (BT_return_sub 가 충전소까지 lane 따라 이동 + 도킹).
+      // /api/gogoping/mode 로 한국어 라벨 "복귀" → mode_to_goal → Goal(mode="RETURNING")
+      // → SetGoal.srv → command_listener → fsm.trigger("return_request").
+      const r = await fetch('/api/gogoping/mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '충전소' }),
+        body: JSON.stringify({ robot: 'gogoping', mode: '복귀' }),
       });
-      confirmation = r.ok ? '충전소로 갈게요' : '충전소를 찾지 못했어요';
+      confirmation = r.ok ? '충전소로 갈게요' : '지금은 복귀할 수 없어요';
     } catch {
       confirmation = '지금은 복귀할 수 없어요';
     }
