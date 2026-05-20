@@ -8,9 +8,8 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Literal
 
-import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,7 +22,7 @@ from ai_service.llm import LLMError, generate_report
 from ai_service.edge_tts_synth import synthesize_edge_mp3_stream
 from ai_service.config import settings as ai_settings
 
-from ai_service.robots import STOP_TOKENS, is_known_robot, modes_for
+from ai_service.robots import is_known_robot, modes_for
 
 
 @asynccontextmanager
