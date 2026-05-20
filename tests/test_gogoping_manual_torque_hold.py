@@ -37,9 +37,21 @@ class _FakeDriver:
         return self._enable_ok
 
 
+class _FakeFSM:
+    """transitions.Machine 의 표면 일부 — current_state property 만."""
+
+    def __init__(self, state: str = "MANUAL") -> None:
+        self.current_state = state
+
+
 class _Ctx:
-    def __init__(self, driver: _FakeDriver | None = None) -> None:
+    def __init__(
+        self,
+        driver: _FakeDriver | None = None,
+        fsm_state: str = "MANUAL",
+    ) -> None:
         self.base_driver = driver
+        self.fsm = _FakeFSM(fsm_state)
 
 
 @pytest.fixture(autouse=True)
@@ -113,3 +125,16 @@ def test_missing_driver_does_not_crash():
     mon.terminate(Status.INVALID) # enable skip
     # blackboard 는 그래도 의도 반영
     assert _bb_read(Keys.MANUAL_TORQUE_ACTIVE) is False
+
+
+def test_terminate_skips_enable_when_entering_error_state():
+    """ERROR 진입 시 enable_torque skip — StopAllMotors 가 곧 release 하므로
+    enable→disable 시퀀스 사이 약 1초 wait 회피."""
+    mon, drv = _mon()
+    mon.initialise()
+    drv.calls.clear()
+    # FSM 이 ERROR 로 전이된 시점에 terminate 호출 시뮬레이션
+    mon.ctx.fsm.current_state = "ERROR"
+    mon.terminate(Status.INVALID)
+    assert drv.calls == []  # enable 호출 안 됨
+    assert _bb_read(Keys.MANUAL_TORQUE_ACTIVE) is False  # blackboard 는 정리

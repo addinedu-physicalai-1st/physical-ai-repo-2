@@ -93,11 +93,11 @@ def test_initialise_resets_timer_and_rearms():
 
 
 def test_default_timeout_when_no_node():
-    """ctx.node=None 이면 default 60s (코드 변경 없으면)."""
+    """ctx.node=None 이면 production 코드의 _DEFAULT_TIMEOUT_S (86400s = 24h) 사용."""
     ctx = _Ctx()
     mon = IdleTimeoutMonitor("idle_default", ctx)
-    # default 가 분 단위라 너무 길어서 _timeout_s 만 검증
-    assert mon._timeout_s == 60.0
+    # _DEFAULT_TIMEOUT_S = 86400.0 (24h) — ROS param 없으면 이 값으로 fallback
+    assert mon._timeout_s == 86400.0
 
 
 def test_terminate_idempotent():
