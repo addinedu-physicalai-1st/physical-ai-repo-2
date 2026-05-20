@@ -315,11 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # 모드 전환 규칙 기반 매칭 (latency 절감)
-    for m in modes_for(req.robot):
-        if m in text:
-            return {"kind": "mode_change", "mode": m}
-
     # 감정 연기('화내봐' '슬퍼봐' 등) — LLM 이 엉뚱한 말만 할 때가 많아 규칙으로 고정
     demo = _emotion_demo_response(text, req.robot)
     if demo:
