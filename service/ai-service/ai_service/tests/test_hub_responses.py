@@ -142,7 +142,7 @@ def test_voice_intent_emotion_demo_sad() -> None:
 
 
 def test_voice_intent_lunch_fast_path_mocked_menu() -> None:
-    with patch("ai_service.context.get_menu_fast", new_callable=AsyncMock) as m:
+    with patch("ai_service.capabilities.db_menu.get_menu_fast", new_callable=AsyncMock) as m:
         m.return_value = "오늘 점심은 단위테스트밥이 나온대요!"
         r = client.post(
             "/voice/intent",
@@ -156,7 +156,7 @@ def test_voice_intent_lunch_fast_path_mocked_menu() -> None:
 
 
 def test_voice_intent_yesterday_menu_passes_relative() -> None:
-    with patch("ai_service.context.get_menu_fast", new_callable=AsyncMock) as m:
+    with patch("ai_service.capabilities.db_menu.get_menu_fast", new_callable=AsyncMock) as m:
         m.return_value = "어제 점심은 테스트!"
         r = client.post(
             "/voice/intent",
@@ -169,7 +169,7 @@ def test_voice_intent_yesterday_menu_passes_relative() -> None:
 
 
 def test_voice_intent_day_before_yesterday_menu_passes_relative() -> None:
-    with patch("ai_service.context.get_menu_fast", new_callable=AsyncMock) as m:
+    with patch("ai_service.capabilities.db_menu.get_menu_fast", new_callable=AsyncMock) as m:
         m.return_value = "그저께 점심은 테스트!"
         r = client.post(
             "/voice/intent",

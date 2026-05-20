@@ -1,10 +1,12 @@
 from datetime import UTC, datetime
 
-from ai_service.context import (
+from ai_service.capabilities.db_menu import (
     _ida_polite_copula_after,
+    parse_menu_query_calendar_day,
+)
+from ai_service.context import (
     _is_bare_name_attendance_utterance,
     _looks_like_menu_query,
-    parse_menu_query_calendar_day,
     _looks_like_report_query,
     _looks_like_schedule_query,
     _looks_like_whereabouts_query,

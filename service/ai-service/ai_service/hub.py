@@ -330,7 +330,7 @@ async def voice_intent(req: IntentRequest) -> dict:
     if any(kw in text for kw in _menu_tokens) and (
         any(w in text for w in _menu_date_markers) or re.search(r"\d+\s*일", text)
     ):
-        from ai_service.context import get_menu_fast, parse_menu_query_calendar_day
+        from ai_service.capabilities.db_menu import get_menu_fast, parse_menu_query_calendar_day
 
         now = datetime.utcnow() + timedelta(hours=9)
         day, relative = parse_menu_query_calendar_day(text, now)
