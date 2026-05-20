@@ -6,6 +6,7 @@ from ai_service.intents.base import (
     now_kst,
 )
 from ai_service.intents.common.attendance import AttendanceHandler
+from ai_service.intents.common.chat_fallback import ChatFallbackHandler
 from ai_service.intents.common.emotion_demo import EmotionDemoHandler
 from ai_service.intents.common.gender import GenderHandler
 from ai_service.intents.common.hello import HelloHandler
@@ -28,7 +29,10 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         WhereaboutsHandler(),
         ReportHandler(),
         AttendanceHandler(),
+        ChatFallbackHandler(),
     ],
+    # gogoping: ChatFallback 은 Task 4 에서 ReturnHandler/GotoVertexHandler 와 함께 등록.
+    # 지금 등록하면 legacy `_is_return_text` / `_try_goto_vertex` 가 hub.py 의 dispatcher 뒤에 있어 unreachable 됨.
     "gogoping": [
         StopHandler(),
         MenuHandler(),
@@ -52,6 +56,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         WhereaboutsHandler(),
         ReportHandler(),
         AttendanceHandler(),
+        ChatFallbackHandler(),
     ],
 }
 
