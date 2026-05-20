@@ -10,6 +10,7 @@ from ai_service.intents.common.gender import GenderHandler
 from ai_service.intents.common.hello import HelloHandler
 from ai_service.intents.common.menu import MenuHandler
 from ai_service.intents.common.mode_change import ModeChangeHandler
+from ai_service.intents.common.schedule import ScheduleHandler
 from ai_service.intents.common.stop import StopHandler
 
 PIPELINES: dict[str, list[IntentHandler]] = {
@@ -20,6 +21,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         GenderHandler(),
         ModeChangeHandler(),
         EmotionDemoHandler(),
+        ScheduleHandler(),
     ],
     "gogoping": [
         StopHandler(),
@@ -28,6 +30,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         GenderHandler(),
         ModeChangeHandler(),
         EmotionDemoHandler(),
+        ScheduleHandler(),
     ],
     "noriarm": [
         StopHandler(),
@@ -36,6 +39,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         GenderHandler(),
         ModeChangeHandler(),
         EmotionDemoHandler(),
+        ScheduleHandler(),
     ],
 }
 
