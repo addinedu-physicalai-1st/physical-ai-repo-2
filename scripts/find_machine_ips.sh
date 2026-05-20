@@ -11,6 +11,7 @@ declare -A MACS=(
   [vic]="2c:cf:67:e7:ee:29"
   [leekt]="e8:65:38:23:73:f1"
   [tonyno]="e4:c7:67:61:2f:2e"
+  [jungbuntu]="e8:65:38:23:fd:6f"   # backend (DB + AI Hub)
 )
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
