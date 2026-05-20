@@ -46,6 +46,10 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
         self._client: ActionClient | None = None
         self._node: Any = None
         self._goal_handle = None
+        # terminate(INVALID) 가 send_goal_async 응답 전에 도착하면 True 로 set —
+        # _on_goal_response 가 gh 받자마자 즉시 cancel 후 result 콜백 등록 skip.
+        # 없으면 nav2 goal 좀비화 (state 는 swap 됐는데 robot 이 이전 경로 따라감).
+        self._cancel_pending: bool = False
         self._result_status: str | None = None  # "succeeded" / "failed" / None
         self._failure_reason: str = ""
         self.blackboard = self.attach_blackboard_client(name=self.qualified_name)
@@ -64,6 +68,7 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
 
     def initialise(self) -> None:
         self._goal_handle = None
+        self._cancel_pending = False
         self._result_status = None
         self._failure_reason = ""
         try:
@@ -94,6 +99,15 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
             self._failure_reason = "rejected"
             return
         self._goal_handle = gh
+        # behavior 가 이미 terminate(INVALID) 됐다면 (race) — 즉시 cancel forward.
+        # result 콜백 등록은 skip — behavior 는 이미 죽었음.
+        if self._cancel_pending:
+            try:
+                gh.cancel_goal_async()
+            except Exception:
+                pass
+            self._cancel_pending = False
+            return
         result_fut = gh.get_result_async()
         result_fut.add_done_callback(self._on_result)
 
@@ -116,12 +130,14 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
 
     def terminate(self, new_status: py_trees.common.Status) -> None:
         # tree 가 INVALID (parent 가 끊음) 로 가면 진행 중 goal 취소
-        if (
-            new_status == py_trees.common.Status.INVALID
-            and self._goal_handle is not None
-        ):
+        if new_status != py_trees.common.Status.INVALID:
+            return
+        if self._goal_handle is not None:
             try:
                 self._goal_handle.cancel_goal_async()
             except Exception:
                 pass
             self._goal_handle = None
+        else:
+            # send_goal_async 응답 전 — _on_goal_response 가 도착 시 cancel.
+            self._cancel_pending = True
