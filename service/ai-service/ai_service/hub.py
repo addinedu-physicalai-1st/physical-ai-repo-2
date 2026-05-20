@@ -315,20 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # "안녕"에 대한 시간대별 인사 처리
-    if text.strip() in ["안녕", "안녕!"]:
-        now = datetime.utcnow() + timedelta(hours=9)
-        hour = now.hour
-        
-        if 9 <= hour <= 11:
-            reply = "안녕하세요! 좋은 아침이에요! 어서오세요!"
-        elif 16 <= hour <= 18:
-            reply = "안녕히 가세요! 다음에 또 봐요!"
-        else:
-            reply = "안녕하세요! 오늘도 만나서 반가워요."
-            
-        return {"kind": "chat", "reply": reply, "emotion": "hello"}
-
     # 성별 질문은 규칙 응답 (빠르고 일관되게)
     if _is_gender_question(text):
         return {
