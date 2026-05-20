@@ -5,9 +5,7 @@ Vite proxy 가 `/api/voice/intent` 를 이쪽으로 forward.
 """
 import asyncio
 import logging
-import re
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
 from typing import Literal
 
 import httpx
@@ -20,23 +18,11 @@ from ai_service.vision import OXBoardTask, default_registry
 
 logger = logging.getLogger(__name__)
 
-from ai_service.context import build_chat_context
-from ai_service.capabilities.db_attendance import (
-    try_attendance_first_reply,
-    try_whereabouts_first_reply,
-)
-from ai_service.capabilities.db_report import try_report_first_reply
-from ai_service.capabilities.db_roster import fetch_registered_children_labels
-from ai_service.capabilities.schedule_file import (
-    load_school_schedule_dict,
-    try_schedule_first_reply,
-)
-from ai_service.llm import LLMError, generate_chat, generate_report
+from ai_service.capabilities.schedule_file import load_school_schedule_dict
+from ai_service.llm import LLMError, generate_report
 from ai_service.edge_tts_synth import synthesize_edge_mp3_stream
 from ai_service.config import settings as ai_settings
 
-from ai_service import prompts
-from ai_service.guard_replies import teacher_idk_line
 from ai_service.robots import STOP_TOKENS, is_known_robot, modes_for
 
 
@@ -108,161 +94,6 @@ class Ignored(BaseModel):
     kind: Literal["ignored"] = "ignored"
 
 
-def _is_stop_text(text: str) -> bool:
-    lower = text.lower()
-    return any(tok in lower for tok in [t.lower() for t in STOP_TOKENS])
-
-
-def _normalize_utterance(text: str) -> str:
-    return re.sub(r"[\s\W_]+", "", text.lower())
-
-
-def _needs_chat_fallback(user_text: str, reply: str) -> bool:
-    """LLM 이 입력 에코/무의미 반복을 낼 때 재시도 없이 안전 문구로 교체."""
-    u = _normalize_utterance(user_text)
-    r = _normalize_utterance(reply)
-    if not u or not r:
-        return True
-    if u == r:
-        return True
-    # 매우 짧은 응답인데 사용자 입력을 거의 그대로 반복하면 fallback
-    if len(r) <= max(8, len(u) + 2) and (u in r or r in u):
-        return True
-    return False
-
-
-# ── 복귀 ("돌아가" / "복귀" / "충전") ──────────────────────────────────────
-_RETURN_TOKENS = ("복귀", "돌아가", "돌아와", "충전소", "충전하러", "충전 하러")
-
-
-def _is_return_text(text: str) -> bool:
-    """RETURNING state 진입 trigger 발화 매칭."""
-    t = text.strip()
-    if not t:
-        return False
-    return any(tok in t for tok in _RETURN_TOKENS)
-
-
-# ── "X로 가" / "X로 이동해줘" — vertex name 추출 ────────────────────────────
-_GOTO_PATTERNS = (
-    "로 가",
-    "로 이동",
-    "에 가",
-    "로 갑",
-    "에 갑",
-    "로 갈",
-    "에 갈",
-    "로 향",
-    "로 와",
-    "에 와",
-    " 가자",
-    " 가줘",
-    " 가",
-)
-
-
-def _load_vertex_names() -> list[str]:
-    """waypoints.yaml 의 vertex name 목록. yaml read 는 가벼움 (한 번에 < 1ms)."""
-    try:
-        from control_service.waypoints import yaml_store as ys
-        wps, _ = ys.load()
-        return [w.name for w in wps]
-    except Exception:
-        return []
-
-
-def _try_goto_vertex(text: str) -> str | None:
-    """발화에 vertex name + goto 패턴이 모두 있으면 vertex name 반환.
-
-    매칭 우선순위: 더 긴 vertex name 먼저 (예: '운동장11' 이 '운동장' 보다 먼저).
-    """
-    t = text.strip()
-    if not t:
-        return None
-    # goto 패턴이 하나라도 있어야
-    if not any(p in t for p in _GOTO_PATTERNS):
-        return None
-    names = sorted(_load_vertex_names(), key=len, reverse=True)
-    for name in names:
-        if name and name in t:
-            return name
-    return None
-
-
-def _is_gender_question(text: str) -> bool:
-    compact = _normalize_utterance(text)
-    if not compact:
-        return False
-    gender_tokens = ("성별", "남자", "여자", "boy", "girl", "male", "female")
-    ask_tokens = ("너", "로봇", "누구", "뭐")
-    return any(t in compact for t in gender_tokens) and (
-        any(t in compact for t in ask_tokens) or "야" in text or "인가" in text
-    )
-
-
-def _emotion_demo_response(text: str, robot: str) -> dict | None:
-    """'화내봐' '슬퍼봐' 등 감정 연기 요청 — LLM 우회."""
-    raw = text.strip()
-    if len(raw) > 36:
-        return None
-    if "지마" in raw or "하지마" in raw.replace(" ", ""):
-        return None
-    c = re.sub(r"[\s\.,!?…:]+", "", raw)
-    if not c:
-        return None
-
-    imperatives = ("봐", "줘", "해봐", "해줘", "할래", "연기", "흉내", "해줄래")
-    has_imperative = any(m in raw for m in imperatives)
-    if len(c) > 10 and not has_imperative:
-        return None
-
-    name = prompts.display_name(robot)
-
-    if any(k in c for k in ("화내", "화나", "짜증", "빡쳐", "열받", "분노")):
-        return {
-            "kind": "chat",
-            "reply": f"으… {name} 화났어! 금방 가라앉힐게.",
-            "emotion": "angry",
-        }
-    if any(k in c for k in ("슬프", "슬퍼", "우울", "서글")):
-        return {
-            "kind": "chat",
-            "reply": f"흑… 너무 슬퍼. {name}이 같이 있어줄게.",
-            "emotion": "sad",
-        }
-    if any(k in c for k in ("울어", "눈물", "엉엉")):
-        return {
-            "kind": "chat",
-            "reply": f"으응… 울어도 괜찮아. {name}이 옆에 있어줄게.",
-            "emotion": "sad",
-        }
-    if any(k in c for k in ("웃어", "웃자", "행복", "기뻐", "신나")):
-        return {
-            "kind": "chat",
-            "reply": f"헤헤! {name}도 신나! 같이 웃자!",
-            "emotion": "happy",
-        }
-    if "심심" in c:
-        return {
-            "kind": "chat",
-            "reply": "심심해? 같이 뭐 재미있는 거 해볼까?",
-            "emotion": "bored",
-        }
-    if any(k in c for k in ("졸려", "잘래", "자고", "쿨쿨")):
-        return {
-            "kind": "chat",
-            "reply": "쿨… 잠이 와… 조금만 눈 붙일게…",
-            "emotion": "sleep",
-        }
-    if "재밌" in c:
-        return {
-            "kind": "chat",
-            "reply": "좋아! 재미있게 놀아보자!",
-            "emotion": "fun",
-        }
-    return None
-
-
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True}
@@ -288,6 +119,8 @@ async def voice_intent(req: IntentRequest) -> dict:
     if not is_known_robot(req.robot):
         return {"kind": "ignored"}
 
+    # Inline import: hub.py defines the Pydantic models (IntentRequest, Chat, ...)
+    # that intents/* modules import. Module-level import here would cycle.
     from ai_service.intents import PIPELINES, IntentContext, now_kst
     ctx = IntentContext(now=now_kst(), req=req)
     for handler in PIPELINES[req.robot]:
