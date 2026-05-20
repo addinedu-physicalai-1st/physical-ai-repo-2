@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-20 (docs 풀 감사 — status.md 카운트/분류 오류 수정, navigation/ 표에 잘못 들어가 있던 manual_torque_hold / stop_all_motors 두 행을 각자 카테고리로 이동, 인프라 행 카운트 정정. 직전 갱신 (2026-05-19) — HardwareHealthMonitor 구현 (LIDAR `/gogoping/scan` + odom `/gogoping/odom` staleness, 6 트리 배치) + admin UI e-stop 버튼 + `/gogoping/emergency_stop` (std_srvs/Trigger))
+마지막 업데이트: 2026-05-20 (자장가 BT 구현 — `BT_lullaby_sub` (LullabyAudio 단일 leaf) + 범용 `UIPublish` common behavior + `UIPublisher.publish_event()` / `/gogoping/ui_event` 토픽 신설. stub_lullaby 삭제. mp3 재생 자체는 robot-web frontend 별도 PR. 직전 갱신 (2026-05-20) — docs 풀 감사. 그 전 (2026-05-19) — HardwareHealthMonitor + admin UI e-stop 버튼)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -13,11 +13,11 @@
 
 | 영역 | 진행 | 비고 |
 |---|---|---|
-| **Trees** | **9 / 13** | MainTree 8/8 ✅ · SubTree 1/5 (BT_return_sub ✅) |
-| **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
-| **Behaviors** | **13 / 34** | common 7/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
+| **Trees** | **10 / 13** | MainTree 8/8 ✅ · SubTree 2/5 (BT_return_sub ✅ · BT_lullaby_sub ✅) |
+| **Stubs (_stubs/)** | **1 / 4** | base ✅ · 3 stub 🟡 (carry/follow/hideseek). stub_lullaby 삭제됨 |
+| **Behaviors** | **15 / 34** | common 9/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
 | **Infrastructure** | **40 / 42** | 🟡 2 (nav2 실물 localization-only / battery_publisher_node static placeholder). PoseSubscriber + MapCache + gogoping_camera_pan 5종 + sim_battery_node + sim_teleport_node 포함 |
-| **합계** | **63 / 94** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + return cycle + **hardware_health (LIDAR/odom staleness) + admin UI e-stop 버튼** |
+| **합계** | **65 / 93** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + return cycle + hardware_health + admin UI e-stop 버튼 + **자장가 BT (LullabyAudio + UIPublish + /gogoping/ui_event topic)** |
 
 ---
 
@@ -38,17 +38,17 @@
 
 > **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree (carry/follow/lullaby/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
 
-### SubTree — 0 / 5
+### SubTree — 2 / 5
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
 | BT_carry_sub | ☐ | StubCarry 로 대체 중. manual / goto / follow 3 mode |
 | BT_follow_sub | ☐ | StubFollow 로 대체 중. 정상 ↔ Loss Recovery |
-| BT_lullaby_sub | ☐ | StubLullaby 로 대체 중. UI mp3 재생 + WaitForExit |
+| BT_lullaby_sub | ✅ | [BT_lullaby_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_lullaby_sub.py) — 단일 LullabyAudio leaf. initialise=lullaby_play event publish, update=RUNNING, terminate=lullaby_stop publish (idempotent). 빌더 2 + LullabyAudio 7 테스트 통과 |
 | BT_hide_and_seek_sub | ☐ | StubHideseek 로 대체 중. 1회 실행 후 종료 |
 | BT_return_sub | ✅ | [BT_return_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py) — OneShot(Sequence([NavigateToVertex("충전소입구"), AlignToDock, ReverseIntoDock, **VerifyDockingContact**])). 빌더가 waypoints.yaml 의 충전소입구 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 로 자동 주입. ReverseIntoDock 완료 후 VerifyDockingContact 가 `docked` trigger 자동 발사 → CHARGING 전이. 6 빌더 테스트 통과 (tests/test_gogoping_return_subtree_builder.py). ⚠ **알려진 이슈** — RETURNING 중 cancel 시 robot 즉시 안 멈춤 + 경로 잔상 ([trees/BT_return_sub.md 의 "알려진 이슈" 섹션](trees/BT_return_sub.md#알려진-이슈--cancel-cleanup-2026-05-18) 참조) |
 
-### Stub (_stubs/) — 1 / 5 (+ 4 🟡)
+### Stub (_stubs/) — 1 / 4 (+ 3 🟡)
 
 walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더째 삭제 + 사용처 (BT_assist_main / BT_play_main) 교체. `grep -rn "STUB:" controller/gogoping-controller/` 로 검색.
 
@@ -57,14 +57,13 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | `_stubs/_base.py` | ✅ | `StubRunningThenSuccess` (N tick → SUCCESS) + `StubInfiniteRunning` (항상 RUNNING) |
 | `_stubs/stub_carry.py` | 🟡 | `StubRunningThenSuccess(30 tick = 3초)`. 진짜 carry+goto 의 "목적지 도달 시 SUCCESS" 의미와 동등 |
 | `_stubs/stub_follow.py` | 🟡 | `StubInfiniteRunning`. 진짜 follow 의 "사람 보이는 한 RUNNING" 의미와 동등 |
-| `_stubs/stub_lullaby.py` | 🟡 | `StubInfiniteRunning`. 진짜 lullaby 의 "사용자 stop 명령까지 RUNNING" 의미와 동등 |
 | `_stubs/stub_hideseek.py` | 🟡 | `StubRunningThenSuccess(30 tick = 3초)`. 진짜 hideseek 의 "1회 사이클 후 SUCCESS" 의미와 동등 |
 
 ---
 
 ## Behaviors
 
-### common/ — 7 / 11
+### common/ — 9 / 11
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -78,7 +77,8 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | docking_contact_check | ☐ | |
 | check_task | ✅ | [check_task.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py) — TaskSelector 분기 Condition. 5 시나리오 통과 |
 | check_carry_mode | ☐ | BT_carry_sub 작성 시 |
-| ui_publish | ☐ | HideAndSeek / Lullaby 작성 시 |
+| ui_publish | ✅ | [ui_publish.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/ui_publish.py) — `message: dict` 1회 publish 후 즉시 SUCCESS. 5 단위 테스트 통과 |
+| lullaby_audio | ✅ | [lullaby_audio.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/lullaby_audio.py) — initialise=play publish / update=RUNNING / terminate=stop publish (idempotent). BT_lullaby_sub 의 단일 leaf. 7 단위 테스트 통과 |
 
 ### navigation/ — 4 / 8
 

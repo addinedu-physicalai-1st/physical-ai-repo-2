@@ -75,9 +75,12 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main (TaskSelector 분기)
         │   │   │   ├── check_carry_mode.[py|/]       # blackboard.carry_mode 값 비교 (manual/goto/follow)
         │   │   │   │                                 #   Used in: BT_carry_sub (CarryCore 분기)
-        │   │   │   └── ui_publish.[py|/]             # 범용 UI 알림 publish (announce / countdown_start 등)
-        │   │   │                                     # message dict 만 다르게 전달, 즉시 SUCCESS
-        │   │   │                                     #   Used in: BT_hide_and_seek_sub, BT_carry_sub (goto/manual), BT_lullaby_sub
+        │   │   │   ├── ui_publish.[py|/]             # 범용 UI 알림 publish (announce / countdown_start 등) (✅)
+        │   │   │   │                                 # message dict 1회 publish 후 즉시 SUCCESS
+        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub, BT_carry_sub (goto/manual)
+        │   │   │   └── lullaby_audio.[py|/]          # 자장가 본체 — initialise=play publish, update=RUNNING (영구), terminate=stop publish (✅)
+        │   │   │                                     # /gogoping/ui_event 에 lullaby_play / lullaby_stop publish. idempotent (_stop_published flag).
+        │   │   │                                     #   Used in: BT_lullaby_sub 만
         │   │   │
         │   │   ├── navigation/
         │   │   │   ├── __init__.py
@@ -154,7 +157,6 @@ controller/gogoping-controller/src/gogoping/
         │   │       ├── _base.py                     # StubRunningThenSuccess (30 tick → SUCCESS) + StubInfiniteRunning (항상 RUNNING)
         │   │       ├── stub_carry.py                # BT_carry_sub 자리 — 30 tick stub (carry+goto 목적지 도달 SUCCESS 의미)
         │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미)
-        │   │       ├── stub_lullaby.py              # BT_lullaby_sub 자리 — 무한 RUNNING (사용자 stop 까지 RUNNING 의미)
         │   │       └── stub_hideseek.py             # BT_hide_and_seek_sub 자리 — 30 tick stub (1회 사이클 SUCCESS 의미)
         │   │
         │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
@@ -175,7 +177,7 @@ controller/gogoping-controller/src/gogoping/
         │           ├── __init__.py
         │           ├── BT_carry_sub.py           # 운반 — 3가지 서브모드 (manual/goto/follow)
         │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
-        │           ├── BT_lullaby_sub.py         # 자장가 — WaitForExit (UI 가 mp3 재생)
+        │           ├── BT_lullaby_sub.py         # 자장가 — LullabyAudio 단일 leaf (UI 가 mp3 재생, BT 는 publish only) (✅)
         │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 (1회 실행) — 숨기 → 카운트 → 탐색 → 복귀
         │           └── BT_return_sub.py          # 도킹 복귀 — OneShot(Sequence(NavTo "충전소입구" → AlignToDock → ReverseIntoDock → VerifyDockingContact)). 마지막 단계가 docked trigger 자동 발사 → CHARGING. 빌더가 yaml 의 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 주입 → docs/bt/trees/BT_return_sub.md
         │

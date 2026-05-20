@@ -49,7 +49,7 @@ ASSIST
         └─ TaskSelector (Selector, memory=False)
               ├─ Sequence: CheckTask("carry")   → CarrySubTree     (stub)
               ├─ Sequence: CheckTask("follow")  → FollowSubTree    (stub) ※ ASSIST 직속 단독 추종
-              └─ Sequence: CheckTask("lullaby") → LullabySubTree   (stub) ※ 교사 명령 — ASSIST 에 분류
+              └─ Sequence: CheckTask("lullaby") → LullabySubTree   (✅) ※ 교사 명령 — ASSIST 에 분류
                                                                      (아이 자발적 놀이 = PLAY)
 
 
