@@ -315,11 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # "OOO 어딨어?" 등 — DB 등하원을 LLM 보다 먼저 (위치 질문 오탐/환각 방지)
-    first_where = await try_whereabouts_first_reply(text)
-    if first_where:
-        return {"kind": "chat", "reply": first_where, "emotion": "interest"}
-
     # 보고서·일과 — 원아 한 명이 확실할 때 `report` 테이블을 LLM 보다 먼저
     first_report = await try_report_first_reply(text)
     if first_report:
