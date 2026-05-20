@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-19 (HardwareHealthMonitor 구현 — LIDAR `/gogoping/scan` + odom `/gogoping/odom` staleness ROS param `hw_health_staleness_seconds` (기본 3.0s) 경과 시 `fault` trigger 발화. 6 트리 배치 (CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN — MANUAL/ERROR 제외). Admin UI DebugStatePanel 에 별도 e-stop 빨간 버튼 + Control Service `/api/gogoping/emergency_stop` REST → `bridge.emergency_stop_sync` → `/gogoping/emergency_stop` (std_srvs/Trigger))
+마지막 업데이트: 2026-05-20 (docs 풀 감사 — status.md 카운트/분류 오류 수정, navigation/ 표에 잘못 들어가 있던 manual_torque_hold / stop_all_motors 두 행을 각자 카테고리로 이동, 인프라 행 카운트 정정. 직전 갱신 (2026-05-19) — HardwareHealthMonitor 구현 (LIDAR `/gogoping/scan` + odom `/gogoping/odom` staleness, 6 트리 배치) + admin UI e-stop 버튼 + `/gogoping/emergency_stop` (std_srvs/Trigger))
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -15,9 +15,9 @@
 |---|---|---|
 | **Trees** | **9 / 13** | MainTree 8/8 ✅ · SubTree 1/5 (BT_return_sub ✅) |
 | **Stubs (_stubs/)** | **1 / 5** | base ✅ · 4 stub 🟡 (의미 동등) |
-| **Behaviors** | **14 / 34** | common 8/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
-| **Infrastructure** | **34 / 37** | 🟡 2 (device-gogoping-laptop.sh / battery_publisher_node) · ☐ 1 (nav2 실물). PoseSubscriber + MapCache + gogoping_camera_pan 5종 추가 |
-| **합계** | **56 / 88** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + return cycle + **hardware_health (LIDAR/odom staleness) + admin UI e-stop 버튼** |
+| **Behaviors** | **13 / 34** | common 7/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
+| **Infrastructure** | **40 / 42** | 🟡 2 (nav2 실물 localization-only / battery_publisher_node static placeholder). PoseSubscriber + MapCache + gogoping_camera_pan 5종 + sim_battery_node + sim_teleport_node 포함 |
+| **합계** | **63 / 94** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + return cycle + **hardware_health (LIDAR/odom staleness) + admin UI e-stop 버튼** |
 
 ---
 
@@ -64,7 +64,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ## Behaviors
 
-### common/ — 8 / 11
+### common/ — 7 / 11
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -80,7 +80,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | check_carry_mode | ☐ | BT_carry_sub 작성 시 |
 | ui_publish | ☐ | HideAndSeek / Lullaby 작성 시 |
 
-### navigation/ — 1 / 8
+### navigation/ — 4 / 8
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -89,8 +89,6 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | align_to_dock | ✅ | [align_to_dock.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/align_to_dock.py) — blackboard ROBOT_POSE.yaw vs CHARGING_DOCK_TARGET_YAW 비교 → cmd_vel.angular.z publish. 9 단위 테스트 통과 (tests/test_gogoping_align_to_dock.py) |
 | reverse_into_dock | ✅ | [reverse_into_dock.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/reverse_into_dock.py) — N초 동안 cmd_vel.linear.x 후진 publish → SUCCESS. 명세상 `approach_dock` 자리 (디자인상 이름 변경). 8 단위 테스트 통과 (tests/test_gogoping_reverse_into_dock.py) |
 | verify_docking_contact | ✅ | [verify_docking_contact.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/verify_docking_contact.py) — ReverseIntoDock 완료 후 `docked` trigger 1회 발사 → CHARGING 자동 전이. 자동 도킹 센서 미구현이라 현재 시간 기반 후진만으로 도킹 간주. 5 단위 테스트 통과 (tests/test_gogoping_verify_docking_contact.py) |
-| manual_torque_hold | ✅ | [manual_torque_hold.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/manual/manual_torque_hold.py) — initialise 에서 `/gogoping/set_torque` (SetBool data=False) 호출로 motor disable, terminate 에서 enable 복원 (ERROR 진입 시엔 skip — StopAllMotors 가 처리). blackboard `MANUAL_TORQUE_ACTIVE` W. BT_manual_main 만 배치. 6 시나리오 통과 (tests/test_gogoping_manual_torque_hold.py). 의존 interface: [BaseDriverClient](../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/base_driver_client.py) |
-| stop_all_motors | ✅ | [stop_all_motors.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/recovery/stop_all_motors.py) — initialise 에서 cmd_vel=0 publish + `release_torque()` 호출. BT_error_main 만 배치. 긴급정지 service `/gogoping/emergency_stop` (Trigger) 가 fsm.force_state("ERROR") → BT swap → 이 behavior 가 즉시 정지 시퀀스. ERROR 가 terminal 이라 terminate 호출 안 됨 |
 | stop_base | ☐ | |
 | maintain_distance | ☐ | |
 | check_arrival | ☐ | |
@@ -132,7 +130,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ---
 
-## 인프라 / 외부 시스템 — 29 / 32
+## 인프라 / 외부 시스템 — 40 / 42
 
 | 항목 | 상태 | 비고 |
 |---|---|---|

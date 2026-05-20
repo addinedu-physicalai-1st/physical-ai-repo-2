@@ -4,14 +4,14 @@ controller/gogoping-controller/src/gogoping/
 │   │   ├── pi.launch.py                  # 라즈베리파이 (vicpinky_bringup + sllidar + camera + battery_publisher_node)
 │   │   └── laptop.launch.py              # 노트북 (placeholder — device-gogoping-laptop.sh 가 직접 ros2 launch)
 │   └── gogoping_bringup/
-│       ├── sim_status_publisher.py       # sim 활성 신호 1Hz (Bool /gogoping/sim_active)
-│       ├── sim_battery_node.py           # sim 전용 — /gogoping/battery + SetBatteryLevel.srv
-│       ├── sim_teleport_node.py          # sim 전용 — /gogoping/sim/teleport_pose srv +
+│       ├── sim_status_publisher.py       # sim 활성 신호 1Hz (Bool /gogoping/sim_active) (✅)
+│       ├── sim_battery_node.py           # sim 전용 — /gogoping/battery + SetBatteryLevel.srv (✅)
+│       ├── sim_teleport_node.py          # sim 전용 — /gogoping/sim/teleport_pose srv + (✅)
 │       │                                 #   /initialpose 토픽 sub. subprocess gz set_pose
 │       │                                 #   호출. admin UI 적용 버튼 / 맵 Shift+클릭 /
 │       │                                 #   RViz 2D Pose Estimate 모두 자동 Gazebo 동기화
-│       └── battery_publisher_node.py     # Pi 운영용 — /gogoping/battery (source: static/sysfs/uart)
-│                                         #   하드웨어 spec 확정 후 source=sysfs/uart 로 전환
+│       └── battery_publisher_node.py     # Pi 운영용 — /gogoping/battery (source: static/sysfs/uart) (🟡)
+│                                         #   현재 source=static (placeholder 100%). 하드웨어 spec 확정 후 source=sysfs/uart 로 전환
 │
 ├── gogoping_camera/                      # USB 카메라 → UDP MJPEG 송출
 ├── gogoping_camera_pan/                  # Arduino Uno + MG995 ×2 pan/tilt 서보 (pyserial, ~/cmd_pan·~/cmd_tilt Float32,
@@ -36,7 +36,9 @@ controller/gogoping-controller/src/gogoping/
         │
         ├── bt/                           # Behavior Tree
         │   ├── __init__.py
-        │   ├── blackboard.py             # 공유 변수 스키마 + 초기값 (Keys 상수, 권한 등록)
+        │   ├── blackboard.py             # 공유 변수 스키마 + 초기값 (Keys 상수, 권한 등록) (✅)
+        │   ├── tree_inspector.py         # snapshot(fsm_state, root_tree) → admin BTStateInline 호환 dict (✅)
+        │   │                             #   battery_level + robot_pose + in_map 포함. main.py 가 1Hz publish 시 호출
         │   │
         │   ├── behaviors/                # 개별 BT 노드 (Action / Condition)
         │   │   │                         # ※ 각 노드는 기본 .py 단일 파일, 복잡해지면 폴더로 전환 가능
@@ -64,11 +66,12 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #            LOW_BATTERY_RETURN — MANUAL/ERROR 제외)
         │   │   │   ├── collision_event_handler.[py|/] # Nav2 Collision Monitor 비정상 상태 → "fault" trigger
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main, BT_returning_main
-        │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → blackboard 세팅 + fsm.trigger 호출
-        │   │   │   │                                 #   Used in: BT_idle_main, BT_assist_main, BT_play_main
+        │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → blackboard 세팅 + fsm.trigger 호출 (✅)
+        │   │   │   │                                 #   SetGoal + ForceState + SetRobotPose + emergency_stop 4 server.
+        │   │   │   │                                 #   Used in: BT_charging_main, BT_idle_main, BT_assist_main, BT_play_main, BT_manual_main, BT_returning_main
         │   │   │   ├── docking_contact_check.[py|/]  # 도킹 접점 전류 흐름 감시, 끊김 시 fault
         │   │   │   │                                 #   Used in: BT_charging_main
-        │   │   │   ├── check_task.[py|/]             # blackboard.assist_task/play_task 값 비교
+        │   │   │   ├── check_task.[py|/]             # blackboard.assist_task/play_task 값 비교 (✅)
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main (TaskSelector 분기)
         │   │   │   ├── check_carry_mode.[py|/]       # blackboard.carry_mode 값 비교 (manual/goto/follow)
         │   │   │   │                                 #   Used in: BT_carry_sub (CarryCore 분기)
@@ -80,14 +83,14 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   ├── __init__.py
         │   │   │   ├── navigate_to_pose.[py|/]       # Nav2 navigate_to_pose 액션 클라이언트 (target_key 인자)
         │   │   │   │                                 #   Used in: BT_carry_sub, BT_hide_and_seek_sub, BT_return_sub
-        │   │   │   ├── navigate_to_vertex.py         # graph_router NavigateToVertex 액션 호출 (target_vertex_name 인자)
+        │   │   │   ├── navigate_to_vertex.py         # graph_router NavigateToVertex 액션 호출 (target_vertex_name 인자) (✅)
         │   │   │   │                                 #   다익스트라 lane 따라 이동. 자세한 설계: docs/graph-routing.md
-        │   │   │   │                                 #   Used in: BT_carry_sub (goto), BT_assist_main 의 named-pose 이동
-        │   │   │   ├── align_to_dock.py              # blackboard target yaw 까지 cmd_vel.angular.z 로 제자리 회전 → docs/bt/behaviors/navigation.md#align_to_dock
+        │   │   │   │                                 #   Used in: BT_carry_sub (goto), BT_return_sub, BT_assist_main 의 named-pose 이동
+        │   │   │   ├── align_to_dock.py              # blackboard target yaw 까지 cmd_vel.angular.z 로 제자리 회전 (✅) → docs/bt/behaviors/navigation.md#align_to_dock
         │   │   │   │                                 #   Used in: BT_return_sub
-        │   │   │   ├── reverse_into_dock.py          # N초 동안 cmd_vel.linear.x 음수 publish (후진 진입) → docs/bt/behaviors/navigation.md#reverse_into_dock
+        │   │   │   ├── reverse_into_dock.py          # N초 동안 cmd_vel.linear.x 음수 publish (후진 진입) (✅) → docs/bt/behaviors/navigation.md#reverse_into_dock
         │   │   │   │                                 #   Used in: BT_return_sub
-        │   │   │   ├── verify_docking_contact.py    # ReverseIntoDock 완료 후 "docked" trigger 1회 발사 → CHARGING 전이 (접점 센서 미통합) → docs/bt/behaviors/navigation.md#verify_docking_contact
+        │   │   │   ├── verify_docking_contact.py    # ReverseIntoDock 완료 후 "docked" trigger 1회 발사 → CHARGING 전이 (접점 센서 미통합) (✅) → docs/bt/behaviors/navigation.md#verify_docking_contact
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── stop_base.[py|/]              # cmd_vel = 0 publish (모바일 베이스 즉시 정지)
         │   │   │   │                                 #   Used in: BT_follow_sub
@@ -194,10 +197,10 @@ controller/gogoping-controller/src/gogoping/
         │
         └── utils/                        # 공통 helper / 순수 함수
             ├── __init__.py
-            ├── waypoints_client.py       # control-server REST 에서 patrol 가져오기 (hide-and-seek 등)
-            ├── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수,
-            │                             #   command_listener 가 import. ROS 의존성 0 → 단위 테스트 13 pass)
-            └── tree_inspector.py         # snapshot(fsm_state, root_tree) → admin BTStateInline 호환 dict
+            ├── waypoints_client.py       # control-server REST 에서 patrol 가져오기 (hide-and-seek 등) (✅)
+            │                             #   실패 시 ${PINGDER_BT_CACHE_DIR:-/tmp/pingder}/<name>.json 캐시 fallback
+            └── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수) (✅)
+                                          #   command_listener 가 import. ROS 의존성 0 → 단위 테스트 13 pass
             
             
             

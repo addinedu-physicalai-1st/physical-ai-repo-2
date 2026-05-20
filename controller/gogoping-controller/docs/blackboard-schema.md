@@ -13,10 +13,12 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W (writer) | R (reader) | 비고 |
 |---|---|---|---|---|
-| `battery_level` | `float` (0~100) | `battery_subscriber` | `battery_full_monitor`, `battery_low_monitor` | % |
+| `battery_level` | `float` (0~100) | `battery_subscriber` | `battery_full_monitor`, `battery_low_monitor`, `tree_inspector` | % |
 | `hardware_health` | `dict[str, bool]` | (각 HW 토픽 subscriber) | `hardware_health_monitor` | 컴포넌트별 alive 플래그 |
 | `collision_state` | `str` (`ok` / `warn` / `fault`) | `collision_subscriber` | `collision_event_handler` | Nav2 Collision Monitor |
 | `docking_contact` | `bool` | `docking_contact_check` | `docking_contact_check` (self) | 도킹 접점 전류 흐름 |
+| `robot_pose` | `dict {x: float, y: float, yaw: float}` | `pose_subscriber` (`/amcl_pose` → map frame) | `map_boundary_monitor`, `align_to_dock`, `tree_inspector` | AMCL localization 결과 (map frame). 부팅 시 `{0.0, 0.0, 0.0}` |
+| `pose_override_active` | `bool` | `command_listener` (`SetRobotPose.srv`) | `pose_subscriber` (W skip 판정) | True 면 `/amcl_pose` 메시지 무시 → ROBOT_POSE 유지. 디버그 좌표 강제용 |
 
 ### 명령 / 모드 (`command_listener` 가 W)
 
@@ -60,6 +62,12 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | `error_reason` | `str` | (fault trigger 호출한 monitor), `command_listener` (emergency_stop 시 `"user_emergency_stop"`) | `notify_admin_ui`, `log_error_to_db` | ERROR 진입 사유 (e.g., `"lidar_timeout"`, `"out_of_map"`, `"user_emergency_stop"`) |
 | `error_source` | `str` | (fault trigger 호출한 monitor), `command_listener` (`"emergency_stop_service"`) | `notify_admin_ui`, `log_error_to_db` | 발화 주체 식별 (e.g., `"HardwareHealthMonitor"`, `"emergency_stop_service"`) — multi-writer 디버깅용 |
 
+### 수동 모드 (manual_torque_hold 가 W)
+
+| 키 | 타입 | W | R | 비고 |
+|---|---|---|---|---|
+| `manual_torque_active` | `bool` | `manual_torque_hold` (initialise=True, terminate=False) | admin UI (snapshot 경유) | True 면 motor torque OFF 상태 — 사용자가 직접 밀어 이동 중. UI 표시용 |
+
 > 현재 FSM state 는 blackboard 키가 아니다. `context.fsm.current_state` (transitions 라이브러리 기본 속성) 를 직접 읽는다.
 
 ## `Keys` 상수 예시
@@ -72,6 +80,8 @@ class Keys:
     HARDWARE_HEALTH = "hardware_health"
     COLLISION_STATE = "collision_state"
     DOCKING_CONTACT = "docking_contact"
+    ROBOT_POSE = "robot_pose"
+    POSE_OVERRIDE_ACTIVE = "pose_override_active"
     # 명령 / 모드
     ASSIST_TASK = "assist_task"
     PLAY_TASK = "play_task"
@@ -94,6 +104,8 @@ class Keys:
     # 에러
     ERROR_REASON = "error_reason"
     ERROR_SOURCE = "error_source"
+    # 수동 모드
+    MANUAL_TORQUE_ACTIVE = "manual_torque_active"
 ```
 
 ## 권한 등록 예시
@@ -114,10 +126,14 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
 | `hardware_health` | `{}` |
 | `collision_state` | `"ok"` |
 | `docking_contact` | `False` |
+| `robot_pose` | `{"x": 0.0, "y": 0.0, "yaw": 0.0}` |
+| `pose_override_active` | `False` |
 | `assist_task` / `play_task` / `carry_mode` / `target_person_id` | `""` |
 | `target_visible` / `found` / `load_dropped` | `False` |
-| `target_pose` / `target_face_bbox` | `None` |
+| `target_pose` / `target_face_bbox` | `None` (writer 가 세팅 전까진 미정의 — reader 는 try/except) |
 | `target_seen_at` | `0.0` |
 | `destination_key` / `hide_position_key` / `home_position_key` / `charging_dock_approach_key` | `""` |
 | `search_waypoints` | `[]` |
+| `charging_dock_target_yaw` | `0.0` |
 | `error_reason` / `error_source` | `""` |
+| `manual_torque_active` | `False` |

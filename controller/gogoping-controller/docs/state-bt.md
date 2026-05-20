@@ -22,7 +22,7 @@ CHARGING
   main: Parallel
         ├─ BatteryFullMonitor     (✅ ≥ 70% → battery_full → IDLE)
         ├─ MapBoundaryMonitor     (✅ amcl 미스로컬라이즈 / 누군가 들고 옮긴 케이스 안전망)
-        ├─ HardwareHealthMonitor  (추후)
+        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ DockingContactCheck    (추후)
         └─ CommandListener        (✅)
   sub: 없음
@@ -33,7 +33,7 @@ IDLE
         ├─ BatteryLowMonitor      (✅ — battery ≤ 20% → battery_low → RETURNING)
         ├─ IdleTimeoutMonitor     (✅ — idle_timeout_seconds 경과 → idle_timeout → RETURNING)
         ├─ MapBoundaryMonitor     (✅ — 비정상 pose 감지 → fault)
-        ├─ HardwareHealthMonitor  (추후)
+        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         └─ CommandListener        (✅)
   sub: 없음
 
@@ -42,14 +42,14 @@ ASSIST
   main: Parallel (SuccessOnSelected=[TaskSelector])
         ├─ BatteryLowMonitor      (✅ ≤20% → battery_low → RETURNING)
         ├─ MapBoundaryMonitor     (✅ OccupancyGrid 기반 → fault(reason="out_of_map") → ERROR)
-        ├─ HardwareHealthMonitor  (추후)
+        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
         ├─ CommandListener        (✅)  ※ cancel 외 active mode 전이 (assist/play/manual_request) 도 가능
         │
         └─ TaskSelector (Selector, memory=False)
-              ├─ Sequence: CheckTask("carry")   → CarrySubTree
-              ├─ Sequence: CheckTask("follow")  → FollowSubTree    ※ ASSIST 직속 단독 추종
-              └─ Sequence: CheckTask("lullaby") → LullabySubTree   ※ 교사 명령 — ASSIST 에 분류
+              ├─ Sequence: CheckTask("carry")   → CarrySubTree     (stub)
+              ├─ Sequence: CheckTask("follow")  → FollowSubTree    (stub) ※ ASSIST 직속 단독 추종
+              └─ Sequence: CheckTask("lullaby") → LullabySubTree   (stub) ※ 교사 명령 — ASSIST 에 분류
                                                                      (아이 자발적 놀이 = PLAY)
 
 
@@ -57,18 +57,17 @@ PLAY
   main: Parallel (SuccessOnSelected=[TaskSelector])
         ├─ BatteryLowMonitor      (✅)
         ├─ MapBoundaryMonitor     (✅)
-        ├─ HardwareHealthMonitor  (추후)
+        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
         ├─ CommandListener        (✅)  ※ cancel / 다른 active mode 전이
         │
         └─ TaskSelector (Selector, memory=False)
-              └─ Sequence: CheckTask("hideseek") → HideAndSeekSubTree   ※ 1회 실행 후 종료
+              └─ Sequence: CheckTask("hideseek") → HideAndSeekSubTree (stub) ※ 1회 실행 후 종료
 
 
 MANUAL
   main: Parallel
-        ├─ ManualTorqueHold        ※ initialise() 에서 torque OFF service 호출,
-        │                            terminate() 에서 torque ON 복원 (추후).
+        ├─ ManualTorqueHold        (✅ initialise=torque OFF service 호출, terminate=torque ON 복원)
         ├─ MapBoundaryMonitor      (✅ — 위치 안전 예외)
         └─ CommandListener         (✅ — cancel / return_request / 다른 *_request)
   sub: 없음
@@ -90,23 +89,26 @@ RETURNING
   main: Parallel (SuccessOnSelected=[ReturnSubTree])
         ├─ BatteryLowMonitor      (✅ — escalation: 또 떨어지면 LOW_BATTERY_RETURN)
         ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map"))
-        ├─ HardwareHealthMonitor  (추후)
+        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
+        ├─ CommandListener        (✅ — 사용자 cancel / *_request)
+        └─ ReturnSubTree          (✅ — OneShot(Sequence))
 
-  sub: ReturnSubTree (Sequence, memory=True)
-        ├─ NavigateToPose(charging_dock_approach_key)
-        ├─ AlignToDock                       [스켈레톤 — 발표는 수동 도킹]
-        ├─ ApproachDock                      [스켈레톤]
-        └─ VerifyDockingContact              [스켈레톤]
+  sub: ReturnSubTree = OneShot(ON_COMPLETION) of:
+        Sequence (memory=True)
+          ├─ NavigateToVertex("충전소입구")  (✅ — graph_router 액션)
+          ├─ AlignToDock                     (✅ — CHARGING_DOCK_TARGET_YAW 까지 제자리 회전)
+          ├─ ReverseIntoDock                  (✅ — N초 cmd_vel.linear.x 후진)
+          └─ VerifyDockingContact             (✅ — docked trigger 자동 발사 → CHARGING)
 
 
 LOW_BATTERY_RETURN
   main: Parallel(SuccessOnAll)
         ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 경계 이탈 시 fault)
-        ├─ HardwareHealthMonitor  (추후)
+        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
-        └─ ReturnSubTree          (추후 — NavTo → Align → Approach → Verify)
-  sub: ReturnSubTree (추후)
+        └─ ReturnSubTree          (✅ — RETURNING 과 동일 SubTree 재사용)
+  sub: ReturnSubTree (✅ — 위 RETURNING sub 와 동일)
 
   ※ lockdown 정책 정확히:
       - *사용자 명령* 차단 (CommandListener 미배치 — SetGoal 거부)
@@ -117,9 +119,11 @@ LOW_BATTERY_RETURN
 
 ERROR
   main: Parallel(SuccessOnAll)
-        └─ (자식 0개 — terminal)
+        └─ StopAllMotors          (✅ initialise=cmd_vel=0 + release_torque, 1 tick SUCCESS)
   sub: 없음
 
   ※ ERROR 는 terminal — reset trigger 없음. 사람이 robot 재시작해야 복구.
-    StopAllMotors / NotifyAdminUI / LogErrorToDB 는 추후 — fault trigger 발화 측 (monitor)
-    이 직접 처리하거나 ERROR 진입 시 main.py 의 hook 에서 처리.
+    NotifyAdminUI / LogErrorToDB 는 추후 — Sequence 로 확장 예정.
+    Emergency Stop 진입 경로: `/gogoping/emergency_stop` (std_srvs/Trigger) →
+    command_listener → fsm.force_state("ERROR") → BT_error_main 빌드 →
+    StopAllMotors.initialise() 가 cmd_vel=0 + torque OFF 즉시 실행.
