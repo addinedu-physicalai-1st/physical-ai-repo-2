@@ -25,6 +25,7 @@ import py_trees
 from py_trees.common import Access, Status
 
 from ...blackboard import Keys
+from ....utils.safety_flags import is_safety_disabled
 
 if TYPE_CHECKING:
     from ....context import Context
@@ -44,13 +45,17 @@ class MapBoundaryMonitor(py_trees.behaviour.Behaviour):
         self.bb.register_key(key=Keys.ERROR_REASON, access=Access.WRITE)
         self.bb.register_key(key=Keys.ERROR_SOURCE, access=Access.WRITE)
         self._fired = False
+        # 시연/디버그 환경 — disable_error_safety:=true 면 fault trigger 발화 skip.
+        self._disabled = is_safety_disabled(
+            getattr(self.ctx, "node", None), "error", monitor_name=self.name,
+        )
 
     def initialise(self) -> None:
         # 트리 swap 시 (ASSIST/PLAY/RETURNING 재진입) 다시 발화 가능하게.
         self._fired = False
 
     def update(self) -> Status:
-        if self._fired:
+        if self._disabled or self._fired:
             return Status.RUNNING
 
         try:

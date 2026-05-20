@@ -212,11 +212,20 @@ def _flatten_leaves(node: Any, depth: int) -> list[dict]:
 
 
 def _leaf_dict(node: Any) -> dict:
-    """단일 노드 → {name, status}."""
+    """단일 노드 → ``{name, status, disabled?}``.
+
+    ``disabled`` 는 monitor 에 ``_disabled`` 속성이 있고 ``True`` 일 때만 ``True`` 로 포함
+    (utils/safety_flags.py 의 is_safety_disabled 결과 저장한 monitor). admin UI 의
+    BTStateInline 이 dim/strikethrough 로 시각 차별. ``_disabled`` 없거나 False 면
+    키 자체를 생략 — snapshot 페이로드 부풀림 방지.
+    """
     name = getattr(node, "name", "?")
     status = getattr(node, "status", None)
     status_name = status.name if status is not None else "INVALID"
-    return {"name": name, "status": status_name}
+    out: dict = {"name": name, "status": status_name}
+    if getattr(node, "_disabled", False):
+        out["disabled"] = True
+    return out
 
 
 def _find_subtree(node: Any, depth: int) -> Any | None:
