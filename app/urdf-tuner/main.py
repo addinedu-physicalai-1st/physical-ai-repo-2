@@ -42,6 +42,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -59,6 +60,8 @@ _CONFIG_DIR = _REPO_ROOT / "controller/gogoping-controller/src/vic_pinky/vicpink
 YAML_PATH = _CONFIG_DIR / "robot_dims.yaml"
 FACTORY_YAML_PATH = _CONFIG_DIR / "robot_dims.factory.yaml"
 WS_ROOT = _REPO_ROOT / "controller/gogoping-controller"
+SYNC_SCRIPT = Path(__file__).resolve().parent / "sync_to_sim.py"
+SIM_XACRO_REL = "src/gogoping/gogoping_navigation/urdf/pinky_kindergarten.urdf.xacro"
 
 YAML_HEADER = (
     "# Vic Pinky 로봇 dimension. app/urdf-tuner GUI 가 편집.\n"
@@ -72,6 +75,12 @@ YAML_HEADER = (
 
 # Hardcoded fallback — factory yaml 이 사라졌을 때만 사용.
 _FALLBACK_DEFAULTS = {
+    "chassis": {
+        "length": 0.6, "width": 0.5, "height": 0.128, "z_offset": 0.087,
+    },
+    "caster": {
+        "radius": 0.0435, "x": 0.244, "y": 0.094,
+    },
     "wheel": {
         "radius": 0.0825, "thickness": 0.05, "separation": 0.4288,
         "x_offset": 0.0, "z_offset": -0.0048,
@@ -122,30 +131,44 @@ _MM = 1000.0
 _RAD = 1.0
 _RAD_LIM = math.pi * 2
 
-WHEEL_FIELDS = [
-    Field("radius",     "Radius",     1.0,    500.0,  0.1,  "mm",  _MM, 3),
-    Field("thickness",  "Thickness",  1.0,    500.0,  0.1,  "mm",  _MM, 3),
-    Field("separation", "Separation", 1.0,   2000.0,  0.1,  "mm",  _MM, 3),
-    Field("x_offset",   "X offset",  -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "앞(+) / 뒤(-)"),
-    Field("z_offset",   "Z offset",  -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "위(+) / 아래(-)"),
+CHASSIS_FIELDS = [
+    Field("length",   "Length (X)",  10.0, 3000.0, 1.0, "mm", _MM, 3, "본체 collision box 앞↔뒤 (시각 메쉬 안 바뀜)"),
+    Field("width",    "Width  (Y)",  10.0, 3000.0, 1.0, "mm", _MM, 3, "본체 collision box 좌↔우 (시각 메쉬 안 바뀜)"),
+    Field("height",   "Height (Z)",  10.0, 1000.0, 1.0, "mm", _MM, 3, "본체 collision box 위↔아래"),
+    Field("z_offset", "Z (ground)",   0.0, 1000.0, 1.0, "mm", _MM, 3, "지면 → base_link 중심 높이 (전체 차체 올림)"),
 ]
 
+CASTER_FIELDS = [
+    Field("radius", "Radius", 1.0, 500.0, 0.1, "mm", _MM, 3, "보조 바퀴 반지름 (4 바퀴 동일)"),
+    Field("x",      "X",      0.0, 1500.0, 0.1, "mm", _MM, 3, "base 기준 |X| — 앞·뒤 4 바퀴 좌우 대칭 (±X)"),
+    Field("y",      "Y",      0.0, 1500.0, 0.1, "mm", _MM, 3, "base 기준 |Y| — 좌·우 4 바퀴 좌우 대칭 (±Y)"),
+]
+
+WHEEL_FIELDS = [
+    Field("radius",     "Radius",     1.0,    500.0,  0.1,  "mm",  _MM, 3, "바퀴 반지름 — 커지면 차체 ↑, odom 전진속도 ↑"),
+    Field("thickness",  "Thickness",  1.0,    500.0,  0.1,  "mm",  _MM, 3, "바퀴 두께 — 시각/충돌만 영향"),
+    Field("separation", "Separation", 1.0,   2000.0,  0.1,  "mm",  _MM, 3, "좌우 바퀴 간격 — 작아지면 같은 회전명령에 더 빨리 회전"),
+    Field("x_offset",   "X offset",  -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "앞(+) / 뒤(-)  — base 기준 좌우 바퀴 X 위치"),
+    Field("z_offset",   "Z offset",  -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "위(+) / 아래(-) — 보통 음수 (차체 아래)"),
+]
+
+# REP-103 frame convention: X=forward, Y=left, Z=up
 LIDAR_MOUNT_FIELDS = [
-    Field("mount_x",    "X",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3),
-    Field("mount_y",    "Y",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3),
-    Field("mount_z",    "Z",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3),
-    Field("mount_roll", "Roll",  -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4),
-    Field("mount_pitch","Pitch", -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4),
-    Field("mount_yaw",  "Yaw",   -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4),
+    Field("mount_x",    "X",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "앞(+) / 뒤(-) — LIDAR 케이스가 차체 어디에 박혀있나"),
+    Field("mount_y",    "Y",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "좌(+) / 우(-) — 보통 0 (가운데)"),
+    Field("mount_z",    "Z",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "위(+) / 아래(-) — 차체 위 높이"),
+    Field("mount_roll", "Roll",  -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4, "X축 회전 — LIDAR 가 좌우로 기울어짐"),
+    Field("mount_pitch","Pitch", -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4, "Y축 회전 — LIDAR 가 앞뒤로 기울어짐"),
+    Field("mount_yaw",  "Yaw",   -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4, "Z축 회전 — LIDAR 케이스 방향 (자세히 잘못 박혔을 때)"),
 ]
 
 LIDAR_LASER_FIELDS = [
-    Field("laser_x",    "X",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3),
-    Field("laser_y",    "Y",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3),
-    Field("laser_z",    "Z",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3),
-    Field("laser_roll", "Roll",  -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4),
-    Field("laser_pitch","Pitch", -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4),
-    Field("laser_yaw",  "Yaw",   -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4),
+    Field("laser_x",    "X",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "앞(+) / 뒤(-) — LIDAR 케이스 안의 측정 원점"),
+    Field("laser_y",    "Y",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "좌(+) / 우(-)"),
+    Field("laser_z",    "Z",     -1000.0, 1000.0, 0.1,  "mm",  _MM, 3, "위(+) / 아래(-) — 케이스 위쪽 모터 회전축"),
+    Field("laser_roll", "Roll",  -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4, "X축 회전 (scan 평면 기울이기)"),
+    Field("laser_pitch","Pitch", -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4, "Y축 회전 (scan 평면 기울이기)"),
+    Field("laser_yaw",  "Yaw",   -_RAD_LIM, _RAD_LIM, 0.01, "rad", _RAD, 4, "Z축 회전 — scan 0° 방향. default π = LIDAR 뒤가 robot 앞"),
 ]
 
 
@@ -237,6 +260,8 @@ QGroupBox[accent="indigo"] { border-left: 3px solid #4f46e5; }
 QGroupBox[accent="cyan"]   { border-left: 3px solid #0891b2; }
 QGroupBox[accent="green"]  { border-left: 3px solid #059669; }
 QGroupBox[accent="pink"]   { border-left: 3px solid #db2777; }
+QGroupBox[accent="violet"] { border-left: 3px solid #7c3aed; }
+QGroupBox[accent="orange"] { border-left: 3px solid #ea580c; }
 
 QGroupBox#sub {
     background-color: #fafbfc;
@@ -427,14 +452,37 @@ class TunerWindow(QMainWindow):
         # 2-column layout:
         #   col 0 (dims):  Wheel, LIDAR mount, LIDAR laser
         #   col 1 (tools): Calibration, RViz preview
-        grid.addWidget(self._build_group("WHEEL", "wheel", WHEEL_FIELDS, "amber"), 0, 0)
-        grid.addWidget(self._build_group("LIDAR · MOUNT", "lidar", LIDAR_MOUNT_FIELDS, "indigo"), 1, 0)
-        grid.addWidget(self._build_group("LIDAR · LASER", "lidar", LIDAR_LASER_FIELDS, "cyan"), 2, 0)
+        grid.addWidget(self._build_group(
+            "CHASSIS", "chassis", CHASSIS_FIELDS, "violet",
+            "본체 collision box + inertia + 지면 높이.\n"
+            "⚠️ 시각 본체는 메쉬(base_link.stl)라 dim 변경해도 안 바뀜.\n"
+            "    box (시뮬 충돌만) 와 차체 올림/내림 효과만."
+        ), 0, 0)
+        grid.addWidget(self._build_group(
+            "CASTER  ·  보조 바퀴", "caster", CASTER_FIELDS, "orange",
+            "보조 바퀴 4 개 (front_left/right, rear_left/right).\n"
+            "Z 는 ground touch 자동 (base 높이 − radius 기준)."
+        ), 1, 0)
+        grid.addWidget(self._build_group(
+            "WHEEL  ·  구동 바퀴", "wheel", WHEEL_FIELDS, "amber",
+            "radius/separation 은 URDF + Gazebo + bringup.py odom 까지 동기화.\n"
+            "x/z offset 은 base_link 기준 좌우 wheel link 위치."
+        ), 2, 0)
+        grid.addWidget(self._build_group(
+            "LIDAR · MOUNT", "lidar", LIDAR_MOUNT_FIELDS, "indigo",
+            "base_link → lidar_mount 정적 transform.  LIDAR 케이스 위치·자세."
+        ), 3, 0)
+        grid.addWidget(self._build_group(
+            "LIDAR · LASER", "lidar", LIDAR_LASER_FIELDS, "cyan",
+            "lidar_mount → laser_link transform.  scan frame.\n"
+            "yaw = π default: LIDAR 모터 0° 가 robot 뒤쪽이라 +π 보정."
+        ), 4, 0)
         grid.addWidget(self._build_calibration_group(), 0, 1, 2, 1)
         grid.addWidget(self._build_rviz_group(), 2, 1)
+        grid.addWidget(self._build_sim_sync_group(), 3, 1, 2, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        grid.setRowStretch(3, 1)
+        grid.setRowStretch(5, 1)
 
         scroll.setWidget(body)
         outer.addWidget(scroll, stretch=1)
@@ -498,15 +546,29 @@ class TunerWindow(QMainWindow):
         return f
 
     def _build_group(self, title: str, section: str,
-                     fields: list[Field], accent: str) -> QGroupBox:
+                     fields: list[Field], accent: str,
+                     description: str = "") -> QGroupBox:
         group = QGroupBox(title)
         group.setProperty("accent", accent)
-        form = QFormLayout(group)
+        outer = QVBoxLayout(group)
+        outer.setSpacing(6)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        if description:
+            hint = QLabel(description)
+            hint.setObjectName("section-hint")
+            hint.setWordWrap(True)
+            outer.addWidget(hint)
+
+        form_wrap = QWidget()
+        form = QFormLayout(form_wrap)
+        form.setContentsMargins(0, 0, 0, 0)
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         form.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
         form.setVerticalSpacing(6)
         form.setHorizontalSpacing(12)
         form.setFieldGrowthPolicy(QFormLayout.FieldsStayAtSizeHint)
+        outer.addWidget(form_wrap)
 
         for spec in fields:
             spin = QDoubleSpinBox()
@@ -523,7 +585,17 @@ class TunerWindow(QMainWindow):
             self._fields[(section, spec.key)] = spec
             self._spins[(section, spec.key)] = spin
 
-            label_w = QLabel(spec.label)
+            if spec.tooltip:
+                label_html = (
+                    f"<span>{spec.label}</span>"
+                    f"<br><span style='color:#8a92a3; font-size:9px; font-weight:400;'>"
+                    f"{spec.tooltip}</span>"
+                )
+            else:
+                label_html = spec.label
+            label_w = QLabel(label_html)
+            label_w.setTextFormat(Qt.RichText)
+            label_w.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if spec.tooltip:
                 label_w.setToolTip(spec.tooltip)
             form.addRow(label_w, spin)
@@ -636,6 +708,63 @@ class TunerWindow(QMainWindow):
         QTimer.singleShot(0, self._update_calib_previews)
         return group
 
+    def _build_sim_sync_group(self) -> QGroupBox:
+        group = QGroupBox("SIM SYNC  ·  RVIZ + GAZEBO LIVE")
+        group.setProperty("accent", "indigo")
+        v = QVBoxLayout(group)
+        v.setSpacing(8)
+
+        desc = QLabel(
+            "device-gogoping-sim.sh 가 떠있을 때 GUI 의 변경을 즉시 sim 에 push.\n"
+            "RSP push 는 RViz 가 새 URDF 를 받아 시각 갱신, Gazebo respawn 은\n"
+            "entity 를 같은 위치에 재 spawn (1~2 초 깜빡임)."
+        )
+        desc.setObjectName("section-hint")
+        desc.setWordWrap(True)
+        v.addWidget(desc)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(5)
+        form.setHorizontalSpacing(10)
+        self.sync_ns = QLineEdit("gogoping")
+        self.sync_ns.setMaximumWidth(160)
+        self.sync_entity = QLineEdit("gogopingpinky")
+        self.sync_entity.setMaximumWidth(160)
+        self.sync_world = QLineEdit("pingdergarten")
+        self.sync_world.setMaximumWidth(160)
+        form.addRow("Namespace", self.sync_ns)
+        form.addRow("Entity (gazebo)", self.sync_entity)
+        form.addRow("World (gazebo)", self.sync_world)
+        v.addLayout(form)
+
+        self.sync_push_rsp = QCheckBox("Push to robot_state_publisher (RViz 실시간)")
+        self.sync_push_rsp.setChecked(True)
+        v.addWidget(self.sync_push_rsp)
+
+        self.sync_respawn = QCheckBox("Respawn Gazebo entity (시뮬 시각·물리 갱신)")
+        self.sync_respawn.setChecked(False)
+        v.addWidget(self.sync_respawn)
+
+        self.sync_on_save = QCheckBox("Auto-sync on save")
+        self.sync_on_save.setChecked(False)
+        v.addWidget(self.sync_on_save)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self.sync_now_btn = QPushButton("SYNC NOW")
+        self.sync_now_btn.setObjectName("run")
+        self.sync_now_btn.clicked.connect(self.on_sync_now)
+        row.addWidget(self.sync_now_btn)
+        row.addStretch(1)
+        v.addLayout(row)
+
+        self.sync_status = QLabel("●  IDLE")
+        self.sync_status.setObjectName("mono")
+        self.sync_status.setStyleSheet("color: #9a9aa5; font-weight: 700; font-size: 11px;")
+        v.addWidget(self.sync_status)
+
+        return group
+
     def _build_actions_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(8)
@@ -688,10 +817,10 @@ class TunerWindow(QMainWindow):
         self._update_calib_previews()
 
     def _collect_from_ui(self) -> dict:
-        out: dict = {"wheel": {}, "lidar": {}}
+        out: dict = {}
         for (section, key), spin in self._spins.items():
             spec = self._fields[(section, key)]
-            out[section][key] = spin.value() / spec.scale
+            out.setdefault(section, {})[key] = spin.value() / spec.scale
         return out
 
     def _current_yaml_val(self, section: str, key: str) -> float:
@@ -785,6 +914,8 @@ class TunerWindow(QMainWindow):
         self._set_status_saved()
         if self._rviz_proc is not None and self.rviz_autoreload.isChecked():
             self._restart_rviz()
+        if self.sync_on_save.isChecked():
+            self._run_sim_sync()
 
     def on_reset(self) -> None:
         factory_note = (
@@ -793,12 +924,18 @@ class TunerWindow(QMainWindow):
         )
         reply = QMessageBox.question(
             self, "Reset to factory",
-            f"슬라이더와 YAML 을 공장 baseline 으로 복원합니다.\n\n"
+            "다음을 모두 공장 baseline 으로 복원합니다:\n\n"
+            "  • Wheel / LIDAR 슬라이더\n"
+            "  • robot_dims.yaml (디스크)\n"
+            "  • Calibration helper 입력값  (100 cm  /  360°)\n"
+            "  • SIM SYNC 입력값  (gogoping  /  gogoping/pinky  /  default)\n\n"
             f"source: {factory_note}\n\n계속할까요?",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
+
+        # 1. Wheel / LIDAR sliders + YAML
         defaults = load_factory_defaults()
         self._load_into_ui(defaults)
         try:
@@ -807,6 +944,22 @@ class TunerWindow(QMainWindow):
             QMessageBox.critical(self, "Save failed", f"Failed to write YAML:\n{e}")
             self._set_status_dirty()
             return
+
+        # 2. Calibration helper inputs
+        self.lin_cmd.setValue(100.0)
+        self.lin_meas.setValue(100.0)
+        self.ang_cmd.setValue(360.0)
+        self.ang_meas.setValue(360.0)
+
+        # 3. SIM SYNC inputs
+        self.sync_ns.setText("gogoping")
+        self.sync_entity.setText("gogopingpinky")
+        self.sync_world.setText("pingdergarten")
+        self.sync_push_rsp.setChecked(True)
+        self.sync_respawn.setChecked(False)
+        self.sync_on_save.setChecked(False)
+        self._set_sync_status("●  IDLE", "#9a9aa5")
+
         self._set_status_saved()
         if self._rviz_proc is not None and self.rviz_autoreload.isChecked():
             self._restart_rviz()
@@ -887,6 +1040,86 @@ class TunerWindow(QMainWindow):
             self.rviz_stop_btn.setEnabled(False)
             self.rviz_status.setText("●  ERROR")
             self.rviz_status.setStyleSheet("color: #dc2626; font-weight: 700; font-size: 11px;")
+
+    # --- Sim sync (RSP + Gazebo respawn) --------------------------------
+
+    def on_sync_now(self) -> None:
+        self._run_sim_sync()
+
+    def _run_sim_sync(self) -> None:
+        targets = []
+        if self.sync_push_rsp.isChecked():
+            targets.append("rsp")
+        if self.sync_respawn.isChecked():
+            targets.append("gazebo")
+        if not targets:
+            self._set_sync_status("●  SKIPPED  ·  no target", "#9a9aa5")
+            return
+
+        err = self._rviz_env_ok()
+        if err is not None:
+            QMessageBox.critical(self, "Sim sync 불가", err)
+            self._set_sync_status("●  ENV ERROR", "#dc2626")
+            return
+
+        ws_setup = WS_ROOT / "install" / "setup.bash"
+        xacro_path = WS_ROOT / SIM_XACRO_REL
+        if not xacro_path.exists():
+            QMessageBox.critical(
+                self, "Xacro 없음",
+                f"{xacro_path}\n경로를 찾을 수 없습니다.",
+            )
+            self._set_sync_status("●  XACRO MISSING", "#dc2626")
+            return
+
+        namespace = self.sync_ns.text().strip()
+        rsp_node = f"/{namespace}/robot_state_publisher" if namespace else "/robot_state_publisher"
+        cmd = (
+            f"source '{ws_setup}' && "
+            f"python3 '{SYNC_SCRIPT}' "
+            f"--xacro '{xacro_path}' "
+            f"--namespace '{namespace}' "
+            f"--rsp-node '{rsp_node}' "
+            f"--entity-name '{self.sync_entity.text().strip()}' "
+            f"--world '{self.sync_world.text().strip()}' "
+            f"--targets {','.join(targets)}"
+        )
+
+        self._set_sync_status("●  SYNCING…", "#d97706")
+        QApplication.processEvents()
+
+        try:
+            r = subprocess.run(
+                ["bash", "-c", cmd],
+                cwd=str(WS_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            self._set_sync_status("●  TIMEOUT", "#dc2626")
+            QMessageBox.warning(self, "Sync timed out",
+                                "30 초 안에 끝나지 않았습니다. sim 이 떠있는지, "
+                                "namespace 가 맞는지 확인하세요.")
+            return
+
+        if r.returncode != 0:
+            self._set_sync_status("●  FAILED", "#dc2626")
+            QMessageBox.critical(
+                self, "Sync failed",
+                f"exit={r.returncode}\n\nstderr:\n{r.stderr.strip()[:1200]}",
+            )
+            return
+
+        msg = (r.stdout + r.stderr).strip().splitlines()
+        last = msg[-1] if msg else "OK"
+        self._set_sync_status(f"✓  {last}", "#059669")
+
+    def _set_sync_status(self, text: str, color: str) -> None:
+        self.sync_status.setText(text)
+        self.sync_status.setStyleSheet(
+            f"color: {color}; font-weight: 700; font-size: 11px;"
+        )
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._kill_rviz()
