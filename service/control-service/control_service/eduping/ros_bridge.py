@@ -77,6 +77,11 @@ PLAYBACK_RAMP_MAX_VEL = 1.5   # rad/s — 갭 / 이 값 = ramp 시간 (clamp 사
 TELEOP_MAX_VEL_RAD_S = 2.0    # rad/s — SmoothDamp 의 catch-up 단계 속도 cap
 TELEOP_SMOOTH_TIME_S = 0.25   # SmoothDamp 시정수 — target 도달까지 nominal 시간
 TELEOP_TICK_DT_MAX = 0.04     # dt clamp 상한 — leader stale 시 단일 tick 점프 방지
+# 라이브 텔레옵에서 GripperActionController 에 throttled 으로 action goal 을 보내
+# 그리퍼도 leader 를 따라가게 함. 매 tick (50Hz) 마다 보내면 액션 churn 이 심해 1mm
+# 변화 + 최소 50ms 간격 (max 20Hz) 로 제한.
+TELEOP_GRIP_THRESHOLD_M = 0.001
+TELEOP_GRIP_MIN_INTERVAL_S = 0.05
 
 
 # --- 데이터 -----------------------------------------------------------------
@@ -158,6 +163,11 @@ class EdupingRosBridge:
         self._teleop_vel_right: list[float] | None = None
         self._teleop_vel_left: list[float] | None = None
         self._teleop_last_tick_s: float = 0.0
+        # 그리퍼 throttle state — 직전에 보낸 값 (dedupe) + 시각 (min interval).
+        self._teleop_grip_right_last: float | None = None
+        self._teleop_grip_left_last: float | None = None
+        self._teleop_grip_right_sent_s: float = 0.0
+        self._teleop_grip_left_sent_s: float = 0.0
 
         # listener: dict[topic_name, set[callback]] — WS hub 들이 등록.
         self._listeners_state: set[Callable[[dict], Any]] = set()
@@ -273,7 +283,10 @@ class EdupingRosBridge:
 
         per-joint velocity state 를 유지해서 가속도 연속 (jerk-free). 큰 갭 catch-up
         단계는 max_speed 로 cap, 가까워지면 smooth_time 시정수로 자연 감속.
-        그리퍼는 GripperActionController 라 streaming 안 됨 — mirror 제외.
+
+        그리퍼는 GripperActionController 라 토픽 streaming 이 안 되지만 action goal 을
+        throttled (1mm 변화 + min 50ms 간격) 로 보내 leader 의 finger_joint1 을 따라가게
+        함. send_goal_async — 직전 goal 은 controller 가 preempt.
         """
         right_idx, left_idx = [], []
         for i in range(1, 8):
@@ -286,6 +299,16 @@ class EdupingRosBridge:
                 return  # 이름이 다르면 (구 녹화 leader 등) 스킵
         target_right = [float(pos[i]) for i in right_idx]
         target_left = [float(pos[i]) for i in left_idx]
+
+        # 그리퍼 finger_joint1 값 추출 — 누락이면 None (구 leader). arm mirror 는 계속.
+        try:
+            grip_right: float | None = float(pos[names.index("openarm_right_finger_joint1")])
+        except ValueError:
+            grip_right = None
+        try:
+            grip_left: float | None = float(pos[names.index("openarm_left_finger_joint1")])
+        except ValueError:
+            grip_left = None
 
         now = time.monotonic()
         with self._lock:
@@ -343,6 +366,42 @@ class EdupingRosBridge:
             m = Float64MultiArray()
             m.data = [float(x) for x in new_left_pos]
             self._pub_left_forward.publish(m)
+
+        self._maybe_send_gripper_goal("right", grip_right, now)
+        self._maybe_send_gripper_goal("left", grip_left, now)
+
+    def _maybe_send_gripper_goal(self, side: str, value: float | None, now: float) -> None:
+        """라이브 텔레옵 그리퍼 throttled action send.
+
+        - value 누락 / 액션 서버 미준비 → skip
+        - 직전 send 값과 1mm 미만 변화 OR 50ms 이내 → skip (action churn 완화)
+        """
+        if value is None:
+            return
+        if side == "right":
+            ac = self._ac_right_gripper
+            last_val = self._teleop_grip_right_last
+            last_sent = self._teleop_grip_right_sent_s
+        else:
+            ac = self._ac_left_gripper
+            last_val = self._teleop_grip_left_last
+            last_sent = self._teleop_grip_left_sent_s
+        if ac is None or not ac.server_is_ready():
+            return
+        if last_val is not None and abs(value - last_val) < TELEOP_GRIP_THRESHOLD_M:
+            return
+        if last_sent > 0.0 and (now - last_sent) < TELEOP_GRIP_MIN_INTERVAL_S:
+            return
+        goal = GripperCommand.Goal()
+        goal.command.position = value
+        goal.command.max_effort = 5.0
+        ac.send_goal_async(goal)
+        if side == "right":
+            self._teleop_grip_right_last = value
+            self._teleop_grip_right_sent_s = now
+        else:
+            self._teleop_grip_left_last = value
+            self._teleop_grip_left_sent_s = now
 
     def _on_follower(self, msg: "JointState") -> None:
         names = list(msg.name)
@@ -457,6 +516,11 @@ class EdupingRosBridge:
                 self._teleop_vel_left = None
                 # 첫 dt 가 huge 가 안 되도록 enable 시점을 last_tick 으로 박음.
                 self._teleop_last_tick_s = time.monotonic()
+                # 그리퍼 throttle 초기화 — 첫 tick 무조건 send.
+                self._teleop_grip_right_last = None
+                self._teleop_grip_left_last = None
+                self._teleop_grip_right_sent_s = 0.0
+                self._teleop_grip_left_sent_s = 0.0
             return {"active": True, "switch": "ok"}
         else:
             with self._lock:
@@ -467,6 +531,10 @@ class EdupingRosBridge:
                 self._teleop_cmd_left = None
                 self._teleop_vel_right = None
                 self._teleop_vel_left = None
+                self._teleop_grip_right_last = None
+                self._teleop_grip_left_last = None
+                self._teleop_grip_right_sent_s = 0.0
+                self._teleop_grip_left_sent_s = 0.0
             self._switch_controllers(
                 activate=["right_joint_trajectory_controller", "left_joint_trajectory_controller"],
                 deactivate=["right_forward_position_controller", "left_forward_position_controller"],
