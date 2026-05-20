@@ -20,7 +20,7 @@ from py_trees.common import Access
 
 
 class Keys:
-    """Blackboard 변수 이름 상수 — 23개.
+    """Blackboard 변수 이름 상수 — 25개.
 
     **문자열 직접 사용 금지** — 항상 ``Keys.<NAME>`` 형태로만 참조.
     """
@@ -60,6 +60,10 @@ class Keys:
     # 수동 모드 (manual_torque_hold 가 W)
     MANUAL_TORQUE_ACTIVE = "manual_torque_active" # bool — True 면 motor torque OFF 상태 (사용자 직접 밀기 가능). admin UI 표시용
 
+    # IDLE 타임아웃 (idle_timeout_monitor 가 W) — admin UI 카운트다운 표시용
+    IDLE_ENTERED_AT = "idle_entered_at"           # float (monotonic sec). IDLE 미진입 시 -1.0
+    IDLE_TIMEOUT_SECONDS = "idle_timeout_seconds" # float — 현재 적용 중인 ROS param 값
+
 
 # 부팅 시 초기값 — 사용 전 writer 가 없을 가능성이 있는 키만.
 # 무엇이 어떤 시점에 쓰이는지는 docs/blackboard-schema.md 의 R/W 매트릭스.
@@ -91,6 +95,9 @@ _DEFAULTS: dict[str, object] = {
     Keys.ERROR_SOURCE: "",
     # 수동 모드
     Keys.MANUAL_TORQUE_ACTIVE: False,
+    # IDLE 타임아웃
+    Keys.IDLE_ENTERED_AT: -1.0,
+    Keys.IDLE_TIMEOUT_SECONDS: 86400.0,
     # 주: TARGET_POSE / TARGET_FACE_BBOX 는 perception writer 가 세팅 전까지
     # 미정의 — reader 가 hasattr / try-except 로 staleness 판정.
 }

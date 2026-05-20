@@ -220,6 +220,46 @@ class StateClient:
 
         threading.Thread(target=_run, name="emergency_stop", daemon=True).start()
 
+    def post_idle_timeout(
+        self,
+        seconds: float,
+        on_result: Callable[[float, bool, str], None] | None = None,
+    ) -> None:
+        """IDLE → RETURNING 자동 복귀 임계값 설정 — ``POST /api/gogoping/idle_timeout``.
+
+        별도 thread 에서 HTTP 호출. 응답 시 ``on_result(seconds, ok, reason)`` 콜백.
+        Admin UI 의 IdleTimeout 슬라이더가 호출.
+
+        서버는 1.0 ≤ seconds ≤ 86400.0 검증 후 ROS param 변경. IdleTimeoutMonitor 의
+        on_set_parameters_callback 이 즉시 ``self._timeout_s`` 갱신 → 현재 진행 중인
+        IDLE 카운트다운에도 다음 tick 부터 새 임계 적용.
+        """
+        url = f"{self._base}/api/gogoping/idle_timeout"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(url, json={"seconds": seconds})
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(seconds, ok, reason)
+                except Exception as e:
+                    logger.warning(f"idle_timeout on_result 콜백 오류: {e}")
+
+        threading.Thread(target=_run, name=f"idle_timeout_{seconds:.0f}", daemon=True).start()
+
     def post_robot_pose(
         self,
         x: float,

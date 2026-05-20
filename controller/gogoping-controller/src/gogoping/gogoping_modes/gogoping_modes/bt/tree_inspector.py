@@ -65,7 +65,34 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader.register_key(key=Keys.ROBOT_POSE, access=Access.READ)
         _bb_reader.register_key(key=Keys.ASSIST_TASK, access=Access.READ)
         _bb_reader.register_key(key=Keys.PLAY_TASK, access=Access.READ)
+        _bb_reader.register_key(key=Keys.IDLE_ENTERED_AT, access=Access.READ)
+        _bb_reader.register_key(key=Keys.IDLE_TIMEOUT_SECONDS, access=Access.READ)
     return _bb_reader
+
+
+def _read_idle_countdown(fsm_state: str) -> tuple[float | None, float | None]:
+    """IDLE 일 때 (remaining, total) 반환. 아니면 (None, total). 모니터 미설치 시 (None, None).
+
+    - remaining = max(0, total - (monotonic_now - entered_at)). 모니터가 IDLE 진입 직후
+      ``IDLE_ENTERED_AT`` 을 monotonic 으로 set, terminate 시 -1.0 으로 리셋.
+    - total 은 IDLE 외 상태에서도 표시 — admin UI 가 "총 X분 / IDLE 시 카운트다운" 형태로
+      쓸 수 있음.
+    """
+    bb = _ensure_bb_reader()
+    try:
+        total = float(bb.get(Keys.IDLE_TIMEOUT_SECONDS))
+    except (KeyError, TypeError, ValueError):
+        return None, None
+    if fsm_state != "IDLE":
+        return None, total
+    try:
+        entered_at = float(bb.get(Keys.IDLE_ENTERED_AT))
+    except (KeyError, TypeError, ValueError):
+        return None, total
+    if entered_at < 0:
+        return None, total
+    elapsed = time.monotonic() - entered_at
+    return max(0.0, total - elapsed), total
 
 
 def _read_battery_level() -> float | None:
@@ -146,6 +173,8 @@ def snapshot(
         except Exception:
             in_map = None
 
+    idle_remaining, idle_total = _read_idle_countdown(fsm_state)
+
     return {
         "robot_id": robot_id,
         "fsm_state": fsm_state,
@@ -156,6 +185,10 @@ def snapshot(
         "battery_level": _read_battery_level(),
         "robot_pose": pose,
         "in_map": in_map,
+        # IDLE → RETURNING 자동 복귀 카운트다운 — admin UI IdleTimeoutPanel 가 표시.
+        # remaining: IDLE 일 때만 float, 아니면 None. total: 항상 float (totals 표시용).
+        "idle_seconds_remaining": idle_remaining,
+        "idle_timeout_seconds": idle_total,
         "ts": time.time(),
     }
 

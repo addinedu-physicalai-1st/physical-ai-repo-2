@@ -32,6 +32,9 @@ SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
 SERVICE_SET_ROBOT_POSE = "/gogoping/debug/set_robot_pose"
 SERVICE_SET_GAZEBO_POSE = "/gogoping/sim/teleport_pose"
 SERVICE_EMERGENCY_STOP = "/gogoping/emergency_stop"
+# gogoping_modes 노드 (namespace gogoping, name gogoping_modes) 의 표준 ParamServer.
+# admin UI 에서 IDLE → RETURNING 임계값 (idle_timeout_seconds) 조정 시 호출.
+SERVICE_SET_PARAMETERS = "/gogoping/gogoping_modes/set_parameters"
 
 # admin UI NavDebugLogCard 가 WS 연결 시 backfill 받는 최근 이벤트 수.
 # 시나리오 재현 직후 늦게 연결해도 직전 cancel chain 한 cycle 정도는 보임.
@@ -87,6 +90,7 @@ class GogopingRosBridge:
         self._set_robot_pose_cli: Any = None  # SetRobotPose.srv client (디버그 전용)
         self._set_gazebo_pose_cli: Any = None  # SetGazeboPose.srv client (sim 디버그 전용)
         self._estop_cli: Any = None        # std_srvs/Trigger client — emergency_stop
+        self._set_params_cli: Any = None   # rcl_interfaces/SetParameters — idle_timeout 등 ROS param 조정
         self._sub: Any = None              # /gogoping/state subscriber
         self._nav_event_sub: Any = None    # /gogoping/debug/nav_events subscriber
         self._executor: Any = None
@@ -108,6 +112,7 @@ class GogopingRosBridge:
         from gogoping_msgs.srv import (
             ForceState, SetBatteryLevel, SetGazeboPose, SetGoal, SetRobotPose,
         )
+        from rcl_interfaces.srv import SetParameters
         from std_msgs.msg import String
         from std_srvs.srv import Trigger
 
@@ -134,6 +139,9 @@ class GogopingRosBridge:
         )
         self._estop_cli = self._node.create_client(
             Trigger, SERVICE_EMERGENCY_STOP,
+        )
+        self._set_params_cli = self._node.create_client(
+            SetParameters, SERVICE_SET_PARAMETERS,
         )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
@@ -360,6 +368,49 @@ class GogopingRosBridge:
             return False, "timeout"
         result = future.result()
         return bool(result.success), str(result.message)
+
+    # ----------------------------------------------------------- set_idle_timeout
+
+    def set_idle_timeout_sync(self, seconds: float) -> tuple[bool, str]:
+        """IDLE → RETURNING 자동 복귀 임계값 설정.
+
+        gogoping_modes 노드의 ROS param ``idle_timeout_seconds`` 를 ``rcl_interfaces/
+        SetParameters`` 로 변경. IdleTimeoutMonitor 의 ``on_set_parameters_callback``
+        이 즉시 ``self._timeout_s`` + blackboard ``IDLE_TIMEOUT_SECONDS`` 갱신.
+
+        반환: ``(accepted, reason)``. service 미가용 / param server 거부 시 False.
+        """
+        if not self._ros_ok or self._set_params_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._set_params_cli.service_is_ready():
+            if not self._set_params_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
+        from rcl_interfaces.srv import SetParameters
+
+        req = SetParameters.Request()
+        param = Parameter()
+        param.name = "idle_timeout_seconds"
+        param.value = ParameterValue(
+            type=ParameterType.PARAMETER_DOUBLE,
+            double_value=float(seconds),
+        )
+        req.parameters = [param]
+
+        future = self._set_params_cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        # SetParameters 는 List[SetParametersResult] 반환 — 첫 결과만 본다 (1개만 보냄).
+        if not result.results:
+            return False, "no_result"
+        r0 = result.results[0]
+        return bool(r0.successful), str(r0.reason or "")
 
     # ----------------------------------------------------------- state pubsub
 
