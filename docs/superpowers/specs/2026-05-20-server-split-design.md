@@ -72,7 +72,7 @@ declare -A MACS=(
 | `_runlib::detect_env` | `VIRTUAL_ENV` / `CONDA_DEFAULT_ENV` 감지, `ENV_DESC` 설정. 활성 환경 없으면 친절한 메시지 + exit 1. |
 | `_runlib::wrap_cmd` | 감지한 환경에서 실행할 명령 문자열을 echo (`run_server.sh` 의 `wrap_cmd` 와 동일 시맨틱). |
 | `_runlib::warn_port_in_use` | `lsof` 로 TCP / UDP 포트 LISTEN 검사, 경고 출력 (치명적이지 않음). |
-| `_runlib::lookup_machine_ip <name>` | `shared/machine_ips.json` 에서 `name.ip` 추출. 파일 없음 / null 이면 stderr 안내 + exit 1. |
+| `_runlib::lookup_machine_ip <name>` | `shared/machine_ips.json` 에서 `name.ip` 추출. 파일 없음 / null 이면 stderr 안내 + return 1 (caller 가 `if !` 로 받을 수 있도록 exit 가 아닌 return). |
 
 ### 4.3 `scripts/run_db_ai.sh` (신규) — backend 박스용
 
