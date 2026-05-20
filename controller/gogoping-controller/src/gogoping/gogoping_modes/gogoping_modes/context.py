@@ -23,6 +23,7 @@ from .interfaces import (
     CameraPanClient,
     CollisionSubscriber,
     DBLogger,
+    DebugEventPublisher,
     MapCache,
     Nav2Client,
     PoseSubscriber,
@@ -50,3 +51,4 @@ class Context:
     map_cache: MapCache              # /map 구독 + is_outside(x,y) (map_boundary_monitor 가 사용)
     base_driver: BaseDriverClient = None   # /gogoping/set_torque (SetBool) — ManualTorqueHold 가 사용. None 이면 behavior 가 skip.
     cmd_vel_pub: Any = None          # /gogoping/cmd_vel publisher — AlignToDock / ReverseIntoDock 가 사용. main.py 가 주입. None 이면 behavior 가 직접 생성 (테스트 호환).
+    debug_events: DebugEventPublisher = None  # /gogoping/debug/nav_events — nav cancel chain 추적. None 이면 no-op.

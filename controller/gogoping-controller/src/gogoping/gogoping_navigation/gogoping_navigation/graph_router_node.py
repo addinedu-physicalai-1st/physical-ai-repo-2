@@ -15,7 +15,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
+import time
 from pathlib import Path
 from threading import Lock
 
@@ -32,11 +34,15 @@ from rclpy.node import Node
 from rclpy.time import Time
 from tf2_ros import Buffer, LookupException, TransformException, TransformListener
 
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from gogoping_msgs.action import NavigateToVertex
 from gogoping_msgs.srv import RouteToVertex
 from gogoping_navigation.graph import Graph
+
+
+_DEBUG_TOPIC = "/gogoping/debug/nav_events"   # admin UI NavDebugLogCard 가 SSE 로 받음
 
 
 class GraphRouterNode(Node):
@@ -98,6 +104,23 @@ class GraphRouterNode(Node):
             cancel_callback=lambda _gh: CancelResponse.ACCEPT,
             callback_group=cb,
         )
+
+        # admin UI NavDebugLogCard 가 SSE 로 받는 debug 이벤트 publisher
+        self._debug_pub = self.create_publisher(String, _DEBUG_TOPIC, 20)
+
+    def _dbg(self, msg: str, level: str = "info") -> None:
+        try:
+            payload = {
+                "ts": time.time(),
+                "source": "graph_rt",
+                "level": level,
+                "msg": msg,
+            }
+            out = String()
+            out.data = json.dumps(payload, ensure_ascii=False)
+            self._debug_pub.publish(out)
+        except Exception:
+            pass
 
     # ──────── TF map → base_link ────────
     def _tick_tf(self) -> None:
@@ -247,11 +270,18 @@ class GraphRouterNode(Node):
                 self.get_logger().info(
                     "navigate_to_vertex: client cancel → nav2 NavigateThroughPoses cancel"
                 )
+                self._dbg(
+                    f"client cancel → nav2 cancel (target={target!r}, "
+                    f"reached_idx={last_idx}/{len(seq)-1})",
+                    level="warn",
+                )
                 try:
                     cancel_future = nav_gh.cancel_goal_async()
                     await cancel_future
+                    self._dbg(f"nav2 cancel ack (target={target!r})")
                 except Exception as e:
                     self.get_logger().warning(f"nav2 cancel failed: {e}")
+                    self._dbg(f"nav2 cancel FAILED: {e}", level="err")
                 gh.canceled()
                 result.success = False
                 result.message = "canceled by client"

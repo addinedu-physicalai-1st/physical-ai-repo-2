@@ -124,8 +124,25 @@ class CommandListener(py_trees.behaviour.Behaviour):
             "target_id": g.target_id,
         }
 
+        # debug event (admin UI 추적용)
+        dbg = getattr(self.ctx, "debug_events", None)
+        if dbg is not None:
+            dbg.event(
+                "SetGoal",
+                f"mode={g.mode!r} task={g.task!r} carry_mode={g.carry_mode!r}"
+                f" dest={g.destination_key!r} target_id={g.target_id!r}",
+            )
+
         # reconcile — 순수 함수, 단위 테스트 13건 통과한 로직
         result = reconcile(goal_dict, self.ctx.fsm, self._bb_writer)
+
+        if dbg is not None:
+            dbg.event(
+                "reconcile",
+                f"trigger={result.trigger_fired!r} accepted={result.accepted}"
+                f" reason={result.reason!r}",
+                level="info" if result.accepted else "warn",
+            )
 
         # 응답 채움
         response.accepted = result.accepted

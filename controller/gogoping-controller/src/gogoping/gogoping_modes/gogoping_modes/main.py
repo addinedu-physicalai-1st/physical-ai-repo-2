@@ -34,6 +34,7 @@ from .interfaces import (
     CameraPanClient,
     CollisionSubscriber,
     DBLogger,
+    DebugEventPublisher,
     MapCache,
     Nav2Client,
     PoseSubscriber,
@@ -75,11 +76,24 @@ class GogopingModes:
             map_cache=MapCache(node),
             base_driver=BaseDriverClient(node),
             cmd_vel_pub=node.create_publisher(Twist, "/gogoping/cmd_vel", 10),
+            debug_events=DebugEventPublisher(node),
         )
 
         # 4) BT 트리 상태 + state 변화 콜백
         self.tree: py_trees.trees.BehaviourTree | None = None
         self._current_state: str | None = None
+        # _on_state_change 가 기록만 하고, 실제 BT swap 은 _tick 첫머리에서 처리.
+        # 이유:
+        #   - service callback thread (rclpy executor) 에서 fsm.trigger() 가 호출되면
+        #     transitions 라이브러리가 on_state_change 콜백을 *동기* 발화 — 그 안에서
+        #     stop(INVALID) + setup() 까지 다 하면 main thread 의 _tick 과 race
+        #     (트리 자료구조가 partial 상태에서 tick).
+        #   - VerifyDockingContact 같이 본인 트리의 update() 안에서 fsm.trigger("docked")
+        #     를 호출하는 노드가 있어 — 즉시 swap 하면 자기 트리를 자기 update 도중
+        #     stop 하는 reentrancy.
+        # 한 tick (100 ms @ 10 Hz) latency 발생하지만, BT leaf 들의 terminate() 가
+        # cmd_vel=0 / goal cancel 책임지므로 안전.
+        self._pending_state: str | None = None
         fsm.add_callback("on_state_change", self._on_state_change)
 
         # 부팅 시 INITIAL_STATE 의 트리 build (FSM 콜백은 state 변경 시에만 fire 라 초기 1회는 수동)
@@ -97,14 +111,19 @@ class GogopingModes:
     # ------------------------------------------------------------ BT swap
 
     def _on_state_change(self) -> None:
-        """FSM state 가 바뀔 때마다 호출 — 새 state 에 맞는 MainTree 로 swap."""
+        """FSM state 변경 콜백 — pending state 만 기록. 실제 BT swap 은 _tick 에서.
+
+        service callback thread 또는 본인 BT update() 안에서 호출돼도 안전 —
+        실제 트리 stop/build/setup 은 main thread (timer) 의 다음 _tick 첫머리.
+        """
         new_state = self.ctx.fsm.current_state
         if new_state == self._current_state:
             return
-        self._logger.info(
-            f"[BT swap] {self._current_state} → {new_state}"
-        )
-        self._build_tree_for_state(new_state)
+        self._pending_state = new_state
+        if self.ctx.debug_events is not None:
+            self.ctx.debug_events.event(
+                "FSM", f"{self._current_state} → {new_state}"
+            )
 
     def _build_tree_for_state(self, state: str) -> None:
         """이전 트리 shutdown + 새 트리 build + setup.
@@ -123,8 +142,11 @@ class GogopingModes:
         self.tree = py_trees.trees.BehaviourTree(root)
         try:
             # node 를 명시 전달 — NavigateToVertex 등 일부 behavior 가 setup(node=...) 를 요구.
+            # debug_events 도 같이 전달 — NavigateToVertex 가 cancel chain event publish 용.
             # py_trees 의 composite/decorator 가 자식들에게 kwargs 를 전파한다.
-            self.tree.setup(timeout=5.0, node=self.node)
+            self.tree.setup(
+                timeout=5.0, node=self.node, debug_events=self.ctx.debug_events,
+            )
         except Exception as e:
             self._logger.error(f"BT setup failed for state={state}: {e}")
             raise
@@ -133,7 +155,20 @@ class GogopingModes:
     # ------------------------------------------------------------ Tick
 
     def _tick(self) -> None:
-        """매 1/TICK_HZ 초 호출 — BT tick + root status 처리 + publish."""
+        """매 1/TICK_HZ 초 호출 — (deferred BT swap) + BT tick + root status 처리 + publish."""
+        # 0) deferred BT swap — _on_state_change 가 기록한 pending state 가 있으면 먼저 처리.
+        #    GIL 덕에 단일 ref 의 read/write 는 atomic — lock 불필요.
+        pending = self._pending_state
+        if pending is not None and pending != self._current_state:
+            self._logger.info(f"[BT swap] {self._current_state} → {pending}")
+            if self.ctx.debug_events is not None:
+                self.ctx.debug_events.event(
+                    "BT swap", f"{self._current_state} → {pending}"
+                )
+            self._build_tree_for_state(pending)
+        # 일치하든 안 하든 pending 은 소비.
+        self._pending_state = None
+
         if self.tree is None:
             return
 
