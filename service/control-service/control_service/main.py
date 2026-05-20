@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-import httpx
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -26,7 +25,7 @@ from control_service.routers import parents as parents_router
 from control_service.routers import photos as photos_router
 from control_service.routers import reports as reports_router
 from control_service.routers import schedule as schedule_router
-from control_service.routers import voice as voice_router
+from control_service import webrtc_voice as webrtc_voice_router
 from control_service.camera_pan.ros_bridge import CameraPanBridge
 from control_service.camera_pan.router import install as install_camera_pan
 from control_service.gogoping.ros_bridge import GogopingRosBridge
@@ -217,7 +216,7 @@ app.include_router(menu_router.router)
 app.include_router(photos_router.router)
 app.include_router(reports_router.router)
 app.include_router(schedule_router.router)
-app.include_router(voice_router.router)
+app.include_router(webrtc_voice_router.router)
 
 # teleop (GogoPing keyboard control) — POST /teleop/cmd_vel, WS /teleop/state, GET /teleop/health
 # install_teleop 가 라우터를 부착하고 hub 를 반환한다. 실제 start/stop 은 lifespan 에서.
@@ -307,12 +306,6 @@ app.mount(
 )
 
 
-class VoiceIntentRequest(BaseModel):
-    text: str = Field(..., min_length=1)
-    robot: Literal["eduping", "gogoping", "noriarm"]
-    class_roster: list[str] = Field(default_factory=list, max_length=40)
-
-
 class ModeRequest(BaseModel):
     robot: Literal["eduping", "gogoping", "noriarm"]
     mode: str
@@ -323,38 +316,9 @@ async def health() -> dict:
     return {"ok": True}
 
 
-@app.post("/api/voice/intent")
-async def voice_intent(req: VoiceIntentRequest) -> dict:
-    """브라우저 발화 → AI Hub 의도 분류 → 결과 반환."""
-    try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_s) as client:
-            response = await client.post(
-                f"{settings.ai_hub_url}/voice/intent",
-                json=req.model_dump(),
-            )
-            response.raise_for_status()
-            result: dict = response.json()
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"AI Hub unavailable: {exc}") from exc
-
-    return result
-
-
-@app.get("/api/voice/tts")
-async def get_tts(text: str):
-    """Robot UI TTS — AI Hub Edge neural MP3."""
-    try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_s) as client:
-            response = await client.get(
-                f"{settings.ai_hub_url}/voice/tts",
-                params={"text": text},
-            )
-            response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"AI Hub TTS unavailable: {exc}") from exc
-
-    media_type = response.headers.get("content-type", "audio/mpeg")
-    return Response(content=response.content, media_type=media_type)
+# /api/voice/intent, /api/voice/tts, /api/stt 는 WebRTC 마이그레이션 후 모두 제거.
+# 음성 흐름은 `/api/voice/webrtc/offer` 단일 진입점 (webrtc_voice.py) 으로 통합:
+# 인바운드 audio → Silero VAD → whisper, intent dispatch → outbound TTS, DataChannel 제어.
 
 
 @app.post("/api/mode")

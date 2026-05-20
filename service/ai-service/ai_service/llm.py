@@ -146,30 +146,6 @@ class LLMError(Exception):
     pass
 
 
-async def classify_intent(text: str, robot: str) -> dict[str, Any]:
-    """Ollama 호출 → 의도 분류 결과 dict 반환.
-
-    실패 시 LLMError raise. 호출자가 fallback 결정.
-    """
-    system = prompts.classify_system(robot)
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": text},
-    ]
-
-    raw = await _ollama_chat(
-        messages=messages,
-        num_predict=settings.ollama_classify_num_predict,
-        num_ctx=settings.ollama_classify_num_ctx,
-        temperature=0.1,
-    )
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        raise LLMError(f"JSON 파싱 실패: {raw[:200]}")
-
-
 async def generate_chat(
     text: str,
     robot: str,

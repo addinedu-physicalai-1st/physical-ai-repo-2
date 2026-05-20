@@ -22,8 +22,6 @@ class Settings:
     ollama_report_validate_num_predict: int = 2048
     ollama_report_validate_num_ctx: int = 8192
     ollama_report_validate_temperature: float = 0.12
-    ollama_classify_num_predict: int = 28
-    ollama_classify_num_ctx: int = 768
     # 생성 상한 — 짧은 JSON 답은 EOS 로 일찍 끝나고, 상한만 너무 크면 최악 지연만 커짐.
     ollama_chat_num_predict: int = 156
     # 프롬프트 프리필 비용 줄이기(512 로도 시스템 프롬프트는 통상 충분).

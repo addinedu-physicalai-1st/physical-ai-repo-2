@@ -1,5 +1,9 @@
 import type { EmotionId, RobotId } from '@/config/robots';
 
+/**
+ * 의도 분류 응답 타입 — `useVoiceController` 가 WebRTC DataChannel `intent` 메시지
+ * payload 의 type guard 로 사용. 서버 (`ai-service /voice/intent`) 가 동일 shape.
+ */
 export type IntentResponse =
   | { kind: 'mode_change'; mode: string }
   | { kind: 'sub_command'; action: 'stop' | 'return' }
@@ -7,29 +11,10 @@ export type IntentResponse =
   | { kind: 'chat'; reply: string; emotion: EmotionId }
   | { kind: 'ignored' };
 
-export async function dispatchIntent(
-  text: string,
-  robot: RobotId,
-  signal?: AbortSignal,
-  /** 반 명단(선택) — 서버가 LLM 컨텍스트에 넣어 이름 질문 환각을 줄임 */
-  classRoster?: string[]
-): Promise<IntentResponse> {
-  const body: Record<string, unknown> = { text, robot };
-  if (classRoster?.length) {
-    body.class_roster = classRoster;
-  }
-  const response = await fetch('/api/voice/intent', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`/api/voice/intent ${response.status}`);
-  }
-  return (await response.json()) as IntentResponse;
-}
-
+/**
+ * 모드 셀렉터 UI 클릭 → 서버 알림 — ROS bridge / 로깅 등이 후속 처리.
+ * 음성 intent 와는 별개 경로 (UI 클릭만).
+ */
 export async function postModeClick(mode: string, robot: RobotId): Promise<void> {
   const response = await fetch('/api/mode', {
     method: 'POST',

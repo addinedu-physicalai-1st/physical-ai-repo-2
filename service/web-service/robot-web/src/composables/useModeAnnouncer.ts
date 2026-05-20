@@ -2,7 +2,7 @@ import { onBeforeUnmount, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
-import { useTTS } from '@/composables/useTTS';
+import type { VoiceController } from '@/composables/useVoiceController';
 
 interface ModeAudioConfig {
   src: string;
@@ -13,17 +13,20 @@ interface ModeAudioConfig {
 /**
  * 모드 전환 시 "{모드} 모드" TTS 발화 후, 모드별 mp3 재생.
  * 첫 진입(default 모드 셋업)은 발화 생략 — `immediate: false` 로 처리.
+ *
+ * TTS 는 server 측 (WebRTC outbound) 를 사용 — voiceController.speak 로 위임.
+ * 클라 측에서는 lip-sync 가 자동으로 attach/detach 됨.
  */
-export function useModeAnnouncer(audioByMode: Record<string, ModeAudioConfig> = {}): void {
-  const { speak, cancel: cancelTTS } = useTTS();
+export function useModeAnnouncer(
+  voiceController: VoiceController,
+  audioByMode: Record<string, ModeAudioConfig> = {},
+): void {
   const mode = useModeStore();
   const voice = useVoiceStore();
   const { currentMode } = storeToRefs(mode);
   const { isSpeaking } = storeToRefs(voice);
 
   const elements = new Map<string, HTMLAudioElement>();
-  // 발화 도중 다른 모드로 전환되면 stale mp3 재생을 막기 위한 토큰
-  let transitionToken = 0;
 
   function getElement(modeName: string, config: ModeAudioConfig): HTMLAudioElement {
     let el = elements.get(modeName);
@@ -64,7 +67,7 @@ export function useModeAnnouncer(audioByMode: Record<string, ModeAudioConfig> = 
 
   watch(
     currentMode,
-    async (next, prev) => {
+    (next, prev) => {
       if (prev && prev !== next) {
         const prevEl = elements.get(prev);
         if (prevEl) {
@@ -72,11 +75,9 @@ export function useModeAnnouncer(audioByMode: Record<string, ModeAudioConfig> = 
           prevEl.currentTime = 0;
         }
       }
-      cancelTTS();
-
-      const myToken = ++transitionToken;
-      await speak(next);
-      if (myToken !== transitionToken) return;
+      // 진행 중 server TTS 가 있으면 비우고 새 모드 안내. WebRTC 가 즉시 buffer clear.
+      voiceController.cancelSpeak();
+      voiceController.speak(next);
 
       const config = audioByMode[next];
       if (!config) return;
@@ -90,7 +91,7 @@ export function useModeAnnouncer(audioByMode: Record<string, ModeAudioConfig> = 
   );
 
   onBeforeUnmount(() => {
-    cancelTTS();
+    voiceController.cancelSpeak();
     stopAllAudio();
     elements.clear();
   });

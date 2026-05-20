@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue';
+import { computed, inject, ref, onBeforeUnmount, onMounted, watch } from 'vue';
 import { FaceMesh, type Results } from '@mediapipe/face_mesh';
 import { useModeStore } from '@/stores/mode';
-import { useTTS } from '@/composables/useTTS';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
 
 const props = defineProps<{
@@ -11,7 +11,7 @@ const props = defineProps<{
 }>();
 
 const modeStore = useModeStore();
-const tts = useTTS();
+const voiceController = inject(VOICE_CONTROLLER_KEY);
 
 function buildGreeting(name: string, type: 'IN' | 'OUT'): string {
   return type === 'IN'
@@ -294,9 +294,12 @@ async function runRecognize(): Promise<void> {
     childCooldowns.set(checked.child_id, Date.now() + COOLDOWN_MS);
     status.value = '';
     if (!checked.already) {
-      void modeStore.holdEmotionDuring('hello', () =>
-        tts.speak(buildGreeting(checked.child_name, checked.type)),
-      );
+      // hold emotion 'hello' 짧게 표시 — WebRTC server TTS 는 fire-and-forget 이라
+      // 정확한 duration 동안 hold 는 불가. 1.5s 정도 짧게 잡고 종료.
+      void modeStore.holdEmotionDuring('hello', async () => {
+        voiceController?.speak(buildGreeting(checked.child_name, checked.type));
+        await new Promise((r) => setTimeout(r, 1500));
+      });
     }
   } finally {
     busy = false;

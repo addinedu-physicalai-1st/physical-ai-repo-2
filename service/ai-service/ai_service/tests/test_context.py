@@ -1,20 +1,28 @@
 from datetime import UTC, datetime
 
-from ai_service.context import (
+from ai_service.capabilities.db_menu import (
     _ida_polite_copula_after,
-    _is_bare_name_attendance_utterance,
-    _looks_like_menu_query,
     parse_menu_query_calendar_day,
-    _looks_like_report_query,
-    _looks_like_schedule_query,
+)
+from ai_service.capabilities.db_attendance import (
+    _is_bare_name_attendance_utterance,
     _looks_like_whereabouts_query,
-    _report_name_candidates,
-    _should_inject_attendance,
     _whereabouts_name_candidates,
     bare_name_attendance_reply,
-    child_call_name,
-    try_schedule_first_reply,
     whereabouts_attendance_reply,
+)
+from ai_service.capabilities.db_report import (
+    _looks_like_report_query,
+    _report_name_candidates,
+)
+from ai_service.capabilities.schedule_file import (
+    _looks_like_schedule_query,
+    try_schedule_first_reply,
+)
+from ai_service.context import (
+    _looks_like_menu_query,
+    _should_inject_attendance,
+    child_call_name,
 )
 
 

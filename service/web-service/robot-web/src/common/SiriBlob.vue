@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import type { VoiceState } from '@/stores/voice';
+import { useVoiceStore } from '@/stores/voice';
 
 const props = defineProps<{ level: number; state: VoiceState }>();
+const { lastWakeAt } = storeToRefs(useVoiceStore());
 
 const baseIntensity = computed(() => {
   if (props.state === 'listening' || props.state === 'wake_detected') return 1;
@@ -10,17 +13,39 @@ const baseIntensity = computed(() => {
   return 0.55;
 });
 
+const active = computed(() => props.state !== 'idle');
+
+// mic 은 wake 감지를 위해 idle 에도 항상 켜져 있어 level 이 흐른다.
+// SiriBlob 은 호출어 직후 (wake_detected) ~ listening 동안에만 음성 크기에 반응.
+const reactiveLevel = computed(() =>
+  props.state === 'wake_detected' || props.state === 'listening' ? props.level : 0
+);
+
 const wrapperStyle = computed(() => ({
-  transform: `scale(${0.55 + baseIntensity.value * 0.15 + props.level * 0.45})`,
+  transform: `scale(${0.55 + baseIntensity.value * 0.15 + reactiveLevel.value * 0.45})`,
 }));
 
 const glowStyle = computed(() => ({
-  opacity: 0.25 + baseIntensity.value * 0.2 + props.level * 0.5,
+  opacity: 0.25 + baseIntensity.value * 0.2 + reactiveLevel.value * 0.5,
 }));
+
+// 호출어가 감지될 때마다 한 번 튕긴다. wakeAt 변경 → 클래스 토글 (off → on)
+// 사이에 nextFrame 을 두어 같은 클래스가 연속 적용돼도 keyframe 이 재시작되도록.
+const bounce = ref(false);
+let bounceTimer: ReturnType<typeof setTimeout> | null = null;
+watch(lastWakeAt, (v) => {
+  if (!v) return;
+  bounce.value = false;
+  requestAnimationFrame(() => {
+    bounce.value = true;
+    if (bounceTimer) clearTimeout(bounceTimer);
+    bounceTimer = setTimeout(() => { bounce.value = false; }, 850);
+  });
+});
 </script>
 
 <template>
-  <div class="siri">
+  <div class="siri" :class="{ 'wake-bounce': bounce, active }">
     <div class="wrapper" :style="wrapperStyle">
       <div class="blob blob-1"></div>
       <div class="blob blob-2"></div>
@@ -38,6 +63,9 @@ const glowStyle = computed(() => ({
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+.siri.wake-bounce {
+  animation: wakePop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .wrapper {
   position: relative;
@@ -60,11 +88,9 @@ const glowStyle = computed(() => ({
     color-mix(in srgb, var(--primary) 30%, transparent) 65%,
     transparent 82%
   );
-  animation: m1 5s ease-in-out infinite;
 }
 .blob-2 {
   background: radial-gradient(circle at 60% 60%, #8b5cf6 0%, #a78bfa 35%, rgba(167, 139, 250, 0.4) 65%, transparent 82%);
-  animation: m2 6.2s ease-in-out infinite;
 }
 .blob-3 {
   background: radial-gradient(
@@ -74,8 +100,11 @@ const glowStyle = computed(() => ({
     color-mix(in srgb, var(--primary) 15%, rgba(96, 165, 250, 0.4)) 65%,
     transparent 82%
   );
-  animation: m3 4.6s ease-in-out infinite;
 }
+/* keyframe wobble 은 활성 상태 동안만 — idle 일 때는 완전 정지 (사용자가 호출 안 하면 움직이지 않음). */
+.siri.active .blob-1 { animation: m1 5s ease-in-out infinite; }
+.siri.active .blob-2 { animation: m2 6.2s ease-in-out infinite; }
+.siri.active .blob-3 { animation: m3 4.6s ease-in-out infinite; }
 .glow {
   position: absolute;
   inset: -14px;
@@ -97,5 +126,11 @@ const glowStyle = computed(() => ({
 @keyframes m3 {
   0%, 100% { transform: translate(0, 0); border-radius: 50% 60% 40% 50%; }
   40%       { transform: translate(8px, 10px); border-radius: 60% 40% 60% 40%; }
+}
+@keyframes wakePop {
+  0%   { transform: scale(0.7) translateY(6px); }
+  35%  { transform: scale(1.35) translateY(-10px); }
+  60%  { transform: scale(0.92) translateY(2px); }
+  100% { transform: scale(1) translateY(0); }
 }
 </style>

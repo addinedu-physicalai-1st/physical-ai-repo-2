@@ -57,19 +57,25 @@ def test_voice_intent_greeting_chat_shape() -> None:
 
 
 def test_voice_intent_name_question_uses_chat_path() -> None:
-    with patch("ai_service.hub.generate_chat", new_callable=AsyncMock) as m:
-        m.return_value = {"reply": "고고핑이에요! 반가워요.", "emotion": "happy"}
-        r = client.post("/voice/intent", json={"text": "너 이름이 뭐야?", "robot": "gogoping"})
+    with patch(
+        "ai_service.intents.common.chat_fallback.generate_chat",
+        new_callable=AsyncMock,
+    ) as m:
+        m.return_value = {"reply": "에듀핑이에요! 반가워요.", "emotion": "happy"}
+        r = client.post("/voice/intent", json={"text": "너 이름이 뭐야?", "robot": "eduping"})
     assert r.status_code == 200
     data = r.json()
     assert data["kind"] == "chat"
-    assert "고고핑" in data["reply"]
+    assert "에듀핑" in data["reply"]
     assert data.get("emotion") == "happy"
     m.assert_awaited_once()
 
 
 def test_voice_intent_schedule_skips_llm() -> None:
-    with patch("ai_service.hub.generate_chat", new_callable=AsyncMock) as m:
+    with patch(
+        "ai_service.intents.common.chat_fallback.generate_chat",
+        new_callable=AsyncMock,
+    ) as m:
         r = client.post(
             "/voice/intent",
             json={"text": "일과표 알려줘", "robot": "gogoping"},
@@ -87,17 +93,23 @@ def test_voice_intent_llm_timeout_returns_teacher_line() -> None:
         return {"reply": "늦게 온 답", "emotion": "happy"}
 
     with patch.object(hub_mod.ai_settings, "voice_chat_llm_max_wait_s", 0.1):
-        with patch("ai_service.hub.build_chat_context", new_callable=AsyncMock) as _ctx:
+        with patch(
+            "ai_service.intents.common.chat_fallback.build_chat_context",
+            new_callable=AsyncMock,
+        ) as _ctx:
             _ctx.return_value = {}
             with patch(
-                "ai_service.hub.fetch_registered_children_labels",
+                "ai_service.intents.common.chat_fallback.fetch_registered_children_labels",
                 new_callable=AsyncMock,
             ) as _ro:
                 _ro.return_value = None
-                with patch("ai_service.hub.generate_chat", side_effect=slow_chat):
+                with patch(
+                    "ai_service.intents.common.chat_fallback.generate_chat",
+                    side_effect=slow_chat,
+                ):
                     r = client.post(
                         "/voice/intent",
-                        json={"text": "트럼프 관세 정책 어떻게 생각해", "robot": "gogoping"},
+                        json={"text": "트럼프 관세 정책 어떻게 생각해", "robot": "eduping"},
                     )
     assert r.status_code == 200
     data = r.json()
@@ -116,7 +128,10 @@ def test_voice_intent_mode_keyword_eduping() -> None:
 
 
 def test_voice_intent_emotion_demo_angry_skips_llm() -> None:
-    with patch("ai_service.hub.generate_chat", new_callable=AsyncMock) as m:
+    with patch(
+        "ai_service.intents.common.chat_fallback.generate_chat",
+        new_callable=AsyncMock,
+    ) as m:
         r = client.post(
             "/voice/intent",
             json={"text": "화내봐!", "robot": "gogoping"},
@@ -142,7 +157,7 @@ def test_voice_intent_emotion_demo_sad() -> None:
 
 
 def test_voice_intent_lunch_fast_path_mocked_menu() -> None:
-    with patch("ai_service.context.get_menu_fast", new_callable=AsyncMock) as m:
+    with patch("ai_service.capabilities.db_menu.get_menu_fast", new_callable=AsyncMock) as m:
         m.return_value = "오늘 점심은 단위테스트밥이 나온대요!"
         r = client.post(
             "/voice/intent",
@@ -156,7 +171,7 @@ def test_voice_intent_lunch_fast_path_mocked_menu() -> None:
 
 
 def test_voice_intent_yesterday_menu_passes_relative() -> None:
-    with patch("ai_service.context.get_menu_fast", new_callable=AsyncMock) as m:
+    with patch("ai_service.capabilities.db_menu.get_menu_fast", new_callable=AsyncMock) as m:
         m.return_value = "어제 점심은 테스트!"
         r = client.post(
             "/voice/intent",
@@ -169,7 +184,7 @@ def test_voice_intent_yesterday_menu_passes_relative() -> None:
 
 
 def test_voice_intent_day_before_yesterday_menu_passes_relative() -> None:
-    with patch("ai_service.context.get_menu_fast", new_callable=AsyncMock) as m:
+    with patch("ai_service.capabilities.db_menu.get_menu_fast", new_callable=AsyncMock) as m:
         m.return_value = "그저께 점심은 테스트!"
         r = client.post(
             "/voice/intent",
@@ -187,10 +202,11 @@ def test_voice_tts_empty_text() -> None:
 
 
 def test_voice_tts_edge_returns_mpeg(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_mp3(_text: str) -> bytes:
-        return b"\xff" * 320
+    async def fake_stream(_text: str):
+        yield b"\xff" * 160
+        yield b"\xff" * 160
 
-    monkeypatch.setattr(hub_mod, "synthesize_edge_mp3", fake_mp3)
+    monkeypatch.setattr(hub_mod, "synthesize_edge_mp3_stream", fake_stream)
     r = client.get("/voice/tts", params={"text": "테스트"})
     assert r.status_code == 200
     assert r.headers.get("content-type", "").startswith("audio/mpeg")

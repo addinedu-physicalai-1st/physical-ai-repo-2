@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, provide, ref, type Ref } from 'vue';
+import { computed, onBeforeUnmount, provide, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoiceController, type VoiceController } from '@/composables/useVoiceController';
-import { VOICE_CONTROLLER_KEY, VOICE_UI_SESSION_KEY } from '@/composables/voiceControllerKey';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useModeAnnouncer } from '@/composables/useModeAnnouncer';
 import EmotionDisplay from '@/common/EmotionDisplay.vue';
 import ModeSelectorFab from '@/common/ModeSelectorFab.vue';
@@ -58,22 +58,17 @@ onBeforeUnmount(() => { cameraPan?.stop(); });
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
 
-const voiceUiSessionActive: Ref<boolean> = ref(false);
-provide(VOICE_UI_SESSION_KEY, voiceUiSessionActive);
-
-// 모드 전환 시 "{모드} 모드" TTS 발화 후 mp3 재생 — GogoPing 자장가는 무한 반복
-useModeAnnouncer({
+// 모드 전환 시 voiceController.speak 로 서버 TTS 안내, BGM mp3 도 같이 처리.
+useModeAnnouncer(voiceController, {
   자장가: { src: '/audio/lullaby.mp3', loop: true, volume: 0.7 },
 });
 
 const started = ref(false);
 
 function handleStart(): void {
-  // 첫 user gesture — TTS engine unlock + STT 시작 (voice 모드일 때만)
-  // unlock 은 useTTS 의 전역 listener 가 자동 처리
+  // 첫 user gesture — WebRTC PC + wake ONNX + 마이크 권한. voice 모드일 때만.
   if (voice.voiceMode === 'voice') voiceController.start();
   started.value = true;
-  voiceUiSessionActive.value = true;
 }
 </script>
 

@@ -50,6 +50,10 @@ dependencies = [
   "transitions>=0.9",
   # GogoPing BT 본체 — py_trees 2.2.x (py-trees-spike.md 의 spike 가 2.2 기준)
   "py-trees>=2.2,<2.3",
+  # WebRTC — control-service 가 브라우저와 PeerConnection 으로 양방향 audio + DataChannel.
+  # Opus 디코딩/인코딩에 av (pyav) 의존.
+  "aiortc>=1.9",
+  "av>=12",
 ]
 
 [dependency-groups]
@@ -65,6 +69,11 @@ dev = [
 asyncio_mode = "auto"
 asyncio_default_test_loop_scope = "session"
 asyncio_default_fixture_loop_scope = "session"
+markers = [
+    "ollama: 실 Ollama HTTP 호출 — 로컬 11434 띄운 상태에서만 실행 (scripts/test.sh 가 자동 감지)",
+    "llm_smoke: 매우 가벼운 LLM 연결 확인용 (RUN_LLM_SMOKE=1 일 때만)",
+    "ros: ROS2 통합 테스트 — rclpy 환경 필요",
+]
 
 [tool.setuptools.packages.find]
 where = ["service/control-service", "service/ai-service", "db/control-db"]

@@ -12,11 +12,11 @@
  * dev 패널 (import.meta.env.DEV) 으로 단계 전환·탈락을 수동 트리거. 노래 단계는
  * 가상 타이머 + 선택 가능한 tempo 패턴 + 선택적 mp3 재생.
  */
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { FaceMesh, type Results as FaceResults } from '@mediapipe/face_mesh';
 import type { EmotionId } from '@/config/robots';
 import { useModeStore } from '@/stores/mode';
-import { useTTS } from '@/composables/useTTS';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
 import OpenarmViewer from './OpenarmViewer.vue';
@@ -61,7 +61,11 @@ interface Participant {
 const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
 
 const mode = useModeStore();
-const tts = useTTS();
+const voiceController = inject(VOICE_CONTROLLER_KEY);
+const tts = {
+  speak: (text: string) => { voiceController?.speak(text); return Promise.resolve(); },
+  cancel: () => { voiceController?.cancelSpeak(); },
+};
 
 // ---- touchdown 사운드 (Web Audio API 합성, 외부 asset 없음) ------------------
 let audioContext: AudioContext | null = null;

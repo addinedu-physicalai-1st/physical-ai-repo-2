@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue';
+import { computed, inject, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
-import { VOICE_CONTROLLER_KEY, VOICE_UI_SESSION_KEY } from '@/composables/voiceControllerKey';
-import { useAudioLevel } from '@/composables/useAudioLevel';
-import { usePhoneViewport } from '@/common/usePhoneViewport';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { faceAccent } from '@/config/colors';
 import CommandBar from './CommandBar.vue';
 import SiriBlob from './SiriBlob.vue';
@@ -21,48 +19,24 @@ const controller = inject(VOICE_CONTROLLER_KEY);
 if (!controller) throw new Error('VOICE_CONTROLLER_KEY not provided');
 const ctrl = controller;
 
-const voiceUiSession = inject(VOICE_UI_SESSION_KEY, ref(false));
+/** SiriBlob 에 줄 audio level — STT 백엔드 (서버 STT) 가 노출하는 stream RMS 재사용. */
+const micLevel = computed(() => ctrl.micLevel.value);
 
-const audio = useAudioLevel();
-const isPhone = usePhoneViewport();
-
-/** SiriBlob 에 줄 audio level — phone 은 useServerSTT 의 stream RMS, 데스크톱은 useAudioLevel. */
-const micLevel = computed(() => (isPhone.value ? ctrl.micLevel.value : audio.level.value));
-
-// voiceMode 토글 — STT on/off 전환 (초기 시작은 App.vue handleStart 가 처리)
+// voiceMode 토글 — WebRTC PC/DC 는 살려두고 mic + wake 만 토글.
+// 텍스트 모드에서도 dispatch_text 가 같은 DC 로 가야 하므로 stop() 하지 않는다.
+// 초기 시작은 App.vue handleStart 가 ctrl.start() 로 처리.
 watch(voiceMode, (next, prev) => {
-  if (next === 'voice' && prev === 'text') ctrl.start();
-  else if (next === 'text' && prev === 'voice') ctrl.stop();
+  if (next === 'voice' && prev === 'text') ctrl.setMicActive(true);
+  else if (next === 'text' && prev === 'voice') ctrl.setMicActive(false);
 });
-
-// 마이크(getUserMedia)는 음성 상태마다 켰다 끄면 OS 인디케이터가 깜빡임.
-// 시작 제스처 이후·음성 모드인 동안만 한 스트림 유지, 타이핑 모드로 바꿀 때만 해제.
-//
-// 휴대전화에서는 audio-level 의 두 번째 getUserMedia 가 webkitSpeechRecognition 의 마이크
-// 입력을 굶겨 STT 가 무음으로 동작하지 않는다 (Chrome Android 한정). STT 가 더 중요하므로
-// phone 에서는 시각화 mic stream 생략, 인디케이터 깜빡임은 감수.
-watch(
-  [voiceMode, voiceUiSession],
-  async ([vm, session]) => {
-    if (isPhone.value) {
-      audio.stop();
-      return;
-    }
-    if (vm === 'voice' && session) {
-      try {
-        await audio.start();
-      } catch (e) {
-        console.warn('[Mic] Failed to start audio visualization:', e);
-      }
-    } else {
-      audio.stop();
-    }
-  },
-  { immediate: true },
-);
 
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'
+);
+
+// listening 동안만 게임 모달·경고창 (z-index 9999) 위로 띄운다.
+const blobActive = computed(
+  () => voiceMode.value === 'voice' && state.value === 'listening'
 );
 
 function switchToText(): void {
@@ -71,7 +45,7 @@ function switchToText(): void {
 </script>
 
 <template>
-  <div class="dock" :style="{ '--primary': primary }">
+  <div class="dock" :class="{ 'dock-top': blobActive }" :style="{ '--primary': primary }">
     <!-- Legacy caption hidden in favor of Premium Subtitles in EmotionDisplay -->
     <!-- <div class="caption-container">
       <VoiceCaption :text="captionText" />
@@ -108,6 +82,10 @@ function switchToText(): void {
   z-index: 15;
   width: min(560px, calc(100vw - 200px));
   min-height: 200px;
+}
+.dock.dock-top {
+  /* WarningModal (9999), MugunghwaGame 토스트 (1000) 위로 — 호출어 활성 동안 항상 최상위 */
+  z-index: 100000;
 }
 
 /* 휴대전화 공통: SiriBlob 자체 크기 축소 (interactive 한 발화 반응은 SiriBlob 의 scale 로 충분히 잘 보임) */

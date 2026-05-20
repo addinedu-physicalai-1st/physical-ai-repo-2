@@ -23,6 +23,8 @@ export const useVoiceStore = defineStore('voice', () => {
   const currentChar = ref<string>('');
   /** 0~1 Web Audio RMS — 말할 때 입 벌림에 섞어 대화감(오·아 리듬) 보강 */
   const speechEnvelope = ref(0);
+  /** 호출어가 새로 감지될 때마다 갱신되는 timestamp — SiriBlob 등이 watch 해서 한 번 튕긴다. */
+  const lastWakeAt = ref<number>(0);
 
   function setState(next: VoiceState): void {
     state.value = next;
@@ -67,6 +69,10 @@ export const useVoiceStore = defineStore('voice', () => {
     speechEnvelope.value = Math.min(1, Math.max(0, value));
   }
 
+  function bumpWake(): void {
+    lastWakeAt.value = Date.now();
+  }
+
   return {
     state,
     sttText,
@@ -78,6 +84,8 @@ export const useVoiceStore = defineStore('voice', () => {
     voiceMode,
     currentChar,
     speechEnvelope,
+    lastWakeAt,
+    bumpWake,
     setState,
     setSttText,
     setLastSpokenText,
