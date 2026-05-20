@@ -229,15 +229,15 @@ class NoriArmDashboard(QWidget):
 class DebugDrawer(QWidget):
     """본문 우측에 붙는 접힘/펼침 사이드 서랍. 좌측 토글 버튼 + 우측 패널 컨테이너.
 
-    panel 안에는 DebugStatePanel / BatteryDebugSlider / PoseDebugPanel 3개가 세로
-    stack. 토글 버튼 (◂/▸) 클릭 시 panel 만 show/hide — 버튼 자체는 항상 노출되어
-    다시 펼칠 수 있다. 초기 상태: 펼침 (open=True).
+    panel 안에는 DebugStatePanel / BatteryDebugSlider / PoseDebugPanel / NavDebugLogCard
+    4개가 세로 stack. 토글 버튼 (◂/▸) 클릭 시 panel 만 show/hide — 버튼 자체는 항상
+    노출되어 다시 펼칠 수 있다. 초기 상태: 펼침 (open=True).
     """
 
-    PANEL_WIDTH = 300
+    PANEL_WIDTH = 340  # NavDebugLogCard 의 monospace 로그가 너무 좁지 않게 살짝 ↑
     TOGGLE_WIDTH = 36
 
-    def __init__(self, debug_panel, battery_debug, pose_debug, parent=None):
+    def __init__(self, debug_panel, battery_debug, pose_debug, nav_debug_log, parent=None):
         super().__init__(parent)
         self.setObjectName("debugDrawer")
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
@@ -283,7 +283,7 @@ class DebugDrawer(QWidget):
         panel_lay.addWidget(debug_panel)
         panel_lay.addWidget(battery_debug)
         panel_lay.addWidget(pose_debug)
-        panel_lay.addStretch(1)
+        panel_lay.addWidget(nav_debug_log, stretch=1)   # 로그가 남는 공간 차지
         lay.addWidget(self.panel)
 
         self._open = True
@@ -319,10 +319,12 @@ class GogoPingDashboard(QWidget):
         # main.py 의 signal connect 가 self.dashboard.debug_panel 형태로 접근.
         from widgets.battery_debug_slider import BatteryDebugSlider
         from widgets.debug_state_panel import DebugStatePanel
+        from widgets.nav_debug_log_card import NavDebugLogCard
         from widgets.pose_debug_panel import PoseDebugPanel
         self.debug_panel = DebugStatePanel()
         self.battery_debug = BatteryDebugSlider()
         self.pose_debug = PoseDebugPanel()
+        self.nav_debug_log = NavDebugLogCard()
 
         # 창이 짧을 때 teleop 영역이 잘리지 않도록 전체를 스크롤 영역으로 감싼다.
         # 폭은 늘 채우고, 세로 컨텐츠가 창 높이를 초과하면 스크롤바가 등장한다.
@@ -342,6 +344,7 @@ class GogoPingDashboard(QWidget):
         # 우측 디버그 사이드 서랍 — 토글 시 panel 접힘/펼침
         self.debug_drawer = DebugDrawer(
             self.debug_panel, self.battery_debug, self.pose_debug,
+            self.nav_debug_log,
         )
 
         # host: 좌측 스크롤 (대시보드 콘텐츠) + 우측 서랍

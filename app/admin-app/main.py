@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import (
 
 from config.client_id import get_or_create_client_id
 from dashboards import GogoPingDashboard
+from services.nav_debug_client import NavDebugClient
 from services.state_client import StateClient
 from services.stream_client import StreamClient
 from theme import COLORS, ROBOTS, apply_theme
@@ -187,6 +188,11 @@ class AdminWindow(QMainWindow):
         # BTStateInline (topbar) + GogoPingDashboard 둘 다 snapshot 으로 갱신
         self.state_client.connect(self._on_robot_state)
 
+        # /ws/nav-debug-events 구독 — Dashboard DebugDrawer 의 NavDebugLogCard 로 흘러감.
+        # cancel chain (SetGoal → reconcile → FSM → BT swap → NavTo → graph_router) 추적.
+        self.nav_debug_client = NavDebugClient(base_url=control_url)
+        self.nav_debug_client.connect(self.dashboard.nav_debug_log.append_event)
+
         # 디버그 패널 (Dashboard 우측 DebugDrawer) → state_client.post_force_state
         self.dashboard.debug_panel.force_state_requested.connect(
             lambda state, sub: self.state_client.post_force_state(
@@ -255,6 +261,10 @@ class AdminWindow(QMainWindow):
                 pass
         try:
             self.state_client.stop()
+        except Exception:
+            pass
+        try:
+            self.nav_debug_client.stop()
         except Exception:
             pass
         super().closeEvent(ev)
