@@ -315,41 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # 점심 메뉴 질문은 DB 직접 조회로 우회 (latency 절감)
-    _menu_tokens = ("점심", "메뉴", "급식")
-    _menu_date_markers = (
-        "오늘",
-        "내일",
-        "어제",
-        "그저께",
-        "엊그제",
-        "모레",
-        "글피",
-        "그끄저께",
-        "하루",
-        "이틀",
-        "사흘",
-        "나흘",
-        "닷새",
-        "뒤",
-        "후",
-        "전",
-        "전에",
-        "이전",
-        "만에",
-        "뭐",
-    )
-    if any(kw in text for kw in _menu_tokens) and (
-        any(w in text for w in _menu_date_markers) or re.search(r"\d+\s*일", text)
-    ):
-        from ai_service.capabilities.db_menu import get_menu_fast, parse_menu_query_calendar_day
-
-        now = datetime.utcnow() + timedelta(hours=9)
-        day, relative = parse_menu_query_calendar_day(text, now)
-
-        menu_text = await get_menu_fast(day, relative=relative)
-        return {"kind": "chat", "reply": menu_text, "emotion": "happy"}
-
     # "안녕"에 대한 시간대별 인사 처리
     if text.strip() in ["안녕", "안녕!"]:
         now = datetime.utcnow() + timedelta(hours=9)

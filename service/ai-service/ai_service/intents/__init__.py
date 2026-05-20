@@ -5,12 +5,13 @@ from ai_service.intents.base import (
     IntentResponse,
     now_kst,
 )
+from ai_service.intents.common.menu import MenuHandler
 from ai_service.intents.common.stop import StopHandler
 
 PIPELINES: dict[str, list[IntentHandler]] = {
-    "eduping": [StopHandler()],
-    "gogoping": [StopHandler()],
-    "noriarm": [StopHandler()],
+    "eduping": [StopHandler(), MenuHandler()],
+    "gogoping": [StopHandler(), MenuHandler()],
+    "noriarm": [StopHandler(), MenuHandler()],
 }
 
 __all__ = ["IntentContext", "IntentHandler", "IntentResponse", "PIPELINES", "now_kst"]
