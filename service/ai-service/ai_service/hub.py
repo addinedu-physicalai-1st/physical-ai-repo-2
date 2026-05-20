@@ -288,11 +288,21 @@ async def voice_intent(req: IntentRequest) -> dict:
     if not is_known_robot(req.robot):
         return {"kind": "ignored"}
 
+    from ai_service.intents import PIPELINES, IntentContext, now_kst
+    ctx = IntentContext(now=now_kst(), req=req)
+    for handler in PIPELINES[req.robot]:
+        result = await handler.try_handle(req, ctx)
+        if result is not None:
+            logger.info(
+                "intent.matched",
+                extra={"robot": req.robot, "handler": handler.name},
+            )
+            return result.model_dump()
+
     text = req.text.strip()
 
-    # 정지 의도는 명확하므로 LLM 우회 (비용·latency 절감)
-    if _is_stop_text(text):
-        return {"kind": "sub_command", "action": "stop"}
+    # ── 디스패처가 아직 매칭 못 한 케이스는 아래 기존 if-블록이 처리 ──
+    # (앞으로 핸들러를 옮기면서 한 블록씩 삭제)
 
     # 복귀 / 충전 (gogoping 만 의미 있음 — 다른 로봇은 ignored)
     if req.robot == "gogoping" and _is_return_text(text):
