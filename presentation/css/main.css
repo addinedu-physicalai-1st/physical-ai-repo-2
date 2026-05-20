@@ -49,6 +49,15 @@ html, body {
   font-weight: 400;
 }
 .reveal a { color: var(--babypink); }
+
+/* Centered slide override */
+.reveal .slides section.slide-center,
+.reveal .slides section.slide-center h1,
+.reveal .slides section.slide-center h2,
+.reveal .slides section.slide-center h3,
+.reveal .slides section.slide-center p {
+  text-align: center !important;
+}
 .reveal a:hover { color: var(--lavender); }
 
 .reveal .slide-number {
@@ -286,4 +295,62 @@ html, body {
   font-family: 'Jua', system-ui, sans-serif;
   font-size: 11px;
   color: white;
+}
+
+/* ===== Horizontal Sprint Timeline ===== */
+.sprint-tl-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  max-width: 1060px;
+  margin: 0 auto;
+  text-align: center;
+  gap: 6px;
+}
+.sprint-tl-card {
+  padding: 10px 6px;
+  border-radius: 14px;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.sprint-tl-card-name {
+  font-family: 'Jua', system-ui, sans-serif;
+  font-size: 0.75em;
+  color: var(--ink);
+  margin-bottom: 3px;
+}
+.sprint-tl-card-date {
+  font-size: 0.58em;
+  color: var(--inkSoft);
+}
+.sprint-tl-card-days {
+  display: inline-block;
+  font-family: 'Jua', system-ui, sans-serif;
+  font-size: 0.55em;
+  color: var(--babypink);
+  background: var(--babypinkSoft);
+  border-radius: 999px;
+  padding: 1px 10px;
+  margin-top: 3px;
+}
+.sprint-tl-card-desc {
+  font-size: 0.62em;
+  color: var(--ink);
+  margin-top: 5px;
+}
+.sprint-tl-card-count {
+  font-size: 0.5em;
+  color: var(--inkSoft);
+  margin-top: 4px;
+}
+.sprint-tl-bar-bg {
+  height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.sprint-tl-bar-bg .sprint-bar {
+  height: 16px;
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 9px;
 }

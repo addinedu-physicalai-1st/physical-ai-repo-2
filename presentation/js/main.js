@@ -8,9 +8,11 @@ var SLIDES = [
   '01-title.html',
   '02-project-intro.html',
   '03-robots-intro.html',
+  '03b-floor-plan.html',
   '04-kindergarten-map.html',
   '05-day-flow.html',
   '06-flow-arrival.html',
+  '06b-demo-arrival.html',
   '07-flow-play.html',
   '08-flow-play-types.html',
   '09-demo-noriarm.html',
@@ -19,20 +21,24 @@ var SLIDES = [
   '12-demo-block2.html',
   '13-flow-lunch.html',
   '14-flow-assist.html',
+  '14b-demo-waypoint.html',
   '15-flow-telemedicine.html',
   '16-flow-departure.html',
   '17-progress.html',
   '18-repo-structure.html',
   '19-sprint-timeline.html',
+  '20-thank-you.html',
 ];
 
 var SLIDE_TITLES = [
   '사랑의 에듀핑',
   'pingdergarten 이란?',
   '로봇 라인업',
+  '유치원 도면',
   '유치원 맵',
   '하루 일과',
   '등원 — 아침 인사 · 출석',
+  '아침 인사 데모',
   '놀이 — 학습 보조 · 자연 촬영',
   '놀이 종류 — 7가지',
   '노리암 데모',
@@ -41,11 +47,13 @@ var SLIDE_TITLES = [
   '블럭쌓기 — 추가 시연',
   '점심 — 메뉴 관리',
   '보조 — 교사 추종 · 운반',
+  'Waypoint 네비게이션 데모',
   '원격 진단 — 의사 원격 진단',
   '하원 — 일일 보고서',
   '구현 진척도',
   '레포 구조',
   '스프린트 타임라인',
+  '감사합니다',
 ];
 
 async function loadSlides() {
@@ -86,6 +94,7 @@ async function initPresentation() {
   function forceCenterAlign() {
     var slideHeight = 720;
     document.querySelectorAll('.reveal .slides section').forEach(function (s) {
+      if (s.getAttribute('data-center') === 'false') return;
       s.style.top = '';
       var sectionHeight = s.scrollHeight;
       var topOffset = (slideHeight - sectionHeight) / 2;
@@ -185,43 +194,64 @@ function initDynamicSlides() {
         info: '<span class="hl pk">physical-ai-repo-2/</span> — 모노레포. device · server · ui 3개 레이어로 분리.' },
       { nodes: { 'rt-root': 'success', 'rt-device': 'active pulse' },
         edges: { 'rt-e1': 'active flow' },
-        info: '<span class="hl pk">device/</span> — ROS2 워크스페이스. 고고핑(Nav2, BT, FSM), 노리암(OMX 게임 프레임워크) 패키지.' },
-      { nodes: { 'rt-root': 'success', 'rt-device': 'success', 'rt-gogo': 'success', 'rt-nori': 'success', 'rt-nav': 'success', 'rt-modes': 'running', 'rt-bt': 'running', 'rt-fsm': 'running', 'rt-server': 'active pulse' },
-        edges: { 'rt-e1': 'success', 'rt-e2': 'active flow', 'rt-e4': 'success', 'rt-e5': 'success', 'rt-e6': 'success', 'rt-e7': 'running', 'rt-e8': 'running', 'rt-e9': 'running' },
-        info: '<span class="hl pk">server/</span> — AI Hub (Ollama LLM) + Control Service (FastAPI + rclpy). <span class="hl bt">modes/</span> 는 스캐폴드 단계.' },
-      { nodes: { 'rt-root': 'success', 'rt-device': 'success', 'rt-server': 'success', 'rt-ai': 'success', 'rt-ctrl': 'success', 'rt-llm': 'success', 'rt-vision': 'success', 'rt-routers': 'success', 'rt-stream': 'success', 'rt-ui': 'active pulse' },
-        edges: { 'rt-e1': 'success', 'rt-e2': 'success', 'rt-e3': 'active flow', 'rt-e10': 'success', 'rt-e11': 'success', 'rt-e12': 'success', 'rt-e13': 'success', 'rt-e14': 'success', 'rt-e15': 'success' },
-        info: '<span class="hl pk">ui/</span> — Robot UI (감정 표현, 음성), Portal UI (교사/보호자), Admin UI (텔레옵).' },
-      { nodes: { 'rt-root': 'success', 'rt-device': 'success', 'rt-gogo': 'success', 'rt-nori': 'success', 'rt-nav': 'success', 'rt-modes': 'running', 'rt-bt': 'running', 'rt-fsm': 'running', 'rt-server': 'success', 'rt-ai': 'success', 'rt-ctrl': 'success', 'rt-ui': 'success', 'rt-robotui': 'success', 'rt-portal': 'success', 'rt-admin': 'success' },
-        edges: { 'rt-e1': 'success', 'rt-e2': 'success', 'rt-e3': 'success', 'rt-e4': 'success', 'rt-e5': 'success', 'rt-e6': 'success', 'rt-e7': 'running', 'rt-e8': 'running', 'rt-e9': 'running', 'rt-e10': 'success', 'rt-e11': 'success', 'rt-e16': 'success', 'rt-e17': 'success', 'rt-e18': 'success', 'rt-e19': 'success' },
-        info: '전체 현황: <span class="hl mt">서버 · UI 완성</span>, <span class="hl bt">BT/FSM 스캐폴드</span> → 이번 스프린트에서 구현 진행 중.' },
+        info: '<span class="hl pk">device/</span> — ROS2 워크스페이스. 에듀핑(OpenArm), 고고핑(Nav2 · BT · FSM), 노리암(OMX 게임) 패키지.' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'running', 'rt-edu': 'running', 'rt-gogo': 'running', 'rt-nori': 'running', 'rt-nav': 'running', 'rt-modes': 'running', 'rt-bt': 'running', 'rt-fsm': 'running', 'rt-server': 'active pulse' },
+        edges: { 'rt-e1': 'success', 'rt-e2': 'active flow', 'rt-e4': 'running', 'rt-e5': 'running', 'rt-e6': 'running', 'rt-e7': 'running', 'rt-e8': 'running', 'rt-e9': 'running', 'rt-e10': 'running' },
+        info: '<span class="hl pk">server/</span> — AI Hub (LLM · Vision · TTS) + Control (FastAPI · rclpy) + DB (PostgreSQL). device 전체 구현 진행 중.' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'running', 'rt-server': 'running', 'rt-ai': 'running', 'rt-ctrl': 'running', 'rt-db': 'running', 'rt-llm': 'running', 'rt-vision': 'running', 'rt-routers': 'running', 'rt-stream': 'running', 'rt-ui': 'active pulse' },
+        edges: { 'rt-e1': 'success', 'rt-e2': 'running', 'rt-e3': 'active flow', 'rt-e11': 'running', 'rt-e12': 'running', 'rt-e13': 'running', 'rt-e14': 'running', 'rt-e15': 'running', 'rt-e16': 'running', 'rt-e17': 'running' },
+        info: '<span class="hl pk">ui/</span> — Robot UI (감정 표현 · 음성), Portal UI (교사/보호자), Admin UI (텔레옵).' },
+      { nodes: { 'rt-root': 'success', 'rt-device': 'running', 'rt-edu': 'running', 'rt-gogo': 'running', 'rt-nori': 'running', 'rt-nav': 'running', 'rt-modes': 'running', 'rt-bt': 'running', 'rt-fsm': 'running', 'rt-server': 'running', 'rt-ai': 'running', 'rt-ctrl': 'running', 'rt-db': 'running', 'rt-ui': 'success', 'rt-robotui': 'success', 'rt-portal': 'success', 'rt-admin': 'success' },
+        edges: { 'rt-e1': 'success', 'rt-e2': 'running', 'rt-e3': 'success', 'rt-e4': 'running', 'rt-e5': 'running', 'rt-e6': 'running', 'rt-e7': 'running', 'rt-e8': 'running', 'rt-e9': 'running', 'rt-e10': 'running', 'rt-e11': 'running', 'rt-e12': 'running', 'rt-e13': 'running', 'rt-e18': 'success', 'rt-e19': 'success', 'rt-e20': 'success' },
+        info: '전체 현황: <span class="hl mt">ui 완성</span>, <span class="hl bt">device · server</span> 구현 진행 중.' },
     ]
   });
 
   registerScenario('sprint-tl', {
     steps: [
       { nodes: {}, edges: {},
-        info: '→ 키를 눌러 스프린트 진행을 확인하세요.' },
-      { nodes: {}, edges: {},
-        info: '<span class="hl pk">Sprint 1-2</span> — 주제 선정 + 상세 설계 100% 완료. 아키텍처, 요구사항, 폴더 구조 확정.',
-        onEnter: function() { _animateSprint('sp1-bar', 100, 'sp1-count', '1/1 Done'); _animateSprint('sp2-bar', 100, 'sp2-count', '9/9 Done'); } },
-      { nodes: {}, edges: {},
-        info: '<span class="hl pk">Sprint 3</span> — 스캐폴드 구현 + 기술 조사. BT 설계, OMX 놀이 설계, 키보드 텔레옵 구현.',
-        onEnter: function() { _animateSprint('sp3-bar', 100, 'sp3-count', '9/9 Done'); } },
-      { nodes: {}, edges: {},
-        info: '<span class="hl bt">Sprint 4 (현재)</span> — 구현 week1. Done 5 + QA 2 = <strong>39%</strong>. 고고핑 Nav 태스크 10개 backlog.',
-        onEnter: function() { _animateSprint('sp4-bar', 39, 'sp4-count', '5 Done / 2 QA / 1 WIP / 10 Todo'); } },
+        info: '<span class="font-display" style="color:#F8B4C4">&rarr;</span> 키를 눌러 스프린트 진행을 확인하세요.',
+        onEnter: function() { _setAllSprints([0,0,0,0,0,0,0]); } },
+      { nodes: { 'sp-n1': 'active pulse' }, edges: {},
+        info: '<span class="hl pk">Sprint 1</span> (04/22-23, 2일) — 주제 선정 완료. 팀 구성 + 프로젝트 주제 확정.',
+        onEnter: function() { _setAllSprints([100,0,0,0,0,0,0]); _animateSprint('sp1-bar', 100, 'sp1-count', '1/1 Done'); } },
+      { nodes: { 'sp-n1': 'success', 'sp-n2': 'active pulse' }, edges: { 'sp-e1': 'success' },
+        info: '<span class="hl pk">Sprint 2</span> (04/25-30, 6일) — 상세 설계 100% 완료. 아키텍처 · 요구사항 · 폴더 구조 확정.',
+        onEnter: function() { _setAllSprints([100,100,0,0,0,0,0]); _animateSprint('sp1-bar', 100, 'sp1-count', '1/1 Done'); _animateSprint('sp2-bar', 100, 'sp2-count', '9/9 Done'); } },
+      { nodes: { 'sp-n1': 'success', 'sp-n2': 'success', 'sp-n3': 'active pulse' }, edges: { 'sp-e1': 'success', 'sp-e2': 'success' },
+        info: '<span class="hl pk">Sprint 3</span> (05/01-07, 7일) — 스캐폴드 구현 + 기술 조사. BT 설계, OMX 놀이 설계, 키보드 텔레옵.',
+        onEnter: function() { _setAllSprints([100,100,100,0,0,0,0]); _animateSprint('sp3-bar', 100, 'sp3-count', '9/9 Done'); } },
+      { nodes: { 'sp-n1': 'success', 'sp-n2': 'success', 'sp-n3': 'success', 'sp-n4': 'running' }, edges: { 'sp-e1': 'success', 'sp-e2': 'success', 'sp-e3': 'running' },
+        info: '<span class="hl bt">Sprint 4</span> (05/08-14, 현재) — 구현 week1. Done 5 + QA 2 = <strong>39%</strong>. 고고핑 Nav 태스크 10개 backlog.',
+        onEnter: function() { _setAllSprints([100,100,100,39,0,0,0]); _animateSprint('sp4-bar', 39, 'sp4-count', '5 Done / 2 QA / 1 WIP / 10 Todo'); } },
     ]
   });
 }
 
 function _animateSprint(barId, pct, countId, countText) {
   var bar = document.getElementById(barId);
-  var label = bar ? bar.querySelector('span') : null;
-  if (bar) bar.style.width = pct + '%';
-  if (label) label.style.opacity = '1';
+  if (bar) {
+    bar.style.width = pct + '%';
+    var label = bar.querySelector('span');
+    if (label && pct > 0) label.style.opacity = '1';
+    else if (label) label.style.opacity = '0';
+  }
   var countEl = document.getElementById(countId);
   if (countEl && countText) countEl.textContent = countText;
+}
+
+function _setAllSprints(pcts) {
+  var counts = ['-', '-', '-', '-', '예정', '예정', '예정'];
+  for (var i = 0; i < pcts.length; i++) {
+    var bar = document.getElementById('sp' + (i + 1) + '-bar');
+    if (bar) {
+      bar.style.width = pcts[i] + '%';
+      var label = bar.querySelector('span');
+      if (label) label.style.opacity = pcts[i] > 0 ? '1' : '0';
+    }
+    var countEl = document.getElementById('sp' + (i + 1) + '-count');
+    if (countEl && pcts[i] === 0) countEl.textContent = counts[i];
+  }
 }
 
 /* ── Demo video toggle ── */

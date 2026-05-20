@@ -9,13 +9,26 @@
 <body>
   <div class="wrap">
     <div class="detail-top">
-      <a class="back-link" href="progress.html">← 진척도로 돌아가기</a>
+      <div id="back-nav"></div>
       <div class="legend">
         <span><span class="dot done"></span>완료</span>
         <span><span class="dot partial"></span>진행중</span>
         <span><span class="dot planned"></span>계획</span>
       </div>
     </div>
+    <script>
+      (function() {
+        const from = new URLSearchParams(location.search).get('from');
+        const nav = document.getElementById('back-nav');
+        if (from === 'presentation') {
+          nav.innerHTML =
+            '<a class="back-link" href="../presentation/index.html">← 발표로 돌아가기</a>';
+        } else {
+          nav.innerHTML =
+            '<a class="back-link" href="progress.html">← 진척도로 돌아가기</a>';
+        }
+      })();
+    </script>
     <header id="detail-head"></header>
     <div class="mode-grid" id="mode-grid"></div>
   </div>
