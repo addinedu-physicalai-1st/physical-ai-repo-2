@@ -14,21 +14,18 @@
     <xacro:property name="wheel_x_offset" value="${dims['wheel']['x_offset']}"/>
     <xacro:property name="wheel_z_offset" value="${dims['wheel']['z_offset']}"/>
 
-    <xacro:property name="chassis_length" value="0.6"/>
-    <xacro:property name="chassis_width" value="0.5"/>
-    <xacro:property name="chassis_height" value="0.128"/>
+    <xacro:property name="chassis_length"   value="${dims['chassis']['length']}"/>
+    <xacro:property name="chassis_width"    value="${dims['chassis']['width']}"/>
+    <xacro:property name="chassis_height"   value="${dims['chassis']['height']}"/>
+    <xacro:property name="chassis_z_offset" value="${dims['chassis']['z_offset']}"/>
     <xacro:property name="chassis_mass" value="50.0"/>
-    <xacro:property name="chassis_z_offset" value="0.087"/>
 
     <xacro:property name="wheel_mass" value="0.05"/>
-    
-    <xacro:property name="caster_wheel_radius" value="${chassis_z_offset/2}"/>
+
+    <xacro:property name="caster_wheel_radius" value="${dims['caster']['radius']}"/>
+    <xacro:property name="caster_x_offset"    value="${dims['caster']['x']}"/>
+    <xacro:property name="caster_y_offset"    value="${dims['caster']['y']}"/>
     <xacro:property name="caster_wheel_mass" value="3.0"/>
-    
-    <xacro:property name="caster_x_inset" value="0.056"/>  
-    <xacro:property name="caster_y_inset" value="0.156"/>  
-    <xacro:property name="caster_x_offset" value="${chassis_length/2 - caster_x_inset}"/>
-    <xacro:property name="caster_y_offset" value="${chassis_width/2 - caster_y_inset}"/>
 
     <material name="white">
         <color rgba="1 1 1 1" />

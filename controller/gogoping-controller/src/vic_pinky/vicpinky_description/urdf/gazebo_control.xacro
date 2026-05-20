@@ -7,8 +7,11 @@
         <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
             <left_joint>${prefix}left_wheel_joint</left_joint>
             <right_joint>${prefix}right_wheel_joint</right_joint>
-            <wheel_separation>0.3788</wheel_separation>
-            <wheel_radius>0.0825</wheel_radius>
+            <!-- wheel_separation / wheel_radius 는 robot_core.xacro 에서 YAML
+                 (config/robot_dims.yaml) 로부터 read 한 property 를 재사용 —
+                 single source of truth. -->
+            <wheel_separation>${wheel_separation}</wheel_separation>
+            <wheel_radius>${wheel_radius}</wheel_radius>
 
             <min_velocity>-1.0</min_velocity>
             <max_velocity>1.0</max_velocity>
