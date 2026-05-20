@@ -1,0 +1,25 @@
+<?xml version='1.0'?>
+<!--
+  app/urdf-tuner GUI 전용 RViz preview.
+
+  display.launch.xml 과의 차이:
+    - joint_state_publisher_gui  →  joint_state_publisher (no GUI)
+      wheel joint 가 continuous 라서 GUI 슬라이더가 마우스 클릭만으로
+      크게 jump → 보정 작업 중 wheel 위치가 마음대로 움직이는 문제 회피.
+      tuner 용도는 dim 변경 확인만 — wheel manipulation 불필요.
+-->
+<launch>
+    <arg name="default_rviz_config_path" default="$(find-pkg-share vicpinky_description)/rviz/urdf_config.rviz"/>
+    <arg name="prefix" default=""/>
+
+    <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher" output="screen">
+        <param name="robot_description"
+               value="$(command 'xacro $(find-pkg-share vicpinky_description)/urdf/robot_core.xacro namespace:=$(var prefix)')"/>
+    </node>
+
+    <node pkg="joint_state_publisher" exec="joint_state_publisher" name="joint_state_publisher" output="screen">
+        <param name="rate" value="10.0"/>
+    </node>
+
+    <node pkg="rviz2" exec="rviz2" output="screen" args="-d $(var default_rviz_config_path)"/>
+</launch>

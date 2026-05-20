@@ -1,0 +1,28 @@
+# Vic Pinky URDF dimension — FACTORY BASELINE.
+# app/urdf-tuner GUI 의 "Reset to default" 가 이 파일을 read 해서
+# robot_dims.yaml 로 복원합니다.
+#
+# ⚠️  이 파일은 GUI 가 절대 덮어쓰지 않습니다.
+#    공장 출하 baseline 으로 항상 보존 — 변경하려면 직접 편집.
+#    실제 robot 이 사용하는 값은 robot_dims.yaml 입니다.
+
+wheel:
+  radius: 0.0825
+  thickness: 0.05
+  separation: 0.4288
+  x_offset: 0.0
+  z_offset: -0.0048
+
+lidar:
+  mount_x: 0.185
+  mount_y: 0.0
+  mount_z: 0.12
+  mount_roll: 0.0
+  mount_pitch: 0.0
+  mount_yaw: 0.0
+  laser_x: 0.0
+  laser_y: 0.0
+  laser_z: 0.03
+  laser_roll: 0.0
+  laser_pitch: 0.0
+  laser_yaw: 3.141592653589793
