@@ -315,14 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # 성별 질문은 규칙 응답 (빠르고 일관되게)
-    if _is_gender_question(text):
-        return {
-            "kind": "chat",
-            "reply": "나는 남자아이처럼 말하는 로봇 친구야! 같이 재미있게 이야기하자.",
-            "emotion": "happy",
-        }
-
     # 모드 전환 규칙 기반 매칭 (latency 절감)
     for m in modes_for(req.robot):
         if m in text:
