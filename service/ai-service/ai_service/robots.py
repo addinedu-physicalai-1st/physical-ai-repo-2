@@ -55,3 +55,22 @@ def capabilities_for(robot: str) -> list[tuple[str, str]]:
         for m in modes_for(robot)
         if m != "대기"
     ]
+
+
+def name_aliases_for(robot: str) -> frozenset[str]:
+    """로봇을 부르는 이름들 (wakeWord + wakeWordAliases + displayName).
+
+    소문자로 정규화된 frozenset. wake-name 매칭에 사용.
+    """
+    entry = _ROBOTS_BY_ID.get(robot)
+    if not entry:
+        return frozenset()
+    names: set[str] = set()
+    if entry.get("wakeWord"):
+        names.add(entry["wakeWord"].lower())
+    for alias in entry.get("wakeWordAliases", []) or []:
+        if alias:
+            names.add(alias.lower())
+    if entry.get("displayName"):
+        names.add(entry["displayName"].lower())
+    return frozenset(names)
