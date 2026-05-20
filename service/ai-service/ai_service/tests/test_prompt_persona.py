@@ -25,4 +25,4 @@ def test_chat_system_shares_base_rules() -> None:
     for o in outs:
         assert "자기 호칭 규칙 (반드시 지킬 것):" in o
         assert "말투 규칙 (반드시 지킬 것):" in o
-        assert "사실 처리 규칙 (가장 중요):" in o
+        assert "사실 처리 규칙 (검증 가능한 사실 질문에만 적용):" in o
