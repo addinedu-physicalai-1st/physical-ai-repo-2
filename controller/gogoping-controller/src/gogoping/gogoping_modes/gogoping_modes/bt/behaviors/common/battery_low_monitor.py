@@ -23,6 +23,7 @@ import py_trees
 from py_trees.common import Access, Status
 
 from ...blackboard import Keys
+from ....utils.safety_flags import is_safety_disabled
 
 if TYPE_CHECKING:
     from ....context import Context
@@ -40,12 +41,18 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
         self.bb = self.attach_blackboard_client(name=name)
         self.bb.register_key(key=Keys.BATTERY_LEVEL, access=Access.READ)
         self._fired = False
+        # 시연/디버그 환경 — disable_battery_safety:=true 면 battery_low trigger 발화 skip.
+        self._disabled = is_safety_disabled(
+            getattr(self.ctx, "node", None), "battery", monitor_name=self.name,
+        )
 
     def initialise(self) -> None:
         # 트리 swap 시 (re-entry) 다시 발화 가능하게.
         self._fired = False
 
     def update(self) -> Status:
+        if self._disabled:
+            return Status.RUNNING
         try:
             level = float(self.bb.get(Keys.BATTERY_LEVEL))
         except (KeyError, TypeError, ValueError):

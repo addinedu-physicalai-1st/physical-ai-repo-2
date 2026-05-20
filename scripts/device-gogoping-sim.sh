@@ -18,6 +18,11 @@
 #   scripts/device-gogoping-sim.sh down      # tmux 세션 + 잔여 가제보·브리지 정리
 #   scripts/device-gogoping-sim.sh status    # 세션 상태
 #
+# 시연/디버그 환경변수 (gogoping_modes 노드에 ros-args 로 전달):
+#   NO_BATTERY_SAFETY=1   BatteryLowMonitor 비활성 — 배터리 ≤20% 자동 RETURNING 차단
+#   NO_ERROR_SAFETY=1     HardwareHealth / MapBoundary fault → ERROR 차단
+# 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 scripts/device-gogoping-sim.sh
+#
 # 의존:
 #   - tmux
 #   - /opt/ros/jazzy 설치
@@ -78,6 +83,16 @@ case "$ACTION" in
 
     SOURCE_ENV="source $ROS_SETUP && source $WS_SETUP"
 
+    # 시연/디버그 — 환경변수 → ros-args. gogoping_modes 노드의 IdleTimeout/Battery/Health
+    # monitor 들이 declare_parameter 로 받음 (utils/safety_flags.py).
+    MODES_ARGS=""
+    if [[ -n "${NO_BATTERY_SAFETY:-}" || -n "${NO_ERROR_SAFETY:-}" ]]; then
+      MODES_ARGS="--ros-args"
+      [[ -n "${NO_BATTERY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_battery_safety:=true"
+      [[ -n "${NO_ERROR_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_error_safety:=true"
+      echo "[device-gogoping-sim] modes 인자: $MODES_ARGS"
+    fi
+
     # tmux 3.4 의 server idle 종료 회피: sleep 으로 띄우고 respawn
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n gazebo \
       -c "$REPO_ROOT" "sleep infinity"
@@ -91,7 +106,7 @@ case "$ACTION" in
 
     # window 2: gogoping_modes (FSM + BT 본체 — /gogoping/state publish, /gogoping/set_goal server)
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes"
+      "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes $MODES_ARGS"
 
     # window 3: sim-battery (sim 전용 — /gogoping/battery 1Hz + 디버그 slider srv)
     tmux new-window -t "$SESSION" -n sim-battery -c "$REPO_ROOT" \

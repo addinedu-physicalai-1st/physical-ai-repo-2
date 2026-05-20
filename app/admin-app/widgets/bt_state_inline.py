@@ -78,9 +78,23 @@ _PLACEHOLDER = "—"
 
 
 def _render_child_html(child: dict) -> str:
-    """status 별 시각화 — 점/체크/엑스 + 텍스트 스타일."""
+    """status 별 시각화 — 점/체크/엑스 + 텍스트 스타일.
+
+    ``child["disabled"] == True`` 면 status 와 무관하게 *비활성* 표시 (회색 ⊘ +
+    strikethrough + dim 텍스트). 시연/디버그용 monitor disable 시 표시. snapshot 의
+    ``disabled`` 키는 tree_inspector._leaf_dict 가 monitor 의 ``_disabled`` 속성
+    True 일 때만 포함.
+    """
     name = str(child.get("name", "?"))
     status = str(child.get("status", "INVALID")).upper()
+
+    if child.get("disabled"):
+        return (
+            f"<span style='color: {COLORS['text_muted']};'>⊘</span>"
+            f"&nbsp;<span style='color: {COLORS['text_muted']}; "
+            f"text-decoration: line-through;'>{name}</span>"
+            f"&nbsp;<span style='color: {COLORS['warning']}; font-size: 8pt;'>(disabled)</span>"
+        )
 
     if status == "RUNNING":
         # 강조 — 가장 눈에 띄게

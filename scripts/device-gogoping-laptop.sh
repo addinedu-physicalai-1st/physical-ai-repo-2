@@ -27,6 +27,11 @@
 #   scripts/device-gogoping-laptop.sh down      # tmux 세션 종료 + 잔여 프로세스 정리
 #   scripts/device-gogoping-laptop.sh status    # 세션 상태
 #
+# 시연/디버그 환경변수 (gogoping_modes 노드에 ros-args 로 전달):
+#   NO_BATTERY_SAFETY=1   BatteryLowMonitor 비활성 — 배터리 ≤20% 자동 RETURNING 차단
+#   NO_ERROR_SAFETY=1     HardwareHealth / MapBoundary fault → ERROR 차단
+# 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 scripts/device-gogoping-laptop.sh
+#
 # 의존:
 #   - tmux
 #   - /opt/ros/jazzy 설치
@@ -79,6 +84,16 @@ case "$ACTION" in
     # 로 처리한다. multicast 차단 환경에선 zshrc 의 <Peers> 안 IP 가 unicast 발견 담당.
 
     SOURCE_ENV="source $ROS_SETUP && source $WS_SETUP"
+
+    # 시연/디버그 — 환경변수 → ros-args. gogoping_modes 노드의 monitor 들이 declare_parameter
+    # 로 받음 (utils/safety_flags.py).
+    MODES_ARGS=""
+    if [[ -n "${NO_BATTERY_SAFETY:-}" || -n "${NO_ERROR_SAFETY:-}" ]]; then
+      MODES_ARGS="--ros-args"
+      [[ -n "${NO_BATTERY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_battery_safety:=true"
+      [[ -n "${NO_ERROR_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_error_safety:=true"
+      echo "[device-gogoping-laptop] modes 인자: $MODES_ARGS"
+    fi
 
     # /dev/arduino-camera (camera-pan 서보용 symlink) 없으면 udev rule 자동 install — 1회만, sudo 묻음.
     # 실패해도 진행 — camera-pan window 에서 serial open 에러로 표시됨.
@@ -187,7 +202,7 @@ case "$ACTION" in
 
     # window 3: gogoping_modes (FSM + BT 본체)
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes"
+      "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes $MODES_ARGS"
 
     # window 3: camera — USB 웹캠 → UDP MJPEG (SR-CAM-001).
     # backend=cv2 default: 외장 웹캠 native MJPEG quality 높아 v4l2 직송 시 frame > 65.4KB drop.

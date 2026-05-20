@@ -38,6 +38,7 @@ import py_trees
 from py_trees.common import Access, Status
 
 from ...blackboard import Keys
+from ....utils.safety_flags import is_safety_disabled
 
 if TYPE_CHECKING:
     from ....context import Context
@@ -71,6 +72,10 @@ class HardwareHealthMonitor(py_trees.behaviour.Behaviour):
         # 새로 만들어져도 같은 process 면 같은 monotonic 시작점이라 OK.
         self._startup_time = time.monotonic()
         self._setup_done = False
+        # 시연/디버그 환경 — disable_error_safety:=true 면 fault trigger 발화 skip.
+        self._disabled = is_safety_disabled(
+            getattr(self.ctx, "node", None), "error", monitor_name=self.name,
+        )
 
     def setup(self, **kwargs) -> None:
         """py_trees 가 트리 setup 시 1회 호출 — ROS subscriber 등록 + param 읽기.
@@ -129,7 +134,7 @@ class HardwareHealthMonitor(py_trees.behaviour.Behaviour):
         self._fired = False
 
     def update(self) -> Status:
-        if self._fired:
+        if self._disabled or self._fired:
             return Status.RUNNING
         now = time.monotonic()
         # startup grace — process 부팅 직후 N초 동안은 fault 보류. sim/실물 동일.
