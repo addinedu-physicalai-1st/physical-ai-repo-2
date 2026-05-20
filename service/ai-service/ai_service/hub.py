@@ -315,11 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # 감정 연기('화내봐' '슬퍼봐' 등) — LLM 이 엉뚱한 말만 할 때가 많아 규칙으로 고정
-    demo = _emotion_demo_response(text, req.robot)
-    if demo:
-        return demo
-
     # 일과표·시간표 — shared JSON(Control `/api/schedule` 과 동일 원본)을 LLM 보다 먼저
     first_sched = try_schedule_first_reply(text)
     if first_sched:

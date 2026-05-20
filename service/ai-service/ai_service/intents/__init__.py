@@ -5,6 +5,7 @@ from ai_service.intents.base import (
     IntentResponse,
     now_kst,
 )
+from ai_service.intents.common.emotion_demo import EmotionDemoHandler
 from ai_service.intents.common.gender import GenderHandler
 from ai_service.intents.common.hello import HelloHandler
 from ai_service.intents.common.menu import MenuHandler
@@ -18,6 +19,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         HelloHandler(),
         GenderHandler(),
         ModeChangeHandler(),
+        EmotionDemoHandler(),
     ],
     "gogoping": [
         StopHandler(),
@@ -25,6 +27,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         HelloHandler(),
         GenderHandler(),
         ModeChangeHandler(),
+        EmotionDemoHandler(),
     ],
     "noriarm": [
         StopHandler(),
@@ -32,6 +35,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         HelloHandler(),
         GenderHandler(),
         ModeChangeHandler(),
+        EmotionDemoHandler(),
     ],
 }
 
