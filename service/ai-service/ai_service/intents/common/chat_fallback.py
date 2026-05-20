@@ -6,7 +6,6 @@ LLM 실패·timeout 시에도 안전 문구를 반환한다.
 from __future__ import annotations
 
 import asyncio
-import logging
 import re
 from typing import ClassVar
 
@@ -18,8 +17,6 @@ from ai_service.guard_replies import teacher_idk_line
 from ai_service.hub import Chat, IntentRequest
 from ai_service.intents.base import IntentContext, IntentHandler, IntentResponse
 from ai_service.llm import LLMError, generate_chat
-
-logger = logging.getLogger(__name__)
 
 
 def _normalize_utterance(text: str) -> str:
