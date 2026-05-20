@@ -4,14 +4,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import ClassVar, Union
+from typing import ClassVar
 
 from ai_service.hub import Chat, GotoVertex, IntentRequest, ModeChange, SubCommand
 
-IntentResponse = Union[ModeChange, SubCommand, GotoVertex, Chat]
+IntentResponse = ModeChange | SubCommand | GotoVertex | Chat
 
 
-def _now_kst() -> datetime:
+def now_kst() -> datetime:
     return datetime.utcnow() + timedelta(hours=9)
 
 

@@ -3,7 +3,7 @@ from ai_service.intents.base import (
     IntentContext,
     IntentHandler,
     IntentResponse,
-    _now_kst,
+    now_kst,
 )
 
 PIPELINES: dict[str, list[IntentHandler]] = {
@@ -12,4 +12,4 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     "noriarm": [],
 }
 
-__all__ = ["IntentContext", "IntentHandler", "IntentResponse", "PIPELINES", "_now_kst"]
+__all__ = ["IntentContext", "IntentHandler", "IntentResponse", "PIPELINES", "now_kst"]
