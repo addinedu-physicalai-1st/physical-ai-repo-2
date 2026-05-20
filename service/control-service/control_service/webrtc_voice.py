@@ -84,6 +84,11 @@ class OfferBody(BaseModel):
     # 브라우저별 영속 UUID — localStorage 에서 첫 방문 시 생성·저장 후 매번 동봉.
     # 같은 client_id 로 새 offer 가 오면 이전 세션 close 후 교체 (refresh 케이스).
     client_id: str
+    # 클라가 현재 보고 있는 robot id (eduping/gogoping/noriarm). session.robot 을
+    # 세션 생성 시점에 미리 세팅해서 wake 없이도 _dispatch_intent 가 올바른
+    # robot persona 로 라우팅되게 함 — 옛 fallback "eduping" 으로 잘못 응답하던
+    # 케이스 방지.
+    robot: str
 
 
 class AnswerBody(BaseModel):
@@ -342,6 +347,9 @@ async def webrtc_offer(body: OfferBody) -> AnswerBody:
 
     pc = RTCPeerConnection()
     session = _Session(log_id=log_id)
+    # /offer 시점에 robot 미리 세팅 — wake msg 처리 (open_gate) 전에 도착하는
+    # dispatch_text 또는 race-condition STT 가 fallback "eduping" 으로 떨어지지 않게.
+    session.robot = body.robot
     # Outbound TTS 트랙을 PC 에 미리 attach — answer SDP 에 m=audio sendrecv 가
     # 들어가 브라우저가 ontrack 으로 받음 → <audio srcObject> 가 재생.
     session.outbound_tts = OutboundTTSTrack()

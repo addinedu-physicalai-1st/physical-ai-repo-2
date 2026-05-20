@@ -11,6 +11,9 @@
 import { ref, type Ref } from 'vue';
 
 export interface UseWebRTCVoiceOptions {
+  /** robot id — /offer 시 서버에 동봉하여 session.robot 미리 세팅. wake 없이도
+   *  ai-service intent dispatch 가 올바른 robot persona 로 라우팅되게 함. */
+  robot: string;
   /** PC 가 'connected' 상태로 진입 시. */
   onConnected?: () => void;
   /** PC 가 close/failed 로 끝났을 때. */
@@ -59,7 +62,7 @@ function getOrCreateClientId(): string {
   }
 }
 
-export function useWebRTCVoice(options: UseWebRTCVoiceOptions = {}): UseWebRTCVoiceReturn {
+export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceReturn {
   const isConnected = ref(false);
   const remoteAudioEl: Ref<HTMLAudioElement | null> = ref(null);
   const remoteStream: Ref<MediaStream | null> = ref(null);
@@ -211,6 +214,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions = {}): UseWebRTCVo
           sdp: pc.localDescription!.sdp,
           type: pc.localDescription!.type,
           client_id: clientId,
+          robot: options.robot,
         }),
       });
       if (!res.ok) {

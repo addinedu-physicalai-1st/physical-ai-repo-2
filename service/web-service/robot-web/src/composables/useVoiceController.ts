@@ -72,6 +72,7 @@ export function useVoiceController(robot: RobotConfig): {
   const tts = useTTS();
 
   const webrtcVoice = useWebRTCVoice({
+    robot: robot.id,
     onMessage: (msg) => handleDcMessage(msg as DcMsg),
     onError: (m) => voice.setError(m),
   });
@@ -200,7 +201,8 @@ export function useVoiceController(robot: RobotConfig): {
       void handleGotoVertex(intent.name);
     } else if (intent.kind === 'sub_command') {
       if (intent.action === 'return') void handleReturn();
-      // stop 은 mode.applyIntent 가 proximityHalt 처리. 추가 행동 없음.
+      else if (intent.action === 'stop') void handleStop();
+      // mode.applyIntent 가 proximityHalt 도 함께 처리 (안전망).
       enterCooldown();
     } else if (intent.kind === 'mode_change') {
       // mode.applyIntent 가 setMode 처리. useModeAnnouncer 가 모드 안내 발화 트리거.
@@ -228,6 +230,32 @@ export function useVoiceController(robot: RobotConfig): {
       confirmation = r.ok ? `${name}으로 갈게요` : `${name}을(를) 찾지 못했어요`;
     } catch {
       confirmation = '지금은 이동할 수 없어요';
+    }
+    speak(confirmation);
+  }
+
+  async function handleStop(): Promise<void> {
+    // "그만"/"멈춰"/"정지"/"스톱" → 현재 mode 중단 + IDLE 전이. mode_to_goal("대기")
+    // 가 Goal(mode="IDLE") 로 변환 → command_listener 가 FSM cancel trigger 발사 →
+    // ASSIST/PLAY/MANUAL/RETURNING 어느 상태든 IDLE 복귀. 자장가/이동/추종/숨바꼭질
+    // 모두 동일 경로. gogoping 외 robot 은 stop 의미가 다르므로 skip (proximityHalt 만).
+    if (robot.id !== 'gogoping') return;
+    // 이미 대기 중이면 fetch 자체 skip — FSM cancel trigger 가 IDLE 에선 미정의라
+    // 항상 거부되는데, 그때마다 "멈출 수 없어요" 안내가 어색하므로 응답만 자연스럽게.
+    if (mode.currentMode === '대기') {
+      speak('이미 쉬고 있어요');
+      return;
+    }
+    let confirmation = '';
+    try {
+      const r = await fetch('/api/gogoping/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ robot: 'gogoping', mode: '대기' }),
+      });
+      confirmation = r.ok ? '네, 멈출게요' : '지금은 멈출 수 없어요';
+    } catch {
+      confirmation = '지금은 멈출 수 없어요';
     }
     speak(confirmation);
   }
