@@ -110,6 +110,7 @@ fsm.trigger("return_request") → FSM RETURNING → BT_return_sub (충전소까�
 - 보조 모드의 `restrictedVoiceMode` 우회 키워드: `"로 가|로 이동|에 가|로 갑|에 갑|로 갈|에 갈| 가자| 가줘"` 또는 `"복귀|돌아가|돌아와|충전소|충전 ?하러"`
 - vertex name 매칭 실패 시 LLM chat fallback (분류기 내부)
 - C 의 `/waypoints/navigate` (graph_router action 직접) 와 달리 본 경로는 **SetGoal.srv 거쳐 FSM trigger 발화** — robot 이동 + state 전이 둘 다. C 는 admin 디버그용 (FSM 우회 직접 nav).
+- `GotoVertexHandler._load_vertex_names()` 가 `waypoints.yaml` 을 매 intent 마다 동적 로드 — **vertex 추가 시 ai-service 재배포 불필요** (yaml 변경 후 graph_router 재시작만으로 음성 매칭에 즉시 반영).
 
 ### E. Admin UI (PyQt) 사용자 인터랙션
 

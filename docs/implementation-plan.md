@@ -163,6 +163,8 @@ last_synced: "2026-05-13T14:08:22"
 | --- | --- | --- | --- |
 | SR-NAP-002 | 낮잠 시각 기록 | GogoPing 이 낮잠 모드(자장가) 진입·종료 시각을 Control Server REST 로 전달하고, Control Server 가 DB `mode_history` 에 기록한다. AI Server 보고서 생성(SR-RPT-001) 시 해당 당일 낮잠 시작·종료 시각을 조회해 요약에 포함한다. | High |
 
+> 음성→BT 진단 (2026-05-20, plan `20260520-2136-gogoping-voice-fsm-bt`): 시나리오 1 (장소 이동: `goto_vertex` intent → `/api/gogoping/goto_vertex` → ASSIST/goto) 과 시나리오 3 (충전 복귀: `sub_command{action:"return"}` → `/api/gogoping/mode {mode:"복귀"}` → RETURNING) 인프라 정합 확인 완료. 시나리오 2 (자장가: `mode_change{mode:"자장가"}`) 는 클라이언트 `applyIntent` 가 `/api/mode` ack-only 만 호출 → BT_lullaby_sub 진입 갭 가능성 — 사용자 발화 검증 후 후속 plan 으로 분리.
+
 ### 2.5 주행 안전 / 자가관리
 
 | S ID | Name | Description | Priority |
