@@ -69,7 +69,8 @@ ros2 action send_goal /graph_router/navigate_to_vertex \
 | Endpoint | 용도 |
 |---|---|
 | `POST /waypoints/route {name}` | 경로 시퀀스만 반환 (시각화/디버깅) |
-| `POST /waypoints/navigate {name}` | 실제 이동 — graph routing |
+| `POST /waypoints/navigate {name}` | 실제 이동 — graph routing 직접 (FSM 우회). admin UI 디버그용 |
+| `POST /api/gogoping/goto_vertex {name}` | 실제 이동 — **SetGoal.srv 경유 → FSM ASSIST/goto 진입**. robot-web 음성 정식 경로 (D 참조) |
 | `GET /waypoints` | vertex + lanes 목록 (admin UI 시각화용) |
 | `GET /waypoints/events` (SSE) | `route_progress` 이벤트 — 현재 통과 vertex |
 
@@ -81,20 +82,34 @@ server 의 [ros_bridge.py](../../../../service/control-service/control_service/w
 
 ```
 "고고핑 운동장11로 가"
-   ↓ STT
-robot-web → POST /api/voice/intent
-   ↓
+   ↓ STT (WebRTC DataChannel)
 service/ai-service/ai_service/hub.py 분류기 (_try_goto_vertex)
-   ↓ 응답
+   ↓ DC intent msg
 {kind: "goto_vertex", name: "운동장11"}
+   ↓ useVoiceController.handleGotoVertex(name)
+robot-web → POST /api/gogoping/goto_vertex {name: "운동장11"}
    ↓
-robot-web handler → POST /waypoints/navigate {name: "운동장11"}
-   ↓
-(이하 C 와 동일)
+control-service /api/gogoping/goto_vertex
+   ↓ Goal(mode=ASSIST, task=goto, destination_key="운동장11") → SetGoal.srv
+gogoping_modes command_listener → goal_reconciler → fsm.trigger("assist_request", task="goto")
+   ↓ FSM IDLE → ASSIST (state 전이!)
+BT_assist_main TaskSelector → goto_branch → BT_goto_sub
+   ↓ NavigateToVertex (graph_router action — C 와 동일 경로)
+   ↓ 도착 → UIPublish("도착했습니다") → assist_done → IDLE
+```
+
+복귀 "충전소로 가" / "복귀":
+```
+{kind: "sub_command", action: "return"}
+   ↓ handleReturn()
+robot-web → POST /api/gogoping/mode {robot:"gogoping", mode:"복귀"}
+   ↓ mode_to_goal("복귀") = Goal(mode="RETURNING") → SetGoal.srv
+fsm.trigger("return_request") → FSM RETURNING → BT_return_sub (충전소까지 lane + 도킹)
 ```
 
 - 보조 모드의 `restrictedVoiceMode` 우회 키워드: `"로 가|로 이동|에 가|로 갑|에 갑|로 갈|에 갈| 가자| 가줘"` 또는 `"복귀|돌아가|돌아와|충전소|충전 ?하러"`
 - vertex name 매칭 실패 시 LLM chat fallback (분류기 내부)
+- C 의 `/waypoints/navigate` (graph_router action 직접) 와 달리 본 경로는 **SetGoal.srv 거쳐 FSM trigger 발화** — robot 이동 + state 전이 둘 다. C 는 admin 디버그용 (FSM 우회 직접 nav).
 
 ### E. Admin UI (PyQt) 사용자 인터랙션
 

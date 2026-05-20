@@ -28,7 +28,7 @@ monitor 가 trigger 발사하면 sub_tree 의 RUNNING 이 INVALID 로 끊기고 
 | "복귀" / "돌아가" / "충전" | sub_command(action=return) | `return_request` | ASSIST → RETURNING (BT_returning_main) |
 | "그만" / "정지" / "취소" | sub_command(action=stop) | `cancel` | 현재 sub_tree 종료, ASSIST 유지 (TaskSelector 가 다시 분기) |
 | "이동" / "추종" / "자장가" | mode_change(mode=...) | `assist_request` (task 변경) | blackboard.assist_task 갱신 → TaskSelector 다른 sub_tree 선택 |
-| "X로 가" (vertex) | goto_vertex(name) | `assist_request(task=goto, target_vertex_name=X)` | BT_goto_sub 진입 후 [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) 호출 |
+| "X로 가" (vertex) | goto_vertex(name) | `assist_request(task=goto, destination_key=X)` | BT_goto_sub 진입 후 [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) (`target_key=Keys.DESTINATION_KEY` 로 override) 호출 |
 
 다른 state 의 trigger 매트릭스: [BT_idle_main](BT_idle_main.md), [BT_play_main](BT_play_main.md).
 
