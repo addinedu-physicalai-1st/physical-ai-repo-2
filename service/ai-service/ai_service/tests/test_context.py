@@ -15,12 +15,14 @@ from ai_service.capabilities.db_report import (
     _looks_like_report_query,
     _report_name_candidates,
 )
+from ai_service.capabilities.schedule_file import (
+    _looks_like_schedule_query,
+    try_schedule_first_reply,
+)
 from ai_service.context import (
     _looks_like_menu_query,
-    _looks_like_schedule_query,
     _should_inject_attendance,
     child_call_name,
-    try_schedule_first_reply,
 )
 
 

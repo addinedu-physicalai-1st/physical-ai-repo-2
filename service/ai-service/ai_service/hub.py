@@ -20,17 +20,17 @@ from ai_service.vision import OXBoardTask, default_registry
 
 logger = logging.getLogger(__name__)
 
-from ai_service.context import (
-    build_chat_context,
-    load_school_schedule_dict,
-    try_schedule_first_reply,
-)
+from ai_service.context import build_chat_context
 from ai_service.capabilities.db_attendance import (
     try_attendance_first_reply,
     try_whereabouts_first_reply,
 )
 from ai_service.capabilities.db_report import try_report_first_reply
 from ai_service.capabilities.db_roster import fetch_registered_children_labels
+from ai_service.capabilities.schedule_file import (
+    load_school_schedule_dict,
+    try_schedule_first_reply,
+)
 from ai_service.llm import LLMError, generate_chat, generate_report
 from ai_service.edge_tts_synth import synthesize_edge_mp3_stream
 from ai_service.config import settings as ai_settings
