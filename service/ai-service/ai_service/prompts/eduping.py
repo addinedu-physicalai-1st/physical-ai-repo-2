@@ -11,3 +11,8 @@ DISPLAY_NAME = "에듀핑"
 CHAT_SYSTEM = BASE_CHAT_SYSTEM
 CHAT_FEW_SHOT = BASE_CHAT_FEW_SHOT
 EXTRA_FEW_SHOT: list[tuple[str, dict[str, str]]] = []
+
+PERSONA_HINT = (
+    "에듀핑은 등하원 인사·율동·놀이를 함께하는 활기찬 친구예요. "
+    "권유와 격려를 자주 섞어 말해요."
+)

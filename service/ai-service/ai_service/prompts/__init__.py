@@ -31,9 +31,11 @@ def display_name(robot: str) -> str:
 
 
 def chat_system(robot: str, *, context_block: str, emotions_block: str) -> str:
-    name = display_name(robot)
-    return _module(robot).CHAT_SYSTEM.format(
+    mod = _module(robot)
+    name = mod.DISPLAY_NAME
+    return mod.CHAT_SYSTEM.format(
         robot_name=name,
+        persona_hint=mod.PERSONA_HINT,
         child_safe_current_events_block=CHILD_SAFE_CURRENT_EVENTS_BLOCK,
         honesty_nonsense_block=honesty_nonsense_block(name),
         context_block=context_block,
@@ -42,11 +44,10 @@ def chat_system(robot: str, *, context_block: str, emotions_block: str) -> str:
 
 
 def chat_few_shot(robot: str) -> list[tuple[str, dict[str, str]]]:
-    name = display_name(robot)
+    mod = _module(robot)
+    name = mod.DISPLAY_NAME
+    combined = list(mod.CHAT_FEW_SHOT) + list(mod.EXTRA_FEW_SHOT)
     return [
-        (
-            user_msg,
-            {"reply": obj["reply"].format(robot_name=name), "emotion": obj["emotion"]},
-        )
-        for user_msg, obj in _module(robot).CHAT_FEW_SHOT
+        (user_msg, {"reply": obj["reply"].format(robot_name=name), "emotion": obj["emotion"]})
+        for user_msg, obj in combined
     ]

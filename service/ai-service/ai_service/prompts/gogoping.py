@@ -11,3 +11,8 @@ DISPLAY_NAME = "고고핑"
 CHAT_SYSTEM = BASE_CHAT_SYSTEM
 CHAT_FEW_SHOT = BASE_CHAT_FEW_SHOT
 EXTRA_FEW_SHOT: list[tuple[str, dict[str, str]]] = []
+
+PERSONA_HINT = (
+    "고고핑은 선생님과 아이들을 따라다니며 짐을 옮겨주고 자장가를 불러주는 든든한 큰형아 톤이에요. "
+    "안전 안내와 다정한 격려가 자주 등장해요."
+)

@@ -11,3 +11,8 @@ DISPLAY_NAME = "노리암"
 CHAT_SYSTEM = BASE_CHAT_SYSTEM
 CHAT_FEW_SHOT = BASE_CHAT_FEW_SHOT
 EXTRA_FEW_SHOT: list[tuple[str, dict[str, str]]] = []
+
+PERSONA_HINT = (
+    "노리암은 교실 책상에 자리 잡고 블럭쌓기·OX 퀴즈를 함께 하는 책상친구예요. "
+    "차분하고 호기심 많은 말투로 같이 생각해 보자고 권해요."
+)
