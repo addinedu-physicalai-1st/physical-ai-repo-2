@@ -333,7 +333,83 @@ def _build_search_sequence(ctx: Context, *, waypoint_name: str, idx: int):
 > **연관 결정 — UI 알림은 `UIPublish` 단일 behavior**
 > 오디오 재생 / 카운트다운 안내 / "찾았다!" 같은 알림은 모두 **`bt/behaviors/common/ui_publish.py` 의 범용 `UIPublish(name, ctx, message)`** 한 behavior 로 처리. `message` dict 만 다르게 전달. `audio/` 같은 별도 카테고리 안 만듦. 시간 대기는 `py_trees.timers.Timer` 빌트인 사용. WaitForStopCommand (UI 의 stop 신호 수신) 만 별도 behavior — blackboard 폴링 패턴이라 UI publish 와 성격 다름.
 
-## 5. 테스트 (단위 / 통합)
+## 5. rclpy 사용 컨벤션 — 안 지키면 폭발하는 함정 3개
+
+과거에 RETURNING cancel 시나리오 디버깅하며 다 한 번씩 밟아본 함정. 새 노드 / behavior /
+action server 추가 시 반드시 따른다. 자세한 사례: [nav-cancel-chain.md](nav-cancel-chain.md).
+
+### 5.1 `ActionServer.execute_callback` 은 **sync** 로 작성
+
+```python
+# ❌ 위험 — RuntimeError: no running event loop
+async def _act_navigate(self, gh):
+    ...
+    await asyncio.sleep(0.05)        # 첫 await 에서 즉시 폭발
+
+# ✅ sync — MultiThreadedExecutor 가 별도 thread 에서 실행
+def _act_navigate(self, gh):
+    ...
+    while not future.done():
+        time.sleep(0.05)
+```
+
+rclpy 의 `ActionServer` 는 `MultiThreadedExecutor` 환경에서 **running asyncio event loop
+를 만들어주지 않는다**. async 패턴 사용 시 첫 `await` 에서 `RuntimeError` 발생 →
+function 즉시 종료 → orphan goal handle.
+
+callback group 은 `ReentrantCallbackGroup` 권장 — sync function 이 thread 를 block 해도
+다른 callback (cancel_callback / TF / 다른 service) 은 별도 thread 에서 정상 동작.
+
+### 5.2 외부 action goal handle 은 `try/finally` safety net 으로 cancel forward
+
+내 노드가 다른 노드 (nav2 등) 의 action goal 을 들고 있을 때, **내 함수가 어떤 경로로
+종료되든 그 goal 을 cancel 해야** 좀비 안 됨. 안 그러면 nav2 controller 가 `cmd_vel`
+계속 publish — robot 안 멈춤.
+
+```python
+nav_gh = None
+try:
+    ...
+    nav_gh = send_future.result()
+    if not nav_gh.accepted:
+        nav_gh = None    # active 아님 — finally skip
+        return result
+    ...
+    # 정상 종료 경로마다 nav_gh = None 명시 (이중 cancel 방지)
+    if cancel_path:
+        nav_gh.cancel_goal_async()
+        nav_gh = None
+        return result
+    ...
+    nav_gh = None    # SUCCESS / nav2 자체 종료
+    return result
+finally:
+    # safety net — 위의 어떤 분기에서도 nav_gh = None 못 했으면 orphan 방지
+    if nav_gh is not None:
+        try:
+            nav_gh.cancel_goal_async()
+        except Exception:
+            pass
+```
+
+### 5.3 `logger.exception()` 금지
+
+ROS 2 jazzy 의 `RcutilsLogger` 는 Python stdlib `logging.Logger` 와 다르다 — `.exception()`
+메서드 없음. 호출하면 secondary `AttributeError` 가 원본 traceback 을 가린다.
+
+```python
+# ❌
+self.get_logger().exception(f"failed: {e}")
+# AttributeError: 'RcutilsLogger' object has no attribute 'exception'
+
+# ✅
+import traceback
+self.get_logger().error(f"failed: {e}\n{traceback.format_exc()}")
+```
+
+---
+
+## 6. 테스트 (단위 / 통합)
 
 - **단위 (ROS 없이)**: `Context` 를 `unittest.mock.MagicMock()` 으로 만들어 behavior 단독 테스트. blackboard 는 py_trees 가 알아서 처리.
 - **통합 (ROS 필요)**: `pytest` + `rclpy.init()` + 실제 Nav2 mock 노드. `scripts/test.sh` 에 등록.
@@ -349,3 +425,4 @@ def _build_search_sequence(ctx: Context, *, waypoint_name: str, idx: int):
 - [ ] monitor 이면 SUCCESS / FAILURE 안 리턴, 항상 RUNNING + trigger 호출
 - [ ] edge-triggered (같은 이벤트 매 tick 반복 호출 X)
 - [ ] 새 blackboard 키 / FSM trigger 추가 시 [blackboard-schema.md](blackboard-schema.md) / [fsm-triggers.md](fsm-triggers.md) 같이 갱신
+- [ ] **새 ActionServer 추가 시** [§5.1](#51-actionserverexecute_callback-은-sync-로-작성) (sync execute_callback) + [§5.2](#52-외부-action-goal-handle-은-tryfinally-safety-net-으로-cancel-forward) (try/finally) + [§5.3](#53-loggerexception-금지) (logger.error) 확인. 위반 시 좀비 goal / RuntimeError 함정 (사례: [nav-cancel-chain.md](nav-cancel-chain.md))
