@@ -26,6 +26,8 @@ export interface UseWebRTCVoiceReturn {
   stop: () => void;
   /** DataChannel send. PC/DC 미연결이면 warn 만 찍고 drop. */
   send: (msg: unknown) => void;
+  /** 로컬 mic 의 outbound track on/off. PC/DC 는 그대로 유지 — 텍스트 모드에서 사용. */
+  setMicEnabled: (enabled: boolean) => void;
   isConnected: Ref<boolean>;
   /** 서버 outbound TTS 가 도착하는 audio element — lip-sync 가 createMediaStreamSource 로 분석. */
   remoteAudioEl: Ref<HTMLAudioElement | null>;
@@ -279,7 +281,14 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions = {}): UseWebRTCVo
     dc.send(typeof msg === 'string' ? msg : JSON.stringify(msg));
   }
 
-  return { start, stop, send, isConnected, remoteAudioEl, remoteStream, micLevel };
+  function setMicEnabled(enabled: boolean): void {
+    if (!localStream) return;
+    for (const track of localStream.getAudioTracks()) {
+      track.enabled = enabled;
+    }
+  }
+
+  return { start, stop, send, setMicEnabled, isConnected, remoteAudioEl, remoteStream, micLevel };
 }
 
 /** ICE gathering 완료 대기 — vanilla ICE 용. timeout 1s 후 그냥 진행 (호스트만이라도). */

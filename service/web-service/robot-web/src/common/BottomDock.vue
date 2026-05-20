@@ -22,14 +22,21 @@ const ctrl = controller;
 /** SiriBlob 에 줄 audio level — STT 백엔드 (서버 STT) 가 노출하는 stream RMS 재사용. */
 const micLevel = computed(() => ctrl.micLevel.value);
 
-// voiceMode 토글 — STT on/off 전환 (초기 시작은 App.vue handleStart 가 처리)
+// voiceMode 토글 — WebRTC PC/DC 는 살려두고 mic + wake 만 토글.
+// 텍스트 모드에서도 dispatch_text 가 같은 DC 로 가야 하므로 stop() 하지 않는다.
+// 초기 시작은 App.vue handleStart 가 ctrl.start() 로 처리.
 watch(voiceMode, (next, prev) => {
-  if (next === 'voice' && prev === 'text') ctrl.start();
-  else if (next === 'text' && prev === 'voice') ctrl.stop();
+  if (next === 'voice' && prev === 'text') ctrl.setMicActive(true);
+  else if (next === 'text' && prev === 'voice') ctrl.setMicActive(false);
 });
 
 const showLoader = computed(
   () => voiceMode.value === 'voice' && state.value === 'dispatching'
+);
+
+// listening 동안만 게임 모달·경고창 (z-index 9999) 위로 띄운다.
+const blobActive = computed(
+  () => voiceMode.value === 'voice' && state.value === 'listening'
 );
 
 function switchToText(): void {
@@ -38,7 +45,7 @@ function switchToText(): void {
 </script>
 
 <template>
-  <div class="dock" :style="{ '--primary': primary }">
+  <div class="dock" :class="{ 'dock-top': blobActive }" :style="{ '--primary': primary }">
     <!-- Legacy caption hidden in favor of Premium Subtitles in EmotionDisplay -->
     <!-- <div class="caption-container">
       <VoiceCaption :text="captionText" />
@@ -75,6 +82,10 @@ function switchToText(): void {
   z-index: 15;
   width: min(560px, calc(100vw - 200px));
   min-height: 200px;
+}
+.dock.dock-top {
+  /* WarningModal (9999), MugunghwaGame 토스트 (1000) 위로 — 호출어 활성 동안 항상 최상위 */
+  z-index: 100000;
 }
 
 /* 휴대전화 공통: SiriBlob 자체 크기 축소 (interactive 한 발화 반응은 SiriBlob 의 scale 로 충분히 잘 보임) */

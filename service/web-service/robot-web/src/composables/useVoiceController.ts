@@ -50,6 +50,8 @@ interface DcMsg {
 export function useVoiceController(robot: RobotConfig): {
   start: () => void;
   stop: () => void;
+  /** voiceMode 토글용 — PC/DC 살려둔 채 mic + wake 만 on/off. */
+  setMicActive: (active: boolean) => void;
   /** 텍스트 명령 (CommandBar 타이핑) — wake gate 우회, 서버에 dispatch_text 송신. */
   processCommand: (text: string) => void;
   /** 외부에서 임의 발화 요청 — 서버에 speak DC msg 송신 (TTS outbound 로 재생). */
@@ -128,6 +130,7 @@ export function useVoiceController(robot: RobotConfig): {
     voice.setSttText('');
     voice.setSpeaking(false);
     voice.setState('wake_detected');
+    voice.bumpWake();
     mode.setEmotionTransient('hello', 1000);
     // 서버에 wake msg → 서버가 (a) gate 열고 (b) outbound 비운 뒤 wakeAck PCM push.
     webrtcVoice.send({ type: 'wake', robot: robot.id });
@@ -313,9 +316,23 @@ export function useVoiceController(robot: RobotConfig): {
     voice.setState('idle');
   }
 
+  /** 모드 전환용 — WebRTC PC/DC 는 살려두고 mic 캡처와 wake word 만 토글.
+   * 텍스트 모드에서는 사용자 발화가 들어가면 안 되지만 dispatch DC 는 필요. */
+  function setMicActive(active: boolean): void {
+    webrtcVoice.setMicEnabled(active);
+    if (active) {
+      void wakeWord.start().catch((e) => {
+        voice.setError(`wake start failed: ${(e as Error).message}`);
+      });
+    } else {
+      void wakeWord.stop();
+    }
+  }
+
   return {
     start,
     stop,
+    setMicActive,
     processCommand,
     speak,
     cancelSpeak,
