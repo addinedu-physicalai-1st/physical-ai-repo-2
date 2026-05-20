@@ -315,11 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # 보고서·일과 — 원아 한 명이 확실할 때 `report` 테이블을 LLM 보다 먼저
-    first_report = await try_report_first_reply(text)
-    if first_report:
-        return {"kind": "chat", "reply": first_report, "emotion": "interest"}
-
     # 이름만 입력 시 등하원 규칙 답변 (소형 LLM 의 아이 말투 환각 방지)
     first_att = await try_attendance_first_reply(text)
     if first_att:
