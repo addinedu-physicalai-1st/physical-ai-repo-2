@@ -230,6 +230,8 @@ def install(
 
     # WS /ws/robot-state — admin-app 이 구독
     _install_state_ws(app, bridge)
+    # WS /ws/nav-debug-events — admin-app 의 NavDebugLogCard 가 구독
+    _install_nav_event_ws(app, bridge)
 
 
 def _install_state_ws(app: FastAPI, bridge: GogopingRosBridge) -> None:
@@ -263,6 +265,48 @@ def _install_state_ws(app: FastAPI, bridge: GogopingRosBridge) -> None:
             pass
         except Exception as e:
             logger.warning(f"robot-state WS 오류: {e}")
+        finally:
+            unreg()
+
+
+def _install_nav_event_ws(app: FastAPI, bridge: GogopingRosBridge) -> None:
+    """``/ws/nav-debug-events`` WebSocket — bridge 의 /gogoping/debug/nav_events fan-out.
+
+    연결 즉시 ``get_recent_nav_events()`` backfill (최근 200개) 한 번 보내고, 이후
+    spin thread 에서 callback 으로 push.
+    """
+
+    @app.websocket("/ws/nav-debug-events")
+    async def nav_event_ws(ws: WebSocket) -> None:
+        await ws.accept()
+        loop = asyncio.get_event_loop()
+        # depth 깊게 — burst (cancel chain 한 cycle = 9~10 event 가 ~1초 안에) 안 잃게
+        queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=200)
+
+        def _on_event(payload: dict) -> None:
+            try:
+                loop.call_soon_threadsafe(queue.put_nowait, payload)
+            except asyncio.QueueFull:
+                # 클라이언트가 너무 느리면 drop — admin UI 는 어차피 최근만 표시
+                pass
+
+        unreg = bridge.register_nav_event_callback(_on_event)
+
+        # backfill
+        for payload in bridge.get_recent_nav_events():
+            try:
+                await ws.send_json(payload)
+            except Exception:
+                break
+
+        try:
+            while True:
+                payload = await queue.get()
+                await ws.send_json(payload)
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.warning(f"nav-debug-events WS 오류: {e}")
         finally:
             unreg()
 

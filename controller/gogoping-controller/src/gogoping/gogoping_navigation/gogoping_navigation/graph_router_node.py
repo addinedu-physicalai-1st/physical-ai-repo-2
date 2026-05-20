@@ -14,7 +14,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import math
 import time
@@ -184,17 +183,38 @@ class GraphRouterNode(Node):
         return res
 
     # ──────── action: navigate_to_vertex ────────
-    async def _act_navigate(
+    def _act_navigate(
         self, gh: ServerGoalHandle
     ) -> NavigateToVertex.Result:
+        """graph_router 의 NavigateToVertex action 처리 — **sync**.
+
+        과거 async 패턴을 썼지만 rclpy ActionServer + MultiThreadedExecutor 환경에선
+        running asyncio event loop 가 없어서 ``await asyncio.sleep`` 이 즉시
+        ``RuntimeError: no running event loop`` 으로 깨졌음. nav2 goal accepted 직후
+        polling 진입과 동시에 종료 → nav_gh 가 orphan → nav2 controller 가 cmd_vel
+        계속 publish (좀비). 따라서 **동기 polling + time.sleep** 으로 변환.
+
+        ⚠️ nav_gh 가 nav2 에 보내진 후 어떤 종료 경로에서도 cancel 을 forward 해야
+        nav2 controller_server 가 cmd_vel publish 를 멈춤. try/finally 의 safety net
+        이 핵심.
+
+        호출 thread: MultiThreadedExecutor + ReentrantCallbackGroup — 본 함수가 polling
+        으로 thread 를 block 해도 다른 callback (cancel_callback / TF / 다른 service)
+        은 별도 thread 에서 정상 동작.
+
+        모든 abort 경로에 admin UI NavDebugLogCard 용 event publish.
+        """
         target = gh.request.target_name
         result = NavigateToVertex.Result()
+        nav_gh = None
+        self._dbg(f"act_navigate start (target={target!r})")
 
         cur = self._current_xy()
         if cur is None:
             gh.abort()
             result.success = False
             result.message = "no tf map→base_link yet"
+            self._dbg("abort: no tf map→base_link yet", level="warn")
             return result
 
         try:
@@ -204,6 +224,7 @@ class GraphRouterNode(Node):
             gh.abort()
             result.success = False
             result.message = str(e)
+            self._dbg(f"abort: graph error {e}", level="err")
             return result
 
         # vertex sequence → PoseStamped 리스트
@@ -225,6 +246,10 @@ class GraphRouterNode(Node):
             gh.abort()
             result.success = False
             result.message = f"nav2 action server '{self._follow_action}' not available"
+            self._dbg(
+                f"abort: nav2 server '{self._follow_action}' unavailable",
+                level="err",
+            )
             return result
 
         nav_goal = NavigateThroughPoses.Goal()
@@ -251,60 +276,124 @@ class GraphRouterNode(Node):
                 last_idx = best_i
             self._publish_feedback(gh, seq, last_idx)
 
-        send_future = self._nav_ac.send_goal_async(
-            nav_goal, feedback_callback=_on_nav_feedback
-        )
-        await send_future
-        nav_gh = send_future.result()
-        if not nav_gh.accepted:
-            gh.abort()
-            result.success = False
-            result.message = "nav2 rejected goal"
-            return result
+        # ★ safety net — nav_gh 가 만들어지면 어떤 종료 경로에서도 cancel forward 보장
+        try:
+            send_future = self._nav_ac.send_goal_async(
+                nav_goal, feedback_callback=_on_nav_feedback
+            )
+            # send_future 동기 대기 — 5s timeout 안 오면 abort
+            send_deadline = time.monotonic() + 5.0
+            while not send_future.done():
+                if gh.is_cancel_requested:
+                    gh.canceled()
+                    result.success = False
+                    result.message = "canceled before send completed"
+                    self._dbg("canceled before send completed", level="warn")
+                    return result
+                if time.monotonic() > send_deadline:
+                    gh.abort()
+                    result.success = False
+                    result.message = "send_goal_async timeout"
+                    self._dbg("abort: send_goal_async timeout", level="err")
+                    return result
+                time.sleep(0.01)
 
-        # 최종 결과 대기 — polling 으로 클라이언트 cancel request 검출.
-        # await get_result_future 만 쓰면 BT 의 cancel_goal_async() 가 nav2 까지 forward 안 됨.
-        get_result_future = nav_gh.get_result_async()
-        while not get_result_future.done():
-            if gh.is_cancel_requested:
-                self.get_logger().info(
-                    "navigate_to_vertex: client cancel → nav2 NavigateThroughPoses cancel"
-                )
-                self._dbg(
-                    f"client cancel → nav2 cancel (target={target!r}, "
-                    f"reached_idx={last_idx}/{len(seq)-1})",
-                    level="warn",
-                )
-                try:
-                    cancel_future = nav_gh.cancel_goal_async()
-                    await cancel_future
-                    self._dbg(f"nav2 cancel ack (target={target!r})")
-                except Exception as e:
-                    self.get_logger().warning(f"nav2 cancel failed: {e}")
-                    self._dbg(f"nav2 cancel FAILED: {e}", level="err")
-                gh.canceled()
+            nav_gh = send_future.result()
+            if not nav_gh.accepted:
+                nav_gh = None   # 어차피 active 아님 → finally cancel skip
+                gh.abort()
                 result.success = False
-                result.message = "canceled by client"
-                result.final_vertex = seq[last_idx] if last_idx < len(seq) else ""
+                result.message = "nav2 rejected goal"
+                self._dbg("abort: nav2 rejected goal", level="warn")
                 return result
-            await asyncio.sleep(0.05)
 
-        wrapper = get_result_future.result()
-        # action_msgs/GoalStatus: 4=SUCCEEDED
-        succeeded = wrapper.status == 4
+            self._dbg(f"nav2 goal accepted ({len(poses)} poses)")
 
-        if not succeeded:
-            gh.abort()
-            result.success = False
-            result.message = f"nav2 status={wrapper.status}"
-            result.final_vertex = seq[last_idx] if last_idx < len(seq) else target
+            # 최종 결과 대기 — polling 으로 클라이언트 cancel request 검출.
+            get_result_future = nav_gh.get_result_async()
+            while not get_result_future.done():
+                if gh.is_cancel_requested:
+                    self.get_logger().info(
+                        "navigate_to_vertex: client cancel → nav2 NavigateThroughPoses cancel"
+                    )
+                    self._dbg(
+                        f"client cancel → nav2 cancel (target={target!r}, "
+                        f"reached_idx={last_idx}/{len(seq)-1})",
+                        level="warn",
+                    )
+                    try:
+                        cancel_future = nav_gh.cancel_goal_async()
+                        # cancel_future 도 짧게 동기 대기 (2s) — nav2 ack 보장
+                        cancel_deadline = time.monotonic() + 2.0
+                        while not cancel_future.done():
+                            if time.monotonic() > cancel_deadline:
+                                self._dbg(
+                                    "nav2 cancel ack timeout — proceed anyway",
+                                    level="warn",
+                                )
+                                break
+                            time.sleep(0.02)
+                        if cancel_future.done():
+                            self._dbg(f"nav2 cancel ack (target={target!r})")
+                    except Exception as e:
+                        self.get_logger().warning(f"nav2 cancel failed: {e}")
+                        self._dbg(f"nav2 cancel FAILED: {e}", level="err")
+                    nav_gh = None   # 명시 cancel — finally 가 중복 cancel 안 하게
+                    gh.canceled()
+                    result.success = False
+                    result.message = "canceled by client"
+                    result.final_vertex = seq[last_idx] if last_idx < len(seq) else ""
+                    return result
+                time.sleep(0.05)
+
+            wrapper = get_result_future.result()
+            # action_msgs/GoalStatus: 4=SUCCEEDED — nav2 자체가 종료한 상태라 nav_gh 도 끝남
+            nav_gh = None   # 정상 종료 — finally cancel skip
+            succeeded = wrapper.status == 4
+
+            if not succeeded:
+                gh.abort()
+                result.success = False
+                result.message = f"nav2 status={wrapper.status}"
+                result.final_vertex = seq[last_idx] if last_idx < len(seq) else target
+                self._dbg(f"abort: nav2 status={wrapper.status}", level="warn")
+                return result
+
+            gh.succeed()
+            result.success = True
+            result.message = ""
+            result.final_vertex = target
+            self._dbg(f"SUCCESS (target={target!r})")
             return result
 
-        gh.succeed()
-        result.success = True
-        result.message = ""
-        result.final_vertex = target
-        return result
+        except Exception as e:
+            # polling 중 일반 예외 — nav_gh 가 살아있으면 orphan 방지 위해 cancel
+            # RcutilsLogger 는 .exception 메서드 없음 — .error 로 traceback 직접 format
+            import traceback
+            self.get_logger().error(
+                f"navigate_to_vertex exception: {e}\n{traceback.format_exc()}"
+            )
+            self._dbg(f"abort: exception {type(e).__name__}: {e}", level="err")
+            try:
+                gh.abort()
+            except Exception:
+                pass
+            result.success = False
+            result.message = f"exception: {e}"
+            return result
+        finally:
+            # ★ safety net — nav_gh 가 active 상태로 살아남으면 nav2 controller 가
+            # cmd_vel 을 계속 publish 하는 좀비 bug. 어떤 종료 경로에서도 cancel forward.
+            if nav_gh is not None:
+                try:
+                    nav_gh.cancel_goal_async()
+                    self._dbg(
+                        f"orphan nav_gh canceled in finally (target={target!r})",
+                        level="err",
+                    )
+                except Exception as e:
+                    self.get_logger().warning(f"orphan cancel failed: {e}")
+                    self._dbg(f"orphan cancel FAILED: {e}", level="err")
 
     # ──────── service: reload_graph ────────
     def _srv_reload_graph(

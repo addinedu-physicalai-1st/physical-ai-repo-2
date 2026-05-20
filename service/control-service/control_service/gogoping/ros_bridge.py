@@ -10,6 +10,7 @@ ROS 환경 미source 시 ``ros_available() == False`` 반환 — 호출자가 50
 """
 from __future__ import annotations
 
+import collections
 import json
 import logging
 import os
@@ -24,12 +25,17 @@ logger = logging.getLogger(__name__)
 
 # 토픽 / 서비스 이름 (gogoping_modes 와 일치 — 모두 /gogoping/* namespace)
 TOPIC_STATE = "/gogoping/state"
+TOPIC_NAV_DEBUG_EVENTS = "/gogoping/debug/nav_events"
 SERVICE_SET_GOAL = "/gogoping/set_goal"
 SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
 SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
 SERVICE_SET_ROBOT_POSE = "/gogoping/debug/set_robot_pose"
 SERVICE_SET_GAZEBO_POSE = "/gogoping/sim/teleport_pose"
 SERVICE_EMERGENCY_STOP = "/gogoping/emergency_stop"
+
+# admin UI NavDebugLogCard 가 WS 연결 시 backfill 받는 최근 이벤트 수.
+# 시나리오 재현 직후 늦게 연결해도 직전 cancel chain 한 cycle 정도는 보임.
+NAV_EVENT_BUFFER_SIZE = 200
 
 
 def ros_available() -> bool:
@@ -66,6 +72,10 @@ class GogopingRosBridge:
         self._lock = threading.Lock()
         self._latest_state: dict | None = None
         self._state_callbacks: list[Callable[[dict], None]] = []
+        self._nav_event_callbacks: list[Callable[[dict], None]] = []
+        self._nav_event_buffer: collections.deque[dict] = collections.deque(
+            maxlen=NAV_EVENT_BUFFER_SIZE,
+        )
         self._ros_ok = False
         self._spin_thread: threading.Thread | None = None
 
@@ -78,6 +88,7 @@ class GogopingRosBridge:
         self._set_gazebo_pose_cli: Any = None  # SetGazeboPose.srv client (sim 디버그 전용)
         self._estop_cli: Any = None        # std_srvs/Trigger client — emergency_stop
         self._sub: Any = None              # /gogoping/state subscriber
+        self._nav_event_sub: Any = None    # /gogoping/debug/nav_events subscriber
         self._executor: Any = None
 
     # ----------------------------------------------------------- lifecycle
@@ -126,6 +137,11 @@ class GogopingRosBridge:
         )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
+        )
+        # nav cancel chain debug — admin UI NavDebugLogCard 가 WS 로 받음. depth=20
+        # publisher 와 맞춰 burst 안 잃도록.
+        self._nav_event_sub = self._node.create_subscription(
+            String, TOPIC_NAV_DEBUG_EVENTS, self._on_nav_event_msg, 20,
         )
         self._executor = rclpy.executors.SingleThreadedExecutor()
         self._executor.add_node(self._node)
@@ -387,10 +403,54 @@ class GogopingRosBridge:
 
         return unregister
 
+    # ----------------------------------------------------------- nav event pubsub
+
+    def _on_nav_event_msg(self, msg: Any) -> None:
+        """``/gogoping/debug/nav_events`` 토픽 콜백 — JSON parse + ring buffer + listener."""
+        try:
+            payload = json.loads(msg.data)
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.warning(f"invalid nav_event JSON: {e}")
+            return
+        # 최소 필드 보강 (publisher 가 빠뜨려도 admin UI 가 깨지지 않게)
+        payload.setdefault("ts", time.time())
+        payload.setdefault("source", "?")
+        payload.setdefault("level", "info")
+        payload.setdefault("msg", "")
+        with self._lock:
+            self._nav_event_buffer.append(payload)
+            callbacks = list(self._nav_event_callbacks)
+        for cb in callbacks:
+            try:
+                cb(payload)
+            except Exception as e:
+                logger.warning(f"nav_event callback 오류: {e}")
+
+    def get_recent_nav_events(self) -> list[dict]:
+        """WS 연결 직후 backfill 용 — 최근 NAV_EVENT_BUFFER_SIZE 개."""
+        with self._lock:
+            return list(self._nav_event_buffer)
+
+    def register_nav_event_callback(
+        self, fn: Callable[[dict], None],
+    ) -> Callable[[], None]:
+        with self._lock:
+            self._nav_event_callbacks.append(fn)
+
+        def unregister() -> None:
+            with self._lock:
+                try:
+                    self._nav_event_callbacks.remove(fn)
+                except ValueError:
+                    pass
+
+        return unregister
+
 
 __all__ = [
     "GogopingRosBridge", "BridgeUnavailable", "ros_available",
-    "TOPIC_STATE", "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
+    "TOPIC_STATE", "TOPIC_NAV_DEBUG_EVENTS",
+    "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
     "SERVICE_SET_BATTERY_LEVEL", "SERVICE_SET_ROBOT_POSE",
     "SERVICE_SET_GAZEBO_POSE", "SERVICE_EMERGENCY_STOP",
 ]

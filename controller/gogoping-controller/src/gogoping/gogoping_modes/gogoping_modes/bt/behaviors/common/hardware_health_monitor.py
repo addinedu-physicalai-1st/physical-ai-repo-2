@@ -18,6 +18,9 @@ monitor 컨벤션 (``docs/conventions.md`` §2):
   새 트리 진입 시 호출되므로 ASSIST/PLAY/RETURNING 재진입 시 다시 발화 가능.
 - ``initialise()`` 가 한 번도 메시지를 못 받은 토픽의 ``_last_*`` 를 *현재 시각* 으로
   세팅 → grace period (= staleness threshold) 이후에야 fault. 부팅 직후 false-positive 회피.
+- 추가로 **process 부팅 grace** (``hw_health_startup_grace_seconds``, 기본 15s) 동안은
+  fault 발화 자체를 보류. sim/실물 둘 다 LIDAR/odom 토픽 + bridge + nav2 가 다 떠서
+  정상 메시지 흐름 안착하는 데 보통 5~10초 필요 — staleness 만으론 부족.
 - 발화 전 ``blackboard.ERROR_REASON / ERROR_SOURCE`` 세팅 (admin UI / DB 로그 활용).
 
 배치 (``docs/state-bt.md`` 정책):
@@ -46,7 +49,9 @@ class HardwareHealthMonitor(py_trees.behaviour.Behaviour):
     TOPIC_LIDAR = "/gogoping/scan"
     TOPIC_ODOM = "/gogoping/odom"
     DEFAULT_STALENESS_S = 3.0
+    DEFAULT_STARTUP_GRACE_S = 15.0
     PARAM_STALENESS = "hw_health_staleness_seconds"
+    PARAM_STARTUP_GRACE = "hw_health_startup_grace_seconds"
 
     def __init__(self, name: str, context: "Context"):
         super().__init__(name)
@@ -61,6 +66,10 @@ class HardwareHealthMonitor(py_trees.behaviour.Behaviour):
         self._lidar_sub = None
         self._odom_sub = None
         self._staleness_s = self.DEFAULT_STALENESS_S
+        self._startup_grace_s = self.DEFAULT_STARTUP_GRACE_S
+        # process 부팅 시점 — startup grace 기준점. monitor 인스턴스가 트리 swap 마다
+        # 새로 만들어져도 같은 process 면 같은 monotonic 시작점이라 OK.
+        self._startup_time = time.monotonic()
         self._setup_done = False
 
     def setup(self, **kwargs) -> None:
@@ -87,6 +96,19 @@ class HardwareHealthMonitor(py_trees.behaviour.Behaviour):
         except Exception:
             pass
 
+        if not node.has_parameter(self.PARAM_STARTUP_GRACE):
+            node.declare_parameter(
+                self.PARAM_STARTUP_GRACE, self.DEFAULT_STARTUP_GRACE_S,
+            )
+        try:
+            val = float(
+                node.get_parameter(self.PARAM_STARTUP_GRACE).get_parameter_value().double_value,
+            )
+            if val >= 0.0:
+                self._startup_grace_s = val
+        except Exception:
+            pass
+
         self._lidar_sub = node.create_subscription(
             LaserScan, self.TOPIC_LIDAR, self._on_lidar, 10,
         )
@@ -110,6 +132,10 @@ class HardwareHealthMonitor(py_trees.behaviour.Behaviour):
         if self._fired:
             return Status.RUNNING
         now = time.monotonic()
+        # startup grace — process 부팅 직후 N초 동안은 fault 보류. sim/실물 동일.
+        # LIDAR/odom 토픽 + bridge + nav2 가 다 안정화될 시간을 준다.
+        if (now - self._startup_time) < self._startup_grace_s:
+            return Status.RUNNING
         # LIDAR 우선 (안전상 더 critical). 동시에 둘 다 stale 이면 lidar 만 보고.
         if (now - self._last_lidar) > self._staleness_s:
             self._fire("lidar_timeout")

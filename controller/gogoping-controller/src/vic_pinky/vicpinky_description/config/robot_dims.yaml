@@ -5,8 +5,8 @@
 # 공장 baseline 은 robot_dims.factory.yaml 별도 보존.
 
 chassis:
-  length: 0.7
-  width: 0.8
+  length: 0.6
+  width: 0.5
   height: 0.128
   z_offset: 0.087
 caster:
