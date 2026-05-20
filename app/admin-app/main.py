@@ -23,7 +23,9 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QPushButton,
     QSizePolicy,
+    QSlider,
     QVBoxLayout,
     QWidget,
 )
@@ -48,6 +50,22 @@ def _detect_sim_mode() -> bool:
         return r.json().get("mode") == "sim"
     except Exception:
         return False
+
+
+def _format_duration(seconds: float) -> str:
+    """초 단위 → 한국어 시/분/초 표기. idle_chip 카운트다운용.
+
+    - >= 1시간: ``"23시간 59분 45초"``
+    - >= 1분:   ``"5분 30초"``
+    - 미만:    ``"45초"``
+    - 0 이하:  ``"0초"``
+    """
+    s = max(0, int(round(seconds)))
+    if s >= 3600:
+        return f"{s // 3600}시간 {(s % 3600) // 60}분 {s % 60}초"
+    if s >= 60:
+        return f"{s // 60}분 {s % 60}초"
+    return f"{s}초"
 
 
 class TopBar(QWidget):
@@ -112,6 +130,66 @@ class TopBar(QWidget):
 
         lay.addStretch(1)
 
+        # IDLE → RETURNING 자동 복귀 카운트다운 chip + 인라인 조정 slider.
+        # IDLE 중에만 chip 카운트다운 진행, slider 도 IDLE 중에만 enabled.
+        self._idle_remaining_s: float | None = None
+        self._idle_total_s: float | None = None
+        self._idle_is_idle: bool = False
+        # state_client 는 AdminWindow 가 _wire_signals 단계에서 setter 로 주입.
+        self._idle_apply_cb: "Callable[[float], None] | None" = None
+
+        # 컨테이너 (수직: chip + slider row)
+        idle_box = QWidget()
+        idle_v = QVBoxLayout(idle_box)
+        idle_v.setContentsMargins(0, 0, 0, 0)
+        idle_v.setSpacing(2)
+
+        self.idle_chip = StatChip(
+            "pin", "복귀까지", "—", COLORS["lavender"],
+            with_bar=False,
+        )
+        self.idle_chip.setMinimumWidth(260)
+        self.idle_chip.setMaximumWidth(300)
+        self.idle_chip.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        idle_v.addWidget(self.idle_chip)
+
+        # 조정 slider row — slider (1~3600초, step 5) + 라벨 + 적용 버튼.
+        # IDLE 일 때만 enabled. 적용 클릭 시 state_client.post_idle_timeout 호출.
+        slider_row = QHBoxLayout()
+        slider_row.setContentsMargins(4, 0, 4, 0)
+        slider_row.setSpacing(4)
+        self.idle_slider = QSlider(Qt.Horizontal)
+        self.idle_slider.setRange(1, 3600)
+        self.idle_slider.setSingleStep(5)
+        self.idle_slider.setPageStep(60)
+        self.idle_slider.setValue(60)
+        self.idle_slider.setEnabled(False)
+        self.idle_slider.setMinimumWidth(120)
+        self.idle_slider_label = QLabel("1분")
+        self.idle_slider_label.setStyleSheet(
+            f"font-size: 8pt; color: {COLORS['text_soft']}; min-width: 56px;"
+        )
+        self.idle_slider_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.idle_apply_btn = QPushButton("적용")
+        self.idle_apply_btn.setEnabled(False)
+        self.idle_apply_btn.setCursor(Qt.PointingHandCursor)
+        self.idle_apply_btn.setStyleSheet(
+            f"QPushButton {{ background: {COLORS['lavender']}; color: white; "
+            f"border: none; border-radius: 4px; padding: 2px 8px; "
+            f"font-size: 8pt; font-weight: 700; }}"
+            f"QPushButton:disabled {{ background: {COLORS['border']}; color: {COLORS['text_muted']}; }}"
+        )
+        self.idle_slider.valueChanged.connect(self._on_idle_slider_changed)
+        self.idle_apply_btn.clicked.connect(self._on_idle_apply_clicked)
+        slider_row.addWidget(self.idle_slider, 1)
+        slider_row.addWidget(self.idle_slider_label, 0)
+        slider_row.addWidget(self.idle_apply_btn, 0)
+        idle_v.addLayout(slider_row)
+
+        idle_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        idle_box.setMaximumWidth(300)
+        lay.addWidget(idle_box, 0, Qt.AlignVCenter)
+
         # 배터리 chip — 본문 chip 행에서 이쪽으로 이동. % 바 포함, 폭 제한.
         self.battery_chip = StatChip(
             "battery", "배터리", "--%", COLORS["mint"],
@@ -138,6 +216,65 @@ class TopBar(QWidget):
         self.clock.setText(now.strftime("%H:%M:%S"))
         # 날짜는 자정 넘어가야만 갱신되지만 비용 없으므로 매초 setText 유지
         self.date.setText(now.strftime("%Y-%m-%d %a"))
+        # IDLE 카운트다운 — snapshot 도착 사이 1초씩 차감. 0 이하면 그대로 유지 (FSM 이
+        # idle_timeout trigger 발화하면 다음 snapshot 에서 remaining=None 으로 비활성).
+        if self._idle_remaining_s is not None:
+            self._idle_remaining_s = max(0.0, self._idle_remaining_s - 1.0)
+        self._refresh_idle_chip()
+
+    def _refresh_idle_chip(self) -> None:
+        """idle_chip 값 갱신 — IDLE 중이면 카운트다운, 아니면 totals 또는 비활성."""
+        if self._idle_remaining_s is not None:
+            self.idle_chip.set_value(_format_duration(self._idle_remaining_s))
+        elif self._idle_total_s is not None:
+            self.idle_chip.set_value(_format_duration(self._idle_total_s))
+        else:
+            self.idle_chip.set_value("—")
+
+    def update_idle_countdown(
+        self, remaining: float | None, total: float | None
+    ) -> None:
+        """``/gogoping/state`` snapshot 의 idle_seconds_remaining / idle_timeout_seconds
+        반영. remaining=None → IDLE 아님 (totals 만 표시, slider 비활성).
+        total=None → 모니터 미동작."""
+        self._idle_remaining_s = remaining
+        self._idle_total_s = total
+        # IDLE 여부 — remaining 이 float 이면 IDLE 중 (snapshot.fsm_state == "IDLE").
+        # slider/적용 버튼 enable 토글.
+        is_idle = remaining is not None
+        if is_idle != self._idle_is_idle:
+            self._idle_is_idle = is_idle
+            self.idle_slider.setEnabled(is_idle)
+            self.idle_apply_btn.setEnabled(is_idle)
+            # IDLE 진입 시 slider 를 현재 total 값으로 동기화 (사용자 직관성).
+            # IDLE 떠나면 slider 위치는 그대로 유지 — 다음 IDLE 진입 시 이어서.
+            if is_idle and total is not None:
+                clamped = max(1, min(3600, int(round(total))))
+                self.idle_slider.blockSignals(True)
+                self.idle_slider.setValue(clamped)
+                self.idle_slider.blockSignals(False)
+                self._refresh_idle_slider_label()
+        self._refresh_idle_chip()
+
+    def _refresh_idle_slider_label(self) -> None:
+        self.idle_slider_label.setText(_format_duration(float(self.idle_slider.value())))
+
+    def _on_idle_slider_changed(self, _v: int) -> None:
+        self._refresh_idle_slider_label()
+
+    def _on_idle_apply_clicked(self) -> None:
+        """적용 버튼 — state_client.post_idle_timeout 호출. apply_cb 미주입이면 no-op."""
+        if self._idle_apply_cb is None:
+            return
+        seconds = float(self.idle_slider.value())
+        try:
+            self._idle_apply_cb(seconds)
+        except Exception:
+            logger.exception("idle_timeout apply 콜백 실패") if "logger" in globals() else None
+
+    def set_idle_apply_callback(self, cb: "Callable[[float], None]") -> None:
+        """AdminWindow._wire_signals 에서 state_client.post_idle_timeout 주입."""
+        self._idle_apply_cb = cb
 
     def update_battery(self, level: float) -> None:
         """``/gogoping/state`` snapshot 의 battery_level 반영 — chip value + % bar."""
@@ -224,6 +361,11 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # TopBar idle_timeout slider 적용 → state_client.post_idle_timeout
+        self.topbar.set_idle_apply_callback(
+            lambda seconds: self.state_client.post_idle_timeout(seconds)
+        )
+
     def _on_robot_state(self, snap: dict) -> None:
         """``/ws/robot-state`` snapshot 단일 수신점. BTStateInline + GogoPingDashboard 분배.
 
@@ -236,6 +378,17 @@ class AdminWindow(QMainWindow):
         if level is not None:
             try:
                 self.topbar.update_battery(float(level))
+            except Exception:
+                pass
+
+        # IDLE → RETURNING 카운트다운. 둘 다 키 자체가 있을 때만 갱신 — 옛 노드/스키마와
+        # forward-compat. remaining=None 은 "IDLE 아님" 정상 값이므로 None 도 그대로 전달.
+        if "idle_seconds_remaining" in snap or "idle_timeout_seconds" in snap:
+            try:
+                self.topbar.update_idle_countdown(
+                    snap.get("idle_seconds_remaining"),
+                    snap.get("idle_timeout_seconds"),
+                )
             except Exception:
                 pass
 

@@ -66,6 +66,13 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 |---|---|---|---|---|
 | `manual_torque_active` | `bool` | `manual_torque_hold` (initialise=True, terminate=False) | admin UI (snapshot 경유) | True 면 motor torque OFF 상태 — 사용자가 직접 밀어 이동 중. UI 표시용 |
 
+### IDLE 타임아웃 (idle_timeout_monitor 가 W)
+
+| 키 | 타입 | W | R | 비고 |
+|---|---|---|---|---|
+| `idle_entered_at` | `float` (monotonic sec) | `idle_timeout_monitor` (initialise=time.monotonic(), terminate=-1.0) | `tree_inspector.snapshot` | IDLE 진입 시각. snapshot 변환 시 `idle_seconds_remaining` 계산 base. 미진입 = -1.0 |
+| `idle_timeout_seconds` | `float` | `idle_timeout_monitor` (param 읽은 값) | `tree_inspector.snapshot` | 현재 적용 중인 ROS param `idle_timeout_seconds` 값. admin UI 카운트다운 totals 표시용 |
+
 > 현재 FSM state 는 blackboard 키가 아니다. `context.fsm.current_state` (transitions 라이브러리 기본 속성) 를 직접 읽는다.
 
 ## `Keys` 상수 예시
@@ -102,6 +109,9 @@ class Keys:
     ERROR_SOURCE = "error_source"
     # 수동 모드
     MANUAL_TORQUE_ACTIVE = "manual_torque_active"
+    # IDLE 타임아웃
+    IDLE_ENTERED_AT = "idle_entered_at"
+    IDLE_TIMEOUT_SECONDS = "idle_timeout_seconds"
 ```
 
 ## 권한 등록 예시
@@ -133,3 +143,5 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
 | `charging_dock_target_yaw` | `0.0` |
 | `error_reason` / `error_source` | `""` |
 | `manual_torque_active` | `False` |
+| `idle_entered_at` | `-1.0` |
+| `idle_timeout_seconds` | `86400.0` (24시간 — IdleTimeoutMonitor 기본값, ROS param `idle_timeout_seconds` 로 오버라이드 가능) |

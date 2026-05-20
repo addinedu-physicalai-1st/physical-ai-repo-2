@@ -113,6 +113,21 @@ class EmergencyStopResponse(BaseModel):
     reason: str = ""
 
 
+class IdleTimeoutRequest(BaseModel):
+    """IDLE → RETURNING 자동 복귀 임계값 변경.
+
+    seconds: 1.0 ~ 86400.0 (1초 ~ 24시간). gogoping_modes 노드의 ROS param
+    ``idle_timeout_seconds`` 를 변경하고 IdleTimeoutMonitor 가 즉시 반영.
+    """
+    seconds: float
+
+
+class IdleTimeoutResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    seconds: float = 0.0
+
+
 def install(
     app: FastAPI,
     bridge: GogopingRosBridge,
@@ -252,6 +267,30 @@ def install(
         if not accepted:
             logger.warning(f"EmergencyStop 거부: reason={reason!r}")
         return EmergencyStopResponse(accepted=accepted, reason=reason)
+
+    @router.post("/idle_timeout", response_model=IdleTimeoutResponse)
+    async def set_idle_timeout(req: IdleTimeoutRequest) -> IdleTimeoutResponse:
+        """IDLE → RETURNING 자동 복귀 임계값 (초) 변경.
+
+        gogoping_modes 노드의 ROS param ``idle_timeout_seconds`` 를 설정. 동작 노드의
+        IdleTimeoutMonitor 가 ``on_set_parameters_callback`` 으로 즉시 ``self._timeout_s``
+        + blackboard ``IDLE_TIMEOUT_SECONDS`` 갱신 — 진행 중 카운트다운 (IDLE 중) 도
+        새 임계 기준으로 다음 tick 부터 적용.
+        """
+        if not (1.0 <= req.seconds <= 86400.0):
+            raise HTTPException(
+                400, f"seconds out of range [1.0, 86400.0]: {req.seconds}"
+            )
+        accepted, reason = await asyncio.to_thread(
+            bridge.set_idle_timeout_sync, req.seconds,
+        )
+        if not accepted:
+            logger.warning(
+                f"SetIdleTimeout 거부: seconds={req.seconds} reason={reason!r}"
+            )
+        return IdleTimeoutResponse(
+            accepted=accepted, reason=reason, seconds=req.seconds,
+        )
 
     app.include_router(router)
 
