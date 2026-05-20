@@ -2,13 +2,13 @@
 # 이 파일은 두 곳에서 read — single source of truth:
 #   1) vicpinky_description/urdf/robot_core.xacro (URDF 시각/TF/collision)
 #   2) vicpinky_bringup/bringup.py            (실 주행 odom + cmd_vel 변환)
-# wheel.radius / separation 변경 후 실 로봇 적용 시 colcon build + 노드 재시작 필요.
+# 공장 baseline 은 robot_dims.factory.yaml 별도 보존.
 
 wheel:
   radius: 0.0825
   thickness: 0.05
   separation: 0.4288
-  x_offset: 0.1
+  x_offset: 0.0
   z_offset: -0.0048
 lidar:
   mount_x: 0.185
@@ -22,4 +22,4 @@ lidar:
   laser_z: 0.03
   laser_roll: 0.0
   laser_pitch: 0.0
-  laser_yaw: 3.141593
+  laser_yaw: 3.141592653589793
