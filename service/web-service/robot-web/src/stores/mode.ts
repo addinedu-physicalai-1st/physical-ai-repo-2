@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, shallowRef } from 'vue';
 import type { EmotionId, RobotConfig } from '@/config/robots';
 import { getCurrentRobot } from '@/config/robots';
-import type { IntentResponse } from '@/composables/useIntentDispatch';
+import { postModeClick, type IntentResponse } from '@/composables/useIntentDispatch';
 
 export const useModeStore = defineStore('mode', () => {
   const robot = shallowRef<RobotConfig>(getCurrentRobot());
@@ -53,6 +53,10 @@ export const useModeStore = defineStore('mode', () => {
     switch (response.kind) {
       case 'mode_change':
         setMode(response.mode);
+        // BT 측에도 전달 — robot-web 의 mode 변경이 voice intent 일 때도
+        // ModeSelectorFab 클릭 경로와 동일하게 control-service → BT 까지 도달해야
+        // admin UI 의 BT state 도 동기화됨. fetch 실패는 무시 (UI 영향 없음).
+        void postModeClick(response.mode, robot.value.id).catch(() => {});
         break;
       case 'sub_command':
         if (response.action === 'stop') proximityHalt.value = true;

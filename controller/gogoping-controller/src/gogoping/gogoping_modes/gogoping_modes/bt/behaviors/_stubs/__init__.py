@@ -9,13 +9,11 @@ from ._base import StubInfiniteRunning, StubRunningThenSuccess
 from .stub_carry import StubCarry
 from .stub_follow import StubFollow
 from .stub_hideseek import StubHideseek
-from .stub_lullaby import StubLullaby
 
 __all__ = [
     "StubCarry",
     "StubFollow",
     "StubHideseek",
-    "StubLullaby",
     "StubRunningThenSuccess",
     "StubInfiniteRunning",
 ]

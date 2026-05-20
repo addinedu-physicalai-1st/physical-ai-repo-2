@@ -19,6 +19,7 @@ import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
 import { useCameraPan } from '@/gogoping/composables/useCameraPan';
 import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
+import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
 
@@ -53,7 +54,13 @@ const showGogopingManual = computed(
 const cameraPan = robot.value.id === 'gogoping' ? useCameraPan() : null;
 if (cameraPan) provide(CAMERA_PAN_KEY, cameraPan);
 
-onBeforeUnmount(() => { cameraPan?.stop(); });
+// gogoping 일 때만 BT snapshot WS 구독 — admin UI 가 mode 바꾸면 자동 반영
+const gogopingStateWs = robot.value.id === 'gogoping' ? useGogopingStateWs() : null;
+
+onBeforeUnmount(() => {
+  cameraPan?.stop();
+  gogopingStateWs?.stop();
+});
 
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);

@@ -86,6 +86,8 @@ t0=$SECONDS
 if ! conda run -n jazzy pytest \
   tests/test_gogoping_battery_monitors.py \
   tests/test_gogoping_idle_timeout_monitor.py \
+  tests/test_gogoping_lullaby_audio.py \
+  tests/test_gogoping_lullaby_subtree_builder.py \
   tests/test_gogoping_map_boundary_monitor.py \
   tests/test_gogoping_manual_torque_hold.py \
   tests/test_gogoping_pose_override.py \

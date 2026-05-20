@@ -62,9 +62,13 @@ CarryGotoMode (Sequence)
                         return_request trigger 발사 → RETURNING 진입 (conventions.md §3 참조)
     
   -------------------------------------------------------------------------------                              
- LullabySubTree (Sequence, memory=True)
-  ├─ PlayAudio("lullaby.mp3", loop=true)
-  └─ WaitForStopCommand
+ LullabySubTree = LullabyAudio (단일 leaf, 의사코드 PlayAudio + WaitForStopCommand 응집)
+   ├─ initialise():  publish_event({event:"lullaby_play", src:"lullaby.mp3", loop:True})
+   ├─ update():      RUNNING (영구 — 외부 trigger 가 BT swap 으로 종료)
+   └─ terminate():   publish_event({event:"lullaby_stop"})  (idempotent)
+ # ※ 의사코드의 PlayAudio + WaitForStopCommand 두 단계는 LullabyAudio 한 노드에 응집.
+ #   terminate 시 stop publish 가 같은 클래스 책임 안에 들어가 race 회피.
+ #   자세한 명세: docs/bt/trees/BT_lullaby_sub.md
 
    -------------------------------------------------------------------------------
  HideAndSeekSubTree

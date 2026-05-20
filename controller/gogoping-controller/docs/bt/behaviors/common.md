@@ -144,8 +144,51 @@ blackboard `assist_task` / `play_task` 값 비교. TaskSelector 분기용 Condit
 
 blackboard 값 비교 (BT_carry_sub 의 CarryCore 분기용 Condition).
 
-## ui_publish  *(스켈레톤)*
+## ui_publish  *(구현됨)*
 
-범용 UI 알림 publish (announce / countdown_start 등). message dict 만 다르게 전달 후 즉시 SUCCESS.
+범용 UI 알림 publish — `message: dict` 1회 publish 후 즉시 SUCCESS. `update()` 가
+`ctx.ui.publish_event(message)` 호출.
 
-| Used in | BT_hide_and_seek_sub, BT_carry_sub (goto/manual), BT_lullaby_sub |
+- read: 없음 (blackboard 의존 X)
+- write: 없음
+- 사용 예:
+  ```python
+  UIPublish("AnnounceFound", ctx, message={"event": "announce", "text": "찾았다!"})
+  UIPublish("StartCountdown", ctx, message={"event": "countdown_start", "seconds": 30})
+  ```
+- 자장가 stop 같은 cleanup-시점 publish 는 ❌ — 그건 [`lullaby_audio`](#lullaby_audio) 처럼
+  `terminate()` 책임을 가진 behavior 가 처리.
+- "1회" 는 단일 활성화당 1회 — Selector(memory=False) 재진입 시 다시 publish (의도된 동작).
+
+| 항목 | 값 |
+|---|---|
+| Topic publish | `/gogoping/ui_event` (`std_msgs/String` JSON) — via `ctx.ui.publish_event()` |
+| Status | SUCCESS (즉시) |
+| terminate(INVALID) | no-op |
+| Used in | BT_lullaby_sub (간접 — LullabyAudio 사용), 추후 BT_hide_and_seek_sub (announce/countdown), BT_carry_sub |
+| 파일 | [`bt/behaviors/common/ui_publish.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/ui_publish.py) |
+| 테스트 | 5 시나리오 (update=SUCCESS / publish_event 1회 호출 / initialise no-op / 임의 message dict 통과 / 재활성화 시 다시 publish) |
+
+---
+
+## lullaby_audio  *(구현됨)*
+
+자장가 SubTree 본체. `initialise()` 에 play publish, `update()` 영구 RUNNING, `terminate()`
+에 stop publish (idempotent).
+
+- read: 없음
+- write: 없음
+- mp3 재생 자체는 robot-web frontend 의 `<audio>` element 가 담당 (별도 PR) — BT 는
+  `/gogoping/ui_event` 에 이벤트만 publish.
+- `_stop_published` flag — `__init__` 초기값 `True` (cold terminate 시 publish 안 함).
+  `initialise()` 가 `False` 로 리셋 → play publish 된 lifetime 안에서만 stop publish 보장.
+
+| 항목 | 값 |
+|---|---|
+| Topic publish | `/gogoping/ui_event` (`std_msgs/String` JSON) — via `ctx.ui.publish_event()` |
+| Messages | `PLAY_MSG = {"event": "lullaby_play", "src": "lullaby.mp3", "loop": True}` / `STOP_MSG = {"event": "lullaby_stop"}` |
+| Status | initialise=play publish 1회 / update=RUNNING 영구 / terminate=stop publish (idempotent) |
+| terminate(INVALID) | stop publish (`_stop_published` flag) |
+| Used in | BT_lullaby_sub (단일 leaf) |
+| 파일 | [`bt/behaviors/common/lullaby_audio.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/lullaby_audio.py) |
+| 테스트 | 7 시나리오 (play publish / update RUNNING / stop publish / idempotent / 재진입 flag 리셋 / 메시지 상수 / cold terminate no-op) |

@@ -55,6 +55,12 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               ws: true,
             },
+            // GogoPing BT snapshot WS — control-service 가 ROS /gogoping/state fan-out
+            '/ws/robot-state': {
+              target: controlTarget,
+              changeOrigin: true,
+              ws: true,
+            },
             // GogoPing 영상 stream (control_service.streaming.app, port 8100, 별도 uvicorn)
             '/ws/video-stream': {
               target: streamingTarget,

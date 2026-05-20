@@ -7,7 +7,7 @@
 TaskSelector 동작:
     blackboard.assist_task == "carry"   → CheckTask("carry")    SUCCESS → StubCarry
     blackboard.assist_task == "follow"  → CheckTask("follow")   SUCCESS → StubFollow
-    blackboard.assist_task == "lullaby" → CheckTask("lullaby")  SUCCESS → StubLullaby
+    blackboard.assist_task == "lullaby" → CheckTask("lullaby")  SUCCESS → BT_lullaby_sub (LullabyAudio)
 
 Selector(memory=False) — 매 tick assist_task 다시 평가 → mode 변경 즉시 반영.
 """
@@ -17,7 +17,8 @@ import py_trees
 from py_trees.common import ParallelPolicy
 
 from ....context import Context
-from ...behaviors._stubs import StubCarry, StubFollow, StubLullaby
+from ...behaviors._stubs import StubCarry, StubFollow
+from ..sub_trees.BT_lullaby_sub import build_lullaby_subtree
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
 from ...behaviors.common.check_task import CheckTask
 from ...behaviors.common.command_listener import CommandListener
@@ -50,7 +51,7 @@ def _task_selector(ctx: Context) -> py_trees.behaviour.Behaviour:
                 name="lullaby_branch", memory=True,
                 children=[
                     CheckTask(Keys.ASSIST_TASK, "lullaby"),
-                    StubLullaby(),  # STUB with build_lullaby(ctx)
+                    build_lullaby_subtree(ctx),
                 ],
             ),
         ],

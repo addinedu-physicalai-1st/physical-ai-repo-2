@@ -8,6 +8,8 @@ snapshot 구조::
     {
       "robot_id": "gogoping",
       "fsm_state": "ASSIST",
+      "assist_task": "lullaby",  # blackboard.ASSIST_TASK ("" / "carry" / "follow" / "lullaby")
+      "play_task": "",            # blackboard.PLAY_TASK ("" / "hideseek")
       "main_tree": {
         "name": "BT_assist_main",
         "children": [
@@ -62,6 +64,8 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader = py_trees.blackboard.Client(name="tree_inspector_reader")
         _bb_reader.register_key(key=Keys.BATTERY_LEVEL, access=Access.READ)
         _bb_reader.register_key(key=Keys.ROBOT_POSE, access=Access.READ)
+        _bb_reader.register_key(key=Keys.ASSIST_TASK, access=Access.READ)
+        _bb_reader.register_key(key=Keys.PLAY_TASK, access=Access.READ)
     return _bb_reader
 
 
@@ -72,6 +76,15 @@ def _read_battery_level() -> float | None:
         return float(bb.get(Keys.BATTERY_LEVEL))
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _read_str_key(key: str) -> str:
+    """blackboard 의 str 키를 안전하게 읽어 반환. 실패 시 빈 문자열."""
+    bb = _ensure_bb_reader()
+    try:
+        return str(bb.get(key) or "")
+    except (KeyError, TypeError):
+        return ""
 
 
 def _read_robot_pose() -> dict | None:
@@ -137,6 +150,8 @@ def snapshot(
     return {
         "robot_id": robot_id,
         "fsm_state": fsm_state,
+        "assist_task": _read_str_key(Keys.ASSIST_TASK),   # "" / "carry" / "follow" / "lullaby"
+        "play_task": _read_str_key(Keys.PLAY_TASK),       # "" / "hideseek"
         "main_tree": main_block,
         "sub_tree": sub_block,
         "battery_level": _read_battery_level(),
