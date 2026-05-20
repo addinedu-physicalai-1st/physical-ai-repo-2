@@ -6,37 +6,24 @@ SubTree
 
 | 경로 | 명령 | 컨텍스트 | 추가 가드 |
 |---|---|---|---|
-| (1) ASSIST 직속 | `assist_request, task=follow, target_id=...` | 단독 추종 (운반 없음) | 없음 |
-| (2) CarrySubTree 의 follow 모드 | `assist_request, task=carry, carry_mode=follow, target_id=...` | 짐 운반 + 추종 | `LoadStabilityCheck` |
+| (1) ASSIST 직속 | `assist_request, task=follow, target_id=...` | 단독 추종 | 없음 |
 
-→ 추종 로직 (1.5m 유지 / Loss Recovery 등) 은 `FollowSubTree` 한 곳에만 작성, 상위 컨텍스트가 가드를 추가한다.
+→ 추종 로직 (1.5m 유지 / Loss Recovery 등) 은 `FollowSubTree` 한 곳에만 작성.
+운반 시나리오는 user 가 follow task + goto task 를 순차 chain (composition) 으로 구성.
 
 # audio / announce 노드 표기 — 의사코드
 
 `PlayAudio` / `AnnounceTask` / `AnnounceArrival` / `CountdownWithAudio` / `AnnounceFound` / `AnnounceNotFound` 는 BT 노드처럼 그려져 있지만 실제로는 모두 **`bt/behaviors/common/ui_publish.py` 의 `UIPublish(message=...)` 단일 behavior 호출의 의사코드**. `CountdownWithAudio` 는 `Sequence(UIPublish(start_countdown), Timer(N))` 패턴. 자세한 코드 sketch 는 [conventions.md §4.1](conventions.md).
 
- -------------------------------------------------------------------------------
-CarrySubTree
-  Parallel (SuccessOnSelected=[CarryCore])
-    ├─ Selector (LoadCheckGuard, memory=False)   ※ manual 모드일 때 비활성
-    │     ├─ CheckCarryMode("manual")            # manual → SUCCESS → 짐 감시 skip
-    │     └─ LoadStabilityCheck                  # 그 외 → 짐 떨어짐 감지 시 FAILURE
-    └─ CarryCore (Selector, memory=False)
-          ├─ Sequence: CheckCarryMode("manual") → CarryManualMode
-          ├─ Sequence: CheckCarryMode("goto")   → CarryGotoMode
-          └─ Sequence: CheckCarryMode("follow") → FollowSubTree    ★ 재사용
+-------------------------------------------------------------------------------
+GotoSubTree (Sequence, memory=True)
+  ├─ NavigateToVertex(destination_key)
+  └─ UIPublish(message={"event":"announce","text":"도착했습니다"})
 
-CarryManualMode (Sequence)
-  ├─ EnableManualControl             (terminate 시 priority "auto" 복원)
-  └─ WaitForExit
+# 운반 시나리오 = user 가 follow task + goto task 를 순차 chain (composition).
+# 짐 감지 / mode 분기 / 음성 안내 / 카메라 동작 모두 없음. SubTree 본체는 단일 이동.
+# 자세한 명세: docs/superpowers/specs/2026-05-20-bt-goto-sub-design.md
 
-CarryGotoMode (Sequence)
-  ├─ RaiseCameraPan(angle_for_carry)
-  ├─ AnnounceTask
-  ├─ NavigateToPose(destination_key)
-  └─ AnnounceArrival
-  
-  
   -------------------------------------------------------------------------------
   FollowSubTree
   Parallel (SuccessOnSelected=[FollowCore])
@@ -99,13 +86,7 @@ ReturnSubTree = OneShot(ON_COMPLETION) of:
 # 후 docked trigger 발사. 추후 docking_contact 토픽 통합 시 검증 추가.
 # 자세한 명세: docs/bt/trees/BT_return_sub.md
 ------------------------------------------------------------------------------- 
-1. CarrySubTree (운반)
-3가지 모드 중 사용자가 선택:
-Manual — UI 화살표로 직접 조작
-Goto — 특정 위치 지정 → 자동 이동
-Follow — 사람 따라가기 (FollowSubTree 재사용)
-
-진행 중 짐 떨어지면 중단.
+1. GotoSubTree (이동) — vertex 까지 lane 따라 이동, 도착 시 알림. 운반은 user 가 follow + goto chain.
 
 2. FollowSubTree (추종)
 카메라 올림 → 사람 인식 → 1.5m 거리 유지하며 따라가기

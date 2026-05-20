@@ -37,7 +37,7 @@ UI BT SUB 영역에 자동 표시.
 | Trigger | 발화 주체 | terminate? | stop publish? |
 |---|---|---|---|
 | `cancel` (ASSIST → IDLE) | `command_listener` (SetGoal mode=IDLE) | ✅ | ✅ |
-| `assist_request(task="carry"/"follow")` | `command_listener` (TaskSelector 가 다른 branch 선택, lullaby_branch RUNNING 끊김) | ✅ | ✅ |
+| `assist_request(task="goto"/"follow")` | `command_listener` (TaskSelector 가 다른 branch 선택, lullaby_branch RUNNING 끊김) | ✅ | ✅ |
 | `return_request` (ASSIST → RETURNING) | `command_listener` (SetGoal mode=RETURNING) | ✅ | ✅ |
 | `manual_request` / `play_request` | `command_listener` | ✅ | ✅ |
 | `battery_low` (ASSIST → LOW_BATTERY_RETURN) | `battery_low_monitor` | ✅ | ✅ |

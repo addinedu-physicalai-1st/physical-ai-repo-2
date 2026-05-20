@@ -73,11 +73,9 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_charging_main
         │   │   │   ├── check_task.[py|/]             # blackboard.assist_task/play_task 값 비교 (✅)
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main (TaskSelector 분기)
-        │   │   │   ├── check_carry_mode.[py|/]       # blackboard.carry_mode 값 비교 (manual/goto/follow)
-        │   │   │   │                                 #   Used in: BT_carry_sub (CarryCore 분기)
         │   │   │   ├── ui_publish.[py|/]             # 범용 UI 알림 publish (announce / countdown_start 등) (✅)
         │   │   │   │                                 # message dict 1회 publish 후 즉시 SUCCESS
-        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub, BT_carry_sub (goto/manual)
+        │   │   │   │                                 #   Used in: BT_goto_sub (AnnounceArrival), BT_hide_and_seek_sub
         │   │   │   └── lullaby_audio.[py|/]          # 자장가 본체 — initialise=play publish, update=RUNNING (영구), terminate=stop publish (✅)
         │   │   │                                     # /gogoping/ui_event 에 lullaby_play / lullaby_stop publish. idempotent (_stop_published flag).
         │   │   │                                     #   Used in: BT_lullaby_sub 만
@@ -85,10 +83,10 @@ controller/gogoping-controller/src/gogoping/
         │   │   ├── navigation/
         │   │   │   ├── __init__.py
         │   │   │   ├── navigate_to_pose.[py|/]       # Nav2 navigate_to_pose 액션 클라이언트 (target_key 인자)
-        │   │   │   │                                 #   Used in: BT_carry_sub, BT_hide_and_seek_sub, BT_return_sub
+        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub, BT_return_sub
         │   │   │   ├── navigate_to_vertex.py         # graph_router NavigateToVertex 액션 호출 (target_vertex_name 인자) (✅)
         │   │   │   │                                 #   다익스트라 lane 따라 이동. 자세한 설계: docs/graph-routing.md
-        │   │   │   │                                 #   Used in: BT_carry_sub (goto), BT_return_sub, BT_assist_main 의 named-pose 이동
+        │   │   │   │                                 #   Used in: BT_goto_sub, BT_return_sub, BT_assist_main 의 named-pose 이동
         │   │   │   ├── align_to_dock.py              # blackboard target yaw 까지 cmd_vel.angular.z 로 제자리 회전 (✅) → docs/bt/behaviors/navigation.md#align_to_dock
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── reverse_into_dock.py          # N초 동안 cmd_vel.linear.x 음수 publish (후진 진입) (✅) → docs/bt/behaviors/navigation.md#reverse_into_dock
@@ -112,8 +110,6 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_hide_and_seek_sub
         │   │   │   ├── child_face_tracker.[py|/]     # 놀이 상대 아이 얼굴 발견 시 blackboard.found = True
         │   │   │   │                                 #   Used in: BT_hide_and_seek_sub
-        │   │   │   └── load_stability_check.[py|/]   # 짐 떨어짐 감지 (manual 모드일 때 비활성)
-        │   │   │                                     #   Used in: BT_carry_sub
         │   │   │
         │   │   ├── follow/               # 카메라 pan 제어 + 추종 관련
         │   │   │   ├── __init__.py
@@ -121,8 +117,8 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_follow_sub
         │   │   │   ├── wait_for_reappear.[py|/]      # target_visible = True 될 때까지 timeout 까지 RUNNING
         │   │   │   │                                 #   Used in: BT_follow_sub
-        │   │   │   ├── raise_camera_pan.[py|/]       # 카메라 각도 올림 (carry/follow 시작 시)
-        │   │   │   │                                 #   Used in: BT_carry_sub (goto mode), BT_follow_sub
+        │   │   │   ├── raise_camera_pan.[py|/]       # 카메라 각도 올림 (follow 시작 시)
+        │   │   │   │                                 #   Used in: BT_follow_sub
         │   │   │   └── pan_camera_sweep.[py|/]       # 카메라 pan 좌우 sweep (탐색용)
         │   │   │                                     #   Used in: BT_follow_sub, BT_hide_and_seek_sub
         │   │   │
@@ -132,10 +128,6 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   initialise=release, terminate=enable. blackboard MANUAL_TORQUE_ACTIVE W.
         │   │   │   │                                 #   ctx.base_driver (BaseDriverClient → /gogoping/set_torque) 사용.
         │   │   │   │                                 #   Used in: BT_manual_main 만
-        │   │   │   ├── enable_manual_control.[py|/]  # camera_pan 우선순위 manual 전환 (terminate 시 auto 복원)
-        │   │   │   │                                 #   Used in: BT_carry_sub (manual mode)
-        │   │   │   └── wait_for_exit.[py|/]          # carry_mode 변경 / cancel 명령까지 RUNNING
-        │   │   │                                     #   Used in: BT_carry_sub (manual mode)
         │   │   │
         │   │   ├── recovery/
         │   │   │   ├── __init__.py
@@ -155,7 +147,6 @@ controller/gogoping-controller/src/gogoping/
         │   │       │                     #   grep -rn "STUB:" controller/gogoping-controller/ 로 검색.
         │   │       ├── __init__.py
         │   │       ├── _base.py                     # StubRunningThenSuccess (30 tick → SUCCESS) + StubInfiniteRunning (항상 RUNNING)
-        │   │       ├── stub_carry.py                # BT_carry_sub 자리 — 30 tick stub (carry+goto 목적지 도달 SUCCESS 의미)
         │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미)
         │   │       └── stub_hideseek.py             # BT_hide_and_seek_sub 자리 — 30 tick stub (1회 사이클 SUCCESS 의미)
         │   │
@@ -166,7 +157,7 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── __init__.py                       # build_main_tree(state, ctx) dispatcher
         │       │   ├── BT_charging_main.py               # CHARGING — BatteryFullMonitor + CommandListener
         │       │   ├── BT_idle_main.py                   # IDLE — CommandListener
-        │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(carry/follow/lullaby stubs)
+        │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(goto ✅ + follow stub + lullaby ✅)
         │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek stub)
         │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON ✅
         │       │   ├── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
@@ -175,7 +166,7 @@ controller/gogoping-controller/src/gogoping/
         │       │
         │       └── sub_trees/            # 작업별 SubTree (총 5개)
         │           ├── __init__.py
-        │           ├── BT_carry_sub.py           # 운반 — 3가지 서브모드 (manual/goto/follow)
+        │           ├── BT_goto_sub.py            # 이동 — Sequence(NavigateToVertex + UIPublish)
         │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
         │           ├── BT_lullaby_sub.py         # 자장가 — LullabyAudio 단일 leaf (UI 가 mp3 재생, BT 는 publish only) (✅)
         │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 (1회 실행) — 숨기 → 카운트 → 탐색 → 복귀

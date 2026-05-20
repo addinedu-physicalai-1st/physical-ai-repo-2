@@ -4,7 +4,7 @@
   - 이벤트 감지 시 → blackboard 세팅 + `context.fsm.trigger(이벤트, **kwargs)` 호출 + **RUNNING 리턴**
   - 정상 시 → **RUNNING 유지** (SUCCESS / FAILURE 리턴 금지)
   - edge-triggered: 직전 값과 비교, 같은 trigger 를 매 tick 반복 호출하지 않음
-- **Action behavior** (`navigate_to_pose`, `verify_docking_contact`, `enable_manual_control`, `ui_publish`, `pan_camera_sweep` 등):
+- **Action behavior** (`navigate_to_pose`, `verify_docking_contact`, `ui_publish`, `pan_camera_sweep` 등):
   - 작업 완료 → SUCCESS, 실패 → FAILURE 리턴 (정상 BT 규약)
   - trigger 호출도 가능 (예: `verify_docking_contact` 가 `docked` trigger 발사 후 SUCCESS)
   - `terminate(new_status)` 는 **idempotent** — 진행 중 외부 작업 cancel
@@ -47,7 +47,7 @@ ASSIST
         ├─ CommandListener        (✅)  ※ cancel 외 active mode 전이 (assist/play/manual_request) 도 가능
         │
         └─ TaskSelector (Selector, memory=False)
-              ├─ Sequence: CheckTask("carry")   → CarrySubTree     (stub)
+              ├─ Sequence: CheckTask("goto")    → BT_goto_sub      (✅)
               ├─ Sequence: CheckTask("follow")  → FollowSubTree    (stub) ※ ASSIST 직속 단독 추종
               └─ Sequence: CheckTask("lullaby") → LullabySubTree   (✅) ※ 교사 명령 — ASSIST 에 분류
                                                                      (아이 자발적 놀이 = PLAY)

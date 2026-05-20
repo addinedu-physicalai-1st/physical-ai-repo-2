@@ -192,7 +192,6 @@ class GogopingRosBridge:
         req = SetGoal.Request()
         req.goal.mode = goal.mode
         req.goal.task = goal.task
-        req.goal.carry_mode = goal.carry_mode
         req.goal.destination_key = goal.destination_key
         req.goal.target_id = goal.target_id
 

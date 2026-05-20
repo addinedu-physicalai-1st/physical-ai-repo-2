@@ -15,7 +15,7 @@
 | Source | `gogoping_msgs/srv/SetGoal` + `gogoping_msgs/srv/ForceState` 두 ROS 서비스 server 호스팅. Control Service 의 `GogopingRosBridge` 가 client. UI → POST `/api/gogoping/mode` (운영) / POST `/api/gogoping/debug/force-state` (디버그) → bridge → srv. |
 | SetGoal 처리 | `utils/goal_reconciler.py` 의 순수 함수 호출 — 현재 state ↔ Goal 차이를 보고 적절한 `*_request` trigger 매핑. ERROR / LOW_BATTERY_RETURN 진입 시 거부 (`accepted=False` + reason). |
 | ForceState 처리 | `fsm.force_state(target_state)` 호출 + sub_task 가 주어지면 blackboard 의 `assist_task` (ASSIST) 또는 `play_task` (PLAY) 세팅. transition 우회 — 디버그 전용. |
-| Blackboard write | `assist_task`, `play_task`, `carry_mode`, `target_id`, `destination_key`, ... |
+| Blackboard write | `assist_task`, `play_task`, `target_id`, `destination_key`, ... |
 | FSM trigger | `assist_request` / `play_request` / `manual_request` / `return_request` / `cancel` (reconciler 가 매핑) |
 | Used in | BT_charging_main, BT_idle_main, BT_assist_main, BT_play_main, BT_manual_main, BT_returning_main |
 | 파일 | [`bt/behaviors/common/command_listener.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) |
@@ -136,13 +136,9 @@ Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 blackboard `assist_task` / `play_task` 값 비교. TaskSelector 분기용 Condition. 매칭 시 SUCCESS, 불일치 시 FAILURE.
 
 - read: `Keys.ASSIST_TASK` 또는 `Keys.PLAY_TASK`
-- Used in: BT_assist_main (carry/follow/lullaby 분기), BT_play_main (hideseek 분기)
+- Used in: BT_assist_main (goto/follow/lullaby 분기), BT_play_main (hideseek 분기)
 - 파일: [`bt/behaviors/common/check_task.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py)
 - 테스트: 5 시나리오 통과
-
-## check_carry_mode  *(스켈레톤)*
-
-blackboard 값 비교 (BT_carry_sub 의 CarryCore 분기용 Condition).
 
 ## ui_publish  *(구현됨)*
 
@@ -165,7 +161,7 @@ blackboard 값 비교 (BT_carry_sub 의 CarryCore 분기용 Condition).
 | Topic publish | `/gogoping/ui_event` (`std_msgs/String` JSON) — via `ctx.ui.publish_event()` |
 | Status | SUCCESS (즉시) |
 | terminate(INVALID) | no-op |
-| Used in | BT_lullaby_sub (간접 — LullabyAudio 사용), 추후 BT_hide_and_seek_sub (announce/countdown), BT_carry_sub |
+| Used in | BT_lullaby_sub (간접 — LullabyAudio 사용), BT_goto_sub (AnnounceArrival), 추후 BT_hide_and_seek_sub (announce/countdown) |
 | 파일 | [`bt/behaviors/common/ui_publish.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/ui_publish.py) |
 | 테스트 | 5 시나리오 (update=SUCCESS / publish_event 1회 호출 / initialise no-op / 임의 message dict 통과 / 재활성화 시 다시 publish) |
 

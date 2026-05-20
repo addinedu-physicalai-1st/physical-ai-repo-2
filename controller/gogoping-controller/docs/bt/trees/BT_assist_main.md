@@ -1,6 +1,6 @@
 # BT_assist_main
 
-ASSIST FSM state 의 MainTree. TaskSelector 로 sub mode (carry / follow / lullaby) 분기 + monitor 분기에서 trigger 수신.
+ASSIST FSM state 의 MainTree. TaskSelector 로 sub mode (goto / follow / lullaby) 분기 + monitor 분기에서 trigger 수신.
 
 ## Root composite
 
@@ -14,7 +14,7 @@ Parallel (BT_assist_main)
 │   ├── hardware_health_monitor # ← fault trigger
 │   └── collision_event_handler # ← fault trigger
 └── task: TaskSelector (check_task → BT_*_sub)
-    ├── (assist_task=="carry")    → BT_carry_sub
+    ├── (assist_task=="goto")     → BT_goto_sub
     ├── (assist_task=="follow")   → BT_follow_sub
     └── (assist_task=="lullaby")  → BT_lullaby_sub
 ```
@@ -27,8 +27,8 @@ monitor 가 trigger 발사하면 sub_tree 의 RUNNING 이 INVALID 로 끊기고 
 |---|---|---|---|
 | "복귀" / "돌아가" / "충전" | sub_command(action=return) | `return_request` | ASSIST → RETURNING (BT_returning_main) |
 | "그만" / "정지" / "취소" | sub_command(action=stop) | `cancel` | 현재 sub_tree 종료, ASSIST 유지 (TaskSelector 가 다시 분기) |
-| "운반" / "추종" / "자장가" | mode_change(mode=...) | `assist_request` (task 변경) | blackboard.assist_task 갱신 → TaskSelector 다른 sub_tree 선택 |
-| "X로 가" (vertex) | goto_vertex(name) | `assist_request(task=carry, carry_mode=goto, target_vertex_name=X)` | carry sub mode 진입 후 [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) 호출 |
+| "이동" / "추종" / "자장가" | mode_change(mode=...) | `assist_request` (task 변경) | blackboard.assist_task 갱신 → TaskSelector 다른 sub_tree 선택 |
+| "X로 가" (vertex) | goto_vertex(name) | `assist_request(task=goto, target_vertex_name=X)` | BT_goto_sub 진입 후 [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) 호출 |
 
 다른 state 의 trigger 매트릭스: [BT_idle_main](BT_idle_main.md), [BT_play_main](BT_play_main.md).
 
@@ -52,4 +52,4 @@ FSM transition 정의: [../../fsm-triggers.md](../../fsm-triggers.md).
 | hardware_health_monitor | common | [behaviors/common.md](../behaviors/common.md) |
 | collision_event_handler | common | [behaviors/common.md](../behaviors/common.md) |
 | check_task | common | [behaviors/common.md](../behaviors/common.md) |
-| (sub_tree 호출) | — | [BT_carry_sub](BT_carry_sub.md), [BT_follow_sub](BT_follow_sub.md), [BT_lullaby_sub](BT_lullaby_sub.md) |
+| (sub_tree 호출) | — | [BT_goto_sub](BT_goto_sub.md), [BT_follow_sub](BT_follow_sub.md), [BT_lullaby_sub](BT_lullaby_sub.md) |

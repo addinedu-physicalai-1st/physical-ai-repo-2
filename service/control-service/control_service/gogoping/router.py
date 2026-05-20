@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from .mode_to_goal import UnsupportedMode, mode_to_goal
+from .mode_to_goal import Goal, UnsupportedMode, mode_to_goal
 from .ros_bridge import GogopingRosBridge
 from ..waypoints.ros_bridge import WaypointsRosBridge
 
@@ -41,6 +41,21 @@ class GogopingModeResponse(BaseModel):
     goal_task: str = ""
 
 
+class GogopingGotoVertexRequest(BaseModel):
+    """robot-web 음성 "X로 가" 처리. vertex 이름으로 ASSIST/goto 진입.
+
+    `/waypoints/navigate` (graph_router action 직접) 와 달리 SetGoal.srv → FSM trigger 거침 — robot 이동 + state ASSIST 전이 둘 다 발생.
+    """
+
+    name: str  # waypoints.yaml 의 vertex 이름
+
+
+class GogopingGotoVertexResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    destination_key: str = ""
+
+
 # ---------------------------------------------------------------- Router install
 
 
@@ -53,7 +68,7 @@ _VALID_FORCE_STATES = (
 class ForceStateRequest(BaseModel):
     """admin UI 의 디버그 패널이 POST 하는 payload."""
     target_state: str        # 8개 STATES 중 하나
-    sub_task: str = ""       # 옵션 — "carry"/"follow"/"lullaby" (ASSIST) / "hideseek" (PLAY)
+    sub_task: str = ""       # 옵션 — "goto"/"follow"/"lullaby" (ASSIST) / "hideseek" (PLAY)
 
 
 class ForceStateResponse(BaseModel):
@@ -130,6 +145,18 @@ def install(
         return GogopingModeResponse(
             accepted=accepted, reason=reason,
             goal_mode=goal.mode, goal_task=goal.task,
+        )
+
+    @router.post("/goto_vertex", response_model=GogopingGotoVertexResponse)
+    async def goto_vertex(req: GogopingGotoVertexRequest) -> GogopingGotoVertexResponse:
+        goal = Goal(mode="ASSIST", task="goto", destination_key=req.name)
+        accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
+        if not accepted:
+            logger.warning(
+                f"SetGoal 거부 (goto_vertex): name={req.name!r} reason={reason!r}"
+            )
+        return GogopingGotoVertexResponse(
+            accepted=accepted, reason=reason, destination_key=req.name,
         )
 
     @router.post("/debug/force-state", response_model=ForceStateResponse)

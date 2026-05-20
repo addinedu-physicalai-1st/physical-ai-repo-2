@@ -24,9 +24,8 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `assist_task` | `str` (`carry` / `follow` / `lullaby` / `""`) | `command_listener` | `check_task` (BT_assist_main) | ASSIST 진입 시 세팅 |
+| `assist_task` | `str` (`goto` / `follow` / `lullaby` / `""`) | `command_listener` | `check_task` (BT_assist_main) | ASSIST 진입 시 세팅 |
 | `play_task` | `str` (`hideseek` / `""`) | `command_listener` | `check_task` (BT_play_main) | PLAY 진입 시 세팅 |
-| `carry_mode` | `str` (`manual` / `goto` / `follow`) | `command_listener` | `check_carry_mode` | carry 서브모드 |
 | `target_person_id` | `str` | `command_listener` | `detect_target_person`, `child_face_tracker` | follow/hide-and-seek 추적 대상 (ReID/face_id) |
 
 > 취소·복귀 등의 명령은 blackboard 플래그 없이 **`cancel` / `return_request` trigger 만 사용** — trigger ↔ blackboard 중복 방지.
@@ -40,13 +39,12 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | `target_face_bbox` | `tuple[int,int,int,int]` | `detect_target_person` | `face_tracking` | 카메라 frame px (x,y,w,h) |
 | `target_seen_at` | `float` (epoch sec) | `detect_target_person` | `wait_for_reappear`, `face_tracking` | 마지막 감지 시각 — staleness 판정용 |
 | `found` | `bool` | `child_face_tracker` | `found_child` | 숨바꼭질 — 아이 발견 |
-| `load_dropped` | `bool` | `load_stability_check` | `load_stability_check` (self) | 짐 떨어짐 |
 
 ### Navigation 타겟 (config 또는 `command_listener` 가 W)
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `destination_key` | `str` | `command_listener` | `navigate_to_pose` | carry goto 목적지 (DB named_pose) |
+| `destination_key` | `str` | `command_listener` | `navigate_to_pose` | goto 목적지 (waypoints.yaml vertex 이름) |
 | `hide_position_key` | `str` | `command_listener` / config | `navigate_to_pose` | 숨바꼭질 숨을 위치 |
 | `search_waypoints` | `list[str]` | config / `command_listener` | `navigate_to_pose` (loop) | 숨바꼭질 탐색 waypoint |
 | `home_position_key` | `str` | config | `navigate_to_pose` | 숨바꼭질 원위치 |
@@ -85,7 +83,6 @@ class Keys:
     # 명령 / 모드
     ASSIST_TASK = "assist_task"
     PLAY_TASK = "play_task"
-    CARRY_MODE = "carry_mode"
     TARGET_PERSON_ID = "target_person_id"
     # Perception
     TARGET_VISIBLE = "target_visible"
@@ -93,7 +90,6 @@ class Keys:
     TARGET_FACE_BBOX = "target_face_bbox"
     TARGET_SEEN_AT = "target_seen_at"
     FOUND = "found"
-    LOAD_DROPPED = "load_dropped"
     # Navigation
     DESTINATION_KEY = "destination_key"
     HIDE_POSITION_KEY = "hide_position_key"
@@ -128,8 +124,8 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
 | `docking_contact` | `False` |
 | `robot_pose` | `{"x": 0.0, "y": 0.0, "yaw": 0.0}` |
 | `pose_override_active` | `False` |
-| `assist_task` / `play_task` / `carry_mode` / `target_person_id` | `""` |
-| `target_visible` / `found` / `load_dropped` | `False` |
+| `assist_task` / `play_task` / `target_person_id` | `""` |
+| `target_visible` / `found` | `False` |
 | `target_pose` / `target_face_bbox` | `None` (writer 가 세팅 전까진 미정의 — reader 는 try/except) |
 | `target_seen_at` | `0.0` |
 | `destination_key` / `hide_position_key` / `home_position_key` / `charging_dock_approach_key` | `""` |

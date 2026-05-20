@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-20 (자장가 BT 구현 — `BT_lullaby_sub` (LullabyAudio 단일 leaf) + 범용 `UIPublish` common behavior + `UIPublisher.publish_event()` / `/gogoping/ui_event` 토픽 신설. stub_lullaby 삭제. mp3 재생 자체는 robot-web frontend 별도 PR. 직전 갱신 (2026-05-20) — docs 풀 감사. 그 전 (2026-05-19) — HardwareHealthMonitor + admin UI e-stop 버튼)
+마지막 업데이트: 2026-05-20 (carry → goto rename batch: CarrySubTree 폐기, BT_goto_sub 신규 ✅, blackboard CARRY_MODE/LOAD_DROPPED 삭제, ROS msg field carry_mode 삭제. 직전 (2026-05-20) — 자장가 BT 구현 — `BT_lullaby_sub` (LullabyAudio 단일 leaf) + 범용 `UIPublish` common behavior + `UIPublisher.publish_event()` / `/gogoping/ui_event` 토픽 신설. stub_lullaby 삭제. 그 전 (2026-05-20) — docs 풀 감사. 그 전 (2026-05-19) — HardwareHealthMonitor + admin UI e-stop 버튼)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -13,11 +13,11 @@
 
 | 영역 | 진행 | 비고 |
 |---|---|---|
-| **Trees** | **10 / 13** | MainTree 8/8 ✅ · SubTree 2/5 (BT_return_sub ✅ · BT_lullaby_sub ✅) |
-| **Stubs (_stubs/)** | **1 / 4** | base ✅ · 3 stub 🟡 (carry/follow/hideseek). stub_lullaby 삭제됨 |
-| **Behaviors** | **15 / 34** | common 9/11 · navigation 4/8 · perception 0/5 · follow 0/4 · manual 1/3 · recovery 1/3 |
+| **Trees** | **11 / 13** | MainTree 8/8 ✅ · SubTree 3/5 (BT_return_sub ✅ · BT_lullaby_sub ✅ · BT_goto_sub ✅) |
+| **Stubs (_stubs/)** | **1 / 3** | base ✅ · 2 stub 🟡 (follow/hideseek). stub_lullaby·stub_carry 삭제됨 |
+| **Behaviors** | **15 / 30** | common 9/10 · navigation 4/8 · perception 0/4 · follow 0/4 · manual 1/1 · recovery 1/3 |
 | **Infrastructure** | **40 / 42** | 🟡 2 (nav2 실물 localization-only / battery_publisher_node static placeholder). PoseSubscriber + MapCache + gogoping_camera_pan 5종 + sim_battery_node + sim_teleport_node 포함 |
-| **합계** | **65 / 93** | walking skeleton + battery line + idle_timeout + map_boundary + camera pan/tilt + return cycle + hardware_health + admin UI e-stop 버튼 + **자장가 BT (LullabyAudio + UIPublish + /gogoping/ui_event topic)** |
+| **합계** | **67 / 88** | carry → goto rename batch 로 분모 정정 (stub_carry 삭제, check_carry_mode/load_stability_check/enable_manual_control/wait_for_exit 삭제, BT_goto_sub 신규 ✅) + 자장가 BT 포함 |
 
 ---
 
@@ -29,33 +29,32 @@
 |---|---|---|
 | BT_charging_main | ✅ | Parallel(BatteryFullMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
 | BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
-| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — carry/follow/lullaby 분기, 각 branch 는 stub). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
+| BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — goto ✅ + follow stub + lullaby ✅). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
 | BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
 | BT_manual_main | ✅ | Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON 라이프사이클 ✅. battery·HW·collision monitor 미배치 — 위치 안전(MapBoundary)만 예외적 배치. docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
 | BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + **ReturnSubTree**). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. ReturnSubTree = OneShot(NavTo "충전소입구" → AlignToDock → ReverseIntoDock) |
 | BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor + HardwareHealthMonitor + **ReturnSubTree**) — lockdown (CommandListener 없음, 사용자 명령 차단). ReturnSubTree 동일 (RETURNING 과 공유). docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 사람이 재시작. docs — [trees/BT_error_main.md](trees/BT_error_main.md) |
 
-> **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree (carry/follow/lullaby/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
+> **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree 미완성분 (follow/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
 
-### SubTree — 2 / 5
+### SubTree — 3 / 5
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
-| BT_carry_sub | ☐ | StubCarry 로 대체 중. manual / goto / follow 3 mode |
+| BT_goto_sub | ✅ | Sequence(NavigateToVertex + UIPublish) — 단일 vertex 이동. 운반은 user 가 follow + goto chain | [trees/BT_goto_sub.md](trees/BT_goto_sub.md) |
 | BT_follow_sub | ☐ | StubFollow 로 대체 중. 정상 ↔ Loss Recovery |
 | BT_lullaby_sub | ✅ | [BT_lullaby_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_lullaby_sub.py) — 단일 LullabyAudio leaf. initialise=lullaby_play event publish, update=RUNNING, terminate=lullaby_stop publish (idempotent). 빌더 2 + LullabyAudio 7 테스트 통과 |
 | BT_hide_and_seek_sub | ☐ | StubHideseek 로 대체 중. 1회 실행 후 종료 |
 | BT_return_sub | ✅ | [BT_return_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py) — OneShot(Sequence([NavigateToVertex("충전소입구"), AlignToDock, ReverseIntoDock, **VerifyDockingContact**])). 빌더가 waypoints.yaml 의 충전소입구 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 로 자동 주입. ReverseIntoDock 완료 후 VerifyDockingContact 가 `docked` trigger 자동 발사 → CHARGING 전이. 6 빌더 테스트 통과 (tests/test_gogoping_return_subtree_builder.py). ⚠ **알려진 이슈** — RETURNING 중 cancel 시 robot 즉시 안 멈춤 + 경로 잔상 ([trees/BT_return_sub.md 의 "알려진 이슈" 섹션](trees/BT_return_sub.md#알려진-이슈--cancel-cleanup-2026-05-18) 참조) |
 
-### Stub (_stubs/) — 1 / 4 (+ 3 🟡)
+### Stub (_stubs/) — 1 / 3 (+ 2 🟡)
 
 walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더째 삭제 + 사용처 (BT_assist_main / BT_play_main) 교체. `grep -rn "STUB:" controller/gogoping-controller/` 로 검색.
 
 | 파일 | 상태 | 의미상 동등성 |
 |---|---|---|
 | `_stubs/_base.py` | ✅ | `StubRunningThenSuccess` (N tick → SUCCESS) + `StubInfiniteRunning` (항상 RUNNING) |
-| `_stubs/stub_carry.py` | 🟡 | `StubRunningThenSuccess(30 tick = 3초)`. 진짜 carry+goto 의 "목적지 도달 시 SUCCESS" 의미와 동등 |
 | `_stubs/stub_follow.py` | 🟡 | `StubInfiniteRunning`. 진짜 follow 의 "사람 보이는 한 RUNNING" 의미와 동등 |
 | `_stubs/stub_hideseek.py` | 🟡 | `StubRunningThenSuccess(30 tick = 3초)`. 진짜 hideseek 의 "1회 사이클 후 SUCCESS" 의미와 동등 |
 
@@ -63,7 +62,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ## Behaviors
 
-### common/ — 9 / 11
+### common/ — 9 / 10
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
@@ -76,7 +75,6 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — `SetGoal.srv` + `ForceState.srv` 2개 서버 호스팅. SetGoal → `goal_reconciler` 호출. ForceState → `fsm.force_state()` + sub_task blackboard 세팅 (ASSIST→assist_task, PLAY→play_task). unit test 7 + reconciler 13 |
 | docking_contact_check | ☐ | |
 | check_task | ✅ | [check_task.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py) — TaskSelector 분기 Condition. 5 시나리오 통과 |
-| check_carry_mode | ☐ | BT_carry_sub 작성 시 |
 | ui_publish | ✅ | [ui_publish.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/ui_publish.py) — `message: dict` 1회 publish 후 즉시 SUCCESS. 5 단위 테스트 통과 |
 | lullaby_audio | ✅ | [lullaby_audio.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/lullaby_audio.py) — initialise=play publish / update=RUNNING / terminate=stop publish (idempotent). BT_lullaby_sub 의 단일 leaf. 7 단위 테스트 통과 |
 
@@ -93,7 +91,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | maintain_distance | ☐ | |
 | check_arrival | ☐ | |
 
-### perception/ — 0 / 5
+### perception/ — 0 / 4
 
 | Behavior | 상태 |
 |---|---|
@@ -101,7 +99,6 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | detect_target_person | ☐ |
 | found_child | ☐ |
 | child_face_tracker | ☐ |
-| load_stability_check | ☐ |
 
 ### follow/ — 0 / 4
 
@@ -112,13 +109,11 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | raise_camera_pan | ☐ |
 | pan_camera_sweep | ☐ |
 
-### manual/ — 1 / 3
+### manual/ — 1 / 1
 
 | Behavior | 상태 |
 |---|---|
 | manual_torque_hold | ✅ |
-| enable_manual_control | ☐ |
-| wait_for_exit | ☐ |
 
 ### recovery/ — 1 / 3
 
@@ -168,7 +163,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | Control Service `GogopingRosBridge` | ✅ | SetGoal + ForceState 클라이언트 + `/gogoping/state` 토픽 구독 |
 | Control Service `/ws/robot-state` | ✅ | gogoping state WS fan-out |
 | Admin UI BTStateInline | ✅ | 3 cell (state/main/sub) + 임베디드 DebugStatePanel |
-| Admin UI DebugStatePanel | ✅ | 🛑 긴급정지 빨간 버튼 (별도 row, 확인 없이 즉시) + 빠른 토글 [수동]/[주행] + state combo + sub combo + 적용 버튼. state 의존 sub 옵션 (ASSIST→carry/follow/lullaby, PLAY→hideseek) |
+| Admin UI DebugStatePanel | ✅ | 🛑 긴급정지 빨간 버튼 (별도 row, 확인 없이 즉시) + 빠른 토글 [수동]/[주행] + state combo + sub combo + 적용 버튼. state 의존 sub 옵션 (ASSIST→goto/follow/lullaby, PLAY→hideseek) |
 | Control Service `/api/gogoping/emergency_stop` | ✅ | DebugStatePanel 의 e-stop 버튼 → state_client.post_emergency_stop → POST → ros_bridge.emergency_stop_sync → `/gogoping/emergency_stop` (std_srvs/Trigger) → command_listener._on_emergency_stop_request → fsm.force_state("ERROR") → BT_error_main 의 StopAllMotors (cmd_vel=0 + torque OFF) |
 | Robot-web shared/robots.json | ✅ | gogoping 모드 — 대기 / 보조▾(추종/운반/자장가) / 놀이▾(숨바꼭질) / 수동 / 복귀 |
 | gogoping_camera_pan `servo_bridge` node | ✅ | [servo_bridge.py](../../src/gogoping/gogoping_camera_pan/gogoping_camera_pan/servo_bridge.py) + [firmware](../../src/gogoping/gogoping_camera_pan/firmware/servo_bridge/servo_bridge.ino) — Arduino Uno + MG995 ×2 (pan D9, tilt D10). 시리얼 (`/dev/arduino-camera`, 115200, `PT:`/`OK:` 라인) ↔ `~/cmd_pan`/`~/cmd_tilt` (Float32) 구독, `~/state` (JointState) publish. clamp (pan 5~175°, tilt 30~150°) + rate_limit + 20Hz state 재송신 (펌웨어 1000ms watchdog 대응). 패키지 문서 — [src/gogoping/gogoping_camera_pan/CLAUDE.md](../../src/gogoping/gogoping_camera_pan/CLAUDE.md) |

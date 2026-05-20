@@ -18,7 +18,7 @@
 
 | Trigger | kwargs | 발화 주체 | 전이 (from → to) | 동시 작업 |
 |---|---|---|---|---|
-| `assist_request` | `task: str` (`carry`/`follow`/`lullaby`) | `command_listener` | **IDLE / PLAY / MANUAL / RETURNING → ASSIST** | `blackboard.assist_task = task` 세팅. `carry` 시 `carry_mode` + `destination_key`, `follow` 또는 `carry+follow` 시 `target_person_id` 도 세팅. RETURNING 에서 발화 시 BT_return_sub OneShot 의 `terminate()` 가 cmd_vel=0 정리. LOW_BATTERY_RETURN 은 lockdown 이라 source 미포함. |
+| `assist_request` | `task: str` (`goto`/`follow`/`lullaby`) | `command_listener` | **IDLE / PLAY / MANUAL / RETURNING → ASSIST** | `blackboard.assist_task = task` 세팅. `goto` 시 `destination_key`, `follow` 시 `target_person_id` 도 세팅. RETURNING 에서 발화 시 BT_return_sub OneShot 의 `terminate()` 가 cmd_vel=0 정리. LOW_BATTERY_RETURN 은 lockdown 이라 source 미포함. |
 | `play_request` | `task: str` (`hideseek`) | `command_listener` | **IDLE / ASSIST / MANUAL / RETURNING → PLAY** | `blackboard.play_task = task` 세팅. `hideseek` 시 `target_person_id` + `hide_position_key` + `search_waypoints` + `home_position_key` 도 세팅. 다른 active mode 또는 RETURNING 에서 직접 전이 가능 (LOW_BATTERY_RETURN 은 lockdown 제외) |
 | `manual_request` | — | `command_listener` | **IDLE / ASSIST / PLAY / RETURNING → MANUAL** | torque OFF — 사용자가 직접 밀어서 이동. 진입 시 `release_torque` 서비스 호출, 진출 시 `enable_torque`. RETURNING 포함 (이전 트리 cleanup 보장). LOW_BATTERY_RETURN 은 lockdown 제외 |
 | `return_request` | — | `command_listener` 또는 `main.py._on_tree_failure()` | **IDLE / ASSIST / PLAY / MANUAL → RETURNING** | 수동 복귀 또는 SubTree FAILURE 시 자동 복귀. MANUAL 에서 발화 시 torque ON 자동 |
@@ -85,7 +85,7 @@
 # behavior 내부에서
 self.context.fsm.trigger("battery_low")
 self.context.fsm.trigger("fault", reason="lidar_timeout")
-self.context.fsm.trigger("assist_request", task="carry")
+self.context.fsm.trigger("assist_request", task="goto")
 ```
 
 - `fsm.trigger()` 는 **idempotent** — 현재 state 에서 invalid trigger 면 무시 (transitions 라이브러리 표준)
@@ -114,7 +114,7 @@ fsm.force_state("ASSIST")          # CHARGING / ERROR / 어디서든 → ASSIST 
 
 sub_task 옵션:
 
-- target 이 `ASSIST` 일 때만 `carry` / `follow` / `lullaby` 중 하나 — blackboard.assist_task 세팅 → TaskSelector 가 해당 분기로
+- target 이 `ASSIST` 일 때만 `goto` / `follow` / `lullaby` 중 하나 — blackboard.assist_task 세팅 → TaskSelector 가 해당 분기로
 - target 이 `PLAY` 일 때만 `hideseek` — blackboard.play_task 세팅
 - 기타 state 는 sub_task 무시
 

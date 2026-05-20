@@ -36,7 +36,7 @@ Parallel(SuccessOnAll(synchronise=False))
 ### 종료
 | Trigger | To | Source |
 |---|---|---|
-| `assist_request` | ASSIST | `command_listener` (SetGoal mode="ASSIST", task=carry/follow/lullaby) |
+| `assist_request` | ASSIST | `command_listener` (SetGoal mode="ASSIST", task=goto/follow/lullaby) |
 | `play_request` | PLAY | `command_listener` (SetGoal mode="PLAY", task=hideseek) |
 | `manual_request` | MANUAL | `command_listener` (SetGoal mode="MANUAL") |
 | `return_request` | RETURNING | `command_listener` (SetGoal mode="RETURNING") |

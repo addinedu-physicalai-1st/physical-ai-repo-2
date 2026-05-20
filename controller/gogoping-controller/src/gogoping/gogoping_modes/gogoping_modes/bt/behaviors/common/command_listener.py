@@ -119,7 +119,6 @@ class CommandListener(py_trees.behaviour.Behaviour):
         goal_dict = {
             "mode": g.mode,
             "task": g.task,
-            "carry_mode": g.carry_mode,
             "destination_key": g.destination_key,
             "target_id": g.target_id,
         }
@@ -129,7 +128,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
         if dbg is not None:
             dbg.event(
                 "SetGoal",
-                f"mode={g.mode!r} task={g.task!r} carry_mode={g.carry_mode!r}"
+                f"mode={g.mode!r} task={g.task!r}"
                 f" dest={g.destination_key!r} target_id={g.target_id!r}",
             )
 
@@ -160,7 +159,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
     # ------------------------------------------------------------ ForceState callback
 
     # ASSIST/PLAY 의 sub_task 매핑 — admin UI debug dropdown 의 옵션과 일치
-    _ASSIST_SUB_TASKS = ("carry", "follow", "lullaby")
+    _ASSIST_SUB_TASKS = ("goto", "follow", "lullaby")
     _PLAY_SUB_TASKS = ("hideseek",)
 
     def _on_force_state_request(self, request, response):
@@ -275,7 +274,7 @@ class _BlackboardWriter:
     """
 
     _WRITE_KEYS = (
-        "assist_task", "play_task", "carry_mode",
+        "assist_task", "play_task",
         "destination_key", "target_person_id",
         # _on_emergency_stop_request 가 fault reason 기록용으로 W
         "error_reason", "error_source",

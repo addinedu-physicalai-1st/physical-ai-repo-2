@@ -244,7 +244,7 @@ install_gogoping(app, _gogoping_bridge, _waypoints_bridge)
 # 해결: state 전이 발생 시 control-service 의 waypoints active goal 도 자동 cancel.
 # cancel_current() 는 active 없으면 no-op 이라 idempotent. 새 모드 진입 시 BT 또는
 # control-service 가 새 nav 호출하면 그때 다시 active 등록.
-# 이 메커니즘은 RETURNING 뿐 아니라 모든 nav 사용 모드 (carry-goto 등) 에 공통 적용.
+# 이 메커니즘은 RETURNING 뿐 아니라 모든 nav 사용 모드 (goto 등) 에 공통 적용.
 _prev_fsm_state: dict[str, str | None] = {"value": None}
 
 def _cancel_waypoints_on_state_change(snapshot: dict) -> None:

@@ -2,7 +2,7 @@
 
 robot-web 의 모드 메뉴 (``shared/robots.json`` 의 gogoping.modeTree) 가 보내는
 한국어 mode 이름 ("추종", "운반", "수동", "자장가", "숨바꼭질", "대기") 을
-``gogoping_msgs/msg/Goal`` 의 ``{mode, task, carry_mode, destination_key, target_id}``
+``gogoping_msgs/msg/Goal`` 의 ``{mode, task, destination_key, target_id}``
 필드로 변환.
 
 UI 가 target_id / destination_key 를 명시적으로 지정하지 않는 Day 1 단계엔 *데모용 기본값*
@@ -32,7 +32,6 @@ class Goal:
 
     mode: str
     task: str = ""
-    carry_mode: str = ""
     destination_key: str = ""
     target_id: str = ""
 
@@ -40,7 +39,6 @@ class Goal:
         return {
             "mode": self.mode,
             "task": self.task,
-            "carry_mode": self.carry_mode,
             "destination_key": self.destination_key,
             "target_id": self.target_id,
         }
@@ -77,8 +75,7 @@ def mode_to_goal(mode_label: str) -> Goal:
 
     if mode_label == "운반":
         return Goal(
-            mode="ASSIST", task="carry",
-            carry_mode="goto",
+            mode="ASSIST", task="goto",
             destination_key=DEMO_DEFAULT_DESTINATION_KEY,
         )
 

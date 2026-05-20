@@ -17,7 +17,7 @@ nav2 / graph_router 호출 + 정지/도킹. 모두 `bt/behaviors/navigation/` �
 | Blackboard write | — |
 | Status | RUNNING (이동 중) / SUCCESS (도착) / FAILURE (vertex 없음·경로 없음·nav2 거부·취소) |
 | terminate(INVALID) | 진행 중 goal cancel |
-| Used in | BT_carry_sub (goto mode), BT_assist_main 의 named-pose 이동 |
+| Used in | BT_goto_sub, BT_return_sub, BT_assist_main 의 named-pose 이동 |
 
 ```python
 from gogoping_modes.bt.behaviors.navigation.navigate_to_vertex import NavigateToVertex
