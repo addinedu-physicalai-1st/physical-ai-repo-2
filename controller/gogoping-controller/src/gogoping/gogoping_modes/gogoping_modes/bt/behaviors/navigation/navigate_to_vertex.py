@@ -52,6 +52,9 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
         self._cancel_pending: bool = False
         self._result_status: str | None = None  # "succeeded" / "failed" / None
         self._failure_reason: str = ""
+        # admin UI NavDebugLogCard 용 — main.py 가 setup(kwargs) 로 주입. None 이면 no-op.
+        self._debug_events: Any = None
+        self._last_target: str = ""
         self.blackboard = self.attach_blackboard_client(name=self.qualified_name)
         self.blackboard.register_key(
             key=self._target_key, access=py_trees.common.Access.READ
@@ -65,6 +68,14 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
         self._client = ActionClient(
             self._node, NavigateToVertexAction, self._action_name
         )
+        self._debug_events = kwargs.get("debug_events")
+
+    def _dbg(self, msg: str, level: str = "info") -> None:
+        if self._debug_events is not None:
+            try:
+                self._debug_events.event("NavTo", msg, level=level)
+            except Exception:
+                pass
 
     def initialise(self) -> None:
         self._goal_handle = None
@@ -89,14 +100,17 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
                 return
         goal = NavigateToVertexAction.Goal()
         goal.target_name = target
+        self._last_target = target
         send_future = self._client.send_goal_async(goal)
         send_future.add_done_callback(self._on_goal_response)
+        self._dbg(f"send → {target!r}")
 
     def _on_goal_response(self, fut: Any) -> None:
         gh = fut.result()
         if not gh.accepted:
             self._result_status = "failed"
             self._failure_reason = "rejected"
+            self._dbg(f"gh rejected ({self._last_target!r})", level="warn")
             return
         self._goal_handle = gh
         # behavior 가 이미 terminate(INVALID) 됐다면 (race) — 즉시 cancel forward.
@@ -107,7 +121,11 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
             except Exception:
                 pass
             self._cancel_pending = False
+            self._dbg(
+                f"race cancel via pending flag ({self._last_target!r})", level="warn"
+            )
             return
+        self._dbg(f"gh accepted ({self._last_target!r})")
         result_fut = gh.get_result_async()
         result_fut.add_done_callback(self._on_result)
 
@@ -116,9 +134,14 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
         res = wrapper.result
         if getattr(res, "success", False):
             self._result_status = "succeeded"
+            self._dbg(f"SUCCESS @ {self._last_target!r}")
         else:
             self._result_status = "failed"
             self._failure_reason = getattr(res, "message", "") or "nav2 failed"
+            self._dbg(
+                f"FAILURE @ {self._last_target!r} reason={self._failure_reason!r}",
+                level="warn",
+            )
 
     def update(self) -> py_trees.common.Status:
         if self._result_status == "succeeded":
@@ -138,6 +161,11 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
             except Exception:
                 pass
             self._goal_handle = None
+            self._dbg(f"terminate(INVALID) gh=present → cancel ({self._last_target!r})")
         else:
             # send_goal_async 응답 전 — _on_goal_response 가 도착 시 cancel.
             self._cancel_pending = True
+            self._dbg(
+                f"terminate(INVALID) gh=None → pending ({self._last_target!r})",
+                level="warn",
+            )

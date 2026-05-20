@@ -15,6 +15,7 @@ from .battery_subscriber import BatterySubscriber
 from .camera_pan_client import CameraPanClient
 from .collision_subscriber import CollisionSubscriber
 from .db_logger import DBLogger
+from .debug_event_publisher import DebugEventPublisher
 from .map_cache import MapCache
 from .nav2_client import Nav2Client
 from .pose_subscriber import PoseSubscriber
@@ -26,6 +27,7 @@ __all__ = [
     "CameraPanClient",
     "CollisionSubscriber",
     "DBLogger",
+    "DebugEventPublisher",
     "MapCache",
     "Nav2Client",
     "PoseSubscriber",
