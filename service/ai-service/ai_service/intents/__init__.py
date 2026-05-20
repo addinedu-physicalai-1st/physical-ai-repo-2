@@ -15,6 +15,7 @@ from ai_service.intents.common.mode_change import ModeChangeHandler
 from ai_service.intents.common.report import ReportHandler
 from ai_service.intents.common.schedule import ScheduleHandler
 from ai_service.intents.common.stop import StopHandler
+from ai_service.intents.common.wake_name import WakeNameHandler
 from ai_service.intents.common.whereabouts import WhereaboutsHandler
 from ai_service.intents.gogoping.goto_vertex import GotoVertexHandler
 from ai_service.intents.gogoping.return_ import ReturnHandler
@@ -22,6 +23,7 @@ from ai_service.intents.gogoping.return_ import ReturnHandler
 PIPELINES: dict[str, list[IntentHandler]] = {
     "eduping": [
         StopHandler(),
+        WakeNameHandler(),
         MenuHandler(),
         HelloHandler(),
         GenderHandler(),
@@ -35,6 +37,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     ],
     "gogoping": [
         StopHandler(),
+        WakeNameHandler(),
         ReturnHandler(),
         GotoVertexHandler(),
         MenuHandler(),
@@ -50,6 +53,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     ],
     "noriarm": [
         StopHandler(),
+        WakeNameHandler(),
         MenuHandler(),
         HelloHandler(),
         GenderHandler(),
