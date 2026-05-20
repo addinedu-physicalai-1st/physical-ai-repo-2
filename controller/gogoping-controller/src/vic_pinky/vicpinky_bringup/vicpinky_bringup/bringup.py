@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 
-import rclpy
-from rclpy.node import Node
+import os
 import math
 import time
+
+import rclpy
+import yaml
+from ament_index_python.packages import get_package_share_directory
+from rclpy.node import Node
 
 from geometry_msgs.msg import Twist, TransformStamped
 from nav_msgs.msg import Odometry
@@ -33,9 +37,18 @@ MODBUS_ID = 0x01
 JOINT_NAME_WHEEL_L = "left_wheel_joint"
 JOINT_NAME_WHEEL_R = "right_wheel_joint"
 
-WHEEL_RAD = 0.0825
+# wheel.radius / wheel.separation 은 app/urdf-tuner GUI 가 편집하는
+# vicpinky_description/config/robot_dims.yaml 과 single source of truth.
+_DIMS_PATH = os.path.join(
+    get_package_share_directory('vicpinky_description'),
+    'config', 'robot_dims.yaml',
+)
+with open(_DIMS_PATH, 'r', encoding='utf-8') as _f:
+    _DIMS = yaml.safe_load(_f)
+
+WHEEL_RAD = float(_DIMS['wheel']['radius'])
 PULSE_PER_ROT = 4096
-WHEEL_BASE = 0.4288
+WHEEL_BASE = float(_DIMS['wheel']['separation'])
 RPM2RAD = 0.104719755
 CIRCUMFERENCE = 2 * math.pi * WHEEL_RAD
 

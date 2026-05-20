@@ -14,8 +14,10 @@
   
   <depend>tf_transformations</depend>
   <depend>laser_filters</depend>
-  
+
   <depend>pyserial</depend>
+  <depend>python3-yaml</depend>
+  <exec_depend>vicpinky_description</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
