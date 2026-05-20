@@ -315,11 +315,6 @@ async def voice_intent(req: IntentRequest) -> dict:
         if vname is not None:
             return {"kind": "goto_vertex", "name": vname}
 
-    # 이름만 입력 시 등하원 규칙 답변 (소형 LLM 의 아이 말투 환각 방지)
-    first_att = await try_attendance_first_reply(text)
-    if first_att:
-        return {"kind": "chat", "reply": first_att, "emotion": "hello"}
-
     # 분류 안 됨 → 잡담 응답 시도. 컨텍스트 + 명단 DB 는 병렬로 가져와 레이턴시 절감
     ctx: dict[str, str] = {}
     db_roster: str | None = None
