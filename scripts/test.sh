@@ -163,6 +163,7 @@ NORIARM_FRAMEWORK_DIR="$REPO_ROOT/controller/noriarm-controller/src/noriarm_fram
 PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_home_pose.py" -v || EXIT=1
 PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_policy_rps.py" -v || EXIT=1
 PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_policy_act.py" -v || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_block_stacking_manifest.py" -v || EXIT=1
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
