@@ -9,11 +9,17 @@ import math
 import os
 import random
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import QEvent, QObject, Qt, QTimer, QUrl
+from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import (
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -21,6 +27,130 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+# QWebEngineView 는 별도 패키지 (PyQtWebEngine) — 미설치 환경에선 placeholder 로 fallback.
+try:
+    from PyQt5.QtWebEngineWidgets import (  # type: ignore[import-not-found]
+        QWebEnginePage,
+        QWebEngineSettings,
+        QWebEngineView,
+    )
+
+    _HAS_WEBENGINE = True
+
+    class _DevPermissivePage(QWebEnginePage):
+        """Accept self-signed certs on localhost (Vite mkcert) so the admin viewer
+        can load `https://localhost:5173/?embed=openarm` without manual CA install.
+
+        Only swallows cert errors whose URL is localhost / 127.0.0.1 — production
+        HTTPS errors still bubble up.
+        """
+
+        def certificateError(self, error):  # type: ignore[override]
+            try:
+                url = error.url().host()
+            except Exception:
+                url = ""
+            return url in ("localhost", "127.0.0.1", "")
+
+except ImportError:
+    QWebEngineView = None  # type: ignore[assignment, misc]
+    QWebEnginePage = None  # type: ignore[assignment, misc]
+    QWebEngineSettings = None  # type: ignore[assignment, misc]
+    _DevPermissivePage = None  # type: ignore[assignment, misc]
+    _HAS_WEBENGINE = False
+
+
+def _tune_webengine_view(view: "QWebEngineView") -> None:
+    """Hardware WebGL / compositor for embedded Three.js (GPU when Chromium allows)."""
+    if QWebEngineSettings is None:
+        return
+    try:
+        s = view.settings()
+        s.setAttribute(QWebEngineSettings.WebGLEnabled, True)
+        s.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
+        s.setAttribute(QWebEngineSettings.ScrollAnimatorEnabled, False)
+        # Qt 5.14+ — request WebGL2 when available (falls back to WebGL1).
+        webgl2 = getattr(QWebEngineSettings, "WebGL2Enabled", None)
+        if webgl2 is not None:
+            s.setAttribute(webgl2, True)
+        # https://localhost:5173 compare page fetches http://127.0.0.1:<data-port>
+        for attr in (
+            "LocalContentCanAccessRemoteUrls",
+            "AllowRunningInsecureContent",
+        ):
+            key = getattr(QWebEngineSettings, attr, None)
+            if key is not None:
+                s.setAttribute(key, True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+class _CompareDataServer:
+    """Localhost HTTP server (daemon thread) serving the compare payload as JSON.
+
+    Legacy: compare popup may fetch via `?data-port=`. PyQt path injects JSON
+    directly and does not use this server.
+    A hash-encoded URL turned out too large (~100KB+ base64) for xdg-open / address
+    bar paste, so the JSON payload lives here on a separate `http://localhost:NNNN`
+    socket. The page URL just carries `?data-port=NNNN` and fetches the data.
+
+    Chrome treats `http://localhost` as a Potentially-Trustworthy Origin so the
+    HTTPS-from-vite page can fetch the HTTP localhost endpoint without mixed-
+    content blocking. (Firefox is stricter; user may need Chrome.)
+    """
+
+    def __init__(self, payload_bytes: bytes) -> None:
+        import http.server
+        import socket
+        import threading
+
+        # Auto-assign a free port — start a temporary socket, read its bound port,
+        # close, then bind the real server to the same number. Tiny race window
+        # but acceptable for a single-user admin tool.
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 0))
+        self.port: int = s.getsockname()[1]
+        s.close()
+
+        body = payload_bytes
+
+        class _Handler(http.server.BaseHTTPRequestHandler):
+            def do_OPTIONS(self) -> None:  # noqa: N802
+                self.send_response(204)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET")
+                self.send_header("Access-Control-Allow-Headers", "*")
+                self.end_headers()
+
+            def do_GET(self) -> None:  # noqa: N802
+                self.send_response(200)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except BrokenPipeError:
+                    pass
+
+            def log_message(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002, D401
+                pass  # silence default access log
+
+        self._server = http.server.HTTPServer(("127.0.0.1", self.port), _Handler)
+        self._thread = threading.Thread(
+            target=self._server.serve_forever, daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        try:
+            self._server.shutdown()
+            self._server.server_close()
+        except Exception:  # noqa: BLE001
+            pass
+
 
 from theme import COLORS, ROBOTS
 from widgets import (
@@ -759,3 +889,1496 @@ def _kv_row(label: str, value_widget: QWidget) -> QWidget:
     lay.addStretch(1)
     lay.addWidget(value_widget)
     return box
+
+
+# --------------------------------------------------------------------------
+# EduPing 컨트롤 대시보드 — OpenArm 3D 뷰어 + 관절 범위 슬라이더 (충돌 방지 튜닝)
+# --------------------------------------------------------------------------
+
+import json
+import math as _math
+from pathlib import Path as _Path
+
+from PyQt5.QtCore import pyqtSignal
+
+
+def _make_selectable(label: QLabel) -> None:
+    """QLabel 텍스트를 마우스 드래그 + Ctrl+C 로 복사 가능하게.
+
+    에러 메시지 (PyQtWebEngine 미설치, 서버 timeout 등) 를 복붙해서 issue tracker 에
+    붙여 넣을 수 있게 — 기본 QLabel 은 텍스트가 read-only 인데도 선택조차 안 된다.
+    """
+    label.setTextInteractionFlags(
+        Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard,
+    )
+    label.setCursor(Qt.IBeamCursor)
+
+
+class _JointHoverFilter(QObject):
+    """Mouse-enter / mouse-leave on a joint box → highlight the matching joint in
+    the embedded 3D viewer via window.highlightJoint() / window.clearJointHighlight(),
+    and toggle a local pulse-dot indicator inside the box (visual confirmation that
+    the cursor is registered, even before looking at the 3D viewer).
+
+    Enter / Leave events fire as the cursor crosses each child widget too — but we
+    only want to clear the highlight when the cursor truly leaves the BOX, not when
+    it just moves between children. The `_entered_widgets` set tracks which children
+    are currently entered; we clear only when the set becomes empty.
+    """
+
+    def __init__(
+        self,
+        dashboard: "EduPingControlDashboard",
+        joint_name: str,
+        *,
+        indicator: QLabel | None = None,
+    ) -> None:
+        super().__init__(dashboard)
+        self._dashboard = dashboard
+        self._joint_name = joint_name
+        self._indicator = indicator
+        self._entered: set[int] = set()
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # noqa: N802
+        et = event.type()
+        if et == QEvent.Enter:
+            was_empty = not self._entered
+            self._entered.add(id(obj))
+            if was_empty:
+                self._dashboard._highlight_joint_in_viewer(self._joint_name)
+                if self._indicator is not None:
+                    self._indicator.setVisible(True)
+        elif et == QEvent.Leave:
+            self._entered.discard(id(obj))
+            if not self._entered:
+                self._dashboard._clear_joint_highlight_in_viewer()
+                if self._indicator is not None:
+                    self._indicator.setVisible(False)
+        return False  # don't consume — let the widget see its events normally
+
+
+# OpenArm v10 (듀얼 암) — left/right 각 7 arm joints + 1 finger = 16 joints.
+# 실제 joint name·URDF 한계는 control_service.eduping.joint_limits.DEFAULT_JOINT_SPECS
+# 에서 import — 백엔드와 동일 source of truth 유지.
+# Control Server 미실행/PYTHONPATH 미설정 환경에서도 admin-app 이 뜨도록 lazy + fallback.
+
+def _openarm_joint_specs() -> list[tuple[str, str, float, float, str]]:
+    """(joint_name, label, urdf_lower, urdf_upper, unit) 16개. fallback 시 빈 리스트."""
+    try:
+        import sys as _sys
+        from pathlib import Path as _P
+        _repo_root = _P(__file__).resolve().parents[2]
+        _cs = _repo_root / "service" / "control-service"
+        _db = _repo_root / "db" / "control-db"
+        for _path in (_cs, _db):
+            _spath = str(_path)
+            if _spath not in _sys.path:
+                _sys.path.insert(0, _spath)
+        from control_service.eduping.joint_limits import DEFAULT_JOINT_SPECS  # type: ignore
+        return list(DEFAULT_JOINT_SPECS)
+    except Exception:
+        # 백엔드 import 못 하면 빈 리스트 — UI 가 안내 메시지만 띄움.
+        return []
+
+
+_OPENARM_SPECS = _openarm_joint_specs()
+
+
+def _openarm_default_limits() -> dict[str, dict[str, float]]:
+    """초기 슬라이더 값 — URDF (lower, upper) 그대로. 사용자가 좁혀서 충돌 방지."""
+    return {
+        name: {"min": lo, "max": hi}
+        for name, _label, lo, hi, _unit in _OPENARM_SPECS
+    }
+
+
+class EduPingControlDashboard(QWidget):
+    """EduPing OpenArm 관리자 대시보드.
+
+    좌측: QWebEngineView 로 robot-web 의 OpenArm 뷰어 임베드 (실시간 3D pose).
+    우측: 각 관절의 Min/Max 한계 슬라이더(double spin box pair) + 저장/복원 버튼.
+
+    저장 버튼은 Control Server 의 `/api/eduping/joint-limits` (POST) 로 전송.
+    Control Server 는 이 한계를 dance replay 시 frame 별로 적용 (clip) 해 학습
+    데이터가 한계를 벗어나는 경우 강제 잘라 충돌을 막는다.
+    """
+
+    limits_save_requested = pyqtSignal(dict)  # {joint_name: {"min": float, "max": float}}
+    limits_reset_requested = pyqtSignal()
+    # rclpy 스핀 스레드 → GUI 스레드 마샬링. Qt 가 cross-thread signal 을 queue 한다.
+    _joint_state_received = pyqtSignal(dict)
+    # 실물 재생 (안전) — main.py 가 control-service 로 limits POST + play POST.
+    safe_play_requested = pyqtSignal(dict)  # {kind, slug, limits}
+
+    # Viewer URL — points at robot-web with `?embed=openarm`, which short-circuits
+    # App.vue to render the same OpenarmViewer (three.js + urdf-loader) the Mugunghwa
+    # game uses, in fullscreen. The embed page exposes `window.highlightJoint(name)`
+    # and `window.clearJointHighlight()` globals so this PyQt side can spotlight a
+    # link on cursor hover.
+    #
+    # HTTPS by default — Vite dev server uses mkcert and serves https on 5173. The
+    # admin viewer below installs `_DevPermissivePage` so the self-signed cert
+    # doesn't block loading. If the user runs `VITE_HTTPS=false npm run dev`,
+    # override with `ADMIN_OPENARM_VIEWER_URL=http://localhost:5173/?embed=openarm`.
+    DEFAULT_VIEWER_URL = "https://localhost:5173/?embed=openarm"
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        meta = ROBOTS["eduping"]
+        accent = meta["color"]
+        self._joint_widgets: dict[str, tuple[QDoubleSpinBox, QDoubleSpinBox]] = {}
+        # Live "현재" QLabel per joint — updated from the rclpy joint-state pump.
+        self._joint_current_labels: dict[str, QLabel] = {}
+        # Hover filters per joint — kept alive (else GC kills them).
+        self._hover_filters: list[_JointHoverFilter] = []
+        # Debounced limit push to the embedded viewer (so slider changes
+        # immediately clip the displayed leader pose — visual self-collision
+        # prevention without needing to click 저장).
+        self._limits_push_timer = QTimer(self)
+        self._limits_push_timer.setSingleShot(True)
+        self._limits_push_timer.setInterval(150)
+        self._limits_push_timer.timeout.connect(self._push_limits_to_viewer)
+        # Latest snapshot from rclpy; consumed by the 10Hz label-update timer
+        # below. Decouples 50Hz callback rate from UI paint cost.
+        self._latest_snap: dict | None = None
+        self._label_update_timer = QTimer(self)
+        self._label_update_timer.setInterval(100)  # 10 Hz
+        self._label_update_timer.timeout.connect(self._tick_label_update)
+        self._label_update_timer.start()
+        # Standalone rclpy 구독자 — 켜져 있으면 control-service 우회. 시작은 EduPing
+        # 탭이 처음 활성화될 때 (main.py 의 _on_tab_changed) 한 번만.
+        self._joint_subscriber: Any = None
+        self._joint_subscriber_started = False
+        # Throttle JS injection — leader publishes at 50Hz; we pump to the embedded
+        # three.js scene at 30Hz to match the viewer's 30 FPS render cap. 15Hz
+        # was noticeably choppy during routine playback (the renderer ran at
+        # 30 FPS but on stale data), so the dance/gesture looked stuttery.
+        # 30Hz pump + 30Hz playback emit (see RoutinePlayback rate below) means
+        # every emitted frame lines up with a render tick.
+        self._js_pump_min_interval_s = 1.0 / 30.0
+        self._js_pump_last_mono: float = 0.0
+        self._js_pump_pending: dict | None = None
+        # Routine playback — replays a recorded dance/greeting through the same
+        # joint-state pipeline as the live rclpy subscriber, so all limit
+        # clipping applies. Used to verify safe-range settings without running
+        # the real arm.
+        self._playback: Any = None
+        # When True, live rclpy leader frames are dropped — the viewer animates
+        # the playback only. Flipped True on play, False on stop / end-of-routine.
+        # Without this gate the viewer flickers between leader pose and the
+        # playback pose at the combined ~100Hz update rate.
+        self._playback_active: bool = False
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(28, 24, 28, 24)
+        outer.setSpacing(18)
+
+        self.header = RobotHeader("eduping")
+        outer.addWidget(self.header)
+
+        # 본문 — 좌(뷰어) / 우(슬라이더) 가로 분할.
+        body = QHBoxLayout()
+        body.setSpacing(14)
+        outer.addLayout(body, 1)
+
+        # ── 좌: 3D 뷰어 ─────────────────────────────────────────────
+        viewer_card = Card("OpenArm 3D 뷰어")
+        viewer_card.set_watermark("🦾")
+
+        # 팔 동기화 (teleop) UI 제거 — 율동 녹화 흐름처럼 follower 연결 시 control-service
+        # 의 eduping bridge 가 leader publish 를 자동으로 forward. 별도 토글 불필요.
+
+        viewer_url = os.environ.get(
+            "ADMIN_OPENARM_VIEWER_URL", self.DEFAULT_VIEWER_URL,
+        )
+        if _HAS_WEBENGINE and QWebEngineView is not None:
+            self.viewer = QWebEngineView()
+            self.viewer.setMinimumSize(520, 420)
+            # Install permissive page so localhost mkcert self-signed certs don't
+            # block load. Stored on self so it isn't GC'd.
+            if _DevPermissivePage is not None:
+                self._viewer_page = _DevPermissivePage(self.viewer)
+                self.viewer.setPage(self._viewer_page)
+            _tune_webengine_view(self.viewer)
+            self._viewer_embed_url = viewer_url
+            self._compare_prepare_thread = None
+            self._viewer_compare_mode = False
+            self._pending_compare_payload_json: str | None = None
+            self.viewer.setUrl(QUrl(viewer_url))
+            try:
+                self.viewer.loadFinished.connect(self._on_viewer_load_finished)
+            except Exception:
+                pass
+            viewer_card.body.addWidget(self.viewer, 1)
+
+            # Diagnostic line — rclpy subscription state + topic + msg count + age.
+            # Updates every 500ms so the user can see if the topic is alive.
+            self._ros_diag_label = QLabel("rclpy: 미시작")
+            self._ros_diag_label.setStyleSheet(
+                f"color: {COLORS['text_muted']}; font-size: 9pt; "
+                f"background: transparent;"
+            )
+            _make_selectable(self._ros_diag_label)
+            viewer_card.body.addWidget(self._ros_diag_label)
+            self._viewer_url_label = QLabel(viewer_url)
+            self._viewer_url_label.setWordWrap(True)
+            self._viewer_url_label.setStyleSheet(
+                f"color: {COLORS['text_muted']}; font-size: 8pt; "
+                f"background: transparent;"
+            )
+            _make_selectable(self._viewer_url_label)
+            viewer_card.body.addWidget(self._viewer_url_label)
+            self._ros_diag_timer = QTimer(self)
+            self._ros_diag_timer.timeout.connect(self._refresh_ros_diag)
+            self._ros_diag_timer.start(500)
+        else:
+            placeholder = QLabel(
+                "PyQtWebEngine 미설치 — 3D 뷰어를 표시하려면:\n"
+                "    pip install PyQtWebEngine\n"
+                f"이후 ADMIN_OPENARM_VIEWER_URL 환경변수로 뷰어 URL 지정\n"
+                f"(기본 {viewer_url})"
+            )
+            placeholder.setWordWrap(True)
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setStyleSheet(
+                f"color: {COLORS['text_muted']}; font-size: 11pt; padding: 24px; "
+                f"background: {COLORS['panel']}; border-radius: 12px;"
+            )
+            placeholder.setMinimumSize(520, 420)
+            # 에러 메시지 복사 가능하게 — 드래그 선택 + Ctrl+C.
+            _make_selectable(placeholder)
+            viewer_card.body.addWidget(placeholder, 1)
+            self.viewer = None
+            self._viewer_embed_url = viewer_url
+            self._viewer_compare_mode = False
+        body.addWidget(viewer_card, 2)
+
+        # ── 우: 녹화 재생 + 관절 범위 슬라이더 (좌/우 듀얼 암) ─────────────────
+        sliders_card = Card("OpenArm 관절 범위 — 좌/우 듀얼 암")
+        sliders_card.set_watermark("📐")
+        # 녹화 재생 — 율동/인사 .yaml 을 viewer 에 시뮬레이션. 실제 arm 동작 X.
+        # 관절 한계 슬라이더가 클립되는지 시각 확인용. 위에 가로 row 로 배치.
+        self._build_playback_row(sliders_card.body)
+        help_lbl = QLabel(
+            "녹화된 dance/replay 가 관절 한계를 넘으면 Control Server 가 자동으로\n"
+            "잘라(clip) 모터·스틸 베이스 충돌을 막습니다. 각 스핀박스 range 는\n"
+            "URDF 한계(절대 한계) — 그 안에서 더 좁히면 안전 윈도우가 줄어듭니다.\n"
+            "단위는 arm joint = rad, finger = m (prismatic)."
+        )
+        help_lbl.setStyleSheet(
+            f"color: {COLORS['text_muted']}; font-size: 9pt; "
+            f"background: transparent;"
+        )
+        help_lbl.setWordWrap(True)
+        _make_selectable(help_lbl)
+        sliders_card.body.addWidget(help_lbl)
+
+        if not _OPENARM_SPECS:
+            warn = QLabel(
+                "joint_limits 스펙을 import 할 수 없습니다 — Control Server 패키지가\n"
+                "PYTHONPATH 에 있는지 확인하세요.\n"
+                "(service/control-service, db/control-db 가 보이지 않는 환경)"
+            )
+            warn.setWordWrap(True)
+            _make_selectable(warn)
+            warn.setStyleSheet(
+                f"color: #c14545; font-size: 10pt; padding: 16px; "
+                f"background: {COLORS['panel']}; border-radius: 8px;"
+            )
+            sliders_card.body.addWidget(warn)
+        else:
+            # 좌/우 두 컬럼. 각 컬럼에 7 arm joint + 1 finger = 8 슬라이더.
+            cols = QHBoxLayout()
+            cols.setSpacing(20)
+            left_form = self._build_arm_form("왼팔", "openarm_left_")
+            right_form = self._build_arm_form("오른팔", "openarm_right_")
+            cols.addLayout(left_form, 1)
+            cols.addLayout(right_form, 1)
+            # 16 슬라이더라 세로로 길어질 수 있어 스크롤 wrap.
+            cols_host = QWidget()
+            cols_host.setLayout(cols)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QScrollArea.NoFrame)
+            scroll.setWidget(cols_host)
+            sliders_card.body.addWidget(scroll, 1)
+
+        # 버튼 — 저장 / URDF 기본값 복원.
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        self.reset_btn = QPushButton("URDF 기본값")
+        self.save_btn = QPushButton("저장")
+        self.save_btn.setStyleSheet(
+            f"QPushButton {{ background: {accent}; color: white; "
+            f"padding: 8px 18px; border-radius: 8px; font-weight: 700; }}"
+            f"QPushButton:hover {{ background: {soften(accent, 0.15)}; }}"
+        )
+        self.reset_btn.clicked.connect(self._on_reset_clicked)
+        self.save_btn.clicked.connect(self._on_save_clicked)
+        btn_row.addStretch(1)
+        btn_row.addWidget(self.reset_btn)
+        btn_row.addWidget(self.save_btn)
+        sliders_card.body.addLayout(btn_row)
+
+        # 마지막 저장 결과 — 성공/실패 메시지 짧게.
+        self.save_status = QLabel("")
+        self.save_status.setStyleSheet(
+            f"color: {COLORS['text_muted']}; font-size: 9pt; "
+            f"background: transparent;"
+        )
+        self.save_status.setWordWrap(True)
+        # 서버 timeout 같은 에러 메시지를 그대로 복사 가능하게.
+        _make_selectable(self.save_status)
+        sliders_card.body.addWidget(self.save_status)
+
+        body.addWidget(sliders_card, 3)
+
+    # ------------------------------------------------- 슬라이더 폼 빌더
+    def _build_arm_form(self, title: str, name_prefix: str) -> QVBoxLayout:
+        """한쪽 팔 (왼/오) 의 spec 만 골라 (Min spin / Max spin) 행을 만든다.
+
+        반환은 QVBoxLayout — 호출자가 좌/우 두 컬럼을 QHBoxLayout 에 넣는다.
+        spin box range 는 각 joint 의 URDF lower/upper 그대로 — 그 안에서만 슬라이딩.
+        """
+        column = QVBoxLayout()
+        column.setSpacing(6)
+        column.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet(
+            f"color: {COLORS['text']}; font-size: 13pt; font-weight: 700; "
+            f"background: transparent;"
+        )
+        column.addWidget(title_lbl)
+
+        defaults = _openarm_default_limits()
+        for name, label, urdf_lo, urdf_hi, unit in _OPENARM_SPECS:
+            if not name.startswith(name_prefix):
+                continue
+            row = QHBoxLayout()
+            row.setSpacing(6)
+            # 단위에 맞게 스텝 다르게 — rad 는 0.05, m (finger) 는 0.001.
+            step = 0.05 if unit == "rad" else 0.001
+            decimals = 3 if unit == "rad" else 4
+            suffix = f" {unit}"
+
+            min_box = QDoubleSpinBox()
+            min_box.setRange(urdf_lo, urdf_hi)
+            min_box.setDecimals(decimals)
+            min_box.setSingleStep(step)
+            min_box.setSuffix(suffix)
+            min_box.setValue(defaults[name]["min"])
+            min_box.setObjectName(f"{name}_min")
+
+            max_box = QDoubleSpinBox()
+            max_box.setRange(urdf_lo, urdf_hi)
+            max_box.setDecimals(decimals)
+            max_box.setSingleStep(step)
+            max_box.setSuffix(suffix)
+            max_box.setValue(defaults[name]["max"])
+            max_box.setObjectName(f"{name}_max")
+
+            # Min 이 Max 를 추월하지 못하게 cross-link.
+            min_box.valueChanged.connect(
+                lambda v, mb=max_box: mb.setMinimum(v),
+            )
+            max_box.valueChanged.connect(
+                lambda v, mb=min_box: mb.setMaximum(v),
+            )
+            # Any slider change → debounced push to the embedded viewer so the
+            # displayed arm immediately clips to the new safe range (visual
+            # self-collision prevention; doesn't require pressing 저장).
+            min_box.valueChanged.connect(lambda _v: self._limits_push_timer.start())
+            max_box.valueChanged.connect(lambda _v: self._limits_push_timer.start())
+
+            label_lbl = QLabel(label)
+            label_lbl.setStyleSheet(
+                f"color: {COLORS['text']}; font-size: 10pt; font-weight: 600; "
+                f"background: transparent; border: none;"
+            )
+            # 현재 값 — leader bringup 의 joint state 가 들어오면 _update_current_joint_labels
+            # 가 매 프레임 (subscriber rate) 갱신. 단위는 unit (arm = rad, finger = m).
+            current_lbl = QLabel("—")
+            current_lbl.setStyleSheet(
+                f"color: #c14545; font-size: 10pt; font-weight: 800; "
+                f"font-variant-numeric: tabular-nums; "
+                f"background: transparent; border: none; min-width: 80px;"
+            )
+            current_lbl.setAlignment(Qt.AlignCenter)
+            self._joint_current_labels[name] = current_lbl
+            min_caption = QLabel("Min:")
+            min_caption.setStyleSheet("background: transparent; border: none;")
+            max_caption = QLabel("Max:")
+            max_caption.setStyleSheet("background: transparent; border: none;")
+            row.addWidget(label_lbl, 2)
+            row.addWidget(current_lbl, 1)
+            row.addWidget(min_caption)
+            row.addWidget(min_box, 1)
+            row.addWidget(max_caption)
+            row.addWidget(max_box, 1)
+
+            # Visible "joint box" — rounded card with clear hover state. The pulse
+            # dot on the right turns visible when hovered, mirroring the 3D
+            # highlight so the user sees which joint they're hovering even before
+            # looking at the viewer.
+            dot = QLabel("●")
+            dot.setStyleSheet(
+                "color: #ff4d6d; font-size: 14pt; font-weight: 900; "
+                "background: transparent; border: none; padding: 0 4px;"
+            )
+            dot.setVisible(False)
+            row.addWidget(dot)
+
+            box = QFrame()
+            box.setObjectName("jointBox")
+            box.setLayout(row)
+            box.setAttribute(Qt.WA_Hover, True)
+            box.setStyleSheet(
+                "QFrame#jointBox {"
+                f"  background: {COLORS['panel']};"
+                f"  border: 1px solid {COLORS['border']};"
+                "  border-radius: 10px;"
+                "  padding: 6px 10px;"
+                "  margin: 2px 0;"
+                "}"
+                "QFrame#jointBox:hover {"
+                f"  background: {soften('#ff4d6d', 0.85)};"
+                "  border-color: #ff4d6d;"
+                "}"
+            )
+
+            # Hover anywhere on this box → spotlight the matching 3D link, and show
+            # the pulse dot inside this box. Filter installed on every child too so
+            # Enter/Leave fire even when the cursor passes over a child widget.
+            hover = _JointHoverFilter(self, name, indicator=dot)
+            self._hover_filters.append(hover)
+            for w in (box, label_lbl, min_box, max_box, min_caption, max_caption):
+                w.installEventFilter(hover)
+
+            column.addWidget(box)
+            self._joint_widgets[name] = (min_box, max_box)
+
+        column.addStretch(1)
+        return column
+
+    def _refresh_ros_diag(self) -> None:
+        """Update the rclpy diag line — shows topic, msg count, and last-msg age.
+
+        Run by a 500ms QTimer on the GUI thread. Reads counters published by the
+        subscriber (set on the rclpy spin thread); int reads are atomic in CPython
+        so no extra lock needed.
+        """
+        label = getattr(self, "_ros_diag_label", None)
+        if label is None:
+            return
+        sub = self._joint_subscriber
+        if sub is None:
+            if not self._joint_subscriber_started:
+                label.setText("rclpy: 미시작 (EduPing 탭 활성화 시 시작)")
+                return
+            # Subscriber start was attempted but failed — surface the exact reason
+            # so the user can act (most common: rclpy not in this Python env, or
+            # ROS env not sourced before launch).
+            from services.eduping_joint_subscriber import last_import_error
+            err = last_import_error() or "원인 불명"
+            label.setText(
+                "rclpy: 시작 실패 — " + err + "  "
+                "(터미널에서 `source /opt/ros/jazzy/setup.bash` 후 admin-app 재실행)"
+            )
+            return
+        try:
+            n = sub.msg_count
+            topic = sub.topic
+            last_mono = sub.last_msg_mono
+            sub_err = sub.last_error
+        except AttributeError:
+            label.setText("rclpy: 상태 조회 실패")
+            return
+        if sub_err is not None:
+            label.setText(f"rclpy: {sub_err}")
+            return
+        if n == 0:
+            label.setText(
+                f"rclpy: 대기 중 — topic={topic} (0 msgs). "
+                "leader bringup 실행 + ROS_DOMAIN_ID 일치 확인."
+            )
+            return
+        import time as _time
+        age = _time.monotonic() - last_mono if last_mono > 0 else float("inf")
+        label.setText(
+            f"rclpy: live — topic={topic} ({n} msgs, last {age:.1f}s ago)"
+        )
+
+    # ------------------------------------------------- routine playback (preview)
+    def _build_playback_row(self, parent_box: QVBoxLayout) -> None:
+        """녹화된 routine (dance/greeting) 목록 + 재생 / 정지 컨트롤.
+
+        재생 시 background thread 가 routine 의 keyframe 을 시각 sample_hz 으로
+        interp → 매 frame 을 self._joint_state_received signal 로 emit → 평소
+        leader 메시지처럼 viewer + 한계 clipping 파이프라인을 거친다.
+        """
+        try:
+            from services.routine_playback import (
+                RoutinePlayback, list_routines,
+            )
+        except Exception as e:  # noqa: BLE001
+            err = QLabel(
+                f"녹화 재생 모듈 로드 실패: {e!r}"
+            )
+            err.setStyleSheet(
+                f"color: #c14545; font-size: 9pt; background: transparent;"
+            )
+            _make_selectable(err)
+            parent_box.addWidget(err)
+            return
+
+        self._routine_items: list[dict[str, str]] = list_routines()
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        title = QLabel("녹화 미리보기")
+        title.setStyleSheet(
+            f"color: {COLORS['text']}; font-size: 10pt; font-weight: 700; "
+            f"background: transparent;"
+        )
+        row.addWidget(title)
+
+        self._routine_combo = QComboBox()
+        if not self._routine_items:
+            self._routine_combo.addItem("(녹화 파일 없음)")
+            self._routine_combo.setEnabled(False)
+        else:
+            for it in self._routine_items:
+                self._routine_combo.addItem(
+                    f"[{it['kind']}] {it['display_name']}", it["path"],
+                )
+        row.addWidget(self._routine_combo, 2)
+
+        self._play_btn = QPushButton("▶ 미리보기")
+        self._stop_btn = QPushButton("■ 정지")
+        self._stop_btn.setEnabled(False)
+        self._play_btn.setStyleSheet(
+            "QPushButton { background: #16a34a; color: white;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #15803d; }"
+            "QPushButton:disabled { background: #cbd5e1; color: #6b7280; }"
+        )
+        self._stop_btn.setStyleSheet(
+            "QPushButton { background: #c14545; color: white;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #a83b3b; }"
+            "QPushButton:disabled { background: #cbd5e1; color: #6b7280; }"
+        )
+        self._play_btn.clicked.connect(self._on_play_routine)
+        self._stop_btn.clicked.connect(self._on_stop_routine)
+        row.addWidget(self._play_btn)
+        row.addWidget(self._stop_btn)
+
+        # 실물 재생 (안전) — control-service 를 거쳐 follower 로 trajectory 송신.
+        # dance_stream 이 매 frame 마다 현재 slider 한계로 clip → 실 motor 가
+        # 그 안에서만 움직임. Control Server 필요.
+        self._safe_play_btn = QPushButton("🔒 실물 재생 (안전)")
+        self._safe_play_btn.setStyleSheet(
+            "QPushButton { background: #2563eb; color: white;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #1d4ed8; }"
+            "QPushButton:disabled { background: #cbd5e1; color: #6b7280; }"
+        )
+        self._safe_play_btn.clicked.connect(self._on_safe_play)
+        row.addWidget(self._safe_play_btn)
+
+        # 🎬 녹화 기반 안전 자동 탐색 — 현재 선택된 routine 의 모든 keyframe pose 를
+        # viewer 에서 차례로 적용 → AABB 충돌 검사 → "충돌하지 않는 frame" 들에서만
+        # 각 joint 의 observed min/max 를 기록 → 그것이 slider 한계가 된다.
+        # 즉, 이 dance 가 자연스럽게 흐를 수 있는 가장 좁은 안전 윈도우. 충돌
+        # frame 은 자동으로 잘려 (clipping) 실 motor 는 그 좁은 윈도우 안에서만
+        # 재생됨. 녹화가 dropdown 에 선택돼 있어야 동작.
+        self._auto_safe_btn = QPushButton("🎬 녹화 기반 안전 자동 탐색")
+        self._auto_safe_btn.setStyleSheet(
+            "QPushButton { background: #f59e0b; color: white;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #d97706; }"
+            "QPushButton:disabled { background: #cbd5e1; color: #6b7280; }"
+        )
+        self._auto_safe_btn.clicked.connect(self._on_auto_find_safe_limits)
+        row.addWidget(self._auto_safe_btn)
+
+        # 안전본 저장 — 원본은 그대로 두고 slider 한계로 clip 한 새 routine 파일을
+        # `<slug>-safe/` 디렉토리에 작성. 차후 율동/인사 목록에서 별도 항목으로 보임.
+        self._safe_save_btn = QPushButton("💾 안전본 저장")
+        self._safe_save_btn.setStyleSheet(
+            "QPushButton { background: " + COLORS["panel"] + ";"
+            f"  color: {COLORS['text']};"
+            f"  border: 1.5px solid {COLORS['border']};"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { border-color: #2563eb; color: #2563eb; }"
+            "QPushButton:disabled { color: #6b7280; }"
+        )
+        self._safe_save_btn.clicked.connect(self._on_save_safe_version)
+        row.addWidget(self._safe_save_btn)
+
+        # ↔ 비교 — 분석 직전 한계와 분석 결과 사이를 toggle. 각 모드에서 ▶ 미리보기
+        # 를 눌러 시뮬레이션을 다시 보면 viewer 가 그 한계로 clip 하므로 자기충돌
+        # 발생 여부를 시각적으로 비교할 수 있다. 분석을 한 번도 안 했으면 비활성.
+        self._compare_btn = QPushButton("↔ 분석 전과 비교")
+        self._compare_btn.setEnabled(False)
+        self._compare_btn.setToolTip(
+            "녹화 기반 안전 분석 직전 한계로 되돌립니다. 다시 누르면 분석 결과 재적용."
+        )
+        self._compare_btn.setStyleSheet(
+            "QPushButton { background: #ede9fe; color: #5b21b6;"
+            "  border: 1.5px solid #8b5cf6;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #ddd6fe; }"
+            "QPushButton:disabled { background: #f1f5f9; color: #94a3b8;"
+            "  border-color: #cbd5e1; }"
+        )
+        self._compare_btn.clicked.connect(self._on_toggle_limits_snapshot)
+        row.addWidget(self._compare_btn)
+
+        # 🖼 좌측 QWebEngineView(웹 브라우저) 에서 분석 전/후 비교 페이지 로드.
+        self._compare_window_btn = QPushButton("🖼 웹뷰어에서 비교 재생")
+        self._compare_window_btn.setEnabled(False)
+        self._compare_window_btn.setToolTip(
+            "좌측 OpenArm 웹뷰어(QWebEngine)에 비교 페이지를 띄웁니다. "
+            "분석 전/후 한계를 좌우로 동시 재생하고, 한쪽을 돌리면 다른 쪽도 따라갑니다."
+        )
+        self._compare_window_btn.setStyleSheet(
+            "QPushButton { background: #5b21b6; color: white;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #4c1d95; }"
+            "QPushButton:disabled { background: #cbd5e1; color: #6b7280; }"
+        )
+        self._compare_window_btn.clicked.connect(self._on_open_compare_in_viewer)
+        row.addWidget(self._compare_window_btn)
+
+        self._exit_compare_btn = QPushButton("↩ 실시간 뷰어")
+        self._exit_compare_btn.setEnabled(False)
+        self._exit_compare_btn.setToolTip(
+            "비교 페이지를 닫고 실시간 leader OpenArm 뷰어로 돌아갑니다."
+        )
+        self._exit_compare_btn.setStyleSheet(
+            "QPushButton { background: #334155; color: white;"
+            "  padding: 6px 14px; border-radius: 6px; font-weight: 700; }"
+            "QPushButton:hover { background: #1e293b; }"
+            "QPushButton:disabled { background: #e2e8f0; color: #94a3b8; }"
+        )
+        self._exit_compare_btn.clicked.connect(self._on_exit_compare_viewer)
+        row.addWidget(self._exit_compare_btn)
+
+        # Internal snapshots used by _on_toggle_limits_snapshot. None until a
+        # scan completes.
+        self._limits_before_scan: dict[str, dict[str, float]] | None = None
+        self._limits_after_scan: dict[str, dict[str, float]] | None = None
+        self._showing_scan_result: bool = False
+
+        # Status label — own row underneath the buttons, full width + wordWrap
+        # so long messages (e.g. "녹화 기반 안전 자동 탐색 완료: 16 joints 분석
+        # … 마음에 들면 [저장] 눌러서 control-service 에 영구화하세요.") aren't
+        # truncated to a fixed column.
+        self._playback_status = QLabel("정지")
+        self._playback_status.setWordWrap(True)
+        self._playback_status.setStyleSheet(
+            f"color: {COLORS['text_muted']}; font-size: 9pt; "
+            f"background: transparent;"
+        )
+        _make_selectable(self._playback_status)
+
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(4)
+        outer.addLayout(row)
+        outer.addWidget(self._playback_status)
+
+        wrapper = QWidget()
+        wrapper.setLayout(outer)
+        wrapper.setStyleSheet(
+            f"background: {COLORS['bg']}; border-radius: 8px; padding: 6px 8px;"
+        )
+        parent_box.addWidget(wrapper)
+
+        # Build the playback instance once — its on_frame callback feeds back
+        # into the same signal the rclpy subscriber uses, so the rest of the
+        # viewer/limit pipeline is unchanged. End-of-routine detection happens
+        # via _refresh_playback_progress (200ms poll) — no on_finished needed.
+        # 30Hz playback emit — paired with the 30Hz JS pump throttle so each
+        # emitted frame reaches the viewer (no wasted Qt signal queue traffic).
+        # Was 50Hz which queued and got down-sampled, contributing to playback
+        # lag in the WebEngine.
+        self._playback = RoutinePlayback(
+            on_frame=lambda snap: self._joint_state_received.emit(snap),
+            rate_hz=30.0,
+        )
+        # Progress poll timer.
+        self._playback_progress_timer = QTimer(self)
+        self._playback_progress_timer.setInterval(200)
+        self._playback_progress_timer.timeout.connect(self._refresh_playback_progress)
+        self._playback_progress_timer.start()
+
+    def _on_play_routine(self) -> None:
+        if self._playback is None:
+            return
+        path = self._routine_combo.currentData()
+        if not isinstance(path, str):
+            return
+        ok = self._playback.start(path)
+        if not ok:
+            self._playback_status.setText(
+                self._playback.last_error or "재생 실패",
+            )
+            return
+        # Silence live leader frames while playback runs — otherwise the viewer
+        # flickers between leader pose and the playback pose at ~100Hz combined.
+        self._playback_active = True
+        self._play_btn.setEnabled(False)
+        self._stop_btn.setEnabled(True)
+        self._playback_status.setText("재생 중… (leader 정지)")
+
+    def _on_stop_routine(self) -> None:
+        if self._playback is None:
+            return
+        self._playback.stop()
+        self._playback_active = False
+        self._play_btn.setEnabled(True)
+        self._stop_btn.setEnabled(False)
+        self._playback_status.setText("정지 (leader 다시 활성)")
+
+    def _on_auto_find_safe_limits(self) -> None:
+        """녹화 dropdown 에서 고른 routine 의 keyframe pose 들을 viewer 에 차례로
+        적용 → AABB 충돌 검사 → 충돌 안 한 frame 들의 per-joint observed min/max
+        를 그대로 slider 한계로 채운다.
+
+        - 다중 joint 가 "실제로 동시에" 움직이는 그 dance 의 상황을 그대로 분석함.
+          (단일 joint sweep 보다 정확.)
+        - 충돌 frame 은 무시 → 그 frame 들의 angle 은 한계 밖이 됨 → 실 motor 재생
+          시 자동으로 clip 되어 자기충돌 회피.
+        - leader feed 는 scan 동안 silence (viewer 가 leader pose 로 덮어쓰지
+          않도록).
+        """
+        item = self._selected_routine()
+        if item is None:
+            self._playback_status.setText(
+                "녹화 dropdown 에서 분석할 routine 을 먼저 선택하세요."
+            )
+            return
+        view = getattr(self, "viewer", None)
+        if view is None:
+            self._playback_status.setText("viewer 미준비 — 자동 탐색 불가")
+            return
+        page = view.page()
+        if page is None:
+            self._playback_status.setText("viewer page 미준비")
+            return
+
+        try:
+            from services.routine_playback import load_recording_for_scan
+        except Exception as e:  # noqa: BLE001
+            self._playback_status.setText(f"녹화 로더 import 실패: {e!r}")
+            return
+
+        recording = load_recording_for_scan(item["path"])
+        if recording is None:
+            self._playback_status.setText(
+                f"녹화 파일을 읽지 못했습니다 — {item.get('display_name', '?')}"
+            )
+            return
+        n_frames = len(recording.get("frames", []))
+        if n_frames == 0:
+            self._playback_status.setText("녹화에 keyframe 이 없습니다.")
+            return
+
+        self._auto_safe_btn.setEnabled(False)
+        self._playback_active = True
+        self._playback_status.setText(
+            f"녹화 기반 안전 분석 중… ({item['display_name']}, {n_frames} frames)"
+        )
+        # 분석 결과 status 에 routine 이름 출력하기 위해 임시 보관.
+        self._last_scan_label = item.get("display_name", "?")
+        self._last_scan_n_frames = n_frames
+        # 비교 toggle 용 스냅샷 — 분석 직전 슬라이더 상태를 그대로 기억.
+        self._limits_before_scan = self.collect_limits()
+
+        import json
+        payload = json.dumps(recording)
+        page.runJavaScript(
+            "window.scanRecordingForSafeOpenarmLimits "
+            f"? window.scanRecordingForSafeOpenarmLimits({payload}) : null",
+            self._on_auto_safe_limits_result,
+        )
+
+    def _on_auto_safe_limits_result(self, result: Any) -> None:
+        """JS callback — `result` is `{joint_name: {min, max}}` or null."""
+        self._auto_safe_btn.setEnabled(True)
+        self._playback_active = False  # resume leader feed
+        label = getattr(self, "_last_scan_label", "?")
+        n_frames = getattr(self, "_last_scan_n_frames", 0)
+        if not isinstance(result, dict) or not result:
+            self._playback_status.setText(
+                "녹화 기반 안전 분석 실패 — viewer 가 URDF 로딩 중이거나 "
+                "모든 frame 이 충돌입니다."
+            )
+            return
+        # Apply to sliders + push to viewer's live clip cache.
+        self.apply_limits(result)
+        self._push_limits_to_viewer()
+        # 비교 toggle 활성화 — 이 시점부터 분석 전/후를 왔다갔다 비교 가능.
+        self._limits_after_scan = {
+            str(k): {"min": float(v.get("min", 0.0)),
+                     "max": float(v.get("max", 0.0))}
+            for k, v in result.items()
+            if isinstance(v, dict)
+        }
+        self._showing_scan_result = True
+        self._compare_btn.setEnabled(True)
+        self._compare_btn.setText("↔ 분석 전과 비교")
+        # 별창 비교도 이제 데이터가 있으니 활성화.
+        self._compare_window_btn.setEnabled(True)
+
+        diff_text = self._summarize_limits_diff(
+            self._limits_before_scan or {}, self._limits_after_scan,
+        )
+        n = len(result)
+        self._playback_status.setText(
+            f"녹화 기반 안전 분석 완료 — '{label}' ({n_frames} frames, "
+            f"{n} joints).  {diff_text}  ▶ 미리보기 로 비교 재생, [↔ 분석 "
+            "전과 비교] 로 한계 toggle, [저장] 으로 control-service 영구화."
+        )
+
+    @staticmethod
+    def _short_joint(name: str) -> str:
+        """`openarm_left_joint2` → `L2`, `openarm_right_gripper_joint1` → `R-G1`."""
+        import re
+        side = "L" if "_left_" in name else "R" if "_right_" in name else "?"
+        if "gripper" in name:
+            m = re.search(r"gripper.*?(\d+)", name)
+            return f"{side}-G{m.group(1) if m else ''}"
+        m = re.search(r"joint[_]?(\d+)", name)
+        return f"{side}{m.group(1)}" if m else name
+
+    def _summarize_limits_diff(
+        self,
+        before: dict[str, dict[str, float]],
+        after: dict[str, dict[str, float]],
+    ) -> str:
+        """분석 전/후 한계의 변화를 사람이 읽을 status 한 줄로 요약."""
+        narrowed: list[tuple[str, float, float, float, float, float]] = []
+        for name, a in after.items():
+            b = before.get(name)
+            if not b:
+                continue
+            try:
+                b_lo, b_hi = float(b["min"]), float(b["max"])
+                a_lo, a_hi = float(a["min"]), float(a["max"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            b_w = b_hi - b_lo
+            a_w = a_hi - a_lo
+            # ≥ 0.05 rad 좁아진 경우만 "narrowed" 로 카운트 (수치 노이즈 무시).
+            if b_w - a_w > 0.05:
+                narrowed.append((name, b_lo, b_hi, a_lo, a_hi, b_w - a_w))
+        if not narrowed:
+            return "변화 없음 (이미 안전 범위)."
+        narrowed.sort(key=lambda x: x[5], reverse=True)
+        top = narrowed[:3]
+        parts = [
+            f"{self._short_joint(n)} {b_lo:+.2f}↔{b_hi:+.2f} → "
+            f"{a_lo:+.2f}↔{a_hi:+.2f}"
+            for (n, b_lo, b_hi, a_lo, a_hi, _) in top
+        ]
+        rest = f" 외 {len(narrowed) - len(top)}개" if len(narrowed) > 3 else ""
+        return f"{len(narrowed)}/{len(after)} joint 좁아짐 ─ " + ", ".join(parts) + rest
+
+    def _compare_page_base_url(self) -> str:
+        viewer_url = os.environ.get(
+            "ADMIN_OPENARM_VIEWER_URL", self.DEFAULT_VIEWER_URL,
+        )
+        root = viewer_url.split("?", 1)[0].rstrip("/")
+        return f"{root}/?embed=openarm-compare"
+
+    def _focus_viewer_panel(self) -> None:
+        """EduPing tab + 좌측 QWebEngineView 가 보이도록."""
+        win = self.window()
+        if win is not None and hasattr(win, "tabs"):
+            win.tabs.setCurrentWidget(self)
+        view = getattr(self, "viewer", None)
+        if view is not None:
+            view.show()
+            view.raise_()
+
+    def _navigate_viewer(self, url: str) -> None:
+        """Load URL in the embedded web view (simulation panel)."""
+        view = getattr(self, "viewer", None)
+        if view is None:
+            return
+        qurl = QUrl(url)
+        view.load(qurl)
+        label = getattr(self, "_viewer_url_label", None)
+        if label is not None:
+            label.setText(url)
+
+    def _compare_page_url(self, data_port: int) -> str:
+        """Vite compare embed + localhost JSON server (PyQt QWebEngineView)."""
+        base = self._compare_page_base_url()
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}data-port={data_port}"
+
+    def _stop_compare_data_server(self) -> None:
+        prev = getattr(self, "_compare_data_server", None)
+        if prev is not None:
+            try:
+                prev.stop()
+            except Exception:  # noqa: BLE001
+                pass
+            self._compare_data_server = None
+
+    def _on_viewer_load_finished(self, ok: bool) -> None:
+        if not ok:
+            if getattr(self, "_viewer_compare_mode", False):
+                self._playback_status.setText(
+                    "비교 페이지 로드 실패 — robot-web 실행 확인 "
+                    "(예: cd service/web-service/robot-web && npm run dev)"
+                )
+            return
+        if getattr(self, "_viewer_compare_mode", False):
+            pending = getattr(self, "_pending_compare_payload_json", None)
+            if pending:
+                view = getattr(self, "viewer", None)
+                page = view.page() if view is not None else None
+                if page is not None:
+                    page.runJavaScript(
+                        f"window.__ADMIN_COMPARE_DATA__ = {pending};"
+                        "window.dispatchEvent(new Event('admin-compare-data'));"
+                    )
+                self._pending_compare_payload_json = None
+            return
+        pending = getattr(self, "_pending_compare_payload_json", None)
+        if pending:
+            view = getattr(self, "viewer", None)
+            page = view.page() if view is not None else None
+            if page is not None:
+                page.runJavaScript(
+                    f"window.__ADMIN_COMPARE_DATA__ = {pending};"
+                    "window.dispatchEvent(new Event('admin-compare-data'));"
+                )
+            self._pending_compare_payload_json = None
+            return
+        self._push_limits_to_viewer()
+
+    def _on_open_compare_in_viewer(self) -> None:
+        """비교 페이지를 EduPing 탭 좌측 QWebEngineView(웹 브라우저)에 로드."""
+        if (self._limits_before_scan is None
+                or self._limits_after_scan is None):
+            self._playback_status.setText(
+                "먼저 [녹화 기반 안전 자동 탐색] 으로 비교할 한계를 만드세요."
+            )
+            return
+        item = self._selected_routine()
+        if item is None:
+            self._playback_status.setText(
+                "녹화 dropdown 에서 routine 을 선택하세요."
+            )
+            return
+
+        self._focus_viewer_panel()
+
+        view = getattr(self, "viewer", None)
+        if view is None or not _HAS_WEBENGINE:
+            QMessageBox.warning(
+                self,
+                "PyQtWebEngine 필요",
+                "좌측 웹뷰어는 PyQt QWebEngineView 가 필요합니다.\n\n"
+                "  pip install PyQtWebEngine\n"
+                "또는 프로젝트 루트에서:\n"
+                "  pip install -e .\n\n"
+                "설치 후 admin 앱을 다시 실행하세요.",
+            )
+            self._playback_status.setText(
+                "PyQtWebEngine 미설치 — pip install PyQtWebEngine 후 재시도."
+            )
+            return
+
+        prev = getattr(self, "_compare_prepare_thread", None)
+        if prev is not None and prev.isRunning():
+            self._playback_status.setText(
+                "이전 비교 준비가 진행 중입니다…"
+            )
+            return
+
+        try:
+            from services.compare_prepare import ComparePrepareThread
+        except Exception as e:  # noqa: BLE001
+            self._playback_status.setText(f"compare worker import 실패: {e!r}")
+            return
+
+        self._compare_window_btn.setEnabled(False)
+        self._viewer_compare_mode = True
+        self._exit_compare_btn.setEnabled(True)
+        # Show compare embed immediately so the left panel visibly switches.
+        self._navigate_viewer(self._compare_page_base_url())
+        self._playback_status.setText(
+            "비교 데이터 준비 중… 좌측 패널에 비교 화면을 띄웠습니다."
+        )
+        thread = ComparePrepareThread(
+            item["path"],
+            item.get("display_name", "?"),
+            self._limits_before_scan,
+            self._limits_after_scan,
+            frame_hz=20.0,
+            parent=self,
+        )
+        thread.finished_ok.connect(self._on_compare_prepare_ready)
+        thread.finished_err.connect(self._on_compare_prepare_failed)
+        thread.finished.connect(lambda: self._compare_window_btn.setEnabled(True))
+        self._compare_prepare_thread = thread
+        thread.start()
+
+    def _on_compare_prepare_ready(self, _payload: dict, payload_json: str) -> None:
+        view = getattr(self, "viewer", None)
+        if view is None:
+            self._playback_status.setText("웹뷰어 없음")
+            return
+        self._stop_compare_data_server()
+        try:
+            self._compare_data_server = _CompareDataServer(
+                payload_json.encode("utf-8"),
+            )
+        except Exception as e:  # noqa: BLE001
+            self._playback_status.setText(f"비교 데이터 서버 시작 실패: {e!r}")
+            return
+        data_port = self._compare_data_server.port
+        full_url = self._compare_page_url(data_port)
+        self._viewer_compare_mode = True
+        # Qt WebEngine often blocks https→http data-port fetch; inject after load too.
+        self._pending_compare_payload_json = payload_json
+        self._exit_compare_btn.setEnabled(True)
+        self._focus_viewer_panel()
+        self._navigate_viewer(full_url)
+        print(f"[ADMIN] compare QWebEngine URL: {full_url}", flush=True)
+        self._playback_status.setText(
+            f"좌측 시뮬레이션 패널에 비교 페이지 로드 중… {full_url}"
+        )
+
+    def _on_compare_prepare_failed(self, message: str) -> None:
+        self._playback_status.setText(f"비교 준비 실패: {message}")
+
+    def _on_exit_compare_viewer(self) -> None:
+        """비교 페이지 종료 → 실시간 embed OpenArm 뷰어 URL 복귀."""
+        if not getattr(self, "_viewer_compare_mode", False):
+            return
+        thread = getattr(self, "_compare_prepare_thread", None)
+        if thread is not None and thread.isRunning():
+            thread.wait(2000)
+        self._viewer_compare_mode = False
+        self._pending_compare_payload_json = None
+        self._stop_compare_data_server()
+        self._exit_compare_btn.setEnabled(False)
+        view = getattr(self, "viewer", None)
+        embed_url = getattr(self, "_viewer_embed_url", self.DEFAULT_VIEWER_URL)
+        if view is not None:
+            self._navigate_viewer(embed_url)
+        self._playback_status.setText("실시간 OpenArm 뷰어로 복귀했습니다.")
+
+    def _open_url_in_default_browser(self, url: str) -> str | None:
+        """여러 launcher 를 차례로 시도. 성공하면 사용한 launcher 이름 반환.
+
+        Linux 의 QDesktopServices.openUrl 은 xdg-open 에 의존하는데, 일부
+        환경 (xdg-mime 설정 망가짐, argv 길이 초과 등) 에서 실패한다. Python
+        표준 `webbrowser` 모듈은 다른 lookup 경로를 쓰므로 fallback 으로
+        효과 있다.
+        """
+        # 1) Qt
+        try:
+            if QDesktopServices.openUrl(QUrl(url)):
+                return "QDesktopServices"
+        except Exception:  # noqa: BLE001
+            pass
+        # 2) Python webbrowser
+        try:
+            import webbrowser
+            if webbrowser.open(url, new=2):
+                return "webbrowser"
+        except Exception:  # noqa: BLE001
+            pass
+        # 3) Linux xdg-open / macOS open / Windows start
+        try:
+            import shutil
+            import subprocess
+            for cmd in ("xdg-open", "open"):
+                exe = shutil.which(cmd)
+                if exe:
+                    subprocess.Popen(
+                        [exe, url],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return cmd
+        except Exception:  # noqa: BLE001
+            pass
+        return None
+
+    def _on_toggle_limits_snapshot(self) -> None:
+        """[↔ 분석 전과 비교] — 분석 전/후 한계 사이를 toggle.
+
+        각 상태에서 ▶ 미리보기 를 누르면 viewer 가 그 한계로 clip 하므로 같은
+        녹화가 자기충돌하는지/안 하는지 시각 비교 가능. 슬라이더 UI 도 즉시 그
+        한계를 반영하고 viewer 의 live clip 캐시에도 push 한다.
+        """
+        if self._limits_before_scan is None or self._limits_after_scan is None:
+            return
+        if self._showing_scan_result:
+            # Switch to "before" (original limits at scan time)
+            self.apply_limits(self._limits_before_scan)
+            self._push_limits_to_viewer()
+            self._showing_scan_result = False
+            self._compare_btn.setText("🔁 분석 결과 다시 적용")
+            self._playback_status.setText(
+                "분석 전 한계로 복원. ▶ 미리보기 를 눌러 비교 (이 한계에선 자기"
+                "충돌이 보일 수 있음). 다시 누르면 안전 한계 복귀."
+            )
+        else:
+            # Switch back to "after" (scan result)
+            self.apply_limits(self._limits_after_scan)
+            self._push_limits_to_viewer()
+            self._showing_scan_result = True
+            self._compare_btn.setText("↔ 분석 전과 비교")
+            self._playback_status.setText(
+                "안전 분석 결과 한계 재적용. ▶ 미리보기 로 다시 비교."
+            )
+
+    def _selected_routine(self) -> dict[str, str] | None:
+        """현재 dropdown 에서 고른 routine item, 없으면 None."""
+        if not getattr(self, "_routine_items", None):
+            return None
+        idx = self._routine_combo.currentIndex()
+        if idx < 0 or idx >= len(self._routine_items):
+            return None
+        return self._routine_items[idx]
+
+    def _on_safe_play(self) -> None:
+        """현재 slider 한계를 control-service 로 push → 실물 재생 트리거.
+
+        Backend (dance_stream) 가 매 frame 마다 동일 한계로 clip 하므로 실 motor 가
+        slider 가 정한 안전 윈도우 밖으로 못 나간다. main.py 의 _on_safe_play_emitted
+        slot 이 HTTP POST 처리.
+        """
+        item = self._selected_routine()
+        if item is None:
+            self._playback_status.setText("재생할 항목 선택 필요")
+            return
+        if item["kind"] == "mugunghwa":
+            self._playback_status.setText(
+                "무궁화 동작은 게임에서만 재생됩니다 (admin 실물 재생 미지원)",
+            )
+            return
+        limits = self.collect_limits()
+        payload = {
+            "kind": item["kind"],
+            "slug": item["slug"],
+            "limits": limits,
+        }
+        self._playback_status.setText("실물 재생 요청 중…")
+        self.safe_play_requested.emit(payload)
+
+    def _on_save_safe_version(self) -> None:
+        """원본은 보존하고 clip 본을 `<slug>-safe/` 디렉토리에 저장."""
+        item = self._selected_routine()
+        if item is None:
+            self._playback_status.setText("저장할 항목 선택 필요")
+            return
+        try:
+            from services.routine_playback import save_clipped_copy
+        except Exception as e:  # noqa: BLE001
+            self._playback_status.setText(f"저장 모듈 import 실패: {e!r}")
+            return
+        ok, msg = save_clipped_copy(
+            source_path=item["path"],
+            source_kind=item["kind"],
+            source_slug=item["slug"],
+            limits=self.collect_limits(),
+        )
+        # Refresh routine list so the new -safe entry appears in the combo box.
+        if ok:
+            self._reload_routine_list()
+        self._playback_status.setText(msg)
+
+    def _reload_routine_list(self) -> None:
+        try:
+            from services.routine_playback import list_routines
+        except Exception:  # noqa: BLE001
+            return
+        prev = self._routine_combo.currentData()
+        self._routine_items = list_routines()
+        self._routine_combo.clear()
+        if not self._routine_items:
+            self._routine_combo.addItem("(녹화 파일 없음)")
+            self._routine_combo.setEnabled(False)
+            return
+        self._routine_combo.setEnabled(True)
+        new_idx = 0
+        for i, it in enumerate(self._routine_items):
+            self._routine_combo.addItem(
+                f"[{it['kind']}] {it['display_name']}", it["path"],
+            )
+            if it["path"] == prev:
+                new_idx = i
+        self._routine_combo.setCurrentIndex(new_idx)
+
+    def _refresh_playback_progress(self) -> None:
+        """200ms tick — updates progress text + flips button state when the
+        playback thread finishes on its own."""
+        if self._playback is None:
+            return
+        if self._playback.is_playing:
+            self._playback_status.setText(
+                f"재생 {self._playback.progress_s:.1f} / "
+                f"{self._playback.duration_s:.1f}s"
+            )
+        else:
+            # Thread exited (either user-stopped or reached end). Reset buttons
+            # AND lift the rclpy gate so the viewer goes back to live leader.
+            if not self._play_btn.isEnabled():
+                self._play_btn.setEnabled(True)
+                self._stop_btn.setEnabled(False)
+                self._playback_active = False
+                self._playback_status.setText("정지 (leader 다시 활성)")
+
+    # ------------------------------------------------- standalone joint-state pump
+    def start_joint_subscriber(self) -> None:
+        """Start the rclpy `/joint_states` subscriber + JS pump into the embedded
+        viewer. Idempotent — second call is a no-op.
+
+        Call when the EduPing tab is first activated (main.py wires this).
+        """
+        if self._joint_subscriber_started:
+            return
+        self._joint_subscriber_started = True
+        try:
+            from services.eduping_joint_subscriber import EdupingJointStateSubscriber
+        except Exception as e:  # noqa: BLE001
+            # services import failed — keep going; the viewer just won't update.
+            return
+        sub = EdupingJointStateSubscriber()
+        ok = sub.start()
+        if not ok:
+            return
+        self._joint_subscriber = sub
+        # Qt cross-thread signal: rclpy spin → GUI thread.
+        self._joint_state_received.connect(self._on_joint_state_main_thread)
+        # Gate: when playback is active, drop live leader frames so the viewer
+        # animates the recording exclusively (no flicker between two streams).
+        sub.add_listener(
+            lambda snap: (
+                None if self._playback_active
+                else self._joint_state_received.emit(snap)
+            ),
+        )
+
+    def stop_joint_subscriber(self) -> None:
+        if self._joint_subscriber is not None:
+            try:
+                self._joint_subscriber.stop()
+            except Exception:  # noqa: BLE001
+                pass
+            self._joint_subscriber = None
+        self._joint_subscriber_started = False
+
+    def _push_limits_to_viewer(self) -> None:
+        """Send the current slider state to the embedded page as joint limits.
+
+        Embed page clips incoming leader positions to these ranges before
+        rendering — gives the user immediate visual feedback when narrowing the
+        safe range (no need to click 저장 to see the effect on the displayed arm).
+        """
+        view = getattr(self, "viewer", None)
+        if view is None:
+            return
+        page = view.page()
+        if page is None:
+            return
+        limits = self.collect_limits()
+        try:
+            payload = json.dumps(limits)
+        except (TypeError, ValueError):
+            return
+        page.runJavaScript(
+            f"if (window.setEdupingJointLimits) {{ window.setEdupingJointLimits({payload}); }}",
+        )
+
+    def _tick_label_update(self) -> None:
+        """10 Hz consumer — reads the latest stashed snap and updates labels.
+
+        Decoupled from the rclpy callback so 50 Hz publishing doesn't queue 50
+        paint events per second across 16 QLabel widgets.
+        """
+        snap = self._latest_snap
+        if snap is None:
+            return
+        self._update_current_joint_labels(snap)
+
+    def _update_current_joint_labels(self, snap: dict) -> None:
+        """Live update for the "현재" radian label in each joint row. Cheap
+        QLabel.setText so we do this every frame, no throttle — keeps the
+        readouts crisp even if the 3D pump skips frames.
+        """
+        names = snap.get("joint_names") or []
+        positions = snap.get("positions") or []
+        if not isinstance(names, list) or not isinstance(positions, list):
+            return
+        if len(names) != len(positions):
+            return
+        labels = self._joint_current_labels
+        if not labels:
+            return
+        for joint_name, pos in zip(names, positions):
+            label = labels.get(str(joint_name))
+            if label is None:
+                continue
+            try:
+                v = float(pos)
+            except (TypeError, ValueError):
+                continue
+            # arm joints use "rad", finger uses "m" — show 3 decimals either way;
+            # the absolute scale differs by ~2 orders of magnitude but the column
+            # width is set so both fit.
+            label.setText(f"{v:+.3f}")
+
+    def _on_joint_state_main_thread(self, snap: dict) -> None:
+        """Push the snapshot into the embedded page via window.setEdupingJointState.
+
+        OpenarmViewer's `externalSnapshot` prop already accepts this shape — when
+        set, it ignores the control-service WS and renders the provided pose.
+
+        Throttled to 15 Hz. If newer snapshots arrive during the throttle window
+        the most recent one wins (older ones are dropped — replay is realtime).
+        Per-joint "현재" QLabel readouts are also throttled (10 Hz via a separate
+        QTimer) so 50Hz rclpy doesn't spam paint events on 16 labels.
+        """
+        # Stash the latest snap; the 10Hz QTimer picks it up to update labels.
+        self._latest_snap = snap
+        if getattr(self, "_viewer_compare_mode", False):
+            return
+        view = getattr(self, "viewer", None)
+        if view is None:
+            return
+        import time as _time
+        now = _time.monotonic()
+        if now - self._js_pump_last_mono < self._js_pump_min_interval_s:
+            # Keep only the latest — older pending snap can be discarded.
+            self._js_pump_pending = snap
+            if not getattr(self, "_js_pump_flush_armed", False):
+                self._js_pump_flush_armed = True
+                # Schedule a flush exactly at the next allowed slot.
+                ms = max(
+                    1,
+                    int((self._js_pump_min_interval_s
+                         - (now - self._js_pump_last_mono)) * 1000),
+                )
+                QTimer.singleShot(ms, self._flush_pending_joint_state)
+            return
+        self._js_pump_last_mono = now
+        self._js_pump_pending = None
+        self._inject_joint_state(snap)
+
+    def _flush_pending_joint_state(self) -> None:
+        self._js_pump_flush_armed = False
+        snap = self._js_pump_pending
+        self._js_pump_pending = None
+        if snap is None:
+            return
+        import time as _time
+        self._js_pump_last_mono = _time.monotonic()
+        self._inject_joint_state(snap)
+
+    def _inject_joint_state(self, snap: dict) -> None:
+        if getattr(self, "_viewer_compare_mode", False):
+            return
+        view = getattr(self, "viewer", None)
+        if view is None:
+            return
+        page = view.page()
+        if page is None:
+            return
+        try:
+            payload = json.dumps(snap)
+        except (TypeError, ValueError):
+            return
+        page.runJavaScript(
+            f"if (window.setEdupingJointState) {{ window.setEdupingJointState({payload}); }}",
+        )
+
+    # ------------------------------------------------- 3D viewer JS bridge
+    def _highlight_joint_in_viewer(self, joint_name: str) -> None:
+        """Inject `window.highlightJoint('name')` into the embedded viewer page.
+
+        No-op if the QWebEngineView isn't there (PyQtWebEngine missing) or if the
+        embed page hasn't loaded yet. JavaScript escaping: joint names are static
+        constants from _OPENARM_SPECS, no user input, so a basic JSON encode is
+        enough.
+        """
+        view = getattr(self, "viewer", None)
+        if view is None:
+            return
+        page = view.page()
+        if page is None:
+            return
+        safe = json.dumps(joint_name)
+        page.runJavaScript(
+            f"if (window.highlightJoint) {{ window.highlightJoint({safe}); }}",
+        )
+
+    def _clear_joint_highlight_in_viewer(self) -> None:
+        view = getattr(self, "viewer", None)
+        if view is None:
+            return
+        page = view.page()
+        if page is None:
+            return
+        page.runJavaScript(
+            "if (window.clearJointHighlight) { window.clearJointHighlight(); }",
+        )
+
+    # ------------------------------------------------- 핸들러
+    def _on_reset_clicked(self) -> None:
+        defaults = _openarm_default_limits()
+        for name, (min_box, max_box) in self._joint_widgets.items():
+            d = defaults[name]
+            # 순서 주의 — 먼저 Min 을 음수 끝으로 내려야 Max upper 가 정상 동작.
+            min_box.setValue(d["min"])
+            max_box.setValue(d["max"])
+        self.save_status.setText("URDF 기본값으로 복원 — '저장' 눌러 적용")
+        self.limits_reset_requested.emit()
+
+    def _on_save_clicked(self) -> None:
+        payload = self.collect_limits()
+        self.save_status.setText("저장 중…")
+        self.limits_save_requested.emit(payload)
+
+    def collect_limits(self) -> dict[str, dict[str, float]]:
+        return {
+            name: {
+                "min": float(min_box.value()),
+                "max": float(max_box.value()),
+            }
+            for name, (min_box, max_box) in self._joint_widgets.items()
+        }
+
+    def apply_limits(self, limits: dict[str, dict[str, float]]) -> None:
+        """외부(서버 GET 결과)에서 가져온 한계로 슬라이더를 채운다."""
+        for name, (min_box, max_box) in self._joint_widgets.items():
+            row = limits.get(name)
+            if not row:
+                continue
+            try:
+                lo = float(row.get("min", -_math.pi))
+                hi = float(row.get("max", _math.pi))
+            except (TypeError, ValueError):
+                continue
+            min_box.setValue(lo)
+            max_box.setValue(hi)
+
+    def set_save_status(self, ok: bool, msg: str) -> None:
+        """`limits_save_requested` 처리 후 결과 메시지 갱신."""
+        color = COLORS.get("success") if ok else "#c14545"
+        self.save_status.setStyleSheet(
+            f"color: {color}; font-size: 9pt; background: transparent;"
+        )
+        self.save_status.setText(msg)

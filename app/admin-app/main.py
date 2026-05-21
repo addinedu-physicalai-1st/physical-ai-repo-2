@@ -1,8 +1,8 @@
 """Pingdergarten Admin UI 진입점.
 
-GogoPing 전용 단일 페이지 대시보드. 이전엔 좌측 사이드바로 GogoPing/NoriArm/Eduping
-3개 페이지를 전환했으나, UI 개편으로 사이드바를 제거하고 GogoPing 한 페이지만 노출.
-시계는 TopBar 우측 (BT state 왼쪽) 으로 이동.
+TopBar (전역 헤더) + 상단 가로 탭바 (QTabWidget) — GogoPing / EduPing 두 탭.
+이전엔 단일 GogoPing 페이지였으나 EduPing OpenArm 관절 범위 튜닝 UI 가 필요해
+다시 탭 구조로 복귀. 시계는 TopBar 우측 (BT state 왼쪽).
 """
 
 from __future__ import annotations
@@ -26,12 +26,13 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from config.client_id import get_or_create_client_id
-from dashboards import GogoPingDashboard
+from dashboards import EduPingControlDashboard, GogoPingDashboard
 from services.nav_debug_client import NavDebugClient
 from services.state_client import StateClient
 from services.stream_client import StreamClient
@@ -82,8 +83,8 @@ class TopBar(QWidget):
         lay.setContentsMargins(28, 12, 28, 10)
         lay.setSpacing(16)
 
-        # 좌측 아이콘 (GogoPing 고정)
-        meta = ROBOTS["gogoping"]
+        # 좌측 아이콘 — 활성 탭에 따라 갱신 (set_active_robot 호출).
+        self._icon_meta = ROBOTS["gogoping"]
         self.icon_box = QFrame()
         self.icon_box.setFixedSize(40, 40)
         self.icon_box.setStyleSheet(
@@ -92,12 +93,12 @@ class TopBar(QWidget):
         )
         ib = QVBoxLayout(self.icon_box)
         ib.setContentsMargins(0, 0, 0, 0)
-        self.icon = Icon(meta["icon"], size=22, color=meta["color"])
+        self.icon = Icon(self._icon_meta["icon"], size=22, color=self._icon_meta["color"])
         ib.addWidget(self.icon, 0, Qt.AlignCenter)
         lay.addWidget(self.icon_box)
 
-        # 타이틀 (서브타이틀 제거)
-        self.title = QLabel(f"{meta['name']} 대시보드")
+        # 타이틀 — 활성 탭에 따라 갱신.
+        self.title = QLabel(f"{self._icon_meta['name']} 대시보드")
         f = QFont()
         f.setPointSize(18)
         f.setBold(True)
@@ -282,6 +283,32 @@ class TopBar(QWidget):
         self.battery_chip.set_value(f"{pct}%")
         self.battery_chip.set_pct(pct)
 
+    def set_active_robot(self, robot_key: str) -> None:
+        """탭 변경 시 호출 — 아이콘/타이틀/로봇별 전용 위젯(BT, 배터리) 표시 토글.
+
+        GogoPing 전용 위젯 (BTStateInline, 배터리 chip) 은 EduPing 탭에선 숨김 —
+        해당 로봇 데이터가 아직 없어 stale 정보를 보여주는 것보다 깔끔.
+        """
+        if robot_key not in ROBOTS:
+            return
+        meta = ROBOTS[robot_key]
+        self._icon_meta = meta
+        # 아이콘 위젯 교체 — Icon 은 setter 가 없어 새 위젯 생성 후 swap.
+        ib_layout = self.icon_box.layout()
+        if ib_layout is not None:
+            while ib_layout.count() > 0:
+                item = ib_layout.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+            self.icon = Icon(meta["icon"], size=22, color=meta["color"])
+            ib_layout.addWidget(self.icon, 0, Qt.AlignCenter)
+        self.title.setText(f"{meta['name']} 대시보드")
+        # GogoPing 전용 위젯은 gogoping 탭에서만 표시.
+        is_gogoping = robot_key == "gogoping"
+        self.bt_state.setVisible(is_gogoping)
+        self.battery_chip.setVisible(is_gogoping)
+
 
 class AdminWindow(QMainWindow):
     def __init__(self):
@@ -314,9 +341,73 @@ class AdminWindow(QMainWindow):
         self.topbar = TopBar()
         root_lay.addWidget(self.topbar)
 
-        self.dashboard = GogoPingDashboard(stream_client=self.stream_client)
-        self.dashboard.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        root_lay.addWidget(self.dashboard, 1)
+        # 가로 탭바 — GogoPing / EduPing. QTabWidget 자체가 탭바를 상단에 그리므로
+        # 별도 nav row 없이 그대로 활용. 기본 탭은 너무 작아서 (~10pt 폰트, 좁은 padding)
+        # 잘 안 보이는 문제 — stylesheet 로 폰트·padding·min-width 모두 키운다.
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("adminTabs")
+        self.tabs.setDocumentMode(True)
+        self.tabs.setTabPosition(QTabWidget.North)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.setStyleSheet(
+            "QTabWidget#adminTabs::pane {"
+            f"  border: 1px solid {COLORS['border']};"
+            "  border-top: none;"
+            "  background: " + COLORS["panel"] + ";"
+            "}"
+            "QTabWidget#adminTabs > QTabBar {"
+            "  qproperty-drawBase: 0;"
+            "}"
+            "QTabWidget#adminTabs QTabBar::tab {"
+            "  font-size: 14pt;"
+            "  font-weight: 700;"
+            "  padding: 14px 36px;"
+            "  min-width: 200px;"
+            f"  color: {COLORS['text_muted']};"
+            f"  background: {COLORS['bg']};"
+            f"  border: 1px solid {COLORS['border']};"
+            "  border-top-left-radius: 12px;"
+            "  border-top-right-radius: 12px;"
+            "  margin-right: 4px;"
+            "}"
+            "QTabWidget#adminTabs QTabBar::tab:selected {"
+            f"  color: {COLORS['text']};"
+            f"  background: {COLORS['panel']};"
+            "  border-bottom-color: " + COLORS["panel"] + ";"
+            "}"
+            "QTabWidget#adminTabs QTabBar::tab:hover:!selected {"
+            f"  color: {COLORS['text']};"
+            "}"
+        )
+
+        self.gogoping_dashboard = GogoPingDashboard(stream_client=self.stream_client)
+        self.gogoping_dashboard.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tabs.addTab(self.gogoping_dashboard, "GogoPing")
+
+        self.eduping_dashboard = EduPingControlDashboard()
+        self.eduping_dashboard.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tabs.addTab(self.eduping_dashboard, "EduPing")
+
+        # Eagerly start the rclpy subscriber + push initial limits to the viewer
+        # NOW (at app init) rather than waiting for the user to click the EduPing
+        # tab. This gives the Three.js scene + leader stream a head start so
+        # the first tab-click is instant.
+        # The QWebEngineView itself starts loading its URL the moment we set
+        # setUrl() in EduPingControlDashboard.__init__, regardless of whether
+        # the tab is currently visible.
+        try:
+            self.eduping_dashboard.start_joint_subscriber()
+        except Exception:
+            pass
+
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        root_lay.addWidget(self.tabs, 1)
+
+        # 첫 탭(GogoPing) 의 robot key 로 TopBar 초기화.
+        self.topbar.set_active_robot("gogoping")
+
+        # 하위 호환용 — 기존 코드가 self.dashboard 참조한 부분 일부 남아있을 수 있음.
+        self.dashboard = self.gogoping_dashboard
 
         # /ws/robot-state 구독 — gogoping_modes 의 BT 상태가 topbar.bt_state 로 흘러감.
         # control-server base URL 은 PINGDER_CONTROL_URL 환경변수 우선.
@@ -361,10 +452,146 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # EduPing 관절 한계 — 슬라이더 저장 버튼이 Control Server POST 트리거.
+        self.eduping_dashboard.limits_save_requested.connect(
+            self._save_eduping_joint_limits,
+        )
+        # 안전 실물 재생 — limits POST + play POST 를 background 에서.
+        self.eduping_dashboard.safe_play_requested.connect(
+            self._safe_play_eduping_routine,
+        )
+
         # TopBar idle_timeout slider 적용 → state_client.post_idle_timeout
         self.topbar.set_idle_apply_callback(
             lambda seconds: self.state_client.post_idle_timeout(seconds)
         )
+
+    def _on_tab_changed(self, index: int) -> None:
+        # 탭 인덱스 → ROBOTS key 매핑 (탭 add 순서 그대로).
+        robot_key = "gogoping" if index == 0 else "eduping"
+        self.topbar.set_active_robot(robot_key)
+        if robot_key == "eduping":
+            # 슬라이더 한 번만 백그라운드 로드. control-service 없으면 조용히 fallback.
+            if not getattr(self, "_eduping_limits_loaded", False):
+                self._load_eduping_joint_limits()
+                self._eduping_limits_loaded = True
+
+    def _control_base_url(self) -> str:
+        return os.environ.get("PINGDER_CONTROL_URL", "http://localhost:8000")
+
+    def _load_eduping_joint_limits(self) -> None:
+        """Best-effort background fetch of saved limits from the control-service.
+
+        Silent failure — the slider just stays at URDF defaults if the server is
+        unreachable. The 3D viewer doesn't need this at all (it goes direct via
+        rclpy), so this is only relevant when the user wants to *save* limits.
+        """
+        import threading
+
+        def _work() -> None:
+            try:
+                import httpx
+                r = httpx.get(
+                    f"{self._control_base_url()}/api/eduping/joint-limits",
+                    timeout=1.5,
+                )
+                if r.status_code != 200:
+                    return
+                data = r.json()
+                limits = data.get("limits") or {}
+                if not isinstance(limits, dict):
+                    return
+                # Marshal back to GUI thread via Qt's invokeMethod indirection.
+                self.eduping_dashboard.apply_limits(limits)
+            except Exception:
+                # No popup, no banner — silent. Defaults stay in place.
+                return
+
+        threading.Thread(target=_work, name="eduping-limits-load", daemon=True).start()
+
+    def _safe_play_eduping_routine(self, payload: dict) -> None:
+        """payload = {kind, slug, limits}. Background thread:
+        1) POST current limits to control-service (so dance_stream clipping
+           uses the values currently shown in the admin sliders).
+        2) POST play with target=real — control-service streams the (clipped)
+           trajectory to the follower controller.
+        Status text on the dashboard is updated with the result.
+        """
+        import threading
+
+        kind = str(payload.get("kind") or "")
+        slug = str(payload.get("slug") or "")
+        limits = payload.get("limits") or {}
+        if kind not in ("dance", "greeting") or not slug:
+            self.eduping_dashboard._playback_status.setText(
+                "재생 요청 payload 오류",
+            )
+            return
+
+        def _work() -> None:
+            try:
+                import httpx
+                base = self._control_base_url()
+                # 1) limits push
+                r = httpx.post(
+                    f"{base}/api/eduping/joint-limits",
+                    json={"limits": limits},
+                    timeout=3.0,
+                )
+                if r.status_code != 200:
+                    self.eduping_dashboard._playback_status.setText(
+                        f"한계 push 실패 — HTTP {r.status_code}",
+                    )
+                    return
+                # 2) play
+                play_url = (
+                    f"{base}/api/eduping/{kind}/{slug}/play"
+                )
+                r2 = httpx.post(
+                    play_url,
+                    json={"target": "real", "speed": 1.0},
+                    timeout=5.0,
+                )
+                if r2.status_code == 200:
+                    self.eduping_dashboard._playback_status.setText(
+                        f"실물 재생 시작: {kind}/{slug}",
+                    )
+                else:
+                    self.eduping_dashboard._playback_status.setText(
+                        f"재생 실패 — HTTP {r2.status_code} ({r2.text[:80]})",
+                    )
+            except Exception as e:
+                self.eduping_dashboard._playback_status.setText(
+                    f"Control Server 미연결: {e} "
+                    "(port 8000 의 control-service 실행 확인)",
+                )
+
+        threading.Thread(target=_work, name="eduping-safe-play", daemon=True).start()
+
+    def _save_eduping_joint_limits(self, limits: dict) -> None:
+        """POST limits in a background thread — only path that surfaces errors,
+        because the user explicitly clicked '저장' and expects feedback.
+        """
+        import threading
+
+        def _work() -> None:
+            try:
+                import httpx
+                r = httpx.post(
+                    f"{self._control_base_url()}/api/eduping/joint-limits",
+                    json={"limits": limits},
+                    timeout=2.5,
+                )
+                if r.status_code == 200:
+                    self.eduping_dashboard.set_save_status(True, "저장 완료")
+                else:
+                    self.eduping_dashboard.set_save_status(
+                        False, f"저장 실패 — HTTP {r.status_code}",
+                    )
+            except Exception as e:
+                self.eduping_dashboard.set_save_status(False, f"저장 실패: {e}")
+
+        threading.Thread(target=_work, name="eduping-limits-save", daemon=True).start()
 
     def _on_robot_state(self, snap: dict) -> None:
         """``/ws/robot-state`` snapshot 단일 수신점. BTStateInline + GogoPingDashboard 분배.
@@ -420,10 +647,23 @@ class AdminWindow(QMainWindow):
             self.nav_debug_client.stop()
         except Exception:
             pass
+        try:
+            self.eduping_dashboard.stop_joint_subscriber()
+        except Exception:
+            pass
+        try:
+            playback = getattr(self.eduping_dashboard, "_playback", None)
+            if playback is not None:
+                playback.stop()
+        except Exception:
+            pass
         super().closeEvent(ev)
 
 
 def main() -> int:
+    from webengine_gpu import apply_chromium_gpu_flags
+
+    apply_chromium_gpu_flags()
     app = QApplication(sys.argv)
     app.setApplicationName("Pingdergarten Admin")
     apply_theme(app)

@@ -61,6 +61,7 @@ from control_service.eduping.ros_bridge import (
 )
 
 from .dance_stream import iter_dance_frames, iter_home_ramp_frames
+from . import joint_limits as _joint_limits
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/eduping", tags=["eduping"])
@@ -301,6 +302,34 @@ async def dance_play(req: Request, slug: str, body: PlayIn) -> dict:
         raise HTTPException(404, str(e)) from e
     except (ValueError, BridgeUnavailable) as e:
         raise HTTPException(400, str(e)) from e
+
+
+class JointLimitsIn(BaseModel):
+    """관리자 UI 에서 POST 하는 페이로드 — 관절명 → {min, max} (URDF rad).
+
+    keys 는 OpenArm joint 이름. 알 수 없는 key 는 무시된다 (joint_limits.set_limits 에서
+    필터링). min > max 면 swap.
+    """
+    limits: dict[str, dict[str, float]] = Field(default_factory=dict)
+
+
+@router.get("/joint-limits")
+async def get_joint_limits() -> dict:
+    """현재 적용 중인 관절 한계 dict. 관리자 UI 가 시작 시 GET 해 슬라이더 초기값으로."""
+    return {
+        "limits": _joint_limits.get_limits(),
+        "joint_names": list(_joint_limits.joint_names()),
+    }
+
+
+@router.post("/joint-limits")
+async def set_joint_limits(body: JointLimitsIn) -> dict:
+    """관리자 UI 의 저장 — 한계 dict 를 JSON 파일에 영구화 + 메모리 캐시 갱신.
+
+    다음 dance / greeting replay 부터 모든 motion frame 이 새 한계로 clip 된다.
+    """
+    cleaned = _joint_limits.set_limits(body.limits)
+    return {"ok": True, "limits": cleaned}
 
 
 @router.post("/arm/return-home")
