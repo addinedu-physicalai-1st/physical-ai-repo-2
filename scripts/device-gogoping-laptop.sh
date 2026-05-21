@@ -189,7 +189,9 @@ case "$ACTION" in
 
     # window 1: localization (map_server + AMCL + lifecycle_manager_localization)
     # map:= 로 default (real_lidar_map.yaml) 대신 map.yaml (도면 + SLAM 정합) 사용.
-    LOCALIZATION_MAP="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/maps/map.yaml"
+    # GOGOPING_MAP env 로 후보 PGM swap 가능 (예: ~/pingdergarten-maps/cand_03/map.yaml).
+    LOCALIZATION_MAP="${GOGOPING_MAP:-$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/maps/map.yaml}"
+    echo "[device-gogoping-laptop] LOCALIZATION_MAP=$LOCALIZATION_MAP"
     tmux new-window -t "$SESSION" -n localization -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation localization_real.launch.xml map:=$LOCALIZATION_MAP"
 
