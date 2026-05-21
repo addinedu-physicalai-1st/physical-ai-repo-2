@@ -25,6 +25,7 @@ from control_service.routers import parents as parents_router
 from control_service.routers import photos as photos_router
 from control_service.routers import reports as reports_router
 from control_service.routers import schedule as schedule_router
+from control_service.routers import teachers as teachers_router
 from control_service import webrtc_voice as webrtc_voice_router
 from control_service.camera_pan.ros_bridge import CameraPanBridge
 from control_service.camera_pan.router import install as install_camera_pan
@@ -216,6 +217,7 @@ app.include_router(menu_router.router)
 app.include_router(photos_router.router)
 app.include_router(reports_router.router)
 app.include_router(schedule_router.router)
+app.include_router(teachers_router.router)
 app.include_router(webrtc_voice_router.router)
 
 # teleop (GogoPing keyboard control) — POST /teleop/cmd_vel, WS /teleop/state, GET /teleop/health
@@ -303,6 +305,15 @@ app.mount(
     "/api/photos-static",
     StaticFiles(directory=settings.photo_dir),
     name="photos-static",
+)
+
+# 교사 얼굴 정적 노출 — user.photo_url 은 /api/teacher-faces/{teacher_id}/0.jpg (정면) 형태.
+from control_service.routers.teachers import TEACHER_FACE_DIR  # noqa: E402
+os.makedirs(TEACHER_FACE_DIR, exist_ok=True)
+app.mount(
+    "/api/teacher-faces",
+    StaticFiles(directory=TEACHER_FACE_DIR),
+    name="teacher-faces",
 )
 
 

@@ -121,6 +121,7 @@ last_synced: "2026-05-13T14:08:22"
 | SR-CAR-006 | 도착 알림 | ROS2 액션 결과 콜백이 GogoPing 노트북 스피커 음성 합성 으로 도착을 알린다. Admin UI 는 SR-ADM-001 로봇 상태 위젯 갱신 + SR-ADM-005 도착 알림으로 인지한다. | High |
 | SR-CAR-007 | 운반 후 대기 | GogoPing 이 운반 액션 완료 후 그 자리에서 대기 상태로 전이한다. | Low |
 | SR-CAR-008 | LiDAR 스캔 관제 표출 | Admin UI 가 control server WS `/teleop/state` 로부터 `/gogoping/scan` 폴라 데이터 (≥360 pts, EMA Hz, age_ms) 를 수신해 GogoPing 대시보드 4분면 중 한 칸을 차지하는 풀사이즈 폴라 뷰로 표출한다. 헤더 LiDAR chip 은 실측 Hz 로 갱신, age > 500ms 면 "신호 지연" 으로 표시. 4방향 (앞/뒤/좌/우 ±15°) 거리 통계 십자 배치. 좌표 변환은 ROS REP 103 → Qt top-down (전방 = 화면 위). | Medium |
+| SR-CAR-009 | 교사 얼굴 매칭 API | Control Server `POST /api/teachers/match-face` 가 multipart 얼굴 이미지를 받아 InsightFace 임베딩 추출 → `teacher_face_embedding <=> $target` (cosine) 최소값을 반환. 임계값 `settings.face_match_threshold` (0.45) 이하만 `matched=true`. | High |
 | SR-SAF-006 | 추종 거리 유지 | GogoPing 이 RPLiDAR C1 으로 카메라 ReID 가 잠근 방위의 거리를 측정해 거리 변동에 따라 속도·정지를 결정한다. 카메라는 추종 대상 식별, LiDAR 는 거리 측정으로 책임 분담. | High |
 
 #### 단계 머신
@@ -277,6 +278,7 @@ last_synced: "2026-05-13T14:08:22"
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
 | SR-OPS-015 | 자녀 정보 보기 | Portal Web 이 Control Service REST 로 child 테이블을 조회해 자녀 기본 정보 (이름·생년월일·반·등록 사진) 를 표시한다. 등록 사진 binary 는 Control Server 가 FastAPI StaticFiles 로 마운트한 정적 경로 (`/api/photos-static/...`) 를 브라우저가 GET 한다. | Low |
+| SR-OPS-019 | 교사 정보 보기 (동료) | Portal Web `/teacher/colleagues` 가 `GET /api/teachers/` 응답 (id·name·class_name·phone·emergency_contact·photo_url·hired_date — 민감 필드 제외) 을 카드 그리드로 표시한다. | Low |
 
 ### 5.4 학부모 — 로그인·계정
 
@@ -312,6 +314,8 @@ last_synced: "2026-05-13T14:08:22"
 | --- | --- | --- | --- |
 | SR-REG-006 | 얼굴 데이터 저장 | Control Server 가 등록 사진 15장에서 얼굴 인식 으로 다중 임베딩을 추출해 child_id 별로 DB BLOB 에 저장한다. 매칭 시 다중 임베딩 중 최대 유사도로 판정해 카메라가 달라도 robust 하게 인식한다. | High |
 | SR-REG-010 | 얼굴 인식 anti-spoofing | 얼굴 캡처(등록·매칭 시점) 가 anti-spoofing (liveness detection) 으로 실제 얼굴 vs 사진·영상 도용을 구별한다. | High |
+| SR-REG-011 | 교사 프로필 입력·수정 | Portal Web `/teacher/profile` 화면이 본인 인적사항 (이름·생년월일·전화·주소·담당 반·입사일·비상연락처) 을 입력받아 `PATCH /api/teachers/me` 로 저장한다. 이메일은 변경 불가. | High |
+| SR-REG-012 | 교사 얼굴 등록 | Portal Web `/teacher/profile` 의 "얼굴 등록" 섹션에서 `<FaceCapture>` 5각도 캡처 → `POST /api/teachers/me/face-images` 로 업로드. Control Server 가 InsightFace 임베딩 5개 추출 후 `teacher_face_image` + `teacher_face_embedding` 에 저장 (재업로드 시 기존 row 삭제 후 재삽입). | High |
 
 ### 6.2 출결 기록
 
