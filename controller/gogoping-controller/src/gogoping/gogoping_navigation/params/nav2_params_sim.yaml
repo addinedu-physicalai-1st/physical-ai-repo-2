@@ -74,10 +74,10 @@ amcl:
     scan_topic: /gogoping/scan
     set_initial_pose: true
     initial_pose:
-      x: 0.20
-      y: -7.00
+      x: 0.0
+      y: 0.0
       z: 0.0
-      yaw: 1.5708
+      yaw: 0.0
 
 
 bt_navigator:
