@@ -23,9 +23,7 @@ install
 log
 .vscode
 CLAUDE.local.md
-docs/superpowers/*
-!docs/superpowers/specs/
-!docs/superpowers/specs/**
+docs/superpowers/
 
 # 모델 가중치 — ultralytics 가 첫 실행 시 자동 다운로드
 service/ai-service/ai_service/models/*.pt

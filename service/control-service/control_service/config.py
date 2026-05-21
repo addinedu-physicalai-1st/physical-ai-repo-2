@@ -1,8 +1,8 @@
 """Control Service settings.
 
-`SECRET`, `DATABASE_URL`, `ROBOT_DEVICE_TOKEN` 세 가지만 `.env` / 환경변수로
-override 된다. 나머지 (쿠키 수명·얼굴 매칭 임계값·AI Hub URL 등) 는 튜닝 노브로
-취급해 이 파일을 직접 수정한다.
+`SECRET`, `DATABASE_URL`, `ROBOT_DEVICE_TOKEN`, `AI_HUB_URL` 네 가지가
+`.env` / 환경변수로 override 된다. 나머지 (쿠키 수명·얼굴 매칭 임계값 등) 는
+튜닝 노브로 취급해 이 파일을 직접 수정한다.
 """
 import os
 from dataclasses import dataclass
@@ -26,9 +26,11 @@ class Settings:
     robot_device_token: str = os.environ.get(
         "ROBOT_DEVICE_TOKEN", "dev-robot-token-change-me"
     )
+    # 분리 운영 시 robot 박스가 backend 박스 IP 를 주입 (run_control.sh).
+    # default 는 같은 머신에 ai-hub 가 있는 로컬 시나리오(run_server.sh) 가정.
+    ai_hub_url: str = os.environ.get("AI_HUB_URL", "http://localhost:8001")
 
     # --- 튜닝 노브 (env 미연동, 코드 수정으로만 변경) ---
-    ai_hub_url: str = "http://localhost:8001"
     request_timeout_s: float = 30.0
     # 보고서 생성은 Hub→Ollama 가 길 수 있어 별도 상한(초).
     ai_hub_report_timeout_s: float = 300.0
