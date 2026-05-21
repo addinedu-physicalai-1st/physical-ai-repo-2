@@ -18,6 +18,7 @@ import GreetingManager from '@/eduping/GreetingManager.vue';
 import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
 import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
+import BlockStacking from '@/noriarm/BlockStacking.vue';
 import { useCameraPan } from '@/gogoping/composables/useCameraPan';
 import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
 import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
@@ -133,6 +134,7 @@ function handleStart(): void {
     <div class="brand">{{ robot.displayName }}</div>
     <AttendanceCamera :mode="attendanceMode" />
     <OXQuiz v-if="showOXQuiz" />
+    <BlockStacking v-if="showOXQuiz" />
     <DanceManager v-if="showDanceManager" />
     <DancePlayPopup v-if="showDancePopup" />
     <GreetingManager v-if="showGreetingManager" />

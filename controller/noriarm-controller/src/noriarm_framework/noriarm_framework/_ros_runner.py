@@ -120,6 +120,62 @@ class GameRunner(Node):
                 "control_msgs.action.GripperCommand import 실패 — 그리퍼 명령 비활성화"
             )
 
+        # ACT 정책이면 카메라 + /joint_states 구독 셋업 — observation 채우기용.
+        self._obs_capture: dict | None = None
+        if cfg.config.policy.kind == "act":
+            self._setup_act_observation_capture()
+
+    def _setup_act_observation_capture(self) -> None:
+        from noriarm_framework.observation_capture import LatestFrameBuffer, LatestJointState
+
+        arm = self._cfg.config.arms[0]
+        camera_keys = tuple(c.id for c in self._cfg.config.cameras) or ("top",)
+        self._obs_capture = {
+            "arm_id": arm.id,
+            "frames": LatestFrameBuffer(keys=camera_keys),
+            "joint_state": LatestJointState(expected_names=arm.controller_joint_names),
+        }
+        # /joint_states 구독 — sim/real 동일.
+        topic = arm.backend(self._cfg.target).get("joint_state_topic", "/joint_states")
+        self.create_subscription(
+            JointState, topic, self._on_joint_state_for_act, 10
+        )
+        # 카메라는 cv2.VideoCapture 로 백그라운드 스레드에서 push.
+        self._start_camera_capture_threads(camera_keys)
+
+    def _on_joint_state_for_act(self, msg) -> None:
+        if self._obs_capture is None:
+            return
+        self._obs_capture["joint_state"].update(list(msg.name), list(msg.position))
+
+    def _start_camera_capture_threads(self, camera_keys: tuple[str, ...]) -> None:
+        import threading
+        import cv2  # lazy — OX 퀴즈는 안 씀
+
+        for i, key in enumerate(camera_keys):
+            t = threading.Thread(
+                target=self._camera_capture_loop, args=(key, i), daemon=True
+            )
+            t.start()
+
+    def _camera_capture_loop(self, key: str, device_index: int) -> None:
+        import cv2
+
+        cap = cv2.VideoCapture(device_index)
+        if not cap.isOpened():
+            self.get_logger().warn(
+                f"카메라 {key} (index={device_index}) open 실패 — obs.images 미공급"
+            )
+            return
+        try:
+            while rclpy.ok():
+                ok, frame = cap.read()
+                if not ok or frame is None:
+                    continue
+                self._obs_capture["frames"].put(key, frame)
+        finally:
+            cap.release()
+
     def run(self) -> None:
         ctx = GameContext(
             game_name=self._cfg.config.name,
@@ -154,7 +210,19 @@ class GameRunner(Node):
         self.get_logger().info(f"게임 종료: steps={step}")
 
     def _sense(self, step: int) -> Observation:
-        return Observation(timestamp=float(step), extra=dict(self._cfg.inputs))
+        """ACT 모드일 때만 실제 obs 채움. 그 외 (OX 퀴즈 등) 빈 obs."""
+        if not hasattr(self, "_obs_capture") or self._obs_capture is None:
+            return Observation(timestamp=float(step), extra=dict(self._cfg.inputs))
+        capture: dict = self._obs_capture
+        images = capture["frames"].snapshot()
+        js = capture["joint_state"].snapshot()
+        joint_states = {capture["arm_id"]: js} if js is not None else None
+        return Observation(
+            images=images if images else None,
+            joint_states=joint_states,
+            timestamp=float(step),
+            extra=dict(self._cfg.inputs),
+        )
 
     def _apply(self, action: Action) -> bool:
         if isinstance(action, IdleAction):

@@ -155,11 +155,20 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[noriarm-controller/noriarm_framework] 매니페스트 + 정책 + trajectory 단위 테스트"
+echo "[noriarm-controller/noriarm_framework] 매니페스트 + 정책 + trajectory + 블럭쌓기 단위 테스트"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 NORIARM_FRAMEWORK_DIR="$REPO_ROOT/controller/noriarm-controller/src/noriarm_framework"
 (cd "$NORIARM_FRAMEWORK_DIR" && PYTHONPATH=. pytest test/test_manifest.py test/test_policy.py test/test_trajectory.py -v) || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_home_pose.py" -v || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_policy_rps.py" -v || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_policy_act.py" -v || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_block_stacking_manifest.py" -v || EXIT=1
+conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_check_models.py" -v || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_ros_bridge_home_events.py" -v || EXIT=1
+PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_observation_capture.py" -v || EXIT=1
+conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_block_stacking_router.py" -v || EXIT=1
+conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_block_stacking_process.py" -v || EXIT=1
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo

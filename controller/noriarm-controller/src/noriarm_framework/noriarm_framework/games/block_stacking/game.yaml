@@ -1,0 +1,58 @@
+name: block_stacking
+display: "블럭쌓기"
+
+hardware:
+  cameras:
+    - id: front
+      role: scene_overhead
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 0
+      real:
+        source: usb
+        # `ls /dev/v4l/by-id` 로 실제 카메라 id 채우기.
+        by_id: "PLACEHOLDER-front-cam"
+    - id: wrist
+      role: gripper_close_up
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 1
+      real:
+        source: usb
+        by_id: "PLACEHOLDER-wrist-cam"
+
+  arms:
+    - id: pointer
+      model: omx_f
+      ros_namespace: /noriarm/pointer
+      role: stacker
+      controller_topic: /arm_controller/joint_trajectory
+      controller_joint_names: [joint1, joint2, joint3, joint4, joint5]
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names: [joint1, joint2, joint3, joint4, joint5, gripper_joint_1]
+        joint_norm_modes: [m100_100, m100_100, m100_100, m100_100, m100_100, range_0_100]
+      real:
+        backend: dynamixel
+        port: /dev/omx_follower
+        baudrate: 1000000
+
+policy:
+  kind: act
+  module: noriarm_framework.games.block_stacking.policy_act
+  repo_id: jisoo3/act_game_block_stacking_0520
+  joint_names: [joint1, joint2, joint3, joint4, joint5]
+  camera_keys: [front, wrist]
+  # device: cuda:0    # 명시 안 하면 lerobot 가 자동 선택.
+
+# RPS '보' replay 는 별도 매니페스트 (rule_based 정책) 로 가져가지 않고, bridge 측
+# 에서 ReplayTrajectoryAction("rps_paper_trajectory.json") 단발 호출로 처리한다.
+
+runtime:
+  rate_hz: 30
+  episode_timeout_s: 600

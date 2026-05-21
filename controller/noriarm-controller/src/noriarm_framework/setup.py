@@ -10,6 +10,7 @@ setup(
         # game.yaml 과 trajectory JSON 을 패키지 안에 함께 배포 — runtime 에서 importlib.resources
         # 로 접근 가능.
         f"{package_name}.games.ox_quiz": ["*.yaml", "*.json"],
+        f"{package_name}.games.block_stacking": ["*.yaml", "*.json"],
     },
     include_package_data=True,
     data_files=[

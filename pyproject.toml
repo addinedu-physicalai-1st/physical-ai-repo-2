@@ -55,6 +55,11 @@ dependencies = [
   # Opus 디코딩/인코딩에 av (pyav) 의존.
   "aiortc>=1.9",
   "av>=12",
+  # NoriArm 블럭쌓기 — ACT 체크포인트 다운로드.
+  "huggingface_hub>=0.25",
+  # NoriArm 블럭쌓기 — ACT (Action Chunking Transformer) 모방학습 추론.
+  # 첫 실행 시 PyTorch + torchvision 을 transitive 로 끌어옴 (~2GB).
+  "lerobot>=0.1",
 ]
 
 [dependency-groups]
