@@ -34,7 +34,10 @@ LEFT_CAN="${LEFT_CAN:-can1}"
 CALIBRATION_ID="${CALIBRATION_ID:-my_openarm_follower}"
 
 ROS_SETUP="/opt/ros/jazzy/setup.bash"
-WS_SETUP="$WS_DIR/install/setup.bash"
+# colcon install 위치: 루트(repo-wide) 우선, 없으면 controller/eduping-controller/install 로 폴백.
+ROOT_SETUP="$REPO_ROOT/install/setup.bash"
+WS_SETUP_FALLBACK="$WS_DIR/install/setup.bash"
+WS_SETUP=""
 
 log() { echo "[device-eduping] $*"; }
 
@@ -48,9 +51,16 @@ require_env() {
     log "ROS Jazzy 가 설치되어 있지 않습니다 ($ROS_SETUP 없음)" >&2
     exit 1
   fi
-  if [[ ! -f "$WS_SETUP" ]]; then
-    log "colcon build 결과가 없습니다 ($WS_SETUP 없음)" >&2
-    log "  controller/eduping-controller/ 에서 빌드 후 재실행." >&2
+  if [[ -f "$ROOT_SETUP" ]]; then
+    WS_SETUP="$ROOT_SETUP"
+  elif [[ -f "$WS_SETUP_FALLBACK" ]]; then
+    WS_SETUP="$WS_SETUP_FALLBACK"
+  else
+    log "colcon build 결과가 없습니다" >&2
+    log "  탐색 경로:" >&2
+    log "    1) $ROOT_SETUP" >&2
+    log "    2) $WS_SETUP_FALLBACK" >&2
+    log "  루트 또는 controller/eduping-controller/ 에서 빌드 후 재실행." >&2
     exit 1
   fi
 }
