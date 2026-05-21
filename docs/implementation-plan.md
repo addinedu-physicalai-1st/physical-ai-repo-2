@@ -13,7 +13,7 @@ last_synced: "2026-05-13T14:08:22"
 | UI | 프레임워크 | 역할 |
 | --- | --- | --- |
 | Robot UI (EduPing·GogoPing·NoriArm 공유) | Vue 3 + Vite dev server (Chromium kiosk) + Pinia + Web Speech API (STT/TTS), 단일 코드베이스 — 각 로봇 노트북에서 `VITE_ROBOT=eduping/gogoping/noriarm` env 로 분기 인스턴스 실행, `server.proxy` 로 `/api/*` → Control Service REST (rosbridge·roslibjs·Nginx 미사용) | 공통 composables/components (호출어·STT·TTS·표정·모드 셀렉터·자연어 디스패처). 로봇별 모드 화면은 `defineAsyncComponent` 로 lazy load. 모드 매트릭스는 §0.2. 자연 촬영은 ROS2 노드가 단독 처리 (SR-PHOTO-001) |
-| Admin UI | PyQt5 데스크톱 앱 (Python 3.11 + PyQt5 + requests + websocket-client). Control Service REST 경유 (`requests.Session()` cookie jar 로 fastapi-users 세션 쿠키 유지) + WebSocket `/ws/robot-state` 로 로봇 상태 push 수신. ROS2 직접 통신 안 함 | 로봇 관제 — 위치·배터리·모드·작업 상태 실시간 모니터링 (SR-ADM-001), 보조 모드 UI 제어 (추종 대상 확정·정지·지도 기반 목적지 지정·도착 알림, SR-ADM-002~005) |
+| Admin UI | PyQt5 데스크톱 앱 (Python 3.11 + PyQt5 + requests + websocket-client). Control Service REST 경유 (`requests.Session()` cookie jar 로 fastapi-users 세션 쿠키 유지) + WebSocket `/ws/robot-state` 로 로봇 상태 push 수신. ROS2 직접 통신 안 함 | 로봇 관제 — 위치·배터리·모드·작업 상태 실시간 모니터링 (SR-ADM-001), 추종·이동 모드 UI 제어 (정지·지도 기반 목적지 지정·도착 알림, SR-ADM-003~005). 추종 시작은 GogoPing UI 가 담당. |
 | Portal Web | Vue 3 + Vite dev server (학부모·교사 공용 웹앱) + Pinia, `server.proxy` 로 `/api/*` → Control Service (사진 binary 는 Control Server 의 FastAPI StaticFiles `/api/photos-static/*` 를 같은 proxy 로 GET) | 교사 기능 (아동·학부모 등록, 출결 보드, 정보·보고서 보기), 학부모 기능 (로그인·등·하원·메뉴·사진·보고서 조회). 학부모·교사 모바일/PC 에서 같은 Wi-Fi LAN IP 로 접근 |
 
 ## 0.1 로봇 UI 모드
@@ -21,7 +21,7 @@ last_synced: "2026-05-13T14:08:22"
 | 로봇 UI | 모드 |
 | --- | --- |
 | EduPing UI | 대기, 등원, 하원, 율동, 무궁화꽃이 피었습니다 |
-| GogoPing UI | 대기, 보조, 숨바꼭질, 자장가 |
+| GogoPing UI | 대기, 추종, 이동, 숨바꼭질, 자장가 |
 | NoriArm UI | 대기, 블럭쌓기, OX 퀴즈, 가게놀이 |
 
 ## 0.2 모드별 동작 매트릭스
@@ -34,7 +34,8 @@ last_synced: "2026-05-13T14:08:22"
 | EduPing UI | 율동 | ✓ | ✓ | ✓ | ✓ | fun |
 | EduPing UI | 무궁화꽃이 피었습니다 | ✓ | ✓ | ✓ | ✓ | fun |
 | GogoPing UI | 대기 | ✓ | ✓ | ✗ | ✗ | basic |
-| GogoPing UI | 보조 | ✓ | ✓ | ✗ | ✓ | basic |
+| GogoPing UI | 추종 | ✓ | ✓ | ✗ | ✓ | basic |
+| GogoPing UI | 이동 | ✓ | ✓ | ✗ | ✓ | basic |
 | GogoPing UI | 숨바꼭질 | ✓ | ✓ | ✓ | ✓ | fun |
 | GogoPing UI | 자장가 | ✓ | ✓ | ✗ | ✗ | sleep |
 | NoriArm UI | 대기 | ✓ | ✓ | ✗ | ✗ | basic |
@@ -109,18 +110,14 @@ last_synced: "2026-05-13T14:08:22"
 
 ## 2. GogoPing UI (Robot UI 코드베이스의 `VITE_ROBOT=gogoping` 인스턴스, VicPinky + Laptop)
 
-### 2.1 보조
+### 2.1 추종
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-CAR-001 | 추종 대상 확인 | Admin UI "추종 시작" 버튼이 눌리면 GogoPing 노트북 디스플레이 + 음성 합성 으로 얼굴 보여달라는 안내를 출력, 노트북 웹캠으로 캡처 후 얼굴 인식 으로 등록 교사와 매칭, 디스플레이 + 음성 합성 으로 확인 멘트 ("○○선생님 맞아요?") 와 UI 확인 버튼 ("맞음" / "다시") 을 표시한 뒤 클릭으로 추종 대상을 확정한다. 매칭 실패 시 "얼굴이 잘 안 보여요. 다시 보여주세요" 안내 후 재캡처 (3회 한도). 3회 실패 시 추종 대상 확정을 취소하고 대기 상태로 복귀한다. | High |
+| SR-CAR-001 | 추종 대상 확인 | GogoPing UI "추종 시작" 버튼이 눌리면 GogoPing 노트북 디스플레이 + 음성 합성 으로 얼굴 보여달라는 안내를 출력, 노트북 웹캠으로 캡처 후 얼굴 인식 으로 등록 교사와 매칭, 디스플레이 + 음성 합성 으로 확인 멘트 ("○○선생님 맞아요?") 와 UI 확인 버튼 ("맞음" / "다시") 을 표시한 뒤 클릭으로 추종 대상을 확정한다. 매칭 실패 시 "얼굴이 잘 안 보여요. 다시 보여주세요" 안내 후 재캡처 (3회 한도). 3회 실패 시 추종 대상 확정을 취소하고 대기 상태로 복귀한다. 트리거 주체는 GogoPing UI — 얼굴 매칭이 로봇 노트북 웹캠 앞에서 일어나야 하므로 Admin UI 에서는 트리거하지 않는다. | High |
 | SR-CAR-002 | 교사 추종 | GogoPing 이 노트북 웹캠 + 사람 추적 (Deep SORT/OSNet ReID) 으로 추종 대상 1인의 방위를 잠그고, RPLiDAR C1 으로 그 방위의 거리를 측정해 거리 제어 로 따라간다. LiDAR 임계 거리 이하 진입 시 즉시 정지 (SR-SAF-006). | High |
-| SR-CAR-003 | 정지·대기 입력 | Admin UI "정지" 버튼 또는 호출어 후속 정지 의도 음성 명령이 진행 중인 동작(추종/자율 주행 등)을 중단하고 대기 상태로 전이시킨다. | High |
-| SR-CAR-004 | 운반 요청 수신 | Admin UI 가 SLAM 맵 + nav graph named pose 를 시각화한 지도 위젯을 표시하고, 교사가 맵 위에서 목적지를 클릭하면 named pose 를 Control Server REST 로 전달해 Control Server 가 ROS2 /carry/deliver 액션 send_goal 을 보낸다. | High |
-| SR-CAR-005 | 자율 주행 | GogoPing 이 RPLiDAR C1 + 자율 주행 으로 사전 SLAM 맵·nav graph 위에서 지정 목적지까지 이동한다. | High |
-| SR-CAR-006 | 도착 알림 | ROS2 액션 결과 콜백이 GogoPing 노트북 스피커 음성 합성 으로 도착을 알린다. Admin UI 는 SR-ADM-001 로봇 상태 위젯 갱신 + SR-ADM-005 도착 알림으로 인지한다. | High |
-| SR-CAR-007 | 운반 후 대기 | GogoPing 이 운반 액션 완료 후 그 자리에서 대기 상태로 전이한다. | Low |
-| SR-CAR-008 | LiDAR 스캔 관제 표출 | Admin UI 가 control server WS `/teleop/state` 로부터 `/gogoping/scan` 폴라 데이터 (≥360 pts, EMA Hz, age_ms) 를 수신해 GogoPing 대시보드 4분면 중 한 칸을 차지하는 풀사이즈 폴라 뷰로 표출한다. 헤더 LiDAR chip 은 실측 Hz 로 갱신, age > 500ms 면 "신호 지연" 으로 표시. 4방향 (앞/뒤/좌/우 ±15°) 거리 통계 십자 배치. 좌표 변환은 ROS REP 103 → Qt top-down (전방 = 화면 위). | Medium |
+| SR-CAR-003 | 정지·대기 입력 | Admin UI "정지" 버튼 또는 호출어 후속 정지 의도 음성 명령이 진행 중인 동작(추종/이동 등)을 중단하고 대기 상태로 전이시킨다. 추종·이동 모드 공통. | High |
+| SR-CAR-008 | LiDAR 스캔 관제 표출 | Admin UI 가 control server WS `/teleop/state` 로부터 `/gogoping/scan` 폴라 데이터 (≥360 pts, EMA Hz, age_ms) 를 수신해 GogoPing 대시보드 4분면 중 한 칸을 차지하는 풀사이즈 폴라 뷰로 표출한다. 헤더 LiDAR chip 은 실측 Hz 로 갱신, age > 500ms 면 "신호 지연" 으로 표시. 4방향 (앞/뒤/좌/우 ±15°) 거리 통계 십자 배치. 좌표 변환은 ROS REP 103 → Qt top-down (전방 = 화면 위). 모드 무관 상시 표시. | Medium |
 | SR-CAR-009 | 교사 얼굴 매칭 API | Control Server `POST /api/teachers/match-face` 가 multipart 얼굴 이미지를 받아 InsightFace 임베딩 추출 → `teacher_face_embedding <=> $target` (cosine) 최소값을 반환. 임계값 `settings.face_match_threshold` (0.45) 이하만 `matched=true`. | High |
 | SR-SAF-006 | 추종 거리 유지 | GogoPing 이 RPLiDAR C1 으로 카메라 ReID 가 잠근 방위의 거리를 측정해 거리 변동에 따라 속도·정지를 결정한다. 카메라는 추종 대상 식별, LiDAR 는 거리 측정으로 책임 분담. | High |
 
@@ -128,15 +125,33 @@ last_synced: "2026-05-13T14:08:22"
 
 | 단계 | 트리거 | 동작 | 표정 | 다음 단계 |
 | --- | --- | --- | --- | --- |
-| 대기 | 보조 모드 진입 또는 Admin UI "정지" 클릭 | 그 자리 대기 | basic | 추종 대상 확인 / 운반 중 |
-| 추종 대상 확인 | Admin UI "추종 시작" 클릭 | SR-CAR-001 절차 (얼굴 보여달라 안내 → 캡처 → 매칭 → 확인 멘트 → UI 확인 버튼 클릭, 매칭 실패 시 3회 한도 재캡처) | interest | (확정) 추종 / (거부) 대기 / (3회 매칭 실패) 대기 |
-| 추종 | 추종 대상 확정 | 노트북 웹캠 + 사람 추적 + 거리 제어 로 교사 추종 | happy | 대기 (Admin UI "정지" 클릭) / Searching (시야 로스트) |
+| 대기 | 추종 모드 진입 또는 "정지" 클릭 (GogoPing UI / Admin UI) | 그 자리 대기 | basic | 추종 대상 확인 |
+| 추종 대상 확인 | GogoPing UI "추종 시작" 클릭 | SR-CAR-001 절차 (얼굴 보여달라 안내 → 캡처 → 매칭 → 확인 멘트 → UI 확인 버튼 클릭, 매칭 실패 시 3회 한도 재캡처) | interest | (확정) 추종 / (거부) 대기 / (3회 매칭 실패) 대기 |
+| 추종 | 추종 대상 확정 | 노트북 웹캠 + 사람 추적 + 거리 제어 로 교사 추종 | happy | 대기 ("정지" 클릭) / Searching (시야 로스트) |
 | Searching | 추종 대상 매칭 실패 또는 추종 중 시야 로스트 | 회전·이동·음성 호출 ("선생님?") 로 대상 재탐색 | interest | (재발견) 추종 / (타임아웃) 대기 |
+| 정지 (전역 트리거) | 어느 단계에서든 UI "정지" 버튼 클릭 또는 호출어 + 정지 의도 발화 (호출어만 부르면 일시 정지 + 대답 후 직전 단계 재개) | 진행 동작 종료 → 대기 | basic | 대기 |
+
+### 2.2 이동
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
+| SR-CAR-004 | 운반 요청 수신 | Admin UI 가 SLAM 맵 + nav graph named pose 를 시각화한 지도 위젯을 표시하고, 교사가 맵 위에서 목적지를 클릭하면 named pose 를 Control Server REST 로 전달해 Control Server 가 ROS2 /carry/deliver 액션 send_goal 을 보낸다. | High |
+| SR-CAR-005 | 자율 주행 | GogoPing 이 RPLiDAR C1 + 자율 주행 으로 사전 SLAM 맵·nav graph 위에서 지정 목적지까지 이동한다. | High |
+| SR-CAR-006 | 도착 알림 | ROS2 액션 결과 콜백이 GogoPing 노트북 스피커 음성 합성 으로 도착을 알린다. Admin UI 는 SR-ADM-001 로봇 상태 위젯 갱신 + SR-ADM-005 도착 알림으로 인지한다. | High |
+| SR-CAR-007 | 운반 후 대기 | GogoPing 이 운반 액션 완료 후 그 자리에서 대기 상태로 전이한다. | Low |
+
+> 정지·대기 입력 (SR-CAR-003) 은 추종 모드와 공통.
+
+#### 단계 머신
+
+| 단계 | 트리거 | 동작 | 표정 | 다음 단계 |
+| --- | --- | --- | --- | --- |
+| 대기 | 이동 모드 진입 또는 Admin UI "정지" 클릭 | 그 자리 대기 | basic | 운반 중 |
 | 운반 중 | Admin UI 목적지 선택 | 자율 주행 으로 nav graph 목적지로 이동 | interest | 도착 |
 | 도착 | 자율 주행 액션 완료 | 대기 상태로 전이 후 교사앱 토스트·사운드 + GogoPing 노트북 스피커 음성 알림 | happy | 대기 |
 | 정지 (전역 트리거) | 어느 단계에서든 UI "정지" 버튼 클릭 또는 호출어 + 정지 의도 발화 (호출어만 부르면 일시 정지 + 대답 후 직전 단계 재개) | 진행 동작 종료 → 대기 | basic | 대기 |
 
-### 2.2 숨바꼭질
+### 2.3 숨바꼭질
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
@@ -154,11 +169,11 @@ last_synced: "2026-05-13T14:08:22"
 | 호명 | 시야 내 등록 참가 아이 발견 (얼굴 인식) | 음성 합성 으로 이름 호명, 해당 아이를 "잡힘" 으로 게임에서 제외 | happy | (남은 아이) 순찰 / (모두 잡힘) 종료 |
 | 종료 (전역 트리거) | 모든 참가 아이 발견 / 타임아웃 / 교사 종료 명령 (호출어 + 자연어 / UI) | 종료 음성 재생, 대기 모드로 전환 | (모두 발견) happy / (타임아웃) sad / (교사 종료) basic | 대기 |
 
-### 2.3 자장가
+### 2.4 자장가
 
 > 구현 완료 — [implemented.md](implemented.md) 참조
 
-### 2.4 낮잠 시각 기록
+### 2.5 낮잠 시각 기록
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
@@ -166,7 +181,7 @@ last_synced: "2026-05-13T14:08:22"
 
 > 음성→BT 진단 (2026-05-20, plan `20260520-2136-gogoping-voice-fsm-bt`): 시나리오 1 (장소 이동: `goto_vertex` intent → `/api/gogoping/goto_vertex` → ASSIST/goto) 과 시나리오 3 (충전 복귀: `sub_command{action:"return"}` → `/api/gogoping/mode {mode:"복귀"}` → RETURNING) 인프라 정합 확인 완료. 시나리오 2 (자장가: `mode_change{mode:"자장가"}`) 는 클라이언트 `applyIntent` 가 `/api/mode` ack-only 만 호출 → BT_lullaby_sub 진입 갭 가능성 — 사용자 발화 검증 후 후속 plan 으로 분리.
 
-### 2.5 주행 안전 / 자가관리
+### 2.6 주행 안전 / 자가관리
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
@@ -175,7 +190,7 @@ last_synced: "2026-05-13T14:08:22"
 | SR-SAF-005 | 사람 근접 시 감속 | GogoPing 이 자율 주행 의 속도 제한 으로 사람 인접 거리에 따라 최대 속도를 스케일 다운한다. 모든 모드에서 항상 활성. | Low |
 | SR-REL-004 | 배터리 저하 복귀 | GogoPing 이 배터리 임계치 도달 시 비긴급 작업(추종 제외 모든 상태)을 cancel 하고 자율 주행 으로 충전소 (`charger`) 로 복귀한다. | Low |
 
-### 2.6 nav graph named pose 카탈로그
+### 2.7 nav graph named pose 카탈로그
 
 | key | 위치 | 사용 SR |
 | --- | --- | --- |
@@ -185,7 +200,7 @@ last_synced: "2026-05-13T14:08:22"
 
 > 위 카탈로그는 시스템이 사전 의존하는 named pose 키 집합이다. SR-CAR-004 운반 목적지는 교사가 맵에서 동적으로 선택하므로 카탈로그 외이며, 사전 키가 아니라도 nav_graph 에 등록된 임의 named pose 또는 좌표면 된다.
 
-### 2.7 카메라 영상 스트리밍
+### 2.8 카메라 영상 스트리밍
 
 > 구현 완료 — [implemented.md](implemented.md) 참조
 
@@ -254,12 +269,16 @@ last_synced: "2026-05-13T14:08:22"
 | --- | --- | --- | --- |
 | SR-ADM-001 | 로봇 상태 표시 | Admin UI(PyQt5)가 Control Server WebSocket 채널 `/ws/robot-state` 를 `websocket-client` 라이브러리로 구독해 로봇별 상태 위젯 (위치·배터리·현재 모드·작업·도착 이벤트) 을 실시간 갱신 표시한다. 인증은 fastapi-users 세션 쿠키를 WebSocket handshake 헤더로 전달. | High |
 
-### 4.2 보조 모드 관제
+### 4.2 추종·이동 정지 관제
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-ADM-002 | 추종 대상 확정 UI | Admin UI 가 "추종 시작" 버튼 클릭 시 GogoPing 에 얼굴 캡처·매칭을 요청하고, 매칭 결과를 디스플레이에 표시한 뒤 "맞음" / "다시" 클릭으로 추종 대상을 확정한다. | High |
-| SR-ADM-003 | 보조 정지·재개 입력 | Admin UI 의 "정지" 버튼 클릭이 Control Server REST 로 정지 명령을 전달해 GogoPing 을 대기 상태로 전이시킨다. | High |
+| SR-ADM-003 | 추종·이동 정지·재개 입력 | Admin UI 의 "정지" 버튼 클릭이 Control Server REST 로 정지 명령을 전달해 GogoPing 을 대기 상태로 전이시킨다. 추종·이동 모드 공통. (추종 시작 트리거는 GogoPing UI 가 담당 — SR-CAR-001.) | High |
+
+### 4.3 이동 모드 관제
+
+| S ID | Name | Description | Priority |
+| --- | --- | --- | --- |
 | SR-ADM-004 | 지도 기반 목적지 지정 | Admin UI 가 SLAM 맵 + nav graph named pose 를 시각화한 지도 위젯을 표시하고, 관리자가 목적지를 클릭하면 named pose 를 Control Server REST 로 전달해 운반 요청을 보낸다. | High |
 | SR-ADM-005 | 도착 알림 수신 | Admin UI 가 SR-ADM-001 로봇 상태 위젯 갱신으로 GogoPing 목적지 도착을 인지하고 토스트 알림을 표시한다. | High |
 
@@ -394,7 +413,7 @@ last_synced: "2026-05-13T14:08:22"
 | SR-UI-002 | UI 모드·명령 클릭 선택 | 각 로봇 UI 가 현재 UI 가 지원하는 모드 버튼·명령 버튼을 상시 노출하고, 클릭 시 자연어 명령과 동등한 효과로 ROS2 토픽·서비스를 발행한다. | High |
 | SR-OPS-001 | 모드 전환 | 호출어 후속 자연어 모드 전환 명령 또는 UI 모드 버튼 클릭이 해당 로봇의 ROS2 latched 토픽 (`/eduping/mode` · `/gogoping/mode` · `/noriarm/mode` 중 하나) 를 발행하고 그 로봇의 노드들이 자기 namespace 의 mode 토픽만 구독해 모드를 적용한다. 로봇 간 모드는 독립적이다. | High |
 | SR-OPS-011 | 모드 내 자연어 명령 | 호출어 후속 자연어 명령을 의도 분류 LLM 으로 현재 모드의 서브 명령 (정지·진행·대상·목적지 등) 으로 라우팅한다. UI 클릭과 동등한 효과. | High |
-| SR-OPS-013 | 보조 모드 음성 입력 제한 | GogoPing 이 보조 모드에 진입한 동안 호출어 인식 시 일시 정지 + 음성 대답하지만, 후속 명령은 정지 의도("정지" / "멈춰" 등) 만 받아 대기 상태로 전이시키고, 그 외 명령(모드 전환·목적지 등)은 무시하고 일시 정지를 해제해 직전 동작을 재개한다. 모드 전환·운반 명령 등은 교사앱 UI 클릭으로만 가능. 음성 출력(안내·도착 알림 등)은 정상. | High |
+| SR-OPS-013 | 추종·이동 모드 음성 입력 제한 | GogoPing 이 추종·이동 모드에 진입한 동안 호출어 인식 시 일시 정지 + 음성 대답하지만, 후속 명령은 정지 의도("정지" / "멈춰" 등) 만 받아 대기 상태로 전이시키고, 그 외 명령(모드 전환·목적지 등)은 무시하고 일시 정지를 해제해 직전 동작을 재개한다. 모드 전환·운반 명령 등은 교사앱 UI 클릭으로만 가능. 음성 출력(안내·도착 알림 등)은 정상. | High |
 
 ### 8.3 표정 상시 표시 (모든 로봇 UI)
 
