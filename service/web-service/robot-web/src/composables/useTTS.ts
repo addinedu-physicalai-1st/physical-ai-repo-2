@@ -9,9 +9,8 @@
  *
  * 제거된 것 (서버 outbound 가 대체):
  *   - speak(text), speakFromHub, playStreaming, playBuffered, MediaSource pump.
- *   - playWakeAck — wakeAck 도 서버 outbound (`wake_ack.mp3` 캐시 → push) 가 담당.
- *     로컬 재생 시 브라우저 AEC reference 에 안 들어가 mic 로 leak 됨 → barge-in
- *     안 됨. 서버 경유 시 AEC 가 깨끗히 제거.
+ *   - playWakeAck — wakeAck audio/voice reply 모두 제거. 호출어 단독 발화는
+ *     클라이언트가 wake_on/wake_off 효과음만 재생, 서버는 dispatch skip.
  */
 import { onBeforeUnmount, ref } from 'vue';
 import { useVoiceStore } from '@/stores/voice';

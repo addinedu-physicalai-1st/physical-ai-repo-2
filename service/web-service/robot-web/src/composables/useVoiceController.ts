@@ -2,7 +2,7 @@
  * 음성 컨트롤러 — WebRTC 단일화 후.
  *
  * 책임:
- *  - 호출어 ONNX (`useWakeWord`) 콜백 처리: wakeAck "네!" 로컬 재생 + 서버 gate 열기.
+ *  - 호출어 ONNX (`useWakeWord`) 콜백 처리: 서버 gate 열기 + outbound buffer 비움 (barge-in).
  *  - WebRTC DataChannel 메시지 수신 (`stt_final` / `intent` / `tts_start` / `tts_end`)
  *    으로 voice state machine 구동.
  *  - 의도 응답 (goto_vertex / sub_command return) 의 navigate API 호출 + 결과 멘트
@@ -36,9 +36,28 @@ const WAKE_THRESHOLDS: Record<string, number> = {
   noriarm: 0.99,
 };
 
+// 호출어 추론 점수 콘솔 로그 — 임계값 튜닝·인식률 확인용. 평소엔 false, 디버깅 시 true.
+const LOG_WAKE_SCORES = false;
+
+// 호출어 사이클 효과음 — listening 시작/종료 신호. Ubuntu Yaru sound theme
+// (bell.oga / complete.oga, CC-BY-SA-4.0) 를 mp3 로 변환해 번들.
+// 로컬 재생이라 AEC 미적용이지만 비음성·1초 미만이라 VAD 가 발화로 분류할 가능성 낮고,
+// OFF 는 gate 가 이미 닫힌 cooldown 진입 시 울려 오탐 dispatch 위험 없음.
+const wakeOnSound = new Audio('/sounds/wake_on.mp3');
+const wakeOffSound = new Audio('/sounds/wake_off.mp3');
+wakeOnSound.preload = 'auto';
+wakeOffSound.preload = 'auto';
+
+function playChime(el: HTMLAudioElement): void {
+  try {
+    el.currentTime = 0;
+    void el.play().catch(() => { /* autoplay/cleanup race — 무시 */ });
+  } catch { /* noop */ }
+}
+
 // 명령 처리 후 잠시 쉬는 cooldown — UI / wake guard 둘 다 쉬는 시간.
 const COOLDOWN_MS = 1500;
-// listening window — wakeAck 직후 사용자가 명령을 시작하지 않으면 cooldown 으로 복귀.
+// listening window — wake 직후 사용자가 명령을 시작하지 않으면 cooldown 으로 복귀.
 // 서버측 gate timeout (6s) 와 정렬.
 const LISTENING_WINDOW_MS = 6000;
 
@@ -100,6 +119,7 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   function enterCooldown(): void {
+    playChime(wakeOffSound);
     voice.setState('cooldown');
     clearCooldownTimer();
     cooldownTimer = window.setTimeout(() => {
@@ -112,12 +132,11 @@ export function useVoiceController(robot: RobotConfig): {
     return mode.robot.defaultEmotionByMode[mode.currentMode] ?? 'basic';
   }
 
-  /** 호출어 ONNX 감지 → 서버 gate 즉시 열기. wakeAck "네!" 도 서버가 outbound 로
-   *  push 해주므로 브라우저 AEC 가 그 audio 를 reference 로 사용해서 마이크에서
-   *  깨끗히 제거.
-   *  - 연속 발화 ("에듀핑인사해") 시 사용자 명령 캡처 가능 (wakeAck barge-in).
+  /** 호출어 ONNX 감지 → 서버 gate 즉시 열기. 호출어 단독 발화는 서버 STT 후
+   *  WakeNameHandler 가 "네" chat reply 로 처리 → 서버 outbound TTS 로 응답.
+   *  - 연속 발화 ("에듀핑인사해") 시 사용자 명령 캡처 가능.
    *  - speaking 상태 (로봇이 응답 TTS 중) 에서 wake 발화 시 진행 중 TTS 끊고 새 사이클.
-   *    (서버 wake handler 가 outbound buffer clear + wakeAck push 자동 수행)
+   *    (서버 wake handler 가 outbound buffer clear)
    */
   function onWakeDetected(): void {
     if (voice.state !== 'idle' && voice.state !== 'speaking') return;
@@ -133,8 +152,9 @@ export function useVoiceController(robot: RobotConfig): {
     voice.setState('wake_detected');
     voice.bumpWake();
     mode.setEmotionTransient('hello', 1000);
-    // 서버에 wake msg → 서버가 (a) gate 열고 (b) outbound 비운 뒤 wakeAck PCM push.
+    // 서버에 wake msg → 서버가 (a) gate 열고 (b) outbound 버퍼 비움 (barge-in).
     webrtcVoice.send({ type: 'wake', robot: robot.id });
+    playChime(wakeOnSound);
     voice.setState('listening');
     armListeningTimer();
   }
@@ -151,6 +171,7 @@ export function useVoiceController(robot: RobotConfig): {
     onWake: () => {
       try { onWakeDetected(); } catch (e) { voice.setError((e as Error).message); }
     },
+    onScore: LOG_WAKE_SCORES ? (s) => { console.log('[wake]', s); } : undefined,
     onError: (m) => voice.setError(`wake: ${m}`),
   });
 

@@ -24,6 +24,7 @@ from typing import Optional
 
 import fractions
 import io
+import re
 import time
 
 import av  # type: ignore[import-not-found]
@@ -38,6 +39,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ai_service import stt as stt_engine
+from ai_service.robots import name_aliases_for
 from control_service.config import settings
 
 logger = logging.getLogger(__name__)
@@ -45,25 +47,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice/webrtc", tags=["voice", "webrtc"])
 
 _VAD_MODEL_PATH = Path(__file__).resolve().parent / "assets" / "silero_vad.onnx"
-_WAKE_ACK_MP3_PATH = Path(__file__).resolve().parent / "assets" / "wake_ack.mp3"
-
-# wakeAck "네!" PCM 캐시 — module load 시 한 번 디코드 후 재사용.
-# 클라이언트 로컬 재생 대신 WebRTC outbound 로 push 해야 브라우저 AEC 가 reference
-# signal 로 잡아 mic 에서 정확히 제거됨. → 연속 발화 ("에듀핑인사해") 시 사용자 명령
-# 이 wakeAck 잔향에 묻히지 않고 깨끗히 캡처됨.
-_wake_ack_pcm: Optional[bytes] = None
-
-
-def _get_wake_ack_pcm() -> bytes:
-    global _wake_ack_pcm
-    if _wake_ack_pcm is None:
-        if not _WAKE_ACK_MP3_PATH.exists():
-            raise FileNotFoundError(f"wakeAck mp3 not found: {_WAKE_ACK_MP3_PATH}")
-        with open(_WAKE_ACK_MP3_PATH, "rb") as f:
-            mp3 = f.read()
-        _wake_ack_pcm = _decode_mp3_to_pcm48k(mp3)
-        logger.info(f"[webrtc] cached wakeAck PCM: {len(_wake_ack_pcm)} bytes")
-    return _wake_ack_pcm
 
 # Silero VAD 단일 ONNX 세션 — 모든 PC 가 공유 (stateless, state 는 호출자가 보관).
 _vad_session: Optional[ort.InferenceSession] = None
@@ -76,6 +59,21 @@ _sessions: dict[str, tuple[RTCPeerConnection, "_Session"]] = {}
 # wake 후 gate 가 열려있는 시간 — 사용자가 명령을 시작할 때까지 + 발화 길이 여유.
 # 너무 짧으면 사용자가 머뭇하면 닫혀버리고, 너무 길면 임의 발화가 잘못 잡힘.
 GATE_OPEN_TIMEOUT_S = 6.0
+
+# 음성 경로에서 호출어만 단독 발화 ("에듀핑.") 시 — 클라이언트가 이미 wake on chime
+# 으로 응답했으므로 LLM dispatch 까지 가면 ChatFallback 이 의미 없는 응답을 만든다.
+# 효과음만 남기기 위해 dispatch skip. 텍스트 경로 (_dispatch_text_only) 는 이 체크 안 함
+# — 사용자가 직접 타이핑한 발화는 LLM 응답이 자연스러움.
+_WAKE_NAME_PUNCT_STRIP = re.compile(r"^[\s\.,!?…:;\-~]+|[\s\.,!?…:;\-~]+$")
+
+
+def _is_wake_name_only(text: str, robot: Optional[str]) -> bool:
+    if not robot:
+        return False
+    candidate = _WAKE_NAME_PUNCT_STRIP.sub("", text).lower()
+    if not candidate:
+        return False
+    return candidate in name_aliases_for(robot)
 
 
 class OfferBody(BaseModel):
@@ -403,9 +401,9 @@ def _handle_client_msg(session: _Session, msg: dict, log_id: str = "") -> None:
     msg_type = msg.get("type")
     if msg_type == "wake":
         session.open_gate(robot=msg.get("robot"))
-        # 진행 중 TTS (있으면) 즉시 끊고 wakeAck "네!" 로 교체 — mid-TTS barge-in 지원.
+        # 진행 중 TTS 즉시 비움 — barge-in. 새 사이클의 응답이 이전 발화와 겹치지 않게.
         if session.outbound_tts is not None:
-            asyncio.create_task(_replace_outbound_with_wake_ack(session))
+            asyncio.create_task(session.outbound_tts.clear())
     elif msg_type == "speak":
         # 명시적 TTS 요청 — 모드 전환 안내, goto_vertex 확인 멘트 등.
         text = (msg.get("text") or "").strip()
@@ -421,20 +419,6 @@ def _handle_client_msg(session: _Session, msg: dict, log_id: str = "") -> None:
             asyncio.create_task(session.outbound_tts.clear())
     else:
         logger.info(f"[webrtc:{log_id}] dc msg: {msg!r}")
-
-
-async def _replace_outbound_with_wake_ack(session: _Session) -> None:
-    """outbound buffer 비움 → wakeAck PCM push. wake msg 처리에서 호출."""
-    track = session.outbound_tts
-    if track is None:
-        return
-    try:
-        pcm = _get_wake_ack_pcm()
-    except Exception:
-        logger.exception(f"[webrtc:{session.log_id}] wakeAck PCM unavailable")
-        return
-    await track.clear()
-    await track.push_pcm(pcm)
 
 
 async def _dispatch_text_only(text: str, session: _Session) -> None:
@@ -538,6 +522,10 @@ async def _transcribe_and_send(pcm: np.ndarray, session: _Session) -> None:
         logger.exception(f"[webrtc:{session.log_id}] transcribe failed")
         return
     logger.info(f"[webrtc:{session.log_id}] STT → {text!r}")
+    if _is_wake_name_only(text, session.robot):
+        logger.info(f"[webrtc:{session.log_id}] STT == wake name only — skip dispatch (chime is the ack)")
+        session.send({"type": "stt_final", "text": ""})
+        return
     session.send({"type": "stt_final", "text": text})
     if not text.strip():
         logger.info(f"[webrtc:{session.log_id}] empty transcript — skip intent dispatch")
