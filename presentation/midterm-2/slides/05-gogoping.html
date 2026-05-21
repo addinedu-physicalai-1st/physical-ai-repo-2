@@ -1,17 +1,42 @@
-<section style="padding:40px 70px">
+<section style="padding:22px 60px">
   <div style="display:flex;justify-content:space-between;align-items:baseline">
     <div>
       <p class="font-display text-em-xs" style="letter-spacing:0.3em;color:#5DBFA3;margin:0">GOGOPING</p>
-      <h2 class="font-display" style="font-size:2em;color:#4A2F28;margin:2px 0 0">Gazebo Waypoint 주행</h2>
+      <h2 class="font-display" style="font-size:2em;color:#4A2F28;margin:2px 0 0">음성 가이드</h2>
     </div>
-    <span class="chip chip-mint">데모 영상</span>
+    <span class="chip chip-mint">데모 영상 · 싱크</span>
   </div>
 
-  <div style="display:flex;justify-content:center;margin-top:32px">
-    <div style="width:880px;height:480px;background:#FFFFFF;border:2px solid #FFE0E6;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#6D4C41;font-family:'Jua'">
-      <video src="assets/videos/gogoping-waypoint.mp4" autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='&lt;div style=&quot;font-size:0.9em&quot;&gt;assets/videos/gogoping-waypoint.mp4&lt;/div&gt;'"></video>
+  <div style="display:flex;justify-content:center;align-items:flex-start;gap:24px;margin-top:24px">
+
+    <div style="text-align:center">
+      <video
+        src="https://minsung.cdn.prismic.io/minsung/ag5o_KYofJOwHdsQ_IMG_4676.MOV"
+        autoplay loop playsinline controls
+        data-sync-offset="1.2"
+        data-base-rate="1.08"
+        style="height:320px;width:auto;border-radius:16px;background:transparent;display:block;object-fit:contain;box-shadow:0 8px 22px rgba(0,0,0,0.12)"
+      ></video>
+      <div class="font-display" style="margin-top:8px;color:#5DBFA3;font-size:0.9em">실물 시연</div>
     </div>
+
+    <div style="text-align:center">
+      <video
+        src="https://minsung.cdn.prismic.io/minsung/ag5pA6YofJOwHdsS_Screencastfrom2026-05-2110-56-19.webm"
+        autoplay muted loop playsinline
+        style="height:320px;width:auto;border-radius:16px;background:transparent;display:block;object-fit:contain;box-shadow:0 8px 22px rgba(0,0,0,0.12)"
+      ></video>
+      <div class="font-display" style="margin-top:8px;color:#2E7D66;font-size:0.9em">UI · 자율 주행</div>
+    </div>
+
   </div>
 
-  <aside class="notes">GogoPing Gazebo Waypoint 자율 주행 영상.</aside>
+  <div class="speed-controls">
+    <button class="speed-btn" data-speed="0.5">0.5x</button>
+    <button class="speed-btn active" data-speed="1">1x</button>
+    <button class="speed-btn" data-speed="1.5">1.5x</button>
+    <button class="speed-btn" data-speed="2">2x</button>
+  </div>
+
+  <aside class="notes">GogoPing 음성 가이드 — 실물 + UI 자율 주행. 영상 320px 로 축소.</aside>
 </section>

@@ -399,3 +399,32 @@ html, body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 /* fragment.fade-out 은 Reveal.js 가 직접 처리 — 추가 override 없이 opacity 전이만 */
+
+/* ===== Video speed control buttons ===== */
+.speed-controls {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 14px;
+}
+.speed-controls .speed-btn {
+  background: #FFFFFF;
+  border: 1.5px solid #FFE0E6;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-family: 'Jua', sans-serif;
+  font-size: 0.72em;
+  color: #6D4C41;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.speed-controls .speed-btn:hover {
+  background: #FFD3DD;
+  color: #4A2F28;
+}
+.speed-controls .speed-btn.active {
+  background: #F8B4C4;
+  color: #FFFFFF;
+  border-color: #F8B4C4;
+}

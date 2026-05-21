@@ -12,7 +12,8 @@ var SLIDES = [
   '04-eduping.html',
   '05-gogoping.html',
   '06-noriarm.html',
-  '06b-section-test.html',
+  '06b-noriarm-block.html',
+  '06c-section-test.html',
   '07-test-results.html',
   '07a-sprint3-portal.html',
   '07b-sprint3-ui.html',
@@ -21,19 +22,24 @@ var SLIDES = [
   '07e-sprint4-gogoping.html',
   '07f-sprint5.html',
   '08-issues.html',
-  '09-tech-research.html',
+  '08b-section-tech.html',
+  '09a-tech-vla.html',
+  '09b-tech-vla-roi.html',
+  '09c-tech-depth.html',
+  '09d-tech-detect.html',
   '10-sprint67-plan.html',
   '11-thank-you.html',
 ];
 
 var SLIDE_TITLES = [
-  '2차 중간발표',
+  '중간발표',
   '스프린트 히스토리',
   '1차 → 2차 진척도',
   '§ 추가 / 개선 + 데모',
   'EduPing — 추가 / 개선',
   'GogoPing — 추가 / 개선',
-  'NoriArm — 추가 / 개선',
+  'NoriArm — OX 퀴즈',
+  'NoriArm — 블럭쌓기 (개선)',
   '§ 테스트 결과',
   'Sprint 3 — 요약 (81%)',
   'Sprint 3 — Portal · 등록',
@@ -43,7 +49,11 @@ var SLIDE_TITLES = [
   'Sprint 4 — GogoPing',
   'Sprint 5 — Carry-over + 신규',
   '주요 이슈',
-  '기술 조사',
+  '§ 기술 조사',
+  '기술 조사 — VLA 데모',
+  '기술 조사 — VLA? (ROI 우회)',
+  '기술 조사 — Depth 카메라',
+  '기술 조사 — 상태 검출',
   '남은 스프린트',
   '감사합니다',
 ];
@@ -61,6 +71,21 @@ async function loadSlides() {
 
 async function initPresentation() {
   await loadSlides();
+
+  // 영상 element 가 자연 비율과 다르게 그려지는 케이스 (회전 메타데이터 등)
+  // → 실제 videoWidth/Height 비율 기반으로 명시적 width 지정 (max-width 도 무시).
+  window.fitVideoBox = function (v) {
+    if (!v.videoWidth || !v.videoHeight) return;
+    var h = parseFloat(getComputedStyle(v).height);
+    if (!h || h < 10) return;
+    var w = h * v.videoWidth / v.videoHeight;
+    v.style.width = w + 'px';
+    v.style.maxWidth = 'none';
+  };
+  document.querySelectorAll('video').forEach(function (v) {
+    if (v.readyState >= 1) window.fitVideoBox(v);
+    else v.addEventListener('loadedmetadata', function () { window.fitVideoBox(v); });
+  });
 
   Reveal.initialize({
     hash: true,
@@ -123,13 +148,73 @@ async function initPresentation() {
       updateSlidePanelActive();
     }
     event.currentSlide.querySelectorAll('video[autoplay]').forEach(function (v) {
-      v.currentTime = 0;
+      // slide 가 visible 된 시점에 다시 fit (hidden 상태에서는 getComputedStyle 부정확)
+      if (window.fitVideoBox) window.fitVideoBox(v);
+      var offset = parseFloat(v.dataset.syncOffset || '0');
+      v.currentTime = offset;
+      var base = parseFloat(v.dataset.baseRate || '1');
+      v.playbackRate = base;
       v.play().catch(function () {});
+
+      // loop 후에도 offset 유지
+      if (offset > 0 && !v._syncBound) {
+        v._syncBound = true;
+        var lastT = offset;
+        v.addEventListener('timeupdate', function () {
+          if (v.currentTime < lastT - 0.5) {
+            v.currentTime = offset;
+          }
+          lastT = v.currentTime;
+        });
+      }
+    });
+
+    // data-sync-videos="true" — master 기준으로 slave 들 연속 싱크.
+    // 드리프트 0.6s 이상이면 slave 의 currentTime 을 master 에 맞춤.
+    if (event.currentSlide.getAttribute('data-sync-videos') === 'true') {
+      var videos = event.currentSlide.querySelectorAll('video');
+      var masterIdx = parseInt(event.currentSlide.getAttribute('data-sync-master-idx') || '0');
+      if (videos.length >= 2 && videos[masterIdx]) {
+        var master = videos[masterIdx];
+        master.addEventListener('timeupdate', function () {
+          for (var i = 0; i < videos.length; i++) {
+            if (i === masterIdx) continue;
+            var slave = videos[i];
+            // master loop 시점에 slave 도 0 으로
+            // master 가 slave 보다 뒤면 slave 를 master 위치로 당김 (앞이면 그대로)
+            var drift = slave.currentTime - master.currentTime;
+            if (drift > 0.6 || drift < -0.6) {
+              slave.currentTime = master.currentTime;
+            }
+          }
+        });
+      }
+    }
+
+    // 속도 버튼 active 상태 reset (1x default)
+    event.currentSlide.querySelectorAll('.speed-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.speed === '1');
     });
   });
 
   Reveal.on('fragmentshown',  function (e) { handleFragment(e, true); });
   Reveal.on('fragmenthidden', function (e) { handleFragment(e, false); });
+
+  // 속도 버튼 클릭 — 현재 슬라이드의 모든 영상 playbackRate 변경
+  document.body.addEventListener('click', function (e) {
+    var btn = e.target.closest('.speed-btn');
+    if (!btn) return;
+    var speed = parseFloat(btn.dataset.speed);
+    var slide = Reveal.getCurrentSlide();
+    if (!slide) return;
+    slide.querySelectorAll('video').forEach(function (v) {
+      var base = parseFloat(v.dataset.baseRate || '1');
+      v.playbackRate = speed * base;
+    });
+    slide.querySelectorAll('.speed-btn').forEach(function (b) {
+      b.classList.toggle('active', b === btn);
+    });
+  });
 }
 
 /* ===== Tree / Sprint 동적 하이라이팅 엔진 ===== */
