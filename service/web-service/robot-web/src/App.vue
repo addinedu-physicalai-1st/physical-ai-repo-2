@@ -25,6 +25,7 @@ import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
 import FollowFaceAuth from '@/gogoping/FollowFaceAuth.vue';
+import HideAndSeekGame from '@/gogoping/HideAndSeekGame.vue';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
 import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
 
@@ -89,6 +90,10 @@ const showGogopingFollowAuth = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '추종'
 );
 
+const isHideAndSeek = computed<boolean>(
+  () => robot.value.id === 'gogoping' && currentMode.value === '숨바꼭질',
+);
+
 async function onFollowAuthenticated(_name: string): Promise<void> {
   voiceController.speak('선생님 확인 완료, 추종을 시작합니다.');
   try {
@@ -148,6 +153,7 @@ function handleStart(): void {
       @authenticated="onFollowAuthenticated"
       @cancel="onFollowAuthCancel"
     />
+    <HideAndSeekGame v-if="isHideAndSeek" />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}
