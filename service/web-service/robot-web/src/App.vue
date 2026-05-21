@@ -25,6 +25,7 @@ import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
 import FollowFaceAuth from '@/gogoping/FollowFaceAuth.vue';
+import HideAndSeekGame from '@/gogoping/HideAndSeekGame.vue';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
 import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
 
@@ -66,6 +67,9 @@ const showMugunghwa = computed(() => robot.value.id === 'eduping' && currentMode
 
 const showGogopingManual = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '수동'
+);
+const showGogopingHideAndSeek = computed(
+  () => robot.value.id === 'gogoping' && currentMode.value === '숨바꼭질'
 );
 
 // gogoping 일 때만 useCameraPan 인스턴스를 생성해서 두 컴포넌트 공유
@@ -148,6 +152,7 @@ function handleStart(): void {
       @authenticated="onFollowAuthenticated"
       @cancel="onFollowAuthCancel"
     />
+    <HideAndSeekGame v-if="showGogopingHideAndSeek" />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}
