@@ -93,12 +93,42 @@ case "$ACTION" in
       echo "[device-gogoping-sim] modes 인자: $MODES_ARGS"
     fi
 
+    # GOGOPING_MAP / GOGOPING_WORLD env 로 PGM·Gazebo world 후보 swap 가능 —
+    # ~/pingdergarten-maps/cand_XX/{map.yaml,world.sdf} 같은 외부 후보 디렉토리를 빌드 없이 테스트.
+    # 미지정 시 sim.launch.py 의 default (install/share 안 map.yaml + pingdergarten.world) 사용.
+    # GOGOPING_SPAWN_X/Y/Z/YAW 로 Pinky 스폰 위치 override (m, rad). PGM 의 origin 좌표계 기준.
+    SIM_LAUNCH_ARGS=""
+    if [[ -n "${GOGOPING_MAP:-}" ]]; then
+      SIM_LAUNCH_ARGS+=" map:=$GOGOPING_MAP"
+      echo "[device-gogoping-sim] GOGOPING_MAP=$GOGOPING_MAP"
+    fi
+    if [[ -n "${GOGOPING_WORLD:-}" ]]; then
+      SIM_LAUNCH_ARGS+=" world:=$GOGOPING_WORLD"
+      echo "[device-gogoping-sim] GOGOPING_WORLD=$GOGOPING_WORLD"
+    fi
+    if [[ -n "${GOGOPING_SPAWN_X:-}" ]]; then
+      SIM_LAUNCH_ARGS+=" spawn_x:=$GOGOPING_SPAWN_X"
+      echo "[device-gogoping-sim] GOGOPING_SPAWN_X=$GOGOPING_SPAWN_X"
+    fi
+    if [[ -n "${GOGOPING_SPAWN_Y:-}" ]]; then
+      SIM_LAUNCH_ARGS+=" spawn_y:=$GOGOPING_SPAWN_Y"
+      echo "[device-gogoping-sim] GOGOPING_SPAWN_Y=$GOGOPING_SPAWN_Y"
+    fi
+    if [[ -n "${GOGOPING_SPAWN_Z:-}" ]]; then
+      SIM_LAUNCH_ARGS+=" spawn_z:=$GOGOPING_SPAWN_Z"
+      echo "[device-gogoping-sim] GOGOPING_SPAWN_Z=$GOGOPING_SPAWN_Z"
+    fi
+    if [[ -n "${GOGOPING_SPAWN_YAW:-}" ]]; then
+      SIM_LAUNCH_ARGS+=" spawn_yaw:=$GOGOPING_SPAWN_YAW"
+      echo "[device-gogoping-sim] GOGOPING_SPAWN_YAW=$GOGOPING_SPAWN_YAW"
+    fi
+
     # tmux 3.4 의 server idle 종료 회피: sleep 으로 띄우고 respawn
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n gazebo \
       -c "$REPO_ROOT" "sleep infinity"
     tmux set-option -t "$SESSION" -g remain-on-exit on
     tmux respawn-pane -k -t "$SESSION:gazebo" -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch gogoping_bringup sim.launch.py"
+      "$SOURCE_ENV && exec ros2 launch gogoping_bringup sim.launch.py$SIM_LAUNCH_ARGS"
 
     # window 1: graph-router (vertex 그래프 + 다익스트라 + nav2 위임)
     tmux new-window -t "$SESSION" -n graph-router -c "$REPO_ROOT" \
