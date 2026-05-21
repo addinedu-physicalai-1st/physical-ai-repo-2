@@ -10,6 +10,14 @@
  */
 import { ref, type Ref } from 'vue';
 
+// 음성 경로 디버그 로그 (WebRTC 연결 lifecycle + DC msg + wake score) on/off.
+// 평소엔 false, 임계값 튜닝·연결 트러블슈팅 시 true. warn 은 항상 출력.
+export const LOG_VOICE_DEBUG = false;
+
+function dlog(...args: unknown[]): void {
+  if (LOG_VOICE_DEBUG) console.log(...args);
+}
+
 export interface UseWebRTCVoiceOptions {
   /** robot id — /offer 시 서버에 동봉하여 session.robot 미리 세팅. wake 없이도
    *  ai-service intent dispatch 가 올바른 robot persona 로 라우팅되게 함. */
@@ -81,7 +89,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
       console.warn('[WebRTC] already started');
       return;
     }
-    console.log('[WebRTC] starting…');
+    dlog('[WebRTC] starting…');
 
     try {
       pc = new RTCPeerConnection(RTC_CONFIG);
@@ -92,7 +100,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
 
     pc.onconnectionstatechange = (): void => {
       const state = pc?.connectionState;
-      console.log('[WebRTC] connection state:', state);
+      dlog('[WebRTC] connection state:', state);
       if (state === 'connected') {
         isConnected.value = true;
         options.onConnected?.();
@@ -103,7 +111,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
     };
 
     pc.oniceconnectionstatechange = (): void => {
-      console.log('[WebRTC] ICE state:', pc?.iceConnectionState);
+      dlog('[WebRTC] ICE state:', pc?.iceConnectionState);
     };
 
     // 인바운드 — 서버가 보낸 TTS audio. <audio> 에 srcObject 로 attach.
@@ -126,16 +134,16 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
       remoteAudioEl.value.play().catch((err) => {
         console.warn('[WebRTC] remote audio autoplay failed:', err);
       });
-      console.log('[WebRTC] remote audio track attached');
+      dlog('[WebRTC] remote audio track attached');
     };
 
     // DataChannel — 클라가 먼저 생성. 서버 (aiortc) 가 ondatachannel 로 받는다.
     dc = pc.createDataChannel('control');
     dc.onopen = (): void => {
-      console.log('[WebRTC] DataChannel open');
+      dlog('[WebRTC] DataChannel open');
     };
     dc.onclose = (): void => {
-      console.log('[WebRTC] DataChannel close');
+      dlog('[WebRTC] DataChannel close');
     };
     dc.onerror = (ev): void => {
       console.warn('[WebRTC] DataChannel error:', ev);
@@ -147,7 +155,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
       } catch {
         /* 텍스트 그대로 전달 */
       }
-      console.log('[WebRTC] DC msg:', parsed);
+      dlog('[WebRTC] DC msg:', parsed);
       options.onMessage?.(parsed);
     };
 
@@ -223,7 +231,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
       }
       const answer = (await res.json()) as RTCSessionDescriptionInit;
       await pc.setRemoteDescription(answer);
-      console.log('[WebRTC] answer applied, waiting for ICE…');
+      dlog('[WebRTC] answer applied, waiting for ICE…');
     } catch (e) {
       options.onError?.(`signaling 실패: ${(e as Error).message}`);
       stop();
@@ -245,7 +253,7 @@ export function useWebRTCVoice(options: UseWebRTCVoiceOptions): UseWebRTCVoiceRe
   }
 
   function stop(): void {
-    console.log('[WebRTC] stopping');
+    dlog('[WebRTC] stopping');
     if (levelRafId !== null) {
       window.cancelAnimationFrame(levelRafId);
       levelRafId = null;

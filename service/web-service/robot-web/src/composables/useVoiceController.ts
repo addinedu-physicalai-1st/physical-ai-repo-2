@@ -24,7 +24,7 @@ import { type RobotConfig, type EmotionId } from '@/config/robots';
 import { isEmotionId } from '@/config/emotions';
 import { useTTS } from './useTTS';
 import { useWakeWord } from './useWakeWord';
-import { useWebRTCVoice } from './useWebRTCVoice';
+import { useWebRTCVoice, LOG_VOICE_DEBUG } from './useWebRTCVoice';
 import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
 import type { IntentResponse } from './useIntentDispatch';
@@ -35,9 +35,6 @@ const WAKE_THRESHOLDS: Record<string, number> = {
   gogoping: 0.99,
   noriarm: 0.99,
 };
-
-// 호출어 추론 점수 콘솔 로그 — 임계값 튜닝·인식률 확인용. 평소엔 false, 디버깅 시 true.
-const LOG_WAKE_SCORES = false;
 
 // 호출어 사이클 효과음 — listening 시작/종료 신호. Ubuntu Yaru sound theme
 // (bell.oga / complete.oga, CC-BY-SA-4.0) 를 mp3 로 변환해 번들.
@@ -171,7 +168,7 @@ export function useVoiceController(robot: RobotConfig): {
     onWake: () => {
       try { onWakeDetected(); } catch (e) { voice.setError((e as Error).message); }
     },
-    onScore: LOG_WAKE_SCORES ? (s) => { console.log('[wake]', s); } : undefined,
+    onScore: LOG_VOICE_DEBUG ? (s) => { console.log('[wake]', s); } : undefined,
     onError: (m) => voice.setError(`wake: ${m}`),
   });
 
