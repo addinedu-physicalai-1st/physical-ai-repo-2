@@ -1,0 +1,155 @@
+<section data-scenario="sprint-tl" style="padding:30px 50px">
+  <p class="font-display text-em-xs" style="letter-spacing:0.2em;color:#FFE5A8">JIRA</p>
+  <h2 class="font-display text-em-lg mt-1">스프린트 타임라인</h2>
+
+  <!-- SVG timeline track with nodes and edges -->
+  <svg viewBox="0 0 1000 64" style="width:100%;max-width:1100px;display:block;margin:20px auto 0">
+    <!-- Horizontal edges between sprint nodes -->
+    <path class="tree-edge" id="sp-e1" d="M96,32 L178,32"/>
+    <path class="tree-edge" id="sp-e2" d="M222,32 L321,32"/>
+    <path class="tree-edge" id="sp-e3" d="M365,32 L464,32"/>
+    <path class="tree-edge" id="sp-e4" d="M508,32 L607,32"/>
+    <path class="tree-edge" id="sp-e5" d="M651,32 L749,32"/>
+    <path class="tree-edge" id="sp-e6" d="M793,32 L892,32"/>
+
+    <!-- Sprint nodes (circles) -->
+    <g class="tree-node" id="sp-n1">
+      <circle cx="75" cy="32" r="21"/>
+      <text x="75" y="39" text-anchor="middle" font-size="16">1</text>
+    </g>
+    <g class="tree-node" id="sp-n2">
+      <circle cx="200" cy="32" r="21"/>
+      <text x="200" y="39" text-anchor="middle" font-size="16">2</text>
+    </g>
+    <g class="tree-node" id="sp-n3">
+      <circle cx="343" cy="32" r="21"/>
+      <text x="343" y="39" text-anchor="middle" font-size="16">3</text>
+    </g>
+    <g class="tree-node" id="sp-n4">
+      <circle cx="486" cy="32" r="21"/>
+      <text x="486" y="39" text-anchor="middle" font-size="16">4</text>
+    </g>
+    <g class="tree-node" id="sp-n5">
+      <circle cx="629" cy="32" r="21"/>
+      <text x="629" y="39" text-anchor="middle" font-size="16">5</text>
+    </g>
+    <g class="tree-node" id="sp-n6">
+      <circle cx="771" cy="32" r="21"/>
+      <text x="771" y="39" text-anchor="middle" font-size="16">6</text>
+    </g>
+    <g class="tree-node" id="sp-n7">
+      <circle cx="914" cy="32" r="21"/>
+      <text x="914" y="39" text-anchor="middle" font-size="16">7</text>
+    </g>
+  </svg>
+
+  <!-- Detail cards grid aligned under SVG nodes -->
+  <div class="sprint-tl-cards" style="grid-template-columns:repeat(7, 1fr)">
+    <!-- Sprint 1 -->
+    <div class="sprint-tl-card" id="sp-card-1">
+      <div class="sprint-tl-card-name">Sprint 1</div>
+      <div class="sprint-tl-card-date">04/22 — 23</div>
+      <div class="sprint-tl-card-days">2일</div>
+      <div class="sprint-tl-card-desc">주제 선정</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp1-bar" style="width:0%;background:linear-gradient(90deg,#F8B4C4,#FFD3DD)">
+          <span id="sp1-label" style="opacity:0">100%</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp1-count">-</div>
+    </div>
+
+    <!-- Sprint 2 -->
+    <div class="sprint-tl-card" id="sp-card-2">
+      <div class="sprint-tl-card-name">Sprint 2</div>
+      <div class="sprint-tl-card-date">04/25 — 30</div>
+      <div class="sprint-tl-card-days">6일</div>
+      <div class="sprint-tl-card-desc">상세 설계</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp2-bar" style="width:0%;background:linear-gradient(90deg,#B5E6D8,#D6F2E8)">
+          <span id="sp2-label" style="opacity:0">100%</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp2-count">-</div>
+    </div>
+
+    <!-- Sprint 3 -->
+    <div class="sprint-tl-card" id="sp-card-3">
+      <div class="sprint-tl-card-name">Sprint 3</div>
+      <div class="sprint-tl-card-date">05/01 — 07</div>
+      <div class="sprint-tl-card-days">7일</div>
+      <div class="sprint-tl-card-desc">스캐폴드 + 조사</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp3-bar" style="width:0%;background:linear-gradient(90deg,#C9B6E4,#E2D4F0)">
+          <span id="sp3-label" style="opacity:0">100%</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp3-count">-</div>
+    </div>
+
+    <!-- Sprint 4 (current) -->
+    <div class="sprint-tl-card" id="sp-card-4">
+      <div class="sprint-tl-card-name" style="color:#A67C00">Sprint 4</div>
+      <div class="sprint-tl-card-date">05/08 — 14</div>
+      <div class="sprint-tl-card-days" style="color:#A67C00;font-weight:700">7일</div>
+      <div class="sprint-tl-card-desc" style="color:#A67C00;font-weight:700">구현 week1</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp4-bar" style="width:0%;background:linear-gradient(90deg,#FFE5A8,#FFF0CC)">
+          <span id="sp4-label" style="opacity:0;color:var(--ink)">39%</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp4-count">-</div>
+    </div>
+
+    <!-- Sprint 5 -->
+    <div class="sprint-tl-card" id="sp-card-5">
+      <div class="sprint-tl-card-name">Sprint 5</div>
+      <div class="sprint-tl-card-date">05/15 — 21</div>
+      <div class="sprint-tl-card-days">7일</div>
+      <div class="sprint-tl-card-desc">구현 week2</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp5-bar" style="width:0%;background:var(--border)">
+          <span id="sp5-label" style="opacity:0">-</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp5-count">예정</div>
+    </div>
+
+    <!-- Sprint 6 -->
+    <div class="sprint-tl-card" id="sp-card-6">
+      <div class="sprint-tl-card-name">Sprint 6</div>
+      <div class="sprint-tl-card-date">05/22 — 28</div>
+      <div class="sprint-tl-card-days">7일</div>
+      <div class="sprint-tl-card-desc">통합 테스트</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp6-bar" style="width:0%;background:var(--border)">
+          <span id="sp6-label" style="opacity:0">-</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp6-count">예정</div>
+    </div>
+
+    <!-- Sprint 7 -->
+    <div class="sprint-tl-card" id="sp-card-7">
+      <div class="sprint-tl-card-name">Sprint 7</div>
+      <div class="sprint-tl-card-date">05/29 — 06/04</div>
+      <div class="sprint-tl-card-days">7일</div>
+      <div class="sprint-tl-card-desc">최종 발표</div>
+      <div class="sprint-tl-bar-bg">
+        <div class="sprint-bar" id="sp7-bar" style="width:0%;background:var(--border)">
+          <span id="sp7-label" style="opacity:0">-</span>
+        </div>
+      </div>
+      <div class="sprint-tl-card-count" id="sp7-count">예정</div>
+    </div>
+  </div>
+
+  <div class="step-info mt-2">
+    <span class="font-display" style="color:#F8B4C4">&rarr;</span> 키를 눌러 스프린트 진행을 확인하세요.
+  </div>
+
+  <span class="fragment" data-fragment-index="1" style="display:none"></span>
+  <span class="fragment" data-fragment-index="2" style="display:none"></span>
+  <span class="fragment" data-fragment-index="3" style="display:none"></span>
+  <span class="fragment" data-fragment-index="4" style="display:none"></span>
+</section>
