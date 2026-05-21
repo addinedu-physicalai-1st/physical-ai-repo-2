@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from .dance_audio import TARGET_SAMPLE_RATE, decode_to_pcm_s16le_mono_16k
+from .joint_limits import clip_positions as _clip_joint_positions
 
 FRAME_TYPE_MOTION = 0x01
 FRAME_TYPE_AUDIO = 0x02
@@ -114,7 +115,9 @@ async def iter_home_ramp_frames(
     start_mono = time.monotonic()
     for t_s, pos in keyframes:
         t_ms = int(round(t_s * 1000))
-        payload = struct.pack(f"<{joint_count}f", *pos)
+        # 관리자 UI 가 좁힌 안전 범위로 clip — joint_limits.json 의 라이브 캐시 적용.
+        clipped = _clip_joint_positions(joint_names, pos)
+        payload = struct.pack(f"<{joint_count}f", *clipped)
         yield (FRAME_TYPE_MOTION, t_ms, payload)
         if realtime:
             target = start_mono + t_s
@@ -201,7 +204,8 @@ async def iter_dance_frames(
 
         if t_s <= motion_total_s:
             pos = _interp_joint_positions(routine.keyframes, t_s, joint_count)
-            payload = struct.pack(f"<{joint_count}f", *pos)
+            clipped = _clip_joint_positions(routine.joint_names, pos)
+            payload = struct.pack(f"<{joint_count}f", *clipped)
             yield (FRAME_TYPE_MOTION, t_ms, payload)
 
         if pcm:

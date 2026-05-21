@@ -77,6 +77,51 @@ if ! "$PY" -c "from PyQt5 import QtCore" >/dev/null 2>&1; then
   "$PY" -m pip install -e "$REPO_ROOT"
 fi
 
-echo "[ui-admin] launching admin UI ($ENV_DESC, $PY)"
+if ! "$PY" -c "from PyQt5.QtWebEngineWidgets import QWebEngineView" >/dev/null 2>&1; then
+  echo "[ui-admin] PyQtWebEngine 미설치 — EduPing 3D 뷰어·별창 비교에 필요"
+  "$PY" -m pip install PyQtWebEngine
+fi
+
+# EduPing 탭의 3D 뷰어가 leader bringup 의 `/eduping/leader/joint_states` 를 직접
+# 받기 위해 rclpy 가 필요. PY 의 site-packages 가 ROS 의 python path 를 못 찾는
+# 경우가 흔해 (특히 conda env), 여기서 ROS env 와 workspace overlay 를 source 해
+# PYTHONPATH·LD_LIBRARY_PATH 를 설정한다. ROS 미설치 환경에서는 조용히 패스 — 그
+# 경우 admin-app 의 EduPing 탭에서 "rclpy 시작 실패" 안내가 뜬다.
+ROS_SETUP_CANDIDATES=(
+  "/opt/ros/jazzy/setup.bash"
+  "/opt/ros/humble/setup.bash"
+  "/opt/ros/iron/setup.bash"
+)
+# ROS setup.bash references several env vars (AMENT_TRACE_SETUP_FILES, COLCON_*,
+# AMENT_CURRENT_PREFIX 등) that may be unset on a fresh shell. Our `set -u` would
+# abort the whole script on first reference. Temporarily relax around source.
+set +u
+for cand in "${ROS_SETUP_CANDIDATES[@]}"; do
+  if [[ -f "$cand" ]]; then
+    # shellcheck disable=SC1090
+    source "$cand"
+    echo "[ui-admin] sourced ROS: $cand"
+    break
+  fi
+done
+
+# eduping controller workspace overlay (sensor_msgs 등은 ROS base 에서, 커스텀
+# 메시지·노드는 워크스페이스에서). 빌드 안 됐으면 패스.
+WS_SETUP="$REPO_ROOT/controller/eduping-controller/install/setup.bash"
+if [[ -f "$WS_SETUP" ]]; then
+  # shellcheck disable=SC1090
+  source "$WS_SETUP"
+  echo "[ui-admin] sourced workspace: $WS_SETUP"
+fi
+set -u
+
+# Qt WebEngine → Chromium: prefer hardware WebGL (see app/admin-app/webengine_gpu.py).
+# Override entirely: QTWEBENGINE_CHROMIUM_FLAGS="..."
+if [[ -z "${QTWEBENGINE_CHROMIUM_FLAGS:-}" ]]; then
+  export QTWEBENGINE_CHROMIUM_FLAGS="--enable-gpu --enable-webgl --ignore-gpu-blocklist --enable-accelerated-2d-canvas --disable-software-rasterizer --use-gl=desktop"
+fi
+
+echo "[ui-admin] launching admin UI ($ENV_DESC, $PY) ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-unset}"
+echo "[ui-admin] QTWEBENGINE_CHROMIUM_FLAGS=${QTWEBENGINE_CHROMIUM_FLAGS}"
 cd "$APP_DIR"
 exec "$PY" main.py

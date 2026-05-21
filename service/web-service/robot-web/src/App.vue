@@ -22,6 +22,21 @@ import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
 import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
+import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
+import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
+
+// `?embed=openarm`         → fullscreen OpenArm viewer for the PyQt admin app
+// `?embed=openarm-compare` → side-by-side two-viewer comparison popup
+const embedMode = (() => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return new URLSearchParams(window.location.search).get('embed');
+  } catch {
+    return null;
+  }
+})();
+const isAdminOpenArmEmbed = embedMode === 'openarm';
+const isAdminOpenArmCompare = embedMode === 'openarm-compare';
 
 const mode = useModeStore();
 const voice = useVoiceStore();
@@ -80,7 +95,11 @@ function handleStart(): void {
 </script>
 
 <template>
-  <div class="app" :class="`bg-${robot.id}`">
+  <!-- Embed mode for the PyQt admin app's QWebEngineView — fullscreen OpenArm
+       viewer, no overlays/voice/mode-selector. -->
+  <AdminOpenArmEmbed v-if="isAdminOpenArmEmbed" />
+  <AdminOpenArmCompare v-else-if="isAdminOpenArmCompare" />
+  <div v-else class="app" :class="`bg-${robot.id}`">
     <EmotionDisplay :emotion="currentEmotion" />
     <BottomDock />
     <ModeSelectorFab />

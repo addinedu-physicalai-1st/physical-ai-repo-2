@@ -28,6 +28,7 @@ dependencies = [
   "opencv-python-headless>=4.10",
   # Admin UI
   "PyQt5>=5.15",
+  "PyQtWebEngine>=5.15",
   # Arduino serial bridge (gogoping_camera_pan)
   "pyserial>=3.5",
   # Admin UI ↔ Control Server teleop (HTTP/WS)
