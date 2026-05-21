@@ -6,6 +6,7 @@ import { useVoiceStore } from '@/stores/voice';
 import { useVoiceController, type VoiceController } from '@/composables/useVoiceController';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useModeAnnouncer } from '@/composables/useModeAnnouncer';
+import { postModeClick } from '@/composables/useIntentDispatch';
 import EmotionDisplay from '@/common/EmotionDisplay.vue';
 import ModeSelectorFab from '@/common/ModeSelectorFab.vue';
 import BottomDock from '@/common/BottomDock.vue';
@@ -22,6 +23,7 @@ import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
 import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
+import FollowFaceAuth from '@/gogoping/FollowFaceAuth.vue';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
 import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
 
@@ -80,6 +82,31 @@ onBeforeUnmount(() => {
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
 
+// 추종 모드 동안 FollowFaceAuth 가 항상 mount — 인증 전엔 중앙 모달, 인증 후엔 좌상단 PiP 로
+// 디버그용 카메라 뷰를 유지. 모드를 벗어나면 unmount 되며 카메라 정지.
+const showGogopingFollowAuth = computed(
+  () => robot.value.id === 'gogoping' && currentMode.value === '추종'
+);
+
+async function onFollowAuthenticated(_name: string): Promise<void> {
+  voiceController.speak('선생님 확인 완료, 추종을 시작합니다.');
+  try {
+    await postModeClick('추종', robot.value.id);
+  } catch {
+    /* BT 미연결이어도 UI 는 진행 */
+  }
+}
+
+async function onFollowAuthCancel(): Promise<void> {
+  // 인증 취소 — 모드를 대기로 되돌리면 showGogopingFollowAuth=false → 오버레이 unmount + 카메라 정지.
+  mode.setMode('대기');
+  try {
+    await postModeClick('대기', robot.value.id);
+  } catch {
+    /* 무시 */
+  }
+}
+
 // 모드 전환 시 voiceController.speak 로 서버 TTS 안내, BGM mp3 도 같이 처리.
 useModeAnnouncer(voiceController, {
   자장가: { src: '/audio/lullaby.mp3', loop: true, volume: 0.7 },
@@ -113,6 +140,12 @@ function handleStart(): void {
     <MugunghwaGame v-if="showMugunghwa" />
     <CameraView v-if="showGogopingManual" />
     <PanTiltControl v-if="showGogopingManual" />
+    <FollowFaceAuth
+      v-if="showGogopingFollowAuth"
+      :active="showGogopingFollowAuth"
+      @authenticated="onFollowAuthenticated"
+      @cancel="onFollowAuthCancel"
+    />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}

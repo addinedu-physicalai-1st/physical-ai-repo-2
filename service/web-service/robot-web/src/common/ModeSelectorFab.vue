@@ -77,6 +77,8 @@ async function select(id: string): Promise<void> {
   }
   mode.setMode(id);
   closeDrawer();
+  // gogoping 의 '추종' 은 교사 얼굴 인증 게이트가 책임짐 — 인증 성공 후 App.vue 에서 postModeClick 을 호출한다.
+  if (robot.value.id === 'gogoping' && id === '추종') return;
   try {
     await postModeClick(id, robot.value.id);
   } catch { /* backend 오류는 UI에 영향 없음 */ }

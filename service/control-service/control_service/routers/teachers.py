@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from control_service.config import settings
-from control_service.deps import require_teacher
+from control_service.deps import require_device_token, require_teacher
 from control_service.face_recognition import extract_embedding
 from control_service.schemas import (
     TeacherColleagueOut,
@@ -189,13 +189,16 @@ async def upload_face_images(
 @router.post("/match-face", response_model=TeacherMatchOut)
 async def match_face(
     file: UploadFile = File(...),
-    _: User = Depends(require_teacher),
+    _: None = Depends(require_device_token),
     db: AsyncSession = Depends(get_session),
 ) -> TeacherMatchOut:
     """입력 얼굴 이미지를 등록 교사 임베딩과 비교해 가장 가까운 교사를 반환한다.
 
     pgvector cosine distance (`<=>`) 최소값을 채택. `settings.face_match_threshold`
-    (0.45) 이하만 matched=true. 등록된 교사 임베딩이 없으면 matched=false."""
+    (0.45) 이하만 matched=true. 등록된 교사 임베딩이 없으면 matched=false.
+
+    인증: robot-web (GogoPing) 의 추종 진입 게이트에서 호출하므로 device token 만 허용.
+    teacher 세션 사용처가 생기면 OR 의존으로 확장."""
     threshold = settings.face_match_threshold
 
     content = await file.read()

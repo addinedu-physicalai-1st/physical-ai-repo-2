@@ -53,6 +53,8 @@ export const useModeStore = defineStore('mode', () => {
     switch (response.kind) {
       case 'mode_change':
         setMode(response.mode);
+        // gogoping '추종' 은 얼굴 인증 게이트가 책임 — 음성 진입도 동일하게 차단.
+        if (robot.value.id === 'gogoping' && response.mode === '추종') break;
         // BT 측에도 전달 — robot-web 의 mode 변경이 voice intent 일 때도
         // ModeSelectorFab 클릭 경로와 동일하게 control-service → BT 까지 도달해야
         // admin UI 의 BT state 도 동기화됨. fetch 실패는 무시 (UI 영향 없음).
