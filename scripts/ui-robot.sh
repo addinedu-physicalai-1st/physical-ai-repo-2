@@ -31,6 +31,14 @@ if [[ ! -d "$APP_DIR/node_modules" ]]; then
   (cd "$APP_DIR" && npm install)
 fi
 
+if [[ "$ROBOT" == "noriarm" ]]; then
+  echo "[ui-robot] NoriArm 모델 점검 (블럭쌓기 ACT)"
+  if ! conda run -n jazzy python "$REPO_ROOT/scripts/noriarm_check_models.py"; then
+    echo "[ui-robot] 모델 점검 실패 — 인터넷 연결 확인 후 다시 시도하세요" >&2
+    exit 1
+  fi
+fi
+
 echo "[ui-robot] $ROBOT 인스턴스 시작 (http://localhost:5173/)"
 cd "$APP_DIR"
 VITE_ROBOT="$ROBOT" exec npm run dev -- --host
