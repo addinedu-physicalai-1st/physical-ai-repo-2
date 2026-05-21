@@ -210,17 +210,23 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-PLAY-003 | 블럭쌓기 | NoriArm 이 블럭쌓기 모드에 진입해 참가 아이 1명과 블럭 5개를 번갈아 쌓는 협동 놀이를 아래 단계 머신으로 진행한다. | High |
+| SR-PLAY-003 | 블럭쌓기 | NoriArm 이 블럭쌓기 모드에 진입해 참가 아이 1명과 가위바위보로 선공을 정한 뒤 블럭 4개 (사람 색 2개 + 로봇 색 2개) 를 번갈아 쌓는 협동 놀이를 아래 단계 머신으로 진행한다. 데모 단순화를 위해 가위바위보는 로봇이 항상 "보" 를 내고 사람은 항상 "가위" 를 낸 것으로 고정 판정 → 사람이 선공. 모방학습 데이터셋이 "사람 먼저 두기" 시퀀스로 학습되어 있어 정책 입력 분포와 일치. **구현 (2026-05-21 데모 통합)**: [BlockStacking.vue](../service/web-service/robot-web/src/noriarm/BlockStacking.vue), [block_stacking.py](../service/control-service/control_service/noriarm/block_stacking.py), [runner_entry.py](../controller/noriarm-controller/src/noriarm_framework/noriarm_framework/games/block_stacking/runner_entry.py). 별도 서브프로세스 (lerobot ACTPolicy) + Control Server 세션 매니저 + HOME 복귀 2회 SIGTERM 종료. | High |
+| SR-PLAY-014 | ACT 체크포인트 사전 점검·다운로드 | NoriArm UI 부트스트랩 스크립트 (Robot UI `VITE_ROBOT=noriarm` 인스턴스 launcher) 가 시작 시 블럭쌓기 ACT 체크포인트 (`https://huggingface.co/jisoo3/act_game_block_stacking_0520`) 가 로컬 캐시 (`~/.cache/huggingface/hub/`) 에 존재하는지 확인하고, 없으면 `huggingface_hub.snapshot_download(repo_id="jisoo3/act_game_block_stacking_0520")` 로 다운로드한다. 진행률·완료 여부는 NoriArm UI 상단 배너로 표출하며, 다운로드 실패 시 블럭쌓기 모드 진입을 차단하고 에러 안내를 표시한다. | High |
+| SR-PLAY-015 | 가위바위보 선공 결정 | NoriArm 이 사전 녹화한 "보" trajectory 를 OX 퀴즈와 동일한 룰 정책 재생 방식 (§3.3 게임 프레임워크) 으로 1회 재생한다. 결과 판정은 데모용으로 사람 승 고정 (사람=가위, 로봇=보) → 사람 선공. RPS trajectory 는 매니페스트의 `replay_trajectory("rps_paper")` action 으로 노출. | High |
+| SR-PLAY-016 | 가위바위보 중 ACT 모델 로딩 | RPS 재생 (보 trajectory + 안내 음성 합성) 동안 백그라운드 태스크로 ACT 정책 가중치를 메모리·GPU 에 로드한다. RPS 단계 종료 시점에 정책 핸들이 준비되어 있어 게임 진입 지연을 시각적으로 가린다. 로드 실패 시 사용자에게 안내 후 대기 모드로 복귀. | Medium |
+| SR-PLAY-017 | 홈 포즈 복귀 감지 종료 | 게임 루프가 `/joint_states` 를 구독해 모든 관절이 사전 정의 `HOME_POSE` 와 임계 (관절별 rad 임계 + holding window) 이내로 일치한 frame 을 1회 "홈 복귀" 이벤트로 카운트한다. 누적 2회 도달 시 (= 로봇이 블럭 2개를 모두 쌓고 복귀 완료) 게임을 종료 단계로 전이시킨다. ROI 모니터링은 보조 종료 조건 (안전망) 으로 유지. | High |
 
 #### 단계 머신
 
 | 단계 | 트리거 | 동작 | 표정 | 다음 단계 |
 | --- | --- | --- | --- | --- |
-| 진입 | §8.2 명령 인터페이스의 모드 전환 | 모드 진입 | hello | 참가자 확정 |
-| 참가자 확정 | 진입 직후 | NoriArm 노트북 웹캠 + 얼굴 인식 으로 참가 아이 1명 확정 | hello | 시작 안내 |
-| 시작 안내 | 참가자 확정 | 음성 합성 으로 시작 안내 ("같이 쌓아볼까?"), 5개 출발 위치(ROI)에 블럭 5개를 1:1 매핑으로 사전 배치 — 사람 색 3개 (사람 ROI 3개) + 로봇 색 2개 (로봇 ROI 2개) | interest | 진행 |
-| 진행 | 시작 안내 또는 출발 위치에 변화 | NoriArm Top 카메라 + 객체 인식 으로 5개 출발 위치 ROI 모니터링, 로봇 ROI 2개 중 자기 색 블럭이 남아있으면 모방학습 정책 (블럭쌓기 ACT) 으로 1개 집어 쌓고 (그리퍼 카메라로 픽업 직전 정밀 검증) 홈 복귀, 로봇 ROI 가 모두 비고 사람 ROI 만 남은 상태에서는 사람 차례로 대기 | interest | (5개 ROI 모두 빔) 종료 |
-| 종료 (전역 트리거) | 5개 출발 위치 ROI 모두 빔 또는 호출어 + 자연어 종료 명령 또는 UI 종료 | 축하 음성 합성 + 대기 모드로 전환 | happy | 대기 |
+| 진입 | §8.2 명령 인터페이스의 모드 전환 | 모드 진입, 부트스트랩에서 받아둔 ACT 체크포인트 (SR-PLAY-014) 존재 재검증 | hello | 참가자 확정 |
+| 참가자 확정 | 진입 직후 | NoriArm 노트북 웹캠 + 얼굴 인식 으로 참가 아이 1명 확정 | hello | 가위바위보 |
+| 가위바위보 | 참가자 확정 | 음성 합성 으로 안내 ("가위바위보!"), OMX 팔이 사전 녹화 "보" trajectory 재생 (SR-PLAY-015). 동시에 백그라운드로 ACT 정책 로드 (SR-PLAY-016). 결과는 사람 승 고정 → 음성 합성 으로 "네가 먼저야!" 안내 | fun | 시작 안내 |
+| 시작 안내 | 가위바위보 종료 + 모델 로드 완료 | 음성 합성 으로 시작 안내 ("같이 쌓아볼까?"), 4개 출발 위치(ROI) 에 블럭 4개를 1:1 매핑으로 사전 배치 — 사람 색 2개 (사람 ROI 2개) + 로봇 색 2개 (로봇 ROI 2개), 홈 복귀 카운터 = 0 초기화 | interest | 사람 차례 |
+| 사람 차례 | 시작 안내 또는 로봇 차례 종료 | 음성 합성 으로 안내 ("이제 네 차례야"), NoriArm Top 카메라 + 객체 인식 으로 사람 ROI 변화 모니터링, 사람 ROI 1개가 비워지면 로봇 차례로 전이 | interest | 로봇 차례 |
+| 로봇 차례 | 사람 ROI 1개 비어짐 | ACT 정책으로 자기 색 블럭 1개를 집어 쌓고 (그리퍼 카메라 정밀 검증) 홈 복귀. `/joint_states` 가 HOME_POSE 임계 진입 시 홈 복귀 카운터 +1 (SR-PLAY-017) | interest | (카운터 = 2) 종료 / (카운터 < 2) 사람 차례 |
+| 종료 (전역 트리거) | 홈 복귀 카운터 = 2 또는 호출어 + 자연어 종료 명령 또는 UI 종료 | 축하 음성 합성 + 대기 모드로 전환 | happy | 대기 |
 
 ### 3.3 게임 프레임워크 (NoriArm 공통)
 
