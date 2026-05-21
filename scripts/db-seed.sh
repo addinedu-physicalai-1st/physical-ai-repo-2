@@ -2,9 +2,11 @@
 # scripts/db-seed.sh — alembic upgrade head + seed 데이터 INSERT (인터랙티브 메뉴)
 #
 # 활성 환경 감지: VIRTUAL_ENV (venv) → CONDA_ENV → CONDA_DEFAULT_ENV(base 제외)
+# DB 위치는 시작 시점에 인터랙티브로 선택 — 로컬 docker 또는 원격 backend(jungbuntu).
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 # 활성 환경에서 실행하는 헬퍼
@@ -25,9 +27,40 @@ else
   run_in_env() { conda run --no-capture-output -n "$ENV_NAME" "$@"; }
 fi
 
-# postgres 떠있는지 확인 (docker compose health status 체크)
-if ! docker compose ps postgres --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
-  echo "[db-seed] postgres 가 떠있지 않습니다. 먼저 'scripts/run_server.sh' 실행" >&2
+# DB 위치 선택 — 로컬 또는 원격. alembic / seed 가 읽는 settings.database_url 은
+# DATABASE_URL 환경변수로 override 되므로, 여기서 export 해두면 두 경로 모두 작동.
+echo ""
+echo "  DB 위치를 선택하세요"
+echo "  1) 로컬     (이 박스의 docker postgres @ localhost:5432)"
+echo "  2) 원격     (machine_ips.json 의 'jungbuntu' IP @ :5432)"
+echo ""
+read -rp "  번호 입력 [1/2]: " DB_LOCATION
+
+case "$DB_LOCATION" in
+  1)
+    DB_HOST="localhost"
+    ;;
+  2)
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/_run_lib.sh"
+    DB_HOST="$(_runlib::lookup_machine_ip jungbuntu)"
+    echo "[db-seed] backend 'jungbuntu' → $DB_HOST"
+    ;;
+  *)
+    echo "[db-seed] 잘못된 입력입니다. 1 또는 2를 입력하세요." >&2
+    exit 1
+    ;;
+esac
+
+DB_PORT="5432"
+export DATABASE_URL="postgresql+asyncpg://pingder:pingder@${DB_HOST}:${DB_PORT}/pingdergarten"
+echo "[db-seed] DATABASE_URL=$DATABASE_URL"
+
+# postgres 도달 확인 — bash 내장 /dev/tcp 로 TCP 단에서만 체크 (docker / pg_isready 의존 없음).
+if ! timeout 2 bash -c "</dev/tcp/$DB_HOST/$DB_PORT" 2>/dev/null; then
+  echo "[db-seed] postgres ($DB_HOST:$DB_PORT) 에 닿지 않습니다." >&2
+  echo "[db-seed]   로컬: 'scripts/run_db_ai.sh' 또는 'scripts/run_server.sh' 로 postgres 기동" >&2
+  echo "[db-seed]   원격: backend 박스에서 'scripts/run_db_ai.sh' 가 떠있는지 + 방화벽 / IP 확인" >&2
   exit 1
 fi
 
