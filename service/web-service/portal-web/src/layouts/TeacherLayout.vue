@@ -11,10 +11,12 @@ const route = useRoute()
 const auth = useAuthStore()
 
 const items = [
-  { to: '/teacher/dashboard', icon: 'layout-dashboard', label: '출결 보드' },
-  { to: '/teacher/children',  icon: 'users-round',     label: '어린이 관리' },
-  { to: '/teacher/menu',      icon: 'utensils',        label: '점심메뉴' },
-  { to: '/teacher/reports',   icon: 'file-text',       label: '일과 보고서' },
+  { to: '/teacher/dashboard',  icon: 'layout-dashboard', label: '출결 보드' },
+  { to: '/teacher/children',   icon: 'users-round',     label: '어린이 관리' },
+  { to: '/teacher/menu',       icon: 'utensils',        label: '점심메뉴' },
+  { to: '/teacher/reports',    icon: 'file-text',       label: '일과 보고서' },
+  { to: '/teacher/profile',    icon: 'user',            label: '내 정보' },
+  { to: '/teacher/colleagues', icon: 'users',           label: '교사 목록' },
 ]
 
 const userMenuOpen = ref(false)

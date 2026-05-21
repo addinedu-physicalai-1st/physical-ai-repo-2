@@ -8,6 +8,8 @@ from control_db.models.report import Report
 from control_db.models.photo import Photo, PhotoSubject
 from control_db.models.face_image import ChildFaceImage
 from control_db.models.face_embedding import ChildFaceEmbedding
+from control_db.models.teacher_face_image import TeacherFaceImage
+from control_db.models.teacher_face_embedding import TeacherFaceEmbedding
 
 __all__ = [
     "Base",
@@ -19,4 +21,6 @@ __all__ = [
     "Photo", "PhotoSubject",
     "ChildFaceImage",
     "ChildFaceEmbedding",
+    "TeacherFaceImage",
+    "TeacherFaceEmbedding",
 ]

@@ -146,3 +146,54 @@ class RegisterParentResponse(BaseModel):
 
 class ReportPatchPayload(BaseModel):
     content: str
+
+
+# ---------- Teachers (SR-REG-011/012, SR-OPS-019, SR-CAR-009) ----------
+
+class TeacherProfileOut(BaseModel):
+    id: UUID
+    email: EmailStr
+    name: str
+    phone: str | None
+    birth_date: DateType | None
+    address: str | None
+    class_name: str | None
+    hired_date: DateType | None
+    emergency_contact: str | None
+    photo_url: str | None
+    face_registered: bool
+    face_image_count: int
+
+
+class TeacherUpdatePayload(BaseModel):
+    name: str | None = None
+    phone: str | None = None
+    birth_date: DateType | None = None
+    address: str | None = None
+    class_name: str | None = None
+    hired_date: DateType | None = None
+    emergency_contact: str | None = None
+
+
+class TeacherColleagueOut(BaseModel):
+    id: UUID
+    name: str
+    class_name: str | None
+    phone: str | None
+    emergency_contact: str | None
+    photo_url: str | None
+    hired_date: DateType | None
+
+
+class TeacherFaceStatusOut(BaseModel):
+    registered: bool
+    image_count: int
+    updated_at: datetime | None
+
+
+class TeacherMatchOut(BaseModel):
+    teacher_id: UUID | None
+    name: str | None
+    distance: float | None
+    threshold: float
+    matched: bool

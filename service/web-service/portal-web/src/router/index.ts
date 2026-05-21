@@ -23,6 +23,8 @@ const routes = [
       { path: 'children/new',  component: () => import('@/views/teacher/Register.vue') },
       { path: 'menu',      component: () => import('@/views/teacher/Menu.vue') },
       { path: 'reports',   component: () => import('@/views/teacher/Reports.vue') },
+      { path: 'profile',    component: () => import('@/views/teacher/Profile.vue') },
+      { path: 'colleagues', component: () => import('@/views/teacher/Colleagues.vue') },
     ],
   },
 

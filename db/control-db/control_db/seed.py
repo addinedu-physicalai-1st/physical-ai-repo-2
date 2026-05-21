@@ -53,8 +53,21 @@ async def seed_teacher(session: AsyncSession, helper: PasswordHelper) -> None:
     ).scalar_one_or_none()
     if existing:
         existing.hashed_password = helper.hash(SEED_PASSWORD)
+        # nullable 인적사항 컬럼은 비어있을 때만 backfill (사용자 입력 덮어쓰지 않음)
+        if existing.phone is None:
+            existing.phone = "010-1111-2222"
+        if existing.birth_date is None:
+            existing.birth_date = date(1985, 3, 12)
+        if existing.address is None:
+            existing.address = "서울시 강남구 테헤란로 123"
+        if existing.class_name is None:
+            existing.class_name = "햇님반"
+        if existing.hired_date is None:
+            existing.hired_date = date(2024, 3, 2)
+        if existing.emergency_contact is None:
+            existing.emergency_contact = "010-3333-4444"
         await session.commit()
-        print(f"[seed] teacher@test.com 비밀번호 = {SEED_PASSWORD} (갱신)")
+        print(f"[seed] teacher@test.com 비밀번호 = {SEED_PASSWORD} (갱신 + 인적사항 백필)")
         return
 
     user = User(
@@ -65,7 +78,12 @@ async def seed_teacher(session: AsyncSession, helper: PasswordHelper) -> None:
         is_superuser=False,
         role="teacher",
         name="노영주",
-        phone=None,
+        phone="010-1111-2222",
+        birth_date=date(1985, 3, 12),
+        address="서울시 강남구 테헤란로 123",
+        class_name="햇님반",
+        hired_date=date(2024, 3, 2),
+        emergency_contact="010-3333-4444",
     )
     session.add(user)
     await session.commit()
