@@ -7,7 +7,7 @@
 #   * use_sim_time: False           (실 시계 사용 — gazebo /clock 불필요)
 #   * AMCL 모션모델 alpha: 0.2      (실 휠 encoder 노이즈 반영, sim 의 0.05 와 다름)
 #   * AMCL sigma_hit: 0.05          (실 LIDAR 정밀도 — sim 의 0.1 보다 엄격)
-#   * AMCL initial_pose:            실 환경 spawn 위치 (지금은 sim 과 동일 0.2/-7.0 둠.
+#   * AMCL initial_pose:            실 환경 spawn 위치 (지금은 sim 과 동일 0.0/0.0/yaw=0 둠.
 #                                    launch arg `initial_pose_x/y/yaw` 로 override 가능)
 #   * frame_id: namespace 없음      (실물 vicpinky_bringup 의 TF: odom / base_footprint / base_link)
 #                                    sim 은 gogoping/base_footprint 등 namespace 사용.
@@ -59,10 +59,10 @@ amcl:
     scan_topic: /gogoping/scan
     set_initial_pose: true
     initial_pose:
-      x: 0.20
-      y: -7.00
+      x: 0.0
+      y: 0.0
       z: 0.0
-      yaw: 1.5708
+      yaw: 0.0
 
 
 map_server:

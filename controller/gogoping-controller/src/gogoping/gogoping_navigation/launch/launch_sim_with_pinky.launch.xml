@@ -3,10 +3,10 @@
 <!--
   핑더가든 가제보 시뮬레이션 + Vic Pinky 스폰.
 
-  스폰 위치 기본값: 입구 (world frame).
-    x = 0.20  (입구 중앙)
-    y = -7.00 (입구 남측, 복도 진입 전 위치)
-    Y(yaw) = 1.5708 (북쪽 = 복도 방향)
+  스폰 위치 기본값 (world frame).
+    x = 0.0
+    y = 0.0
+    Y(yaw) = 0.0 (동쪽 = +X 방향)
 
   vicpinky_description / vicpinky_gazebo 가 빌드/소싱돼 있어야 함.
 -->
@@ -18,10 +18,10 @@
     <arg name="gui" default="true"/>
 
     <!-- Pinky spawn pose (world frame) -->
-    <arg name="spawn_x" default="0.20"/>
-    <arg name="spawn_y" default="-7.00"/>
+    <arg name="spawn_x" default="0.0"/>
+    <arg name="spawn_y" default="0.0"/>
     <arg name="spawn_z" default="0.10"/>
-    <arg name="spawn_yaw" default="1.5708"/>
+    <arg name="spawn_yaw" default="0.0"/>
 
     <!-- vicpinky_description 부모 경로 추가 → model://vicpinky_description/... 해석 가능 -->
     <set_env name="GZ_SIM_RESOURCE_PATH"

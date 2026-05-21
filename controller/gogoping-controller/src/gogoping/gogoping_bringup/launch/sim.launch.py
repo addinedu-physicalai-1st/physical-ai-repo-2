@@ -62,13 +62,13 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             "spawn_x",
-            default_value="0.20",
-            description="Pinky spawn x (world frame, m). default = 입구 중앙",
+            default_value="0.0",
+            description="Pinky spawn x (world frame, m).",
         ),
         DeclareLaunchArgument(
             "spawn_y",
-            default_value="-7.00",
-            description="Pinky spawn y (world frame, m). default = 입구 남측",
+            default_value="0.0",
+            description="Pinky spawn y (world frame, m).",
         ),
         DeclareLaunchArgument(
             "spawn_z",
@@ -77,8 +77,8 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             "spawn_yaw",
-            default_value="1.5708",
-            description="Pinky spawn yaw (rad). default = 1.5708 (북향)",
+            default_value="0.0",
+            description="Pinky spawn yaw (rad). default = 0.0 (동향, +X)",
         ),
         IncludeLaunchDescription(
             AnyLaunchDescriptionSource(sim_with_nav2_xml),
