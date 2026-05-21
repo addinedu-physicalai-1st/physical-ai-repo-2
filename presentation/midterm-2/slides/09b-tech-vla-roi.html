@@ -18,32 +18,21 @@
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:16px">
 
     <div class="pastel-card" style="border-color:#FFD3DD;padding:14px 20px">
-      <div style="display:flex;align-items:baseline;gap:10px">
-        <span style="font-family:'Jua';font-size:0.7em;color:#F8B4C4;letter-spacing:0.15em">전처리</span>
-        <span class="font-display" style="font-size:1.1em;color:#4A2F28">ROI 좌표 매핑</span>
-      </div>
+      <div style="font-family:'Jua';font-size:0.7em;color:#F8B4C4;letter-spacing:0.15em">전처리</div>
+      <div class="font-display" style="font-size:1.1em;color:#4A2F28;margin-top:4px">ROI 좌표 매핑</div>
       <div style="color:#6D4C41;font-size:0.85em;margin-top:6px;line-height:1.55;word-break:keep-all">
-        자연어 instruction 못 받음 → 물체 위치 ROI 로 우회
+        자연어 instruction 못 받음<br/>→ 물체 위치 ROI로 우회
       </div>
     </div>
 
     <div class="pastel-card" style="border-color:#D6F2E8;padding:14px 20px">
-      <div style="display:flex;align-items:baseline;gap:10px">
-        <span style="font-family:'Jua';font-size:0.7em;color:#2E7D66;letter-spacing:0.15em">결과</span>
-        <span class="font-display" style="font-size:1.1em;color:#2E7D66">효과 확인 ✓</span>
-      </div>
+      <div style="font-family:'Jua';font-size:0.7em;color:#2E7D66;letter-spacing:0.15em">검증 · prompt swap</div>
+      <div class="font-display" style="font-size:1.1em;color:#4A2F28;margin-top:4px">L2 ratio</div>
       <div style="color:#6D4C41;font-size:0.85em;margin-top:6px;line-height:1.55;word-break:keep-all">
-        <strong>grounding / attention</strong> 으로 model 이 ROI 인지 검증
+        5종 prompt 로 action L2 측정<br/>cross / within ratio ↑ &nbsp; <strong>grounding 강함</strong>
       </div>
     </div>
 
-  </div>
-
-  <div class="speed-controls" style="margin-top:12px">
-    <button class="speed-btn" data-speed="0.5">0.5x</button>
-    <button class="speed-btn active" data-speed="1">1x</button>
-    <button class="speed-btn" data-speed="1.5">1.5x</button>
-    <button class="speed-btn" data-speed="2">2x</button>
   </div>
 
   <aside class="notes">VLA? — 영상 위, 카드 2개 아래로 배치.</aside>
