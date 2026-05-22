@@ -550,9 +550,10 @@ class MapView(QWidget):
             for px, py in self._plan[1:]:
                 path.lineTo(self._map_to_widget(px, py))
             qp.drawPath(path)
-        # 웨이포인트 마커 (graph 모드에서만) — zoom 에 따라 마커/폰트 같이 확대
+        # 웨이포인트 마커 (graph 모드에서만) — zoom 에 sqrt 비례.
+        # 선형이면 확대 시 노드가 화면을 덮어 답답 → 라벨 폰트와 동일하게 sqrt.
         if self._display_mode == 'graph':
-            z = self._zoom
+            z = math.sqrt(self._zoom)
             # lanes — 회색 선 (마커보다 먼저 그려서 마커가 위에 오게).
             # 편집 모드 hover/selected lane 은 굵게 강조.
             wp_by_name = {w["name"]: w for w in self._waypoints}
@@ -620,8 +621,8 @@ class MapView(QWidget):
                 qp.setPen(QPen(QColor(border_color), border_width))
                 qp.setBrush(QBrush(QColor(fill_color)))
                 qp.drawEllipse(p, r, r)
-                # 라벨: zoom 의 sqrt 비례 — 확대해도 천천히 커짐 (인접 충돌 완화)
-                fsize = max(7, int(round(7 * math.sqrt(z))))
+                # 라벨: z 가 이미 sqrt(zoom) 이므로 그대로 사용 (인접 충돌 완화)
+                fsize = max(7, int(round(7 * z)))
                 qp.setFont(QFont("", fsize, QFont.Bold))
                 fm = qp.fontMetrics()
                 tw = fm.horizontalAdvance(w["name"]) + 6
