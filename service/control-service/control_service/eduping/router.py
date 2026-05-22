@@ -345,6 +345,33 @@ async def arm_return_home(req: Request, body: ReturnHomeIn) -> dict:
         raise HTTPException(400, str(e)) from e
 
 
+class HighfiveHandTargetIn(BaseModel):
+    """DepthViewer 가 보낸 손 3D 위치 (d435 optical frame, meters)."""
+    x: float = Field(..., description="optical X (right, m)")
+    y: float = Field(..., description="optical Y (down, m)")
+    z: float = Field(..., description="optical Z (forward = depth, m)")
+    frame_id: str | None = Field(
+        default=None,
+        description="기본 d435_depth_optical_frame. 다른 frame 사용 시 명시 — TF 트리에 존재해야 함.",
+    )
+
+
+@router.post("/highfive/hand-target")
+async def highfive_hand_target(req: Request, body: HighfiveHandTargetIn) -> dict:
+    """DepthViewer (또는 외부 트리거) → ROS PointStamped /eduping/highfive/hand_point.
+
+    highfive_node 가 이 topic 을 subscribe — TF (frame_id → world) → IK → JointTrajectory.
+    본 endpoint 는 publish 만 하고 반환 (fire-and-forget); 실제 모션 완료는 player 측에서.
+    """
+    bridge = _bridge(req)
+    frame_id = body.frame_id or "d435_depth_optical_frame"
+    try:
+        bridge.publish_highfive_target(body.x, body.y, body.z, frame_id=frame_id)
+    except BridgeUnavailable as e:
+        raise HTTPException(503, str(e)) from e
+    return {"ok": True, "frame_id": frame_id, "point": {"x": body.x, "y": body.y, "z": body.z}}
+
+
 @router.websocket("/dance/stream")
 async def dance_stream_ws(websocket: WebSocket) -> None:
     """율동 모드 단일 양방향 채널.

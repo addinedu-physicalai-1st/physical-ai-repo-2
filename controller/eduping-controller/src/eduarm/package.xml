@@ -18,6 +18,24 @@
   <exec_depend>builtin_interfaces</exec_depend>
   <!-- feetech leader 노드 (실물 mini leader) 는 후속 PR — scservo_sdk 의존 추가 예정 -->
 
+  <!-- octomap_demo.launch.py 가 띄우는 외부 노드들 -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>moveit_ros_move_group</exec_depend>
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>openarm_bimanual_moveit_config</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>octomap_rviz_plugins</exec_depend>
+  <!-- 실 D435 깊이 토픽 publish. apt install ros-jazzy-realsense2-camera 필요.
+       sim 만 돌릴 거면 octomap_demo_sim.launch.py 가 이 의존성 우회. -->
+  <exec_depend>realsense2_camera</exec_depend>
+  <!-- Phase 3 — cartesian-velocity servo + collision-aware halting. -->
+  <exec_depend>moveit_servo</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <!-- Phase 4 — servo_reach_node 가 사용. -->
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+
   <export>
     <build_type>ament_python</build_type>
   </export>

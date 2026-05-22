@@ -23,15 +23,23 @@ export interface HandPoint {
 
 export interface UseHandTracker {
   hand: Ref<HandPoint | null>;
+  /** MediaPipe 가 `onResults` 를 최소 1회 호출했는지 — model 다운로드 + WebGL 컨텍스트
+   *  초기화가 끝났다는 신호. 손이 실제로 검출됐는지와는 무관. UI 의 'loading…' 표시
+   *  해제용으로 사용한다 (손이 안 보여도 트래커는 살아있음). */
+  ready: Ref<boolean>;
   /** Returns false if previous detect still pending (skip). */
   detect(img: ImageBitmap | HTMLCanvasElement | HTMLVideoElement): boolean;
   close(): Promise<void>;
 }
 
 export function useHandTracker(): UseHandTracker {
+  console.log('[useHandTracker] constructing Hands instance');
   const hands = new Hands({
-    locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`,
+    locateFile: (file) => {
+      const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`;
+      console.log('[useHandTracker] locateFile →', url);
+      return url;
+    },
   });
   hands.setOptions({
     maxNumHands: 1,
@@ -41,10 +49,28 @@ export function useHandTracker(): UseHandTracker {
   });
 
   const hand = ref<HandPoint | null>(null);
+  const ready = ref(false);
   let busy = false;
+
+  // Force the WASM + model download up-front via initialize(). Otherwise the first
+  // hands.send() implicitly triggers init but if WASM fails to load (CDN block,
+  // network), send() never resolves and onResults never fires → loading 무한.
+  // initialize() returns a Promise we can hook up to set ready independently of
+  // actual hand detections.
+  hands
+    .initialize()
+    .then(() => {
+      console.log('[useHandTracker] MediaPipe Hands ready (WASM + model loaded)');
+      if (!ready.value) ready.value = true;
+    })
+    .catch((err) => {
+      console.error('[useHandTracker] MediaPipe Hands init FAILED:', err);
+      // ready 그대로 false — UI 'loading…' 으로 남아 사용자에게 시각 신호.
+    });
 
   hands.onResults((results: Results) => {
     busy = false;
+    if (!ready.value) ready.value = true;
     const lms = results.multiHandLandmarks?.[0];
     if (!lms || lms.length === 0) {
       hand.value = null;
@@ -63,8 +89,13 @@ export function useHandTracker(): UseHandTracker {
     };
   });
 
+  let firstSendLogged = false;
   function detect(img: ImageBitmap | HTMLCanvasElement | HTMLVideoElement): boolean {
     if (busy) return false;
+    if (!firstSendLogged) {
+      console.log('[useHandTracker] first detect() call — passing image to MediaPipe');
+      firstSendLogged = true;
+    }
     busy = true;
     // MediaPipe runtime accepts ImageBitmap (verified in shipped solutions API)
     // but the TS types only allow HTMLImageElement | HTMLVideoElement | HTMLCanvasElement.
@@ -79,5 +110,5 @@ export function useHandTracker(): UseHandTracker {
     await hands.close();
   }
 
-  return { hand, detect, close };
+  return { hand, ready, detect, close };
 }

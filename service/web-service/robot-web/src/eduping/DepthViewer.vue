@@ -94,7 +94,10 @@ function handleFrame(frame: DecodedDepthFrame): void {
         if (!ok) bm.close();
       }).catch((e) => console.warn('hand decode:', e));
     }
-    if (!firstResultReceived && tracker.hand.value !== null) {
+    // MediaPipe 가 첫 onResults 를 한 번 부르면 트래커 자체는 살아있는 것 — 손이
+    // 실제로 잡혔는지 (hand.value !== null) 와 무관하게 로딩 표시를 끈다.
+    // 이전 로직은 손이 안 보이면 'loading…' 이 영원히 안 풀려 사용자가 혼란.
+    if (!firstResultReceived && tracker.ready.value) {
       firstResultReceived = true;
       handLoading.value = false;
     }

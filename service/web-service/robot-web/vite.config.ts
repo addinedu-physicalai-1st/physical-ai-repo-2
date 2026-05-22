@@ -67,6 +67,15 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               ws: true,
             },
+            // EduPing D435 depth stream — 동일 streaming uvicorn (port 8100) 의
+            // depth WS router. 4b98dc6 (D435 뎁스카메라 스트리밍 + 하이파이브 뷰 탭
+            // 추가) 가 클라/서버 코드는 추가했지만 이 proxy rule 과 streaming/app.py
+            // 의 include_router 가 빠져있어 브라우저 → 5173 → 8100 hop 이 닿지 않았다.
+            '/ws/depth-stream': {
+              target: streamingTarget,
+              changeOrigin: true,
+              ws: true,
+            },
           },
     },
     test: {
