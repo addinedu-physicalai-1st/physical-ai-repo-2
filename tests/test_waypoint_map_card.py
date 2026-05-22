@@ -9,13 +9,10 @@ pytest.importorskip("PyQt5")
 def card(qtbot, tmp_path, monkeypatch):
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app/admin-app"))
-    svg = tmp_path / "admin_map.svg"
-    svg.write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 881 720" '
-        'width="881" height="720"><rect width="881" height="720" fill="#FAF7F2"/></svg>',
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("PINGDER_ADMIN_MAP_SVG", str(svg))
+    pgm = tmp_path / "map_v2.pgm"
+    # 최소 P5 PGM (2x2, 전부 흰색). QPixmap 이 valid 로 로드 가능.
+    pgm.write_bytes(b"P5\n2 2\n255\n\xff\xff\xff\xff")
+    monkeypatch.setenv("PINGDER_ADMIN_MAP_PGM", str(pgm))
     from widgets.waypoint_map_card import WaypointMapCard
     w = WaypointMapCard(control_url="http://localhost:0")
     qtbot.addWidget(w)
@@ -26,9 +23,9 @@ def test_card_creates_without_error(card):
     assert card is not None
 
 
-def test_card_loads_svg(card):
-    assert card._svg_renderer is not None
-    assert card._svg_renderer.isValid()
+def test_card_loads_map(card):
+    assert card._map_pixmap is not None
+    assert not card._map_pixmap.isNull()
 
 
 def test_sse_event_updates_robot(qtbot, card):

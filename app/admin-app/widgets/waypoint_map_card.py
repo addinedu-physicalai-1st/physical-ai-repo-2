@@ -1,4 +1,4 @@
-"""웨이포인트 맵 카드 — 카툰 SVG + 노드 마커 + 로봇 + 라이브 경로 + 사이드 리스트.
+"""웨이포인트 맵 카드 — SLAM PGM 배경 + 노드 마커 + 로봇 + 라이브 경로 + 사이드 리스트.
 
 rclpy 직접 import 금지 — Control Server REST/SSE 만 사용."""
 
@@ -8,34 +8,32 @@ import json
 import math
 import os
 import pathlib
-import re
 import time
 from typing import Any
 
 from PyQt5.QtCore import Qt, QTimer, QPointF, QRectF, QSize, QThread, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QBrush
-from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QBrush, QPixmap
 from PyQt5.QtWidgets import (
     QAction, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMenu, QMessageBox, QPushButton, QStackedWidget,
     QVBoxLayout, QWidget,
 )
 
-DEFAULT_SVG = (pathlib.Path(__file__).resolve().parents[3]
-               / "controller/gogoping-controller/src/gogoping/gogoping_navigation"
-               / "models/pingdergarten/admin_map.svg")
+DEFAULT_MAP_PGM = (pathlib.Path(__file__).resolve().parents[3]
+                   / "controller/gogoping-controller/src/gogoping/gogoping_navigation"
+                   / "maps/map_v2.pgm")
 
 
-def _svg_path() -> pathlib.Path:
-    return pathlib.Path(os.environ.get("PINGDER_ADMIN_MAP_SVG", str(DEFAULT_SVG)))
+def _map_pgm_path() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("PINGDER_ADMIN_MAP_PGM", str(DEFAULT_MAP_PGM)))
 
 
 class MapView(QWidget):
-    """SVG 배경 + 마커/로봇/경로 오버레이 + Nav2 Goal 클릭-드래그."""
+    """SLAM PGM 배경 + 마커/로봇/경로 오버레이 + Nav2 Goal 클릭-드래그."""
 
-    MAP_ORIGIN = (-11.0, -9.0)
-    MAP_RES = 0.025
-    MAP_SIZE = (881, 720)
+    MAP_ORIGIN = (-9.485, -8.342)
+    MAP_RES = 0.050
+    MAP_SIZE = (575, 467)
     DRAG_MIN_PX = 12          # 이보다 짧은 드래그는 클릭 실수로 간주, goal 무시
     NODE_HIT_PX = 16          # 편집 모드 노드 hit 반경 (widget px)
     LANE_HIT_PX = 8           # 편집 모드 lane hit perpendicular 거리 (widget px)
@@ -59,16 +57,8 @@ class MapView(QWidget):
         self.setFocusPolicy(Qt.StrongFocus)            # Esc 키 받을 수 있게
         self.setCursor(Qt.CrossCursor)                  # 맵 위 커서 십자
         self.setMouseTracking(True)                     # hover 좌표 표시용
-        self._svg = QSvgRenderer(str(_svg_path()))
-        # graph 모드 전용 SVG — 영역 라벨 (<text>) 제거. waypoint 이름과 겹치는 것 방지.
-        try:
-            svg_text = pathlib.Path(_svg_path()).read_text(encoding='utf-8')
-            svg_no_label = re.sub(r'<text\b[^>]*>.*?</text>', '', svg_text, flags=re.DOTALL)
-            self._svg_no_label = QSvgRenderer()
-            self._svg_no_label.load(svg_no_label.encode('utf-8'))
-        except OSError:
-            self._svg_no_label = self._svg  # fallback
-        # 표시 모드: 'map' = SVG + 로봇/경로만, 'graph' = + waypoint 마커
+        self._map_pixmap = QPixmap(str(_map_pgm_path()))
+        # 표시 모드: 'map' = 배경 + 로봇/경로만, 'graph' = + waypoint 마커
         self._display_mode: str = 'graph'
         # zoom/pan — Ctrl + 휠로 줌인/아웃, 마우스 위치 중심
         self._zoom: float = 1.0
@@ -545,12 +535,12 @@ class MapView(QWidget):
     def paintEvent(self, _evt: Any) -> None:
         qp = QPainter(self)
         qp.setRenderHint(QPainter.Antialiasing, True)
-        active_svg = self._svg_no_label if self._display_mode == 'graph' else self._svg
-        if active_svg.isValid():
+        qp.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        if not self._map_pixmap.isNull():
             W = self.width(); H = self.height()
             target = QRectF(self._pan.x(), self._pan.y(),
                             W * self._zoom, H * self._zoom)
-            active_svg.render(qp, target)
+            qp.drawPixmap(target, self._map_pixmap, QRectF(self._map_pixmap.rect()))
         # 라이브 경로
         if len(self._plan) >= 2:
             pen = QPen(QColor("#00A86B"), 3, Qt.DashLine)
@@ -973,7 +963,7 @@ class WaypointMapCard(QFrame):
         layout.addLayout(body)
 
         # 테스트 접근용
-        self._svg_renderer = self._map._svg
+        self._map_pixmap = self._map._map_pixmap
 
         QTimer.singleShot(0, self._refresh_list)
 

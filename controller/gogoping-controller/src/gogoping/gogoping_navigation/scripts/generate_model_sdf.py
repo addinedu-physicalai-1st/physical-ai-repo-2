@@ -14,8 +14,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 # 패키지 source tree 기준 상대 경로
 _PKG_ROOT = Path(__file__).resolve().parents[1]
-MAP_PGM  = _PKG_ROOT / 'maps' / 'map.pgm'
-MAP_YAML = _PKG_ROOT / 'maps' / 'map.yaml'
+MAP_PGM  = _PKG_ROOT / 'maps' / 'map_v2.pgm'
+MAP_YAML = _PKG_ROOT / 'maps' / 'map_v2.yaml'
 OUT_DIR  = _PKG_ROOT / 'models' / 'pingdergarten'
 TEX_DIR  = OUT_DIR / 'materials' / 'textures'
 
