@@ -39,13 +39,21 @@ const blobActive = computed(
   () => voiceMode.value === 'voice' && state.value === 'listening'
 );
 
+// 텍스트 모드에선 모드 화면 (z-index 50~80) 위로 입력창을 끌어올림.
+// WarningModal (9999) 보단 아래에 두어 경고가 뜨면 그쪽이 우선되게 함.
+const textActive = computed(() => voiceMode.value === 'text');
+
 function switchToText(): void {
   voice.setVoiceMode('text');
 }
 </script>
 
 <template>
-  <div class="dock" :class="{ 'dock-top': blobActive }" :style="{ '--primary': primary }">
+  <div
+    class="dock"
+    :class="{ 'dock-top': blobActive, 'dock-text': textActive }"
+    :style="{ '--primary': primary }"
+  >
     <!-- Legacy caption hidden in favor of Premium Subtitles in EmotionDisplay -->
     <!-- <div class="caption-container">
       <VoiceCaption :text="captionText" />
@@ -86,6 +94,10 @@ function switchToText(): void {
 .dock.dock-top {
   /* WarningModal (9999), MugunghwaGame 토스트 (1000) 위로 — 호출어 활성 동안 항상 최상위 */
   z-index: 100000;
+}
+.dock.dock-text {
+  /* 모드 화면 (50~80) 위로 입력창 노출. WarningModal (9999) 아래라 경고가 뜨면 가려짐. */
+  z-index: 100;
 }
 
 /* 휴대전화 공통: SiriBlob 자체 크기 축소 (interactive 한 발화 반응은 SiriBlob 의 scale 로 충분히 잘 보임) */
