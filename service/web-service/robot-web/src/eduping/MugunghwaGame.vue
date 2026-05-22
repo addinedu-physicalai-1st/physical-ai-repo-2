@@ -19,8 +19,9 @@ import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
 import { useFaceDetector } from '@/composables/useFaceDetector';
-import { useFaceTracker, type Bbox, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
 import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
+import { mapMatchesToTracks, postRecognizeMulti } from '@/composables/identifyTracksFromFrame';
 import OpenarmViewer from './OpenarmViewer.vue';
 import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 
@@ -44,7 +45,7 @@ const STAGE_META: Record<Stage, StageMeta> = {
 
 const STAGES: Stage[] = ['entry', 'ready', 'song', 'observation', 'eliminationWait', 'end'];
 
-interface ChildRoster { id: number; name: string }
+interface ChildRoster { id: number; name: string; photo_url?: string | null }
 interface Participant {
   id: number;
   name: string;
@@ -56,7 +57,7 @@ interface Participant {
   reached: boolean;
   /** 도착한 순서 (1, 2, 3...). 도착 토글 해제 시 null. */
   place: number | null;
-  /** 등록 시 카메라에서 잘라낸 얼굴 썸네일 (data URL). 없으면 이니셜 표시. */
+  /** 등록된 얼굴 사진 (/api/face-images/...). 없으면 이니셜 표시. */
   faceUrl?: string;
 }
 
@@ -129,6 +130,7 @@ async function loadRoster(): Promise<void> {
       eliminated: false,
       reached: false,
       place: null,
+      faceUrl: c.photo_url ?? undefined,
     }));
     if (participants.value.length === 0) {
       rosterError.value = '등록된 어린이가 없어요. 포털에서 먼저 등록해주세요.';
@@ -488,7 +490,6 @@ function restartGame(): void {
     p.eliminated = false;
     p.reached = false;
     p.place = null;
-    p.faceUrl = undefined;
   }
   setStage('entry');
 }
@@ -701,86 +702,13 @@ async function captureFullFrame(): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9));
 }
 
-function cropFaceDataUrl(bitmap: ImageBitmap, bbox: number[]): string {
-  // bbox = [x1, y1, x2, y2] in source-pixel coords. 15% 패딩으로 머리/얼굴 좀 넉넉히.
-  const [x1, y1, x2, y2] = bbox;
-  const w = x2 - x1;
-  const h = y2 - y1;
-  const padX = w * 0.15;
-  const padY = h * 0.15;
-  const sx = Math.max(0, x1 - padX);
-  const sy = Math.max(0, y1 - padY);
-  const sw = Math.min(bitmap.width - sx, w + padX * 2);
-  const sh = Math.min(bitmap.height - sy, h + padY * 2);
-  // 썸네일 128 정사각으로 cover-crop. 디스플레이도 원형 아바타.
-  const target = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = target;
-  canvas.height = target;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-  // 종횡비 보존하며 cover (가운데 정렬).
-  const scale = Math.max(target / sw, target / sh);
-  const drawW = sw * scale;
-  const drawH = sh * scale;
-  const dx = (target - drawW) / 2;
-  const dy = (target - drawH) / 2;
-  ctx.drawImage(bitmap, sx, sy, sw, sh, dx, dy, drawW, drawH);
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
-
 async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
   const video = videoRef.value;
   if (!video || video.readyState < 2) return [];
-  // crop bitmap 도 같이 만들어 register 시 썸네일 즉시 확보.
-  let bitmap: ImageBitmap | null = null;
-  try {
-    const fullBlob = await captureFullFrame();
-    if (fullBlob) bitmap = await createImageBitmap(fullBlob);
-  } catch { /* noop */ }
-  const form = new FormData();
-  const trackOrder: TrackedFace[] = [];
-  for (const t of tracks) {
-    const blob = await cropTrack(video, t.bbox);
-    if (!blob) continue;
-    form.append('files', blob, `track-${t.trackId}.jpg`);
-    trackOrder.push(t);
-  }
-  if (trackOrder.length === 0) { bitmap?.close?.(); return []; }
-  try {
-    const res = await fetch('/api/attendance/recognize-crops', {
-      method: 'POST',
-      headers: { 'X-Device-Token': DEVICE_TOKEN },
-      body: form,
-    });
-    if (!res.ok) { bitmap?.close?.(); return []; }
-    const body = await res.json() as {
-      matches: Array<{ matched: boolean; child_id: number | null; child_name: string | null; distance: number | null }>;
-    };
-    const results: IdentityResult[] = body.matches.map((m, i) => ({
-      trackId: trackOrder[i].trackId,
-      childId: m.matched ? m.child_id : null,
-      childName: m.matched ? m.child_name : null,
-      distance: m.distance,
-    }));
-    // bitmap + bbox 로 썸네일 즉시 등록 (registered 토글은 applyEntryBindings 에서).
-    if (bitmap) {
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i];
-        const t = trackOrder[i];
-        if (!r.childId) continue;
-        const p = participants.value.find((x) => x.id === r.childId);
-        if (p && !p.faceUrl) {
-          try { p.faceUrl = cropFaceDataUrl(bitmap, t.bbox); } catch { /* noop */ }
-        }
-      }
-      bitmap.close?.();
-    }
-    return results;
-  } catch {
-    bitmap?.close?.();
-    return [];
-  }
+  const fullBlob = await captureFullFrame();
+  if (!fullBlob) return [];
+  const matches = await postRecognizeMulti(fullBlob, DEVICE_TOKEN);
+  return mapMatchesToTracks(tracks, matches).map((p) => p.result);
 }
 
 function applyEntryBindings(): void {
@@ -793,23 +721,6 @@ function applyEntryBindings(): void {
     pushToast(`${p.name} 등록!`, p.faceUrl);
     void tts.speak(`${p.name} 등록 완료`).catch(() => { /* TTS off */ });
   }
-}
-
-async function cropTrack(video: HTMLVideoElement, bbox: Bbox): Promise<Blob | null> {
-  const [x1, y1, x2, y2] = bbox;
-  const padX = (x2 - x1) * 0.15;
-  const padY = (y2 - y1) * 0.15;
-  const sx = Math.max(0, x1 - padX);
-  const sy = Math.max(0, y1 - padY);
-  const sw = Math.min(video.videoWidth - sx, (x2 - x1) + padX * 2);
-  const sh = Math.min(video.videoHeight - sy, (y2 - y1) + padY * 2);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(sw);
-  canvas.height = Math.round(sh);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
 }
 
 let detectorRafId: number | null = null;

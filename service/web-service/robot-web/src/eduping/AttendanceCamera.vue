@@ -4,8 +4,9 @@ import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
 import { useFaceDetector } from '@/composables/useFaceDetector';
-import { useFaceTracker, type Bbox, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
 import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
+import { mapMatchesToTracks, postRecognizeMulti } from '@/composables/identifyTracksFromFrame';
 
 const props = defineProps<{
   /** 'IN' (등원) or 'OUT' (하원). null 이면 카메라 정지. */
@@ -167,54 +168,23 @@ const detector = useFaceDetector({
   },
 });
 
-/** 새 stable track 들의 face crop 만 추출해 /recognize-crops 호출. */
+/** 전체 frame 을 /recognize-multi 로 보내고 응답 bbox 를 stable track 에 IoU 매칭. */
 async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
   const video = videoRef.value;
   if (!video || video.readyState < 2) return [];
-  const form = new FormData();
-  const trackOrder: TrackedFace[] = [];
-  for (const t of tracks) {
-    const blob = await cropTrack(video, t.bbox);
-    if (!blob) continue;
-    form.append('files', blob, `track-${t.trackId}.jpg`);
-    trackOrder.push(t);
-  }
-  if (trackOrder.length === 0) return [];
-  try {
-    const res = await fetch('/api/attendance/recognize-crops', {
-      method: 'POST',
-      headers: { 'X-Device-Token': DEVICE_TOKEN },
-      body: form,
-    });
-    if (!res.ok) return [];
-    const body = await res.json() as {
-      matches: Array<{ matched: boolean; child_id: number | null; child_name: string | null; distance: number | null }>;
-    };
-    return body.matches.map((m, i) => ({
-      trackId: trackOrder[i].trackId,
-      childId: m.matched ? m.child_id : null,
-      childName: m.matched ? m.child_name : null,
-      distance: m.distance,
-    }));
-  } catch {
-    return [];
-  }
+  const blob = await captureFullFrame(video);
+  if (!blob) return [];
+  const matches = await postRecognizeMulti(blob, DEVICE_TOKEN);
+  return mapMatchesToTracks(tracks, matches).map((p) => p.result);
 }
 
-async function cropTrack(video: HTMLVideoElement, bbox: Bbox): Promise<Blob | null> {
-  const [x1, y1, x2, y2] = bbox;
-  const padX = (x2 - x1) * 0.15;
-  const padY = (y2 - y1) * 0.15;
-  const sx = Math.max(0, x1 - padX);
-  const sy = Math.max(0, y1 - padY);
-  const sw = Math.min(video.videoWidth - sx, (x2 - x1) + padX * 2);
-  const sh = Math.min(video.videoHeight - sy, (y2 - y1) + padY * 2);
+async function captureFullFrame(video: HTMLVideoElement): Promise<Blob | null> {
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(sw);
-  canvas.height = Math.round(sh);
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  ctx.drawImage(video, 0, 0);
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
 }
 

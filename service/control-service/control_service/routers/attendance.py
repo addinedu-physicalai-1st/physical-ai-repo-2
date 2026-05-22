@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from control_service.auth import current_active_user
 from control_service.config import settings
 from control_service.deps import assert_my_child, require_device_token, require_teacher
-from control_service.face_recognition import extract_embedding, extract_embeddings_all, extract_embedding_from_crop
+from control_service.face_recognition import extract_embedding, extract_embeddings_all
 from control_service.schemas import (
     AttendanceCheckPayload,
     AttendanceCheckResult,
@@ -269,57 +269,6 @@ async def recognize_face(
         child_name=child_name,
         distance=float(distance),
     )
-
-
-@router.post(
-    "/attendance/recognize-crops",
-    response_model=FaceRecognizeMultiResult,
-    dependencies=[Depends(require_device_token)],
-)
-async def recognize_face_crops(
-    files: list[UploadFile] = File(...),
-    session: AsyncSession = Depends(get_session),
-) -> FaceRecognizeMultiResult:
-    """클라이언트가 이미 face bbox 를 알고 단일 얼굴 crop 만 보낸 경우의 매칭.
-
-    각 file 은 단일 얼굴 crop. detect 단계 skip — embedding 만 추출 후 DB 매칭.
-    응답 matches 순서 = 입력 files 순서.
-    `bbox` 는 항상 None (클라가 이미 위치를 앎).
-    """
-    matches: list[FaceRecognizeSingleMatch] = []
-    for file in files:
-        content = await file.read()
-        emb = extract_embedding_from_crop(content)
-        if emb is None:
-            matches.append(FaceRecognizeSingleMatch(matched=False))
-            continue
-        stmt = (
-            select(
-                ChildFaceEmbedding.child_id,
-                Child.name,
-                ChildFaceEmbedding.embedding.cosine_distance(emb).label("distance"),
-            )
-            .join(Child, Child.id == ChildFaceEmbedding.child_id)
-            .order_by("distance")
-            .limit(1)
-        )
-        row = (await session.execute(stmt)).first()
-        if row is None:
-            matches.append(FaceRecognizeSingleMatch(matched=False))
-            continue
-        child_id, child_name, distance = row
-        if distance > settings.face_match_threshold:
-            matches.append(FaceRecognizeSingleMatch(matched=False, distance=float(distance)))
-        else:
-            matches.append(
-                FaceRecognizeSingleMatch(
-                    matched=True,
-                    child_id=child_id,
-                    child_name=child_name,
-                    distance=float(distance),
-                )
-            )
-    return FaceRecognizeMultiResult(matches=matches)
 
 
 @router.post(

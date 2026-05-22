@@ -23,7 +23,7 @@ export interface UseFaceTrackerOptions {
   expireMs?: number; // default 800
 }
 
-function iou(a: Bbox, b: Bbox): number {
+export function iou(a: Bbox, b: Bbox): number {
   const x1 = Math.max(a[0], b[0]);
   const y1 = Math.max(a[1], b[1]);
   const x2 = Math.min(a[2], b[2]);
