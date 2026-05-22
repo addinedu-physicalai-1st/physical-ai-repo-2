@@ -13,12 +13,14 @@
  * 가상 타이머 + 선택 가능한 tempo 패턴 + 선택적 mp3 재생.
  */
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { FaceMesh, type Results as FaceResults } from '@mediapipe/face_mesh';
 import type { EmotionId } from '@/config/robots';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
+import { useFaceDetector } from '@/composables/useFaceDetector';
+import { useFaceTracker, type Bbox, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
 import OpenarmViewer from './OpenarmViewer.vue';
 import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 
@@ -664,12 +666,10 @@ function teardownCamera(): void {
   cameraReady.value = false;
 }
 
-// ---- face recognition during 진입 ------------------------------------------
-// AttendanceCamera.vue 와 같은 패턴: MediaPipe FaceMesh 는 "안정적으로 얼굴이 보임" 을
-// 알려주는 게이트 역할만. 매칭은 풀 프레임 한 장을 서버에 보내 insightface 가 동일
-// det_size 안에서 모든 얼굴을 한 번에 처리. 서버측 새 엔드포인트 /api/attendance/
-// recognize-multi 가 감지된 얼굴 각각에 대해 best match 를 돌려주므로, 동시에 5명이
-// 카메라에 있어도 한 번의 POST 로 처리 — 등/하원 의 single-face 흐름을 그대로 멀티화.
+// ---- recognize-multi 응답 타입 (observation / eliminationWait 단계 전용) ------
+// 진입 단계는 아래의 useFaceDetector + useFaceTracker + useFaceIdentityCache 조합으로
+// 전환됐고, 관찰/탈락대기 단계는 임시로 풀 프레임 recognize-multi 를 계속 사용 —
+// Task 9 에서 캐시 기반으로 정리 예정.
 interface RecognizeSingleMatch {
   matched: boolean;
   child_id: number | null;
@@ -681,33 +681,27 @@ interface RecognizeMultiResult {
   matches: RecognizeSingleMatch[];
 }
 
-const STABLE_FRAMES_REQUIRED = 8;
-const MIN_RECOGNIZE_INTERVAL_MS = 1500;
-// 게이트용 — MediaPipe 는 얼굴 존재 여부만 보면 충분하지만, 다인원 동시 시 안정
-// 카운트가 흔들리지 않도록 maxNumFaces 는 5 로 둔다.
-const FACE_MESH_MAX = 5;
-
-let faceMesh: FaceMesh | null = null;
-let recognizeRafId: number | null = null;
-let recognizeBusy = false;
-let stableFrameCount = 0;
-let lastRecognizeAt = 0;
+// ---- entry 단계 face recognition (tracker + identity cache) ----------------
+// observation / eliminationWait 단계는 아직 recognizeMulti (서버 전체 프레임) 사용 —
+// Task 9 에서 캐시 기반으로 정리 예정.
 const recognitionActive = ref(false);
 
-function setupFaceMesh(): void {
-  if (faceMesh) return;
-  faceMesh = new FaceMesh({
-    locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`,
-  });
-  faceMesh.setOptions({
-    maxNumFaces: FACE_MESH_MAX,
-    refineLandmarks: false,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.6,
-  });
-  faceMesh.onResults(handleFaceResults);
-}
+const tracker = useFaceTracker();
+let latestTracks: TrackedFace[] = [];
+
+const identityCache = useFaceIdentityCache({
+  stableFramesRequired: 5,
+  identify: async (tracks): Promise<IdentityResult[]> => identifyTracks(tracks),
+});
+
+const detector = useFaceDetector({
+  onDetections: (faces) => {
+    latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
+    void identityCache.feed(latestTracks).then(() => {
+      if (stage.value === 'entry') applyEntryBindings();
+    });
+  },
+});
 
 async function captureFullFrame(): Promise<Blob | null> {
   const v = videoRef.value;
@@ -731,20 +725,6 @@ async function recognizeMulti(blob: Blob): Promise<RecognizeMultiResult | null> 
   });
   if (!res.ok) return null;
   return (await res.json()) as RecognizeMultiResult;
-}
-
-function handleFaceResults(results: FaceResults): void {
-  if (stage.value !== 'entry') return;
-  const hasFace = (results.multiFaceLandmarks?.length ?? 0) > 0;
-  if (!hasFace) {
-    stableFrameCount = 0;
-    return;
-  }
-  stableFrameCount += 1;
-  if (stableFrameCount < STABLE_FRAMES_REQUIRED) return;
-  if (recognizeBusy) return;
-  if (Date.now() - lastRecognizeAt < MIN_RECOGNIZE_INTERVAL_MS) return;
-  void runRecognize();
 }
 
 function cropFaceDataUrl(bitmap: ImageBitmap, bbox: number[]): string {
@@ -775,75 +755,121 @@ function cropFaceDataUrl(bitmap: ImageBitmap, bbox: number[]): string {
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
-async function runRecognize(): Promise<void> {
-  if (stage.value !== 'entry') return;
-  recognizeBusy = true;
-  lastRecognizeAt = Date.now();
+async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return [];
+  // crop bitmap 도 같이 만들어 register 시 썸네일 즉시 확보.
+  let bitmap: ImageBitmap | null = null;
   try {
-    const blob = await captureFullFrame();
-    if (!blob) return;
-    // 같은 프레임 비트맵으로 매칭 + 얼굴 크롭 → 등록 시 썸네일 즉시 확보.
-    let bitmap: ImageBitmap | null = null;
-    try { bitmap = await createImageBitmap(blob); } catch { /* noop */ }
-    const result = await recognizeMulti(blob);
-    if (!result?.matches?.length) {
-      bitmap?.close?.();
-      return;
-    }
-    const seen = new Set<number>();
-    for (const m of result.matches) {
-      if (!m.matched || m.child_id == null) continue;
-      if (seen.has(m.child_id)) continue;
-      seen.add(m.child_id);
-      const p = participants.value.find((x) => x.id === m.child_id);
-      if (!p || p.registered) continue;
-      if (bitmap && m.bbox && m.bbox.length === 4) {
-        try { p.faceUrl = cropFaceDataUrl(bitmap, m.bbox); } catch { /* noop */ }
+    const fullBlob = await captureFullFrame();
+    if (fullBlob) bitmap = await createImageBitmap(fullBlob);
+  } catch { /* noop */ }
+  const form = new FormData();
+  const trackOrder: TrackedFace[] = [];
+  for (const t of tracks) {
+    const blob = await cropTrack(video, t.bbox);
+    if (!blob) continue;
+    form.append('files', blob, `track-${t.trackId}.jpg`);
+    trackOrder.push(t);
+  }
+  if (trackOrder.length === 0) { bitmap?.close?.(); return []; }
+  try {
+    const res = await fetch('/api/attendance/recognize-crops', {
+      method: 'POST',
+      headers: { 'X-Device-Token': DEVICE_TOKEN },
+      body: form,
+    });
+    if (!res.ok) { bitmap?.close?.(); return []; }
+    const body = await res.json() as {
+      matches: Array<{ matched: boolean; child_id: number | null; child_name: string | null; distance: number | null }>;
+    };
+    const results: IdentityResult[] = body.matches.map((m, i) => ({
+      trackId: trackOrder[i].trackId,
+      childId: m.matched ? m.child_id : null,
+      childName: m.matched ? m.child_name : null,
+      distance: m.distance,
+    }));
+    // bitmap + bbox 로 썸네일 즉시 등록 (registered 토글은 applyEntryBindings 에서).
+    if (bitmap) {
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        const t = trackOrder[i];
+        if (!r.childId) continue;
+        const p = participants.value.find((x) => x.id === r.childId);
+        if (p && !p.faceUrl) {
+          try { p.faceUrl = cropFaceDataUrl(bitmap, t.bbox); } catch { /* noop */ }
+        }
       }
-      p.registered = true;
-      const speakName = m.child_name ?? p.name;
-      pushToast(`${speakName} 등록!`, p.faceUrl);
-      // 음성으로도 누가 등록됐는지 알림. 빠르게 연속 등록되면 자연스럽게 큐잉됨.
-      void tts.speak(`${speakName} 등록 완료`).catch(() => { /* TTS off */ });
+      bitmap.close?.();
     }
+    return results;
+  } catch {
     bitmap?.close?.();
-  } finally {
-    recognizeBusy = false;
+    return [];
   }
 }
 
-async function recognizeLoop(): Promise<void> {
-  if (stage.value !== 'entry') {
-    recognizeRafId = null;
-    return;
+function applyEntryBindings(): void {
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
+    const p = participants.value.find((x) => x.id === childId);
+    if (!p || p.registered) continue;
+    p.registered = true;
+    pushToast(`${p.name} 등록!`, p.faceUrl);
+    void tts.speak(`${p.name} 등록 완료`).catch(() => { /* TTS off */ });
   }
-  if (videoRef.value && faceMesh && videoRef.value.readyState >= 2) {
-    try { await faceMesh.send({ image: videoRef.value }); } catch { /* noop */ }
-  }
-  recognizeRafId = requestAnimationFrame(() => void recognizeLoop());
 }
 
-function startRecognition(): void {
+async function cropTrack(video: HTMLVideoElement, bbox: Bbox): Promise<Blob | null> {
+  const [x1, y1, x2, y2] = bbox;
+  const padX = (x2 - x1) * 0.15;
+  const padY = (y2 - y1) * 0.15;
+  const sx = Math.max(0, x1 - padX);
+  const sy = Math.max(0, y1 - padY);
+  const sw = Math.min(video.videoWidth - sx, (x2 - x1) + padX * 2);
+  const sh = Math.min(video.videoHeight - sy, (y2 - y1) + padY * 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(sw);
+  canvas.height = Math.round(sh);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
+}
+
+let recognizeRafId: number | null = null;
+
+function startDetectorLoop(): void {
   if (recognizeRafId !== null) return;
-  setupFaceMesh();
-  stableFrameCount = 0;
-  lastRecognizeAt = 0;
+  detector.start();
   recognitionActive.value = true;
-  recognizeRafId = requestAnimationFrame(() => void recognizeLoop());
+  const tick = async (): Promise<void> => {
+    if (videoRef.value && videoRef.value.readyState >= 2) {
+      try { await detector.send(videoRef.value); } catch { /* noop */ }
+    }
+    recognizeRafId = requestAnimationFrame(() => void tick());
+  };
+  recognizeRafId = requestAnimationFrame(() => void tick());
 }
 
-function stopRecognition(): void {
+function stopDetectorLoop(): void {
   if (recognizeRafId !== null) {
     cancelAnimationFrame(recognizeRafId);
     recognizeRafId = null;
   }
-  stableFrameCount = 0;
+  detector.close();
+  tracker.reset();
+  identityCache.reset();
+  latestTracks = [];
   recognitionActive.value = false;
 }
 
-watch(stage, (s) => {
-  if (s === 'entry') startRecognition();
-  else stopRecognition();
+watch(stage, (s, prev) => {
+  // detector 루프는 entry 부터 시작, end 시 정지. observation 에선 entry 의 캐시를
+  // 그대로 사용해야 하므로 루프 유지.
+  if (s === 'entry' && prev !== 'entry') startDetectorLoop();
+  if (s === 'end') stopDetectorLoop();
 });
 
 // ---- motion detection during 관찰 ------------------------------------------
@@ -1257,8 +1283,8 @@ onMounted(() => {
   navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
   // 첫 mount 시 단계가 'entry' 면 watch 가 한 번 안 돌므로 직접 확대 트리거.
   if (STAGES_WITH_AUTO_CAMERA.includes(stage.value)) cameraExpanded.value = true;
-  // 마찬가지로 첫 mount 가 entry 면 recognition 도 시작.
-  if (stage.value === 'entry') startRecognition();
+  // 마찬가지로 첫 mount 가 entry 면 detector loop 도 시작.
+  if (stage.value === 'entry') startDetectorLoop();
 });
 
 onUnmounted(() => {
@@ -1268,7 +1294,7 @@ onUnmounted(() => {
     songAudio.src = '';
     songAudio = null;
   }
-  stopRecognition();
+  stopDetectorLoop();
   stopMotionDetection();
   stopObservationCountdown();
   stopEliminationWait();
@@ -1276,10 +1302,6 @@ onUnmounted(() => {
   if (audioContext) {
     try { void audioContext.close(); } catch { /* noop */ }
     audioContext = null;
-  }
-  if (faceMesh) {
-    try { faceMesh.close(); } catch { /* noop */ }
-    faceMesh = null;
   }
   navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
   if (deviceChangeDebounce !== null) {
