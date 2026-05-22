@@ -851,6 +851,9 @@ watch(stage, (s, prev) => {
 // SAD (Sum of Absolute Differences, 그레이스케일 다운샘플 160x90) 비교 → 임계 초과 시
 // 카메라 PIP 빨강 플래시 + "움직였어요!" TTS (쿨다운). 누가 움직였는지는 식별하지 않고
 // 교사가 카드의 ✕ 버튼으로 직접 탈락 처리. 추후 YOLO-Pose + ByteTrack 으로 per-kid 자동화 예정.
+// 별도 1.5s 주기 probe 는 제거 — 식별이 캐시 기반이라 주기적 재호출이 불필요하고, 천천히
+// 움직이는 케이스도 8Hz motion-diff 가 누적 SAD 로 잡아내는 것을 신뢰. 잡지 못한 케이스는
+// 교사가 ✕ 로 직접 탈락 처리.
 const MOTION_DOWNSAMPLE_W = 160;
 const MOTION_DOWNSAMPLE_H = 90;
 // 평균 픽셀 변화율 임계 — 0..1 범위 (255 정규화 후 평균). 작을수록 민감.
@@ -866,7 +869,7 @@ let motionCtx: CanvasRenderingContext2D | null = null;
 let lastMotionAnnouncementAt = 0;
 // 관찰 진입 시 캡처한 각 등록 아이의 bbox 중심점 — 이후 motion 이벤트마다 비교.
 const observationBasePositions = new Map<number, { x: number; y: number }>();
-// recognize-multi inflight 가드 — 모션 이벤트가 빠르게 연속될 때 서버 중복 호출 차단.
+// 연속 motion 이벤트로 인한 setStage 중복 실행 차단. 서버 호출은 더 이상 없음.
 let moverProbeInflight = false;
 // 픽셀 단위 변위 임계. 640x480 기준 ~1.6%. strict 이상이면 즉시 탈락.
 const MOVER_DISPLACEMENT_PX = 10;
@@ -917,7 +920,7 @@ function captureObservationBaseline(): void {
 }
 
 function probeMoversAndMaybeEliminate(): void {
-  if (moverProbeInflight) return;  // 짧은 재진입 차단 (TTS race)
+  if (moverProbeInflight) return;  // 연속 motion 이벤트 중복 차단
   if (stage.value !== 'observation') return;
   moverProbeInflight = true;
   try {
