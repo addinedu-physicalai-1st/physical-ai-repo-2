@@ -73,7 +73,12 @@ async function refresh(): Promise<void> {
 }
 
 function requestPlay(item: DanceItem): void {
-  // 클릭 즉시 재생 X — 안전을 위해 확인 팝업 띄움.
+  // 이미 재생 중인 곡 카드 클릭 = 즉시 정지 (item-icon 이 이미 stop 으로 바뀌어 있는 상태).
+  if (item.slug === playingSlug.value) {
+    stop();
+    return;
+  }
+  // 다른 곡 — 클릭 즉시 재생 X. 안전을 위해 확인 팝업 띄움.
   pendingItem.value = item;
 }
 
