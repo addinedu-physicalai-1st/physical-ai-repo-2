@@ -92,6 +92,21 @@ export interface UseWakeWordOptions {
    * mic ring 은 계속 채워지므로 다음에 inference 재개 시 끊김 없음.
    */
   isEnabled?: () => boolean;
+  /**
+   * 분류기 ONNX 파일명 suffix. 미지정 → `<robotId>.onnx` (기존 openWakeWord 학습 +
+   * `<robotId>.onnx.data` 사이드카). 'v2' → `<robotId>_v2.onnx` (livekit-wakeword
+   * Piper 학습, single-file). 둘 다 (16,96) embedding 입력은 같지만:
+   *  · 입력 tensor name 이 'x' vs 'embeddings' — session.inputNames[0] 으로 동적 바인딩.
+   *  · v2 학습 측 (livekit-wakeword data/features.py) 의 mel 입력은 sf.read 의
+   *    raw [-1,1] float. 기존 frontend 의 *32767 int16-cast 가 들어가면 mel power 가
+   *    10⁹ 배 부풀어 학습 분포와 어긋나 score 가 0 부근에 박힘. v2 에선 audio scale skip.
+   */
+  modelVariant?: string;
+  /**
+   * true 면 RMS 무음 게이트 + Silero VAD 게이트 둘 다 우회. whisper 류 작은 목소리 /
+   * 디버깅 용. 평상시엔 CPU 부담 + 비음성 noise false-positive 위험 때문에 false.
+   */
+  bypassGate?: boolean;
 }
 
 export interface UseWakeWordReturn {
@@ -203,18 +218,22 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
     return new Uint8Array(await r.arrayBuffer());
   }
 
-  /** 외부 data 가 있는 모델 (학습 export 결과의 `<name>.onnx` + `<name>.onnx.data`) 로드. */
-  async function createSessionWithExternal(
+  /**
+   * 학습 export 가 external-data (`<name>.onnx` + `<name>.onnx.data`) 면 sidecar 까지
+   * 같이 로드. 단일 파일 export (livekit-wakeword v2 처럼 weights 가 .onnx 안에 inline)
+   * 면 .data fetch 가 404 → single-file 로 fallback.
+   */
+  async function createClassifierSession(
     onnxUrl: string,
     sessOpts: ort.InferenceSession.SessionOptions,
   ): Promise<ort.InferenceSession> {
     const model = await fetchBytes(onnxUrl);
-    // 학습 export 가 dynamic_axes 로 batch dim 을 외부화 — `<name>.onnx.data` 가 weights.
-    // onnxruntime-web 은 brwoser 파일시스템이 없어서 InferenceSession.create 의
-    // `externalData` 옵션으로 byte buffer 를 명시적으로 넘겨야 한다.
     const dataUrl = `${onnxUrl}.data`;
-    const dataBytes = await fetchBytes(dataUrl);
-    // path 는 .onnx 내부에서 참조하는 파일명 그대로 (basename, no path).
+    const dataResp = await fetch(dataUrl);
+    if (!dataResp.ok) {
+      return ort.InferenceSession.create(model, sessOpts);
+    }
+    const dataBytes = new Uint8Array(await dataResp.arrayBuffer());
     const externalDataName = dataUrl.split('/').pop() ?? 'model.onnx.data';
     return ort.InferenceSession.create(model, {
       ...sessOpts,
@@ -243,10 +262,13 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       sessOpts,
     );
     vad = new SileroVAD(vadSess);
-    // robot 별 분류기는 train.py 가 `<robot>.onnx.data` 사이드카로 weights 분리.
+    // robot 별 분류기 — variant 미지정 시 `<robot>.onnx` (+ `<robot>.onnx.data`),
+    // 'v2' 등 지정 시 `<robot>_<variant>.onnx`. v2 는 livekit-wakeword 의 single-file
+    // ONNX 라 .data sidecar 없음 → createClassifierSession 안에서 fallback.
+    const suffix = options.modelVariant ? `_${options.modelVariant}` : '';
     for (const robotId of options.robotIds) {
-      const sess = await createSessionWithExternal(
-        `${ASSET_BASE}/${robotId}.onnx`,
+      const sess = await createClassifierSession(
+        `${ASSET_BASE}/${robotId}${suffix}.onnx`,
         sessOpts,
       );
       robotSessions.set(robotId, sess);
@@ -283,7 +305,8 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
     }
 
     // 게이트 — speaking 중이거나, speaking 끝난 후 grace window 이내일 때만 wake step.
-    if (performance.now() - lastVadSpeechAt > VAD_GRACE_MS) {
+    // bypassGate (debug / whisper) 면 VAD 결과와 무관하게 항상 runStep.
+    if (!options.bypassGate && performance.now() - lastVadSpeechAt > VAD_GRACE_MS) {
       // 게이트 닫힘 — score history 도 끊김으로 비워서 spike 가 confirm 에 끼지 않게.
       if (recentScores.size > 0) recentScores.clear();
       return;
@@ -299,12 +322,18 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
     try {
       const audio = audioRing.snapshot(); // 43200 samples (2.7s)
 
-      // ─ Step 1: int16 scale (학습 측 _get_melspectrogram 의 int16 → float32 cast 와 일치)
+      // ─ Step 1: 학습 파이프라인의 audio scale 와 정렬.
+      //  · openWakeWord (기존 `<robot>.onnx`): 학습 측 _get_melspectrogram 이 int16 cast →
+      //    frontend 도 *32767 로 맞춤.
+      //  · livekit-wakeword v2 (`<robot>_v2.onnx`): data/features.py 가 sf.read 의 raw
+      //    [-1,1] float 그대로 mel 에 넘김. *32767 하면 mel power 가 10⁹ 배 부풀어 학습
+      //    분포와 어긋남.
+      const scaleToInt16 = !options.modelVariant;
       const scaledAudio = new Float32Array(audio.length);
       for (let i = 0; i < audio.length; i++) {
         const v = audio[i];
         const clipped = v < -1 ? -1 : v > 1 ? 1 : v;
-        scaledAudio[i] = Math.round(clipped * 32767);
+        scaledAudio[i] = scaleToInt16 ? Math.round(clipped * 32767) : clipped;
       }
 
       // ─ Step 2: melspec → (1, 1, n_frames, 32). n_frames ≈ ceil(samples/160) - 3.
@@ -360,7 +389,10 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       const clfIn = new ort.Tensor('float32', clfBuf, [nClf, CLF_WINDOW, EMBED_DIM]);
       const scores: Record<string, number> = {};
       for (const [robotId, sess] of robotSessions) {
-        const out = await sess.run({ x: clfIn });
+        // 기존 분류기는 입력 이름 'x', livekit-wakeword v2 는 'embeddings' — 모델마다
+        // 다르므로 session 메타에서 첫 입력명을 가져와 동적 바인딩.
+        const inputName = sess.inputNames[0];
+        const out = await sess.run({ [inputName]: clfIn });
         const arr = Object.values(out)[0].data as Float32Array;
         let best = 0;
         for (let i = 0; i < arr.length; i++) if (arr[i] > best) best = arr[i];
@@ -432,9 +464,11 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
         const chunk = ev.data;
         if (!chunk || chunk.length !== HOP_SAMPLES) return;
         audioRing.push(chunk);
-        let s2 = 0;
-        for (let i = 0; i < chunk.length; i++) s2 += chunk[i] * chunk[i];
-        if (Math.sqrt(s2 / chunk.length) < SILENCE_RMS_THRESHOLD) return;
+        if (!options.bypassGate) {
+          let s2 = 0;
+          for (let i = 0; i < chunk.length; i++) s2 += chunk[i] * chunk[i];
+          if (Math.sqrt(s2 / chunk.length) < SILENCE_RMS_THRESHOLD) return;
+        }
         void processVadAndStep(chunk);
       };
       sourceNode.connect(workletNode);
