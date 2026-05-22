@@ -6,7 +6,7 @@
 #   노트북       — Nav2·modes·vision (본 스크립트)
 #
 # 동작:
-#   - tmux 세션 'gogoping-laptop' 안에 window 8개:
+#   - tmux 세션 'gogoping-laptop' 안에 window 9개:
 #       graph-router : gogoping_navigation graph_router.launch.xml
 #                      (vertex 그래프 + 다익스트라 + nav2 위임)
 #       localization : gogoping_navigation localization_real.launch.xml
@@ -17,8 +17,10 @@
 #                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
 #       camera       : USB 웹캠 → UDP MJPEG 송출 (gogoping_camera camera_stream, SR-CAM-001).
 #       camera-pan   : Arduino 시리얼 MG995 ×2 pan/tilt (gogoping_camera_pan).
-#       follow       : gogoping_follow follow.launch.py — Image+Scan+FollowTarget →
-#                      /cmd_vel + /gogoping/tracking_state. YOLO+ReID lazy-load.
+#       perception   : gogoping_perception perception.launch.py — /camera/image_raw →
+#                      YOLO + ByteTrack + ReID → /gogoping/tracking_state (5 Hz). GPU lazy-load.
+#       follow       : gogoping_follow follow.launch.py — /gogoping/tracking_state + /scan →
+#                      /cmd_vel (P 컨트롤 20 Hz).
 #       rviz         : rviz2 -d gogoping_view.rviz (Map + TF + RobotModel + LaserScan 시각화)
 #
 # 사용:
@@ -219,12 +221,16 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
-    # window 5: follow — Image+Scan+FollowTarget 구독 → /cmd_vel (20Hz P 컨트롤) +
-    # /gogoping/tracking_state (5Hz). TeacherDetector (YOLO + ReID) 는 첫 FollowTarget 시 lazy-load.
+    # window 5: perception — /camera/image_raw → YOLO + ByteTrack + ReID → /gogoping/tracking_state.
+    # GPU lazy-load on first /gogoping/follow_target. follow_node 는 이 토픽만 subscribe.
+    tmux new-window -t "$SESSION" -n perception -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_perception perception.launch.py"
+
+    # window 6: follow — /gogoping/tracking_state + /scan 구독 → /cmd_vel (20 Hz P 컨트롤).
     tmux new-window -t "$SESSION" -n follow -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_follow follow.launch.py"
 
-    # window 6: rviz2 (Map + TF + RobotModel + LaserScan)
+    # window 7: rviz2 (Map + TF + RobotModel + LaserScan)
     # config 는 install/share 의 symlink (--symlink-install 가정).
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
     tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
@@ -241,7 +247,7 @@ case "$ACTION" in
 
     echo "[device-gogoping-laptop] 세션 '$SESSION' 시작 — attach"
     echo "[device-gogoping-laptop] ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-<unset>}"
-    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / nav2 / modes / camera / camera-pan / follow / rviz' 클릭으로 전환"
+    echo "[device-gogoping-laptop] 하단 status bar 의 'graph-router / localization / nav2 / modes / camera / camera-pan / perception / follow / rviz' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)
@@ -258,6 +264,7 @@ case "$ACTION" in
       "ros2 run gogoping_modes"
       "ros2 launch gogoping_camera camera_stream"
       "ros2 launch gogoping_camera_pan camera_pan"
+      "ros2 launch gogoping_perception perception"
       "ros2 launch gogoping_follow follow"
       "rviz2 -d .*gogoping_view"
     )
