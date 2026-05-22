@@ -145,7 +145,7 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
     // 추론 전 한 프레임 yield — driveMotion rAF 등 렌더링 콜백이 먼저 실행되도록.
     // WebGL readback(gl.readPixels)이 메인 스레드를 블록하기 전에 rAF 를 소진시켜
     // 율동 모션·오디오 싱크 지연을 최소화한다.
-    await new Promise<void>((r) => requestAnimationFrame(r));
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
     const nowMs = Date.now();
     const inCooldown = nowMs < captureCooldownUntil;
     try {
