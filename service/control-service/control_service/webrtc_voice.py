@@ -322,6 +322,16 @@ class _Session:
         if dc is None:
             logger.warning(f"[webrtc:{self.log_id}] no DC to send {payload!r}")
             return
+        # aiortc 의 RTCDataChannel.send() 는 readyState != 'open' 이면 InvalidStateError
+        # 를 raise — 우리 case: 이전 세션 evict 직후 새 세션 negotiate 중에 server-side
+        # send 가 race 로 들어오는 경우. 예외 raise 로 stack trace 가 매번 찍히면
+        # 로그가 시끄럽고 운영 진단이 어려워 readyState 사전 체크로 swallow.
+        state = getattr(dc, "readyState", "?")
+        if state != "open":
+            logger.warning(
+                f"[webrtc:{self.log_id}] DC not open (state={state!r}) — drop {payload.get('type', payload)!r}",
+            )
+            return
         try:
             dc.send(json.dumps(payload))  # type: ignore[attr-defined]
         except Exception:
@@ -373,8 +383,20 @@ async def webrtc_offer(body: OfferBody) -> AnswerBody:
 
     @pc.on("datachannel")
     def on_datachannel(channel) -> None:  # noqa: D401
-        logger.info(f"[webrtc:{log_id}] datachannel opened: label={channel.label}")
+        logger.info(
+            f"[webrtc:{log_id}] datachannel opened: "
+            f"label={channel.label} initial_state={getattr(channel, 'readyState', '?')!r}",
+        )
         session.dc = channel
+
+        @channel.on("close")
+        def on_close() -> None:
+            # DC 가 닫히면 self.dc 를 None 으로 — 이후 send() 가 'no DC' 경고만
+            # 찍고 끝나도록 (이전엔 aiortc 가 InvalidStateError 를 raise 해서 trace
+            # 스팸).
+            logger.info(f"[webrtc:{log_id}] datachannel closed — clearing session.dc")
+            if session.dc is channel:
+                session.dc = None
 
         @channel.on("message")
         def on_message(message) -> None:
