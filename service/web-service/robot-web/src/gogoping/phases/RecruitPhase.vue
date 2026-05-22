@@ -1,13 +1,15 @@
 <script setup lang="ts">
 /**
  * 숨바꼭질 모집 단계.
- * 좌: GogoPing 라이브 카메라 (얼굴 매칭으로 자동 등록되는 모습 확인).
- * 우: 등록 어린이 명단 카드 (무궁화 entry 패턴 — 등록 시 핑크 체크, 미등록 회색 대기).
- *     카드 탭으로 수동 토글도 가능.
+ * 좌: GogoPing 라이브 카메라 + 얼굴 자동 등록 (face tracker 캐시).
+ * 우: 등록 어린이 명단 카드 — 카드 탭으로 수동 토글 가능.
  */
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CameraView from '../CameraView.vue';
 import type { Participant } from '../useHideAndSeekState';
+import { useFaceDetector } from '@/composables/useFaceDetector';
+import { useFaceTracker, type Bbox, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
 
 const props = defineProps<{
   participants: Participant[];
@@ -16,10 +18,124 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   toggle: [id: number];
+  register: [id: number];
   start: [];
 }>();
 
 const canStart = computed(() => props.registeredCount > 0);
+
+const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
+const STABLE_FRAMES_REQUIRED = 5;
+
+const cameraViewRef = ref<{ getImgEl: () => HTMLImageElement | null } | null>(null);
+const captureCanvasRef = ref<HTMLCanvasElement | null>(null);
+const cameraImgEl = computed(() => cameraViewRef.value?.getImgEl() ?? null);
+
+const tracker = useFaceTracker();
+let latestTracks: TrackedFace[] = [];
+
+const identityCache = useFaceIdentityCache({
+  stableFramesRequired: STABLE_FRAMES_REQUIRED,
+  identify: async (tracks): Promise<IdentityResult[]> => identifyTracks(tracks),
+});
+
+const detector = useFaceDetector({
+  onDetections: (faces) => {
+    latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
+    void identityCache.feed(latestTracks).then(applyBindings);
+  },
+});
+
+let rafId: number | null = null;
+
+async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
+  const canvas = captureCanvasRef.value;
+  if (!canvas) return [];
+  const form = new FormData();
+  const trackOrder: TrackedFace[] = [];
+  for (const t of tracks) {
+    const blob = await cropFromCanvas(canvas, t.bbox);
+    if (!blob) continue;
+    form.append('files', blob, `track-${t.trackId}.jpg`);
+    trackOrder.push(t);
+  }
+  if (trackOrder.length === 0) return [];
+  try {
+    const res = await fetch('/api/attendance/recognize-crops', {
+      method: 'POST',
+      headers: { 'X-Device-Token': DEVICE_TOKEN },
+      body: form,
+    });
+    if (!res.ok) return [];
+    const body = await res.json() as {
+      matches: Array<{ matched: boolean; child_id: number | null; child_name: string | null; distance: number | null }>;
+    };
+    return body.matches.map((m, i) => ({
+      trackId: trackOrder[i].trackId,
+      childId: m.matched ? m.child_id : null,
+      childName: m.matched ? m.child_name : null,
+      distance: m.distance,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function applyBindings(): void {
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
+    const p = props.participants.find((x) => x.id === childId);
+    if (!p || p.registered) continue;
+    emit('register', childId);
+  }
+}
+
+async function cropFromCanvas(source: HTMLCanvasElement, bbox: Bbox): Promise<Blob | null> {
+  const [x1, y1, x2, y2] = bbox;
+  const padX = (x2 - x1) * 0.15;
+  const padY = (y2 - y1) * 0.15;
+  const sx = Math.max(0, x1 - padX);
+  const sy = Math.max(0, y1 - padY);
+  const sw = Math.min(source.width - sx, (x2 - x1) + padX * 2);
+  const sh = Math.min(source.height - sy, (y2 - y1) + padY * 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(sw);
+  canvas.height = Math.round(sh);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
+}
+
+async function loop(): Promise<void> {
+  const img = cameraImgEl.value;
+  const canvas = captureCanvasRef.value;
+  if (img && canvas && img.complete && img.naturalWidth > 0) {
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      try { await detector.send(canvas); } catch { /* noop */ }
+    }
+  }
+  rafId = requestAnimationFrame(() => { void loop(); });
+}
+
+onMounted(() => {
+  detector.start();
+  rafId = requestAnimationFrame(() => { void loop(); });
+});
+
+onBeforeUnmount(() => {
+  if (rafId !== null) cancelAnimationFrame(rafId);
+  rafId = null;
+  detector.close();
+  tracker.reset();
+  identityCache.reset();
+  latestTracks = [];
+});
 </script>
 
 <template>
@@ -31,7 +147,8 @@ const canStart = computed(() => props.registeredCount > 0);
 
     <div class="body">
       <div class="camera-wrap">
-        <CameraView />
+        <CameraView ref="cameraViewRef" />
+        <canvas ref="captureCanvasRef" hidden />
       </div>
 
       <ul class="roster">
