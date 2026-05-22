@@ -39,7 +39,7 @@
       "displayName": "GogoPing",
       "wakeWord": "고고핑",
       "wakeWordAliases": ["고고핀", "꼬꼬핑", "꼬꼬핀", "고고팽", "고고빙"],
-      "modes": ["대기", "보조", "추종", "이동", "자장가", "놀이", "숨바꼭질", "수동", "복귀"],
+      "modes": ["대기", "추종", "이동", "자장가", "놀이", "숨바꼭질", "수동", "복귀"],
       "modeTree": [
         "대기",
         "추종",
@@ -51,7 +51,6 @@
       ],
       "defaultEmotionByMode": {
         "대기": "basic",
-        "보조": "basic",
         "추종": "basic",
         "이동": "basic",
         "놀이": "fun",
@@ -60,7 +59,7 @@
         "수동": "basic",
         "복귀": "basic"
       },
-      "restrictedVoiceMode": "보조"
+      "restrictedVoiceMode": "추종"
     },
     {
       "id": "noriarm",

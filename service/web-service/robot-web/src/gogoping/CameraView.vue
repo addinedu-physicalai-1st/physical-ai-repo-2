@@ -2,8 +2,10 @@
 import { inject, onBeforeUnmount, ref } from 'vue';
 import { useVideoStream, type StreamStatus } from './composables/useVideoStream';
 import { CAMERA_PAN_KEY } from './cameraPanKey';
+import { VIDEO_STREAM_KEY } from './videoStreamKey';
 
-const stream = useVideoStream('gogoping');
+const injected = inject(VIDEO_STREAM_KEY, null);
+const stream = injected ?? useVideoStream('gogoping');
 const cameraPan = inject(CAMERA_PAN_KEY);
 
 function statusClass(s: StreamStatus): string {
@@ -36,7 +38,7 @@ function viewPointerUp(ev: PointerEvent) {
   dragView.value?.releasePointerCapture(ev.pointerId);
 }
 
-onBeforeUnmount(() => stream.stop());
+onBeforeUnmount(() => { if (!injected) stream.stop(); });
 </script>
 
 <template>

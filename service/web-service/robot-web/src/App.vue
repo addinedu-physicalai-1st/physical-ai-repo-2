@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, provide, ref } from 'vue';
+import { computed, onBeforeUnmount, provide, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
@@ -21,6 +21,8 @@ import OXQuiz from '@/noriarm/OXQuiz.vue';
 import BlockStacking from '@/noriarm/BlockStacking.vue';
 import { useCameraPan } from '@/gogoping/composables/useCameraPan';
 import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
+import { useVideoStream } from '@/gogoping/composables/useVideoStream';
+import { VIDEO_STREAM_KEY } from '@/gogoping/videoStreamKey';
 import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
@@ -76,16 +78,23 @@ const showGogopingHideAndSeek = computed(
 const cameraPan = robot.value.id === 'gogoping' ? useCameraPan() : null;
 if (cameraPan) provide(CAMERA_PAN_KEY, cameraPan);
 
+// gogoping 일 때만 useVideoStream 인스턴스를 한 번만 생성해서 CameraView/FollowFaceAuth 공유
+const videoStream = robot.value.id === 'gogoping' ? useVideoStream('gogoping') : null;
+if (videoStream) provide(VIDEO_STREAM_KEY, videoStream);
+
 // gogoping 일 때만 BT snapshot WS 구독 — admin UI 가 mode 바꾸면 자동 반영
 const gogopingStateWs = robot.value.id === 'gogoping' ? useGogopingStateWs() : null;
 
 onBeforeUnmount(() => {
   cameraPan?.stop();
+  videoStream?.stop();
   gogopingStateWs?.stop();
 });
 
 const voiceController: VoiceController = useVoiceController(robot.value);
 provide(VOICE_CONTROLLER_KEY, voiceController);
+
+const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
 
 // 추종 모드 동안 FollowFaceAuth 가 항상 mount — 인증 전엔 중앙 모달, 인증 후엔 좌상단 PiP 로
 // 디버그용 카메라 뷰를 유지. 모드를 벗어나면 unmount 되며 카메라 정지.
@@ -93,16 +102,41 @@ const showGogopingFollowAuth = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '추종'
 );
 
-async function onFollowAuthenticated(_name: string): Promise<void> {
-  voiceController.speak('선생님 확인 완료, 추종을 시작합니다.');
+async function onFollowAuthenticated(payload: { name: string; teacher_id: string }): Promise<void> {
+  voiceController.speak(`${payload.name} 선생님 확인 완료, 추종을 시작합니다.`);
   try {
     await postModeClick('추종', robot.value.id);
   } catch {
     /* BT 미연결이어도 UI 는 진행 */
   }
+  // ROS 측 추종 시작 trigger.
+  if (payload.teacher_id) {
+    try {
+      await fetch('/api/gogoping/follow/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-Token': DEVICE_TOKEN,
+        },
+        body: JSON.stringify({ teacher_id: payload.teacher_id }),
+      });
+    } catch {
+      /* 오프라인 — UI 는 진행, ROS 추종은 미동작 */
+    }
+  }
 }
 
 async function onFollowAuthCancel(): Promise<void> {
+  try {
+    await fetch('/api/gogoping/follow/stop', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-Token': DEVICE_TOKEN,
+      },
+      body: '{}',
+    });
+  } catch { /* 오프라인 — UI 는 진행 */ }
   // 인증 취소 — 모드를 대기로 되돌리면 showGogopingFollowAuth=false → 오버레이 unmount + 카메라 정지.
   mode.setMode('대기');
   try {
@@ -111,6 +145,21 @@ async function onFollowAuthCancel(): Promise<void> {
     /* 무시 */
   }
 }
+
+// 추종 → 다른 mode 전이 시 follow/stop 호출 (FollowFaceAuth cancel 경로와 중복돼도 backend idempotent).
+let _prevModeForFollow = currentMode.value;
+watch(currentMode, async (newMode) => {
+  if (_prevModeForFollow === '추종' && newMode !== '추종') {
+    try {
+      await fetch('/api/gogoping/follow/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Token': DEVICE_TOKEN },
+        body: '{}',
+      });
+    } catch { /* ignore */ }
+  }
+  _prevModeForFollow = newMode;
+});
 
 // 모드 전환 시 voiceController.speak 로 서버 TTS 안내, BGM mp3 도 같이 처리.
 useModeAnnouncer(voiceController, {

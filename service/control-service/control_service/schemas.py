@@ -197,3 +197,32 @@ class TeacherMatchOut(BaseModel):
     distance: float | None
     threshold: float
     matched: bool
+
+
+# ---------- GogoPing Follow ----------
+# Client → backend 로 embedding 을 전달하지 않음. backend 가 teacher_id 로 DB lookup.
+
+
+class FollowStartPayload(BaseModel):
+    teacher_id: UUID
+
+
+class FollowStopPayload(BaseModel):
+    pass
+
+
+class FollowStateOut(BaseModel):
+    active: bool
+    teacher_id: UUID | None = None
+    teacher_name: str | None = None
+    matched: bool = False
+    distance_m: float | None = None
+    angle_deg: float | None = None
+    bbox_size_px: int | None = None
+    bbox_x1: int | None = None
+    bbox_y1: int | None = None
+    bbox_x2: int | None = None
+    bbox_y2: int | None = None
+    track_id: int | None = None
+    reid_sim: float | None = None
+    updated_at: datetime | None = None
