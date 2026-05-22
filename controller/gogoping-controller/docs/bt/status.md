@@ -2,7 +2,7 @@
 
 코드 구현 vs 명세(스켈레톤). docs 작성/계획만 된 항목과 실제 동작하는 항목 구분.
 
-마지막 업데이트: 2026-05-20 (carry → goto rename batch: CarrySubTree 폐기, BT_goto_sub 신규 ✅, blackboard CARRY_MODE/LOAD_DROPPED 삭제, ROS msg field carry_mode 삭제. 직전 (2026-05-20) — 자장가 BT 구현 — `BT_lullaby_sub` (LullabyAudio 단일 leaf) + 범용 `UIPublish` common behavior + `UIPublisher.publish_event()` / `/gogoping/ui_event` 토픽 신설. stub_lullaby 삭제. 그 전 (2026-05-20) — docs 풀 감사. 그 전 (2026-05-19) — HardwareHealthMonitor + admin UI e-stop 버튼)
+마지막 업데이트: 2026-05-22 (patrol 빌딩 블록 — `BT_patrol_sub` ✅ (재사용 가능 building block — vertex 마다 SelectVertex+Nav+PanCameraSweep 동적 빌드 + FailureIsSuccess skip-on-failure) + `SelectVertex` common behavior ✅ + `PanCameraSweep` follow behavior ✅ + `CameraPanClient` interface stub → 실 구현. Goal.msg 에 `string[] search_waypoints` 필드 추가. FSM/TaskSelector 결선은 보류 — 호출자가 사용. 직전 (2026-05-20) — carry → goto rename batch. 그 전 — 자장가 BT 구현)
 
 ## 범례
 - ✅ 구현 완료 (동작 검증)
@@ -13,11 +13,11 @@
 
 | 영역 | 진행 | 비고 |
 |---|---|---|
-| **Trees** | **11 / 13** | MainTree 8/8 ✅ · SubTree 3/5 (BT_return_sub ✅ · BT_lullaby_sub ✅ · BT_goto_sub ✅) |
+| **Trees** | **11 / 13** + 1 빌딩블록 | MainTree 8/8 ✅ · SubTree 3/5 (BT_return_sub ✅ · BT_lullaby_sub ✅ · BT_goto_sub ✅) · **빌딩 블록 BT_patrol_sub ✅** (재사용 가능, mode/task 단위 SubTree 아님) |
 | **Stubs (_stubs/)** | **1 / 3** | base ✅ · 2 stub 🟡 (follow/hideseek). stub_lullaby·stub_carry 삭제됨 |
-| **Behaviors** | **15 / 30** | common 9/10 · navigation 4/8 · perception 0/4 · follow 0/4 · manual 1/1 · recovery 1/3 |
-| **Infrastructure** | **40 / 42** | 🟡 2 (nav2 실물 localization-only / battery_publisher_node static placeholder). PoseSubscriber + MapCache + gogoping_camera_pan 5종 + sim_battery_node + sim_teleport_node 포함 |
-| **합계** | **67 / 88** | carry → goto rename batch 로 분모 정정 (stub_carry 삭제, check_carry_mode/load_stability_check/enable_manual_control/wait_for_exit 삭제, BT_goto_sub 신규 ✅) + 자장가 BT 포함 |
+| **Behaviors** | **17 / 31** | common 10/11 · navigation 4/8 · perception 0/4 · follow 1/4 · manual 1/1 · recovery 1/3 |
+| **Infrastructure** | **40 / 42** | 🟡 2 (nav2 실물 localization-only / battery_publisher_node static placeholder). camera_pan_client 실 구현 포함 |
+| **합계** | **69 / 89** | patrol 빌딩 블록 (BT_patrol_sub + SelectVertex + PanCameraSweep + CameraPanClient 실 구현) 추가 |
 
 ---
 
@@ -38,7 +38,7 @@
 
 > **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree 미완성분 (follow/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
 
-### SubTree — 3 / 5
+### SubTree — 3 / 5 (+ 1 빌딩 블록)
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
@@ -46,6 +46,7 @@
 | BT_follow_sub | ☐ | StubFollow 로 대체 중. 정상 ↔ Loss Recovery |
 | BT_lullaby_sub | ✅ | [BT_lullaby_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_lullaby_sub.py) — 단일 LullabyAudio leaf. initialise=lullaby_play event publish, update=RUNNING, terminate=lullaby_stop publish (idempotent). 빌더 2 + LullabyAudio 7 테스트 통과 |
 | BT_hide_and_seek_sub | ☐ | StubHideseek 로 대체 중. 1회 실행 후 종료 |
+| BT_patrol_sub | ✅ | **빌딩 블록 (mode/task 단위 SubTree 아님)** — [BT_patrol_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_patrol_sub.py). `build_patrol_sub(ctx, waypoints)` 로 vertex 마다 `FailureIsSuccess(Sequence(SelectVertex + NavigateToVertex + PanCameraSweep))` 동적 생성. 9 빌더 테스트 통과. 현재 어디에도 결선되지 않음 — 호출자가 사용 |
 | BT_return_sub | ✅ | [BT_return_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py) — OneShot(Sequence([NavigateToVertex("충전소입구"), AlignToDock, ReverseIntoDock, **VerifyDockingContact**])). 빌더가 waypoints.yaml 의 충전소입구 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 로 자동 주입. ReverseIntoDock 완료 후 VerifyDockingContact 가 `docked` trigger 자동 발사 → CHARGING 전이. 6 빌더 테스트 통과 (tests/test_gogoping_return_subtree_builder.py). ⚠ **알려진 이슈** — RETURNING 중 cancel 시 robot 즉시 안 멈춤 + 경로 잔상 ([trees/BT_return_sub.md 의 "알려진 이슈" 섹션](trees/BT_return_sub.md#알려진-이슈--cancel-cleanup-2026-05-18) 참조) |
 
 ### Stub (_stubs/) — 1 / 3 (+ 2 🟡)
@@ -62,10 +63,11 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 
 ## Behaviors
 
-### common/ — 9 / 10
+### common/ — 10 / 11
 
 | Behavior | 상태 | 파일 |
 |---|---|---|
+| select_vertex | ✅ | [select_vertex.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/select_vertex.py) — 고정 vertex 이름을 BB.target_vertex_name 에 W 후 즉시 SUCCESS. NavigateToVertex 와 짝. 5 단위 테스트 통과 (tests/test_gogoping_select_vertex.py). Used in: BT_patrol_sub |
 | battery_full_monitor | ✅ | [battery_full_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_full_monitor.py) — BT_charging_main 에 배치, 부팅 시 CHARGING → IDLE 자동 전이 (BATTERY_LEVEL init=100.0 가정) |
 | battery_low_monitor | ✅ | [battery_low_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/battery_low_monitor.py) — hysteresis 20% 진입 / 25% 진출, edge-triggered. BT_idle/assist/play/returning_main 4개 배치 (RETURNING 은 LOW_BATTERY_RETURN escalation). 5 시나리오 통과 |
 | idle_timeout_monitor | ✅ | [idle_timeout_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/idle_timeout_monitor.py) — IDLE 진입 후 ROS param `idle_timeout_seconds` (기본 60s) 경과 시 `idle_timeout` trigger. edge-triggered, `initialise()` 에서 timer 리셋. BT_idle_main 만 배치. 6 시나리오 통과 |
@@ -100,14 +102,14 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | found_child | ☐ |
 | child_face_tracker | ☐ |
 
-### follow/ — 0 / 4
+### follow/ — 1 / 4
 
-| Behavior | 상태 |
-|---|---|
-| face_tracking | ☐ |
-| wait_for_reappear | ☐ |
-| raise_camera_pan | ☐ |
-| pan_camera_sweep | ☐ |
+| Behavior | 상태 | 파일 |
+|---|---|---|
+| face_tracking | ☐ | |
+| wait_for_reappear | ☐ | |
+| raise_camera_pan | ☐ | |
+| pan_camera_sweep | ✅ | [pan_camera_sweep.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/follow/pan_camera_sweep.py) — 시간 기반 시퀀스 (90→30→150→90, 1.5s × 4). ctx.camera_pan.publish_pan() 호출. terminate(INVALID) 시 center() 1회. `now_fn` 주입형 시간 (테스트용). 13 단위 테스트 통과 (tests/test_gogoping_pan_camera_sweep.py). Used in: BT_patrol_sub |
 
 ### manual/ — 1 / 1
 
@@ -133,7 +135,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | FSM `force_state(target)` debug | ✅ | `fsm.machine.set_state()` + 수동 `_after_state_change()` 호출로 transition 우회. admin DebugStatePanel 진입점 |
 | Goal 기반 reconciler (goal_reconciler.py) | ✅ | 순수 함수 — 현재 state ↔ Goal 차이 보고 적절한 trigger 매핑. ROS 의존성 0 → 단위 테스트 13 pass. ERROR / LOW_BATTERY_RETURN lockdown 처리 |
 | Tree inspector (tree_inspector.py) | ✅ | `snapshot(fsm_state, root_tree)` → admin BTStateInline 호환 dict. **battery_level 키** 포함 (blackboard.BATTERY_LEVEL 읽음) |
-| Context (context.py) | ✅ | `@dataclass(frozen=True)` — node / fsm / 6 interfaces (`ui_publisher` 만 실 구현, 나머지 5 stub) |
+| Context (context.py) | ✅ | `@dataclass(frozen=True)` — node / fsm / 6 interfaces (`ui_publisher` + `camera_pan_client` 실 구현, 나머지 4 stub). camera_pan_client 는 `/servo_bridge/cmd_pan` (Float32) publisher — PanCameraSweep behavior 가 사용 |
 | main.py BT swap | ✅ | `GogopingModes` 노드 — INITIAL_STATE="CHARGING", TICK_HZ=10, PUBLISH_HZ=1. state 변화 시 트리 swap + 이전 트리 `shutdown()` |
 | blackboard.py 스키마 | ✅ | 21 Keys + `init_blackboard()`. Access 권한 (READ/WRITE) 등록 |
 | graph.py (다익스트라) | ✅ | 14 단위 테스트 pass |

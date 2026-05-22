@@ -45,6 +45,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
 | `destination_key` | `str` | `command_listener` | `navigate_to_vertex` (BT_goto_sub 에서 `target_key=Keys.DESTINATION_KEY` 로 명시) | goto 목적지 (waypoints.yaml vertex 이름) |
+| `target_vertex_name` | `str` | `select_vertex` | `navigate_to_vertex` (default `target_key`) | NavigateToVertex 의 기본 R 키. BT_patrol_sub 의 각 visit 마다 SelectVertex 가 W. **string literal — Keys 에 등재되지 않음** (현재 정책) |
 | `hide_position_key` | `str` | `command_listener` / config | `navigate_to_pose` | 숨바꼭질 숨을 위치 |
 | `search_waypoints` | `list[str]` | config / `command_listener` | `navigate_to_pose` (loop) | 숨바꼭질 탐색 waypoint |
 | `home_position_key` | `str` | config | `navigate_to_pose` | 숨바꼭질 원위치 |
