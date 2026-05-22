@@ -54,7 +54,13 @@ export function useDanceStream(): UseDanceStream {
 
   let ws: WebSocket | null = null;
   let audioCtx: AudioContext | null = null;
+  // streamEpoch: motion·elapsed timeline 의 render-clock 기준점. 이 시각에 "audio t=0 이
+  //   들린다" 고 가정. 모션 buffer 와 visual elapsed 가 이걸 따라감.
+  // audioEpoch:  src.start() 에 넘기는 render-clock 시각. streamEpoch 보다 outputLatency
+  //   만큼 일찍. spec 상 src.start(T) 로 render 한 샘플은 T + outputLatency 에 speaker
+  //   에 도달하므로, 결과적으로 speaker reach time = streamEpoch 로 맞춰짐.
   let streamEpoch = 0;
+  let audioEpoch = 0;
   let header: StreamHeader | null = null;
   let elapsedTimer: number | null = null;
   let endCallback: (() => void) | null = null;
@@ -100,6 +106,7 @@ export function useDanceStream(): UseDanceStream {
     }
     motionQueue.length = 0;
     streamEpoch = 0;
+    audioEpoch = 0;
     header = null;
   }
 
@@ -122,7 +129,7 @@ export function useDanceStream(): UseDanceStream {
     const src = audioCtx.createBufferSource();
     src.buffer = audioBuf;
     src.connect(audioCtx.destination);
-    src.start(Math.max(audioCtx.currentTime, streamEpoch + tMs / 1000));
+    src.start(Math.max(audioCtx.currentTime, audioEpoch + tMs / 1000));
   }
 
   function handleBinary(buf: ArrayBuffer): void {
@@ -137,6 +144,14 @@ export function useDanceStream(): UseDanceStream {
             (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         }
         streamEpoch = audioCtx.currentTime + WARMUP_S;
+        // outputLatency: 시스템·드라이버가 보고하는 render → speaker 지연 (수십~수백 ms).
+        // 미지원 브라우저는 0 또는 undefined → baseLatency 로 fallback, 그것도 없으면 0.
+        // 이 값만큼 audio 스케줄을 앞당겨야 streamEpoch 시각에 실제 소리가 나옴.
+        const audioLatency =
+          (typeof audioCtx.outputLatency === 'number' && audioCtx.outputLatency > 0
+            ? audioCtx.outputLatency
+            : audioCtx.baseLatency) || 0;
+        audioEpoch = streamEpoch - audioLatency;
         isPlaying.value = true;
         elapsedMs.value = 0;
         motionQueue.length = 0;
