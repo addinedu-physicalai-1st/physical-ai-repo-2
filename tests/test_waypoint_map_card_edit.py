@@ -12,13 +12,9 @@ pytest.importorskip("PyQt5")
 def card(qtbot, tmp_path, monkeypatch):
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app/admin-app"))
-    svg = tmp_path / "admin_map.svg"
-    svg.write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 881 720" '
-        'width="881" height="720"></svg>',
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("PINGDER_ADMIN_MAP_SVG", str(svg))
+    pgm = tmp_path / "map_v2.pgm"
+    pgm.write_bytes(b"P5\n2 2\n255\n\xff\xff\xff\xff")
+    monkeypatch.setenv("PINGDER_ADMIN_MAP_PGM", str(pgm))
     from widgets.waypoint_map_card import WaypointMapCard
     c = WaypointMapCard()
     qtbot.addWidget(c)

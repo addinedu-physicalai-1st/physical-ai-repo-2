@@ -12,7 +12,7 @@
     # → /initialpose 에 x, y, quaternion 발행됨
 -->
 <launch>
-  <arg name="map" default="$(find-pkg-share gogoping_navigation)/maps/map.yaml"/>
+  <arg name="map" default="$(find-pkg-share gogoping_navigation)/maps/map_v2.yaml"/>
   <arg name="rviz_config" default="$(find-pkg-share gogoping_navigation)/rviz/map_view.rviz"/>
 
   <node pkg="nav2_map_server" exec="map_server" name="map_server" output="screen">
