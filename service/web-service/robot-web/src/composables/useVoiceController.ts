@@ -104,6 +104,7 @@ export function useVoiceController(robot: RobotConfig): {
     clearListeningTimer();
     listeningTimer = window.setTimeout(() => {
       listeningTimer = null;
+      playChime(wakeOffSound);
       enterCooldown();
     }, LISTENING_WINDOW_MS);
   }
@@ -116,7 +117,9 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   function enterCooldown(): void {
-    playChime(wakeOffSound);
+    // wake_off 효과음은 호출자 (armListeningTimer 타임아웃 / onSttFinal) 가 직접
+    // 재생 — listening → cooldown 전이일 때만 울리고, TTS 종료나 intent 처리 후
+    // 진입은 사람 발화 감지와 무관하므로 무음.
     voice.setState('cooldown');
     clearCooldownTimer();
     cooldownTimer = window.setTimeout(() => {
@@ -198,6 +201,8 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   function onSttFinal(text: string): void {
+    // STT 결과 도착 = 사람 발화 감지 종료. text 유무와 무관하게 wake_off 효과음.
+    if (voice.state === 'listening') playChime(wakeOffSound);
     const trimmed = text.trim();
     if (!trimmed) {
       enterCooldown();

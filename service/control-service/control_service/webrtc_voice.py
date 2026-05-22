@@ -523,8 +523,16 @@ async def _transcribe_and_send(pcm: np.ndarray, session: _Session) -> None:
         return
     logger.info(f"[webrtc:{session.log_id}] STT → {text!r}")
     if _is_wake_name_only(text, session.robot):
-        logger.info(f"[webrtc:{session.log_id}] STT == wake name only — skip dispatch (chime is the ack)")
-        session.send({"type": "stt_final", "text": ""})
+        # 호출어 단독 발화 — 사용자가 곧 명령을 이어 부를 수 있도록 listening 유지.
+        # 빈 stt_final 을 보내면 클라이언트 onSttFinal('') → enterCooldown 으로
+        # listening 이 즉시 닫혀 사용자가 명령 시작도 못 한다. stt_final 자체를
+        # 생략해 클라이언트는 listening timer (6s) 까지 명령 대기.
+        # 또한 _consume_audio 가 line 507 에서 미리 닫은 gate 를 재오픈해
+        # 이어지는 사용자 명령 utterance 가 차단되지 않게 한다.
+        logger.info(
+            f"[webrtc:{session.log_id}] STT == wake name only — keep listening, skip dispatch (chime is the ack)"
+        )
+        session.open_gate(session.robot)
         return
     session.send({"type": "stt_final", "text": text})
     if not text.strip():

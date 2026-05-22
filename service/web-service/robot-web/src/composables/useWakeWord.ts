@@ -1,20 +1,26 @@
 /**
- * 호출어 인식 (onnxruntime-web) — 마이크 PCM 을 melspec → embedding → robot 별 binary
- * 분류기로 흘려서, 점수가 임계값을 넘으면 onWake(robotId) 콜백을 발행한다.
+ * 호출어 인식 (onnxruntime-web) — 마이크 PCM 을 Silero VAD 게이트 → melspec →
+ * embedding → robot 별 binary 분류기로 흘려서, 점수가 임계값을 (연속 N step)
+ * 넘으면 onWake(robotId) 콜백을 발행한다.
  *
  * 파이프라인 데이터 흐름:
  *   AudioContext(sampleRate=16000) → AudioWorkletNode (wake-pcm-worklet) →
- *   80ms (1280-sample) chunk → AudioRing(12560 samples = 785ms) →
- *   melspec ONNX → 76 mel frames → embedding ONNX → 1 embed frame →
- *   EmbedRing(16 frames × 96 dim) → robot 별 분류기 ONNX → score →
- *   decideWakeHits → onWake.
+ *   80ms (1280-sample) chunk → RMS gate → Silero VAD (512-sample chunks) →
+ *   AudioRing(43200 samples = 2.7s) → melspec ONNX → 76 mel frames →
+ *   embedding ONNX → robot 별 분류기 ONNX → score → confirm window (연속 K) →
+ *   onWake.
  *
  * 디자인 메모:
  *   - 호출 위치 (useVoiceController) 가 STT MediaStream 을 별개로 잡으므로 이 모듈도
  *     자기 stream 을 따로 잡는다. 브라우저가 동일 마이크 다중 소비를 처리한다.
- *   - 모델 5 개는 `start()` 첫 호출 시 lazy 로딩. 이후 호출은 재사용.
- *   - score 계산은 worklet 메시지마다 = ~80ms 주기. UI thread 의 ONNX 추론 비용은
- *     CPU 0.x% 수준 (5MB 모델, 1 inference 마다 수 ms).
+ *   - 모델 6 개 (Silero VAD 1 + melspec 1 + embed 1 + robot 3) 는 `start()` 첫 호출
+ *     시 lazy 로딩. 이후 호출은 재사용.
+ *   - VAD 게이트: 비음성 noise (식기·박수·BGM) 가 wake 분류기에 들어가서 false-positive
+ *     를 내는 것을 차단. 서버 측 (control_service/webrtc_voice.py) 의 SileroVAD 와
+ *     동일 모델·동일 hysteresis 파라미터 사용. 단, 서버는 STT utterance segmentation
+ *     용, 클라이언트는 wake-pre 게이트 용 — 역할 다름.
+ *   - Multi-frame confirmation (WAKE_CONFIRM_FRAMES): 단발 spike 거름. 연속 K step
+ *     모두 임계 초과 시에만 fire. K=2 면 +80ms 지연.
  */
 import { onBeforeUnmount, ref, type Ref } from 'vue';
 import * as ort from 'onnxruntime-web';
@@ -24,6 +30,7 @@ import {
   decideWakeHits,
   type WakeHit,
 } from './wakeBuffers';
+import { LOG_VOICE_DEBUG } from './useWebRTCVoice';
 
 // onnxruntime-web 의 WASM/glue 파일 (ort-wasm-*.wasm, *.mjs) 은 ort 내부 dynamic
 // import 로 받아온다. Vite 가 public/ 의 .mjs 를 import 경로로 거부하므로 CDN 으로
@@ -47,6 +54,20 @@ const CLF_STRIDE = 1;
 
 const ASSET_BASE = '/models/wakeword';
 const WORKLET_PATH = '/audio-worklets/wake-pcm-worklet.js';
+
+// Silero VAD v5 — chunk 512 samples (32ms @ 16kHz). state shape (2,1,128).
+const VAD_CHUNK_SAMPLES = 512;
+// VAD speaking 종료 후 grace window — wake 음절 마지막 부분이 ring 에 다 들어올 때까지
+// inference 유지. 호출어 ("에듀핑") 길이 ~600ms 중 마지막 음절 직후에 VAD 가 silence
+// 로 떨어져도 다음 1~2 step 은 더 돌려서 wake 점수 산출.
+const VAD_GRACE_MS = 600;
+// Silero VAD hysteresis — 서버 SileroVAD 와 정렬 (control_service/webrtc_voice.py).
+const VAD_POSITIVE_THRESHOLD = 0.5;
+const VAD_NEGATIVE_THRESHOLD = 0.35;
+const VAD_MIN_SPEECH_FRAMES = 2;
+const VAD_MIN_SILENCE_FRAMES = 8;
+// 연속 K step max score 모두 임계 초과 시에만 wake 발화 — 단발 spike 거름.
+const WAKE_CONFIRM_FRAMES = 2;
 
 /** robot id → 점수 임계값. useVoiceController 가 env 또는 shared/robots.json 기반으로 주입. */
 export type WakeThresholds = Record<string, number>;
@@ -83,6 +104,67 @@ export interface UseWakeWordReturn {
 
 const DEFAULT_COOLDOWN_MS = 1500;
 
+/** Silero VAD v5 streaming runner — chunk (512 float32) 당 prob + start/end event.
+ *  서버 control_service/webrtc_voice.py 의 SileroVAD 와 동일 hysteresis. */
+class SileroVAD {
+  static readonly SR_TENSOR = new ort.Tensor('int64', BigInt64Array.from([16000n]), [1]);
+  state = new Float32Array(2 * 1 * 128);
+  speaking = false;
+  private speechCount = 0;
+  private silenceCount = 0;
+
+  constructor(private readonly session: ort.InferenceSession) {}
+
+  async feed(chunk: Float32Array): Promise<{ prob: number; event: 'start' | 'end' | null }> {
+    if (chunk.length !== VAD_CHUNK_SAMPLES) {
+      throw new Error(`VAD expects ${VAD_CHUNK_SAMPLES} samples, got ${chunk.length}`);
+    }
+    const input = new ort.Tensor('float32', chunk, [1, VAD_CHUNK_SAMPLES]);
+    const stateT = new ort.Tensor('float32', this.state, [2, 1, 128]);
+    const out = await this.session.run({ input, state: stateT, sr: SileroVAD.SR_TENSOR });
+    // 서버처럼 출력 순서 0=prob, 1=new state. ONNX 모델 정의 기준.
+    const outputs = Object.values(out);
+    const prob = (outputs[0].data as Float32Array)[0] ?? 0;
+    this.state = new Float32Array(outputs[1].data as Float32Array);
+    return { prob, event: this.advance(prob) };
+  }
+
+  reset(): void {
+    this.state.fill(0);
+    this.speaking = false;
+    this.speechCount = 0;
+    this.silenceCount = 0;
+  }
+
+  private advance(prob: number): 'start' | 'end' | null {
+    if (!this.speaking) {
+      if (prob >= VAD_POSITIVE_THRESHOLD) {
+        this.speechCount += 1;
+        this.silenceCount = 0;
+        if (this.speechCount >= VAD_MIN_SPEECH_FRAMES) {
+          this.speaking = true;
+          return 'start';
+        }
+      } else {
+        this.speechCount = 0;
+      }
+    } else {
+      if (prob < VAD_NEGATIVE_THRESHOLD) {
+        this.silenceCount += 1;
+        if (this.silenceCount >= VAD_MIN_SILENCE_FRAMES) {
+          this.speaking = false;
+          this.speechCount = 0;
+          this.silenceCount = 0;
+          return 'end';
+        }
+      } else {
+        this.silenceCount = 0;
+      }
+    }
+    return null;
+  }
+}
+
 export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
   const isRunning = ref(false);
   const lastScores = ref<Record<string, number>>({});
@@ -94,6 +176,8 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
 
   let melspecSess: ort.InferenceSession | null = null;
   let embedSess: ort.InferenceSession | null = null;
+  let vadSess: ort.InferenceSession | null = null;
+  let vad: SileroVAD | null = null;
   let robotSessions: Map<string, ort.InferenceSession> = new Map();
 
   const audioRing = new AudioRing(AUDIO_RING_SAMPLES);
@@ -104,6 +188,14 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
   void EmbedRing;
 
   let inflight = false;
+  let vadBusy = false;
+  // worklet chunk (1280) → VAD chunk (512) 분할용 누적 버퍼. 매 worklet 메시지마다
+  // 새 sample 을 이어붙이고 512 단위로 잘라 VAD 에 feed. carry 는 남겨둠.
+  let vadCarry = new Float32Array(0);
+  // VAD speaking 또는 직전 grace window 동안만 runStep 허용. ms 기준.
+  let lastVadSpeechAt = 0;
+  // 최근 K step 의 robot 별 score — 연속 임계 초과 confirmation 용.
+  const recentScores: Map<string, number[]> = new Map();
 
   async function fetchBytes(url: string): Promise<Uint8Array> {
     const r = await fetch(url);
@@ -137,7 +229,7 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       executionProviders: ['wasm'],
       graphOptimizationLevel: 'all',
     };
-    // melspec / embedding 은 single-file (external data 없음) — URL 로 직접.
+    // melspec / embedding / Silero VAD 모두 single-file (external data 없음) — URL 직접.
     melspecSess = await ort.InferenceSession.create(
       `${ASSET_BASE}/melspectrogram.onnx`,
       sessOpts,
@@ -146,6 +238,11 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       `${ASSET_BASE}/embedding_model.onnx`,
       sessOpts,
     );
+    vadSess = await ort.InferenceSession.create(
+      `${ASSET_BASE}/silero_vad.onnx`,
+      sessOpts,
+    );
+    vad = new SileroVAD(vadSess);
     // robot 별 분류기는 train.py 가 `<robot>.onnx.data` 사이드카로 weights 분리.
     for (const robotId of options.robotIds) {
       const sess = await createSessionWithExternal(
@@ -154,6 +251,44 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       );
       robotSessions.set(robotId, sess);
     }
+  }
+
+  /** worklet chunk (1280) → VAD chunk (512) 분할 + state 갱신 + 게이트 확인 후 runStep. */
+  async function processVadAndStep(chunk: Float32Array): Promise<void> {
+    if (!vad) return;
+    if (vadBusy) return; // CPU 따라잡지 못한 경우 skip — 다음 chunk 에서 만회.
+    vadBusy = true;
+    try {
+      const merged = new Float32Array(vadCarry.length + chunk.length);
+      merged.set(vadCarry);
+      merged.set(chunk, vadCarry.length);
+      let off = 0;
+      while (off + VAD_CHUNK_SAMPLES <= merged.length) {
+        // tensor 는 buffer 를 keep ref 할 수 있어 매 chunk copy.
+        const slice = new Float32Array(
+          merged.buffer,
+          merged.byteOffset + off * Float32Array.BYTES_PER_ELEMENT,
+          VAD_CHUNK_SAMPLES,
+        ).slice();
+        const { prob, event } = await vad.feed(slice);
+        if (LOG_VOICE_DEBUG && event) console.log(`[wake-vad] ${event} prob=${prob.toFixed(3)}`);
+        if (vad.speaking) lastVadSpeechAt = performance.now();
+        off += VAD_CHUNK_SAMPLES;
+      }
+      vadCarry = merged.slice(off);
+    } catch (e) {
+      options.onError?.(`vad step error: ${(e as Error).message}`);
+    } finally {
+      vadBusy = false;
+    }
+
+    // 게이트 — speaking 중이거나, speaking 끝난 후 grace window 이내일 때만 wake step.
+    if (performance.now() - lastVadSpeechAt > VAD_GRACE_MS) {
+      // 게이트 닫힘 — score history 도 끊김으로 비워서 spike 가 confirm 에 끼지 않게.
+      if (recentScores.size > 0) recentScores.clear();
+      return;
+    }
+    void runStep();
   }
 
   async function runStep(): Promise<void> {
@@ -234,12 +369,30 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       lastScores.value = scores;
       options.onScore?.(scores);
 
+      // Multi-frame confirmation — 직전 K-1 step + 현재 step 모두 임계 초과 시만 fire.
+      // 단발 spike (식기 부딪힘 등) 는 보통 한 step 만 튀고 다음 step 에서 떨어짐.
+      for (const robotId of options.robotIds) {
+        const history = recentScores.get(robotId) ?? [];
+        history.push(scores[robotId] ?? 0);
+        while (history.length > WAKE_CONFIRM_FRAMES) history.shift();
+        recentScores.set(robotId, history);
+      }
+
       const hits = decideWakeHits(scores, options.thresholds ?? {});
       if (hits.length === 0) return;
+      const confirmed = hits.filter((hit) => {
+        const history = recentScores.get(hit.robotId) ?? [];
+        if (history.length < WAKE_CONFIRM_FRAMES) return false;
+        const thr = options.thresholds?.[hit.robotId] ?? 0.9;
+        return history.every((s) => s >= thr);
+      });
+      if (confirmed.length === 0) return;
       const now = performance.now();
       if (now - lastWakeAt < (options.cooldownMs ?? DEFAULT_COOLDOWN_MS)) return;
       lastWakeAt = now;
-      options.onWake(hits[0]);
+      // confirm 후엔 history 비움 — cooldown 동안 잔재로 즉시 재발화 막음.
+      recentScores.clear();
+      options.onWake(confirmed[0]);
     } catch (e) {
       options.onError?.(`wake step error: ${(e as Error).message}`);
     } finally {
@@ -268,11 +421,12 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
       await audioContext.audioWorklet.addModule(WORKLET_PATH);
       sourceNode = audioContext.createMediaStreamSource(stream);
       workletNode = new AudioWorkletNode(audioContext, 'wake-pcm-worklet');
-      // 무음 chunk 에서는 inference skip — 마이크 noise floor RMS ≈ 0.003,
-      // 발화 시 ≥ 0.01. 0.005 임계값으로 발화 시작 전까지 mel/embed/clf 전부 건너뜀.
-      // 발화 도중에는 매 chunk RMS > threshold 라 inference 정상 동작.
-      // wake word 가 ring 에 들어있어도 무음 후속 chunk 에서는 skip — 이미 검출
-      // 직후 cooldown 2.5s 가 작동하므로 손실 없음.
+      // 2 단계 게이트:
+      //   1. RMS — 마이크 noise floor (~0.003) 도 안 되는 완전 무음은 VAD 호출도 skip.
+      //   2. Silero VAD — voice / non-voice 구별. speaking 또는 직전 grace window 내
+      //      에서만 wake 분류기 실행. 비음성 noise (식기·박수·BGM) 가 분류기에 들어가
+      //      false-positive 내는 것을 차단.
+      // ring 은 게이트와 무관하게 항상 채워서 wake 발생 시 ring 안에 2.7s context 보장.
       const SILENCE_RMS_THRESHOLD = 0.005;
       workletNode.port.onmessage = (ev: MessageEvent<Float32Array>) => {
         const chunk = ev.data;
@@ -281,7 +435,7 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
         let s2 = 0;
         for (let i = 0; i < chunk.length; i++) s2 += chunk[i] * chunk[i];
         if (Math.sqrt(s2 / chunk.length) < SILENCE_RMS_THRESHOLD) return;
-        void runStep();
+        void processVadAndStep(chunk);
       };
       sourceNode.connect(workletNode);
       // worklet 출력은 destination 으로 안 보낸다 (스피커 mute)
@@ -313,6 +467,11 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
         stream.getTracks().forEach((t) => t.stop());
         stream = null;
       }
+      // VAD state 와 누적 버퍼 / score history 리셋 — 재시작 시 직전 세션 잔재 제거.
+      vad?.reset();
+      vadCarry = new Float32Array(0);
+      lastVadSpeechAt = 0;
+      recentScores.clear();
     } catch (e) {
       options.onError?.(`wake stop error: ${(e as Error).message}`);
     }
