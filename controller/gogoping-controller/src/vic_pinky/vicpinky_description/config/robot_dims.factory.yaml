@@ -1,33 +1,36 @@
-# Vic Pinky URDF dimension — FACTORY BASELINE.
+# Vic Pinky URDF dimension — FACTORY BASELINE (v1.0.0 기준).
 # app/urdf-tuner GUI 의 "Reset to default" 가 이 파일을 read 해서
 # robot_dims.yaml 로 복원합니다.
 #
 # ⚠️  이 파일은 GUI 가 절대 덮어쓰지 않습니다.
 #    공장 출하 baseline 으로 항상 보존 — 변경하려면 직접 편집.
 #    실제 robot 이 사용하는 값은 robot_dims.yaml 입니다.
+#
+# v1.0.0 xacro 가 directly 사용하지 않는 필드 (chassis.z_offset, caster.x/y,
+# wheel.x_offset/z_offset) 도 urdf-tuner GUI 호환을 위해 포함.
 
 chassis:
-  length: 0.6      # collision box X (앞↔뒤). 시각 메쉬는 base_link.stl 로 별개
-  width: 0.5       # collision box Y
-  height: 0.128    # collision box Z
-  z_offset: 0.087  # base_footprint → base_link Z (지면 위 차체 중심 높이)
+  length: 0.6
+  width: 0.4
+  height: 0.14
+  z_offset: 0.0
 
 caster:
-  radius: 0.0435   # 보조 바퀴 반지름
-  x: 0.244         # base_link 기준 |X| — 4개 위치 (±x, ±y) 좌우 대칭
-  y: 0.094         # base_link 기준 |Y|
+  radius: 0.0325
+  x: 0.4
+  y: 0.1
 
 wheel:
   radius: 0.0825
   thickness: 0.05
-  separation: 0.4288
+  separation: 0.475
   x_offset: 0.0
-  z_offset: -0.0048
+  z_offset: 0.0
 
 lidar:
-  mount_x: 0.185
+  mount_x: 0.0
   mount_y: 0.0
-  mount_z: 0.12
+  mount_z: 0.18
   mount_roll: 0.0
   mount_pitch: 0.0
   mount_yaw: 0.0

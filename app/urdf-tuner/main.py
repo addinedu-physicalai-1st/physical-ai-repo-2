@@ -75,18 +75,20 @@ YAML_HEADER = (
 
 # Hardcoded fallback — factory yaml 이 사라졌을 때만 사용.
 _FALLBACK_DEFAULTS = {
+    # v1.0.0 base. chassis.z_offset / caster.x,y / wheel.x_offset,z_offset 은
+    # v1.0.0 xacro 가 직접 derive 하므로 슬라이더는 남지만 yaml 변경해도 무시됨.
     "chassis": {
-        "length": 0.6, "width": 0.5, "height": 0.128, "z_offset": 0.087,
+        "length": 0.6, "width": 0.4, "height": 0.14, "z_offset": 0.0,
     },
     "caster": {
-        "radius": 0.0435, "x": 0.244, "y": 0.094,
+        "radius": 0.0325, "x": 0.4, "y": 0.1,
     },
     "wheel": {
-        "radius": 0.0825, "thickness": 0.05, "separation": 0.4288,
-        "x_offset": 0.0, "z_offset": -0.0048,
+        "radius": 0.0825, "thickness": 0.05, "separation": 0.475,
+        "x_offset": 0.0, "z_offset": 0.0,
     },
     "lidar": {
-        "mount_x": 0.185, "mount_y": 0.0, "mount_z": 0.12,
+        "mount_x": 0.0, "mount_y": 0.0, "mount_z": 0.18,
         "mount_roll": 0.0, "mount_pitch": 0.0, "mount_yaw": 0.0,
         "laser_x": 0.0, "laser_y": 0.0, "laser_z": 0.03,
         "laser_roll": 0.0, "laser_pitch": 0.0, "laser_yaw": math.pi,
