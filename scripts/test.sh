@@ -96,6 +96,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_align_to_dock.py \
   tests/test_gogoping_reverse_into_dock.py \
   tests/test_gogoping_verify_docking_contact.py \
+  tests/test_gogoping_pan_camera_sweep.py \
   tests/test_gogoping_return_subtree_builder.py \
   tests/test_gogoping_select_vertex.py \
   tests/test_gogoping_ui_publish.py \
