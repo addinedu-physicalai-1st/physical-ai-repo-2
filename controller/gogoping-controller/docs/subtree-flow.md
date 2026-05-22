@@ -85,6 +85,19 @@ ReturnSubTree = OneShot(ON_COMPLETION) of:
 # 접점 센서는 미구현 — VerifyDockingContact 가 "후진 끝났으면 도킹 완료" 간주
 # 후 docked trigger 발사. 추후 docking_contact 토픽 통합 시 검증 추가.
 # 자세한 명세: docs/bt/trees/BT_return_sub.md
+-------------------------------------------------------------------------------
+PatrolSubTree (building block — mode/task 단위 SubTree 아님)
+  Sequence (memory=True, name="BT_patrol_sub")
+    ├─ FailureIsSuccess("safe_visit_A") of Sequence("visit_A", memory=True):
+    │     ├─ SelectVertex(vertex_name="A")    # BB.target_vertex_name = "A"
+    │     ├─ NavigateToVertex                  # graph_router action
+    │     └─ PanCameraSweep                    # 90 → 30 → 150 → 90 (1.5s × 4)
+    ├─ FailureIsSuccess("safe_visit_B") of …
+    └─ FailureIsSuccess("safe_visit_C") of …
+
+# build_patrol_sub(ctx, waypoints) — 빌드 시 vertex list 받아 동적 자식 생성.
+# 한 vertex 실패 시 다음 vertex 계속 (skip-on-failure).
+# 자세한 명세: docs/bt/trees/BT_patrol_sub.md
 ------------------------------------------------------------------------------- 
 1. GotoSubTree (이동) — vertex 까지 lane 따라 이동, 도착 시 알림. 운반은 user 가 follow + goto chain.
 
@@ -103,3 +116,12 @@ ReturnSubTree = OneShot(ON_COMPLETION) of:
 5. ReturnSubTree (도킹 복귀) — 4단계
 graph_router 로 "충전소입구" vertex 까지 lane 따라 이동 → 도크 등진 yaw 로 제자리 회전 → N초 후진 → docked trigger 자동 발사 (VerifyDockingContact) → CHARGING 전이 → OneShot 잠금 (재실행 X).
 자동 도킹 접점 센서는 미구현 — 시간 기반 후진 끝나면 무조건 도킹 완료 간주.
+
+---
+
+### 빌딩 블록 (mode/task 단위 SubTree 아님)
+
+**PatrolSubTree** — vertex list 를 순서대로 돌며 각 vertex 에서 카메라 좌우 sweep.
+한 vertex 실패는 skip 후 다음 진행 (`FailureIsSuccess` decorator). 본 SubTree 자체는
+어느 mode/task 에도 결선돼 있지 않다 — 호출자가 빌더 `build_patrol_sub(ctx, waypoints)` 로
+사용. 추후 `HideAndSeekSubTree` 의 search 단계 등에서 재사용 예정.

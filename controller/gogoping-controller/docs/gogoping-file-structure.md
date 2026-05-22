@@ -73,6 +73,9 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_charging_main
         │   │   │   ├── check_task.[py|/]             # blackboard.assist_task/play_task 값 비교 (✅)
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main (TaskSelector 분기)
+        │   │   │   ├── select_vertex.py              # 고정 vertex 이름을 BB.target_vertex_name 에 W 후 SUCCESS (✅)
+        │   │   │   │                                 #   NavigateToVertex 와 짝 — Sequence(SelectVertex + NavigateToVertex) 패턴
+        │   │   │   │                                 #   Used in: BT_patrol_sub
         │   │   │   ├── ui_publish.[py|/]             # 범용 UI 알림 publish (announce / countdown_start 등) (✅)
         │   │   │   │                                 # message dict 1회 publish 후 즉시 SUCCESS
         │   │   │   │                                 #   Used in: BT_goto_sub (AnnounceArrival), BT_hide_and_seek_sub
@@ -119,8 +122,8 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_follow_sub
         │   │   │   ├── raise_camera_pan.[py|/]       # 카메라 각도 올림 (follow 시작 시)
         │   │   │   │                                 #   Used in: BT_follow_sub
-        │   │   │   └── pan_camera_sweep.[py|/]       # 카메라 pan 좌우 sweep (탐색용)
-        │   │   │                                     #   Used in: BT_follow_sub, BT_hide_and_seek_sub
+        │   │   │   └── pan_camera_sweep.py           # 카메라 pan 시간 기반 시퀀스: 90→30→150→90 (1.5s × 4). terminate(INVALID) 시 90 복귀. ctx.camera_pan.publish_pan() 사용 (✅) → docs/bt/behaviors/follow.md#pan_camera_sweep
+        │   │   │                                     #   Used in: BT_patrol_sub, BT_follow_sub (예정), BT_hide_and_seek_sub (예정)
         │   │   │
         │   │   ├── manual/
         │   │   │   ├── __init__.py
@@ -164,18 +167,19 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
         │       │   └── BT_low_battery_return_main.py    # LOW_BATTERY_RETURN — 빈 lockdown (CommandListener 없음)
         │       │
-        │       └── sub_trees/            # 작업별 SubTree (총 5개)
+        │       └── sub_trees/            # SubTree (mode/task 단위 5개 + 빌딩 블록)
         │           ├── __init__.py
         │           ├── BT_goto_sub.py            # 이동 — Sequence(NavigateToVertex + UIPublish)
         │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
         │           ├── BT_lullaby_sub.py         # 자장가 — LullabyAudio 단일 leaf (UI 가 mp3 재생, BT 는 publish only) (✅)
         │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 (1회 실행) — 숨기 → 카운트 → 탐색 → 복귀
+        │           ├── BT_patrol_sub.py          # ★ 빌딩 블록 (mode/task 단위 아님) — build_patrol_sub(ctx, waypoints) 로 vertex 마다 Sequence(SelectVertex + NavigateToVertex + PanCameraSweep) 동적 생성 + FailureIsSuccess 로 감싸 skip-on-failure (✅) → docs/bt/trees/BT_patrol_sub.md
         │           └── BT_return_sub.py          # 도킹 복귀 — OneShot(Sequence(NavTo "충전소입구" → AlignToDock → ReverseIntoDock → VerifyDockingContact)). 마지막 단계가 docked trigger 자동 발사 → CHARGING. 빌더가 yaml 의 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 주입 → docs/bt/trees/BT_return_sub.md
         │
         ├── interfaces/                   # 외부 HW / ROS action·service·topic 호출 래퍼
         │   ├── __init__.py
         │   ├── nav2_client.py            # Nav2 NavigateToPose 액션 클라이언트  (stub)
-        │   ├── camera_pan_client.py      # gogoping_camera_pan 토픽 publish 래퍼 (/camera_pan/auto)  (stub)
+        │   ├── camera_pan_client.py      # gogoping_camera_pan 토픽 publish 래퍼 — /servo_bridge/cmd_pan (Float32 deg) publisher. publish_pan(deg) clamp 5~175°, center() = 90°. PanCameraSweep behavior 가 사용 (✅)
         │   ├── ui_publisher.py           # robot-web / admin-app 로 상태 publish  (✅ 실 구현 — `/gogoping/state` 1Hz)
         │   ├── base_driver_client.py     # vic_pinky_bringup 의 /gogoping/set_torque (SetBool) 클라이언트
         │   │                             #   release_torque() / enable_torque() — ManualTorqueHold 가 사용 (✅)
