@@ -276,6 +276,118 @@ async def test_check_in_skips_when_routine_missing(
     fake_bridge.play_routine.assert_not_called()
 
 
+# ---- /attendance/recognize-crops ----
+
+
+async def test_recognize_crops_returns_matches_in_input_order(
+    client: AsyncClient, db_session, monkeypatch
+):
+    """클라가 보낸 crop 순서대로 matches 가 반환되고, 각 crop 의 가장 가까운 child 가 매칭된다."""
+    import io
+    from control_db.models import Child, ChildFaceEmbedding
+    from control_service.routers import attendance as att_module
+
+    # 두 어린이 — 각자 distinct embedding
+    c1 = Child(name="A", birth_date=date(2021, 1, 1), class_name="햇살반",
+               photo_url=None, created_at=datetime.now(timezone.utc))
+    c2 = Child(name="B", birth_date=date(2021, 2, 2), class_name="햇살반",
+               photo_url=None, created_at=datetime.now(timezone.utc))
+    db_session.add_all([c1, c2])
+    await db_session.flush()
+    emb_a = [1.0] + [0.0] * 511
+    emb_b = [0.0] + [1.0] + [0.0] * 510
+    db_session.add_all([
+        ChildFaceEmbedding(child_id=c1.id, embedding=emb_a),
+        ChildFaceEmbedding(child_id=c2.id, embedding=emb_b),
+    ])
+    await db_session.flush()
+    await db_session.commit()
+
+    # 호출 순서: [crop_b_bytes, crop_a_bytes]. 응답도 같은 순서여야 함.
+    call_order: list[bytes] = []
+    def fake_extract(image_bytes: bytes) -> list[float]:
+        call_order.append(image_bytes)
+        # bytes 의 첫 바이트로 a/b 분기 (테스트용)
+        return emb_b if image_bytes[:1] == b"B" else emb_a
+
+    monkeypatch.setattr(att_module, "extract_embedding_from_crop", fake_extract)
+
+    files = [
+        ("files", ("0.jpg", io.BytesIO(b"B_fake_jpeg"), "image/jpeg")),
+        ("files", ("1.jpg", io.BytesIO(b"A_fake_jpeg"), "image/jpeg")),
+    ]
+    response = await client.post(
+        "/api/attendance/recognize-crops",
+        files=files,
+        headers=_device_headers(),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    matches = body["matches"]
+    assert len(matches) == 2
+    assert matches[0]["matched"] is True
+    assert matches[0]["child_name"] == "B"
+    assert matches[1]["matched"] is True
+    assert matches[1]["child_name"] == "A"
+    # bbox 는 응답에 포함하지 않음 (클라가 이미 앎)
+    assert matches[0]["bbox"] is None
+
+
+async def test_recognize_crops_returns_unmatched_when_distance_over_threshold(
+    client: AsyncClient, db_session, monkeypatch
+):
+    import io
+    from control_db.models import Child, ChildFaceEmbedding
+    from control_service.routers import attendance as att_module
+
+    c1 = Child(name="A", birth_date=date(2021, 1, 1), class_name="햇살반",
+               photo_url=None, created_at=datetime.now(timezone.utc))
+    db_session.add(c1)
+    await db_session.flush()
+    emb_a = [1.0] + [0.0] * 511
+    db_session.add(ChildFaceEmbedding(child_id=c1.id, embedding=emb_a))
+    await db_session.flush()
+    await db_session.commit()
+
+    # 직교 embedding → cosine_distance = 1.0 > threshold
+    emb_stranger = [0.0] + [1.0] + [0.0] * 510
+    monkeypatch.setattr(att_module, "extract_embedding_from_crop", lambda _: emb_stranger)
+
+    files = [("files", ("0.jpg", io.BytesIO(b"x"), "image/jpeg"))]
+    response = await client.post(
+        "/api/attendance/recognize-crops",
+        files=files,
+        headers=_device_headers(),
+    )
+    assert response.status_code == 200, response.text
+    matches = response.json()["matches"]
+    assert len(matches) == 1
+    assert matches[0]["matched"] is False
+    assert matches[0]["distance"] is not None
+
+
+async def test_recognize_crops_returns_unmatched_when_no_face_in_crop(
+    client: AsyncClient, db_session, monkeypatch
+):
+    """extract_embedding_from_crop 이 None 반환 시 matched=False, distance=None."""
+    import io
+    from control_service.routers import attendance as att_module
+
+    monkeypatch.setattr(att_module, "extract_embedding_from_crop", lambda _: None)
+
+    files = [("files", ("0.jpg", io.BytesIO(b"x"), "image/jpeg"))]
+    response = await client.post(
+        "/api/attendance/recognize-crops",
+        files=files,
+        headers=_device_headers(),
+    )
+    assert response.status_code == 200, response.text
+    matches = response.json()["matches"]
+    assert len(matches) == 1
+    assert matches[0]["matched"] is False
+    assert matches[0]["distance"] is None
+
+
 # ---- DELETE /api/attendance/{child_id} (교사 디버그용 리셋) ----
 
 
