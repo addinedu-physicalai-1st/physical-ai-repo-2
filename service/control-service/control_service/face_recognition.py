@@ -77,3 +77,14 @@ def extract_embeddings_all(image_bytes: bytes) -> list[dict]:
         }
         for f in faces
     ]
+
+
+def extract_embedding_from_crop(image_bytes: bytes) -> Optional[list[float]]:
+    """이미 클라가 crop 한 얼굴 이미지에서 embedding 만 추출.
+
+    의도 표현용 별도 함수 — 동작은 `extract_embedding` 과 동일하지만
+    호출자가 "이건 detect 불필요한 face crop" 임을 명시한다는 차이.
+    가장 큰 얼굴 1개의 512-d L2-normalized embedding 반환.
+    crop 안에 얼굴이 안 보이거나 디코딩 실패면 None.
+    """
+    return extract_embedding(image_bytes)
