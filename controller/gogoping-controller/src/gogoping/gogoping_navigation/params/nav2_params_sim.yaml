@@ -126,7 +126,7 @@ controller_server:
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 0.5
+      rotate_to_heading_angular_vel: 0.75
       transform_tolerance: 0.1
       use_velocity_scaled_lookahead_dist: true
       min_approach_linear_velocity: 0.05
@@ -296,7 +296,7 @@ behavior_server:
     robot_base_frame: gogoping/base_link
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0
+    max_rotational_vel: 1.5
     min_rotational_vel: 0.4
     rotational_acc_lim: 3.2
 
@@ -321,8 +321,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "CLOSED_LOOP"
-    max_velocity: [0.25, 0.0, 1.0]
-    min_velocity: [-0.25, 0.0, -1.0]
+    max_velocity: [0.25, 0.0, 1.5]
+    min_velocity: [-0.25, 0.0, -1.5]
     max_accel: [1.8, 0.0, 2.0]
     max_decel: [-1.8, 0.0, -2.0]
     odom_topic: "/gogoping/odom"
