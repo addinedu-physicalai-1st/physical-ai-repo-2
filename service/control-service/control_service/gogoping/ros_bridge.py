@@ -13,9 +13,11 @@ from __future__ import annotations
 import collections
 import json
 import logging
+import math
 import os
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from .mode_to_goal import Goal
@@ -35,6 +37,8 @@ SERVICE_EMERGENCY_STOP = "/gogoping/emergency_stop"
 # gogoping_modes 노드 (namespace gogoping, name gogoping_modes) 의 표준 ParamServer.
 # admin UI 에서 IDLE → RETURNING 임계값 (idle_timeout_seconds) 조정 시 호출.
 SERVICE_SET_PARAMETERS = "/gogoping/gogoping_modes/set_parameters"
+TOPIC_FOLLOW_TARGET = "/gogoping/follow_target"
+TOPIC_TRACKING_STATE = "/gogoping/tracking_state"
 
 # admin UI NavDebugLogCard 가 WS 연결 시 backfill 받는 최근 이벤트 수.
 # 시나리오 재현 직후 늦게 연결해도 직전 cancel chain 한 cycle 정도는 보임.
@@ -93,6 +97,9 @@ class GogopingRosBridge:
         self._set_params_cli: Any = None   # rcl_interfaces/SetParameters — idle_timeout 등 ROS param 조정
         self._sub: Any = None              # /gogoping/state subscriber
         self._nav_event_sub: Any = None    # /gogoping/debug/nav_events subscriber
+        self._follow_target_pub: Any = None   # /gogoping/follow_target publisher
+        self._tracking_state_sub: Any = None  # /gogoping/tracking_state subscriber
+        self._last_tracking_state: dict | None = None
         self._executor: Any = None
 
     # ----------------------------------------------------------- lifecycle
@@ -150,6 +157,14 @@ class GogopingRosBridge:
         # publisher 와 맞춰 burst 안 잃도록.
         self._nav_event_sub = self._node.create_subscription(
             String, TOPIC_NAV_DEBUG_EVENTS, self._on_nav_event_msg, 20,
+        )
+        # follow target publisher + tracking state subscriber
+        from gogoping_msgs.msg import FollowTarget, TrackingState
+        self._follow_target_pub = self._node.create_publisher(
+            FollowTarget, TOPIC_FOLLOW_TARGET, 10,
+        )
+        self._tracking_state_sub = self._node.create_subscription(
+            TrackingState, TOPIC_TRACKING_STATE, self._on_tracking_state, 10,
         )
         self._executor = rclpy.executors.SingleThreadedExecutor()
         self._executor.add_node(self._node)
@@ -495,6 +510,56 @@ class GogopingRosBridge:
                     pass
 
         return unregister
+
+    # ----------------------------------------------------------- follow target
+
+    def publish_follow_target(self, payload: dict) -> None:
+        """교사 추종 시작 — FollowTarget 메시지 publish."""
+        from gogoping_msgs.msg import FollowTarget
+        msg = FollowTarget()
+        msg.teacher_id = str(payload["teacher_id"])
+        msg.teacher_name = payload.get("teacher_name", "")
+        msg.embedding = list(payload["embedding"])
+        msg.ts_ms = int(payload.get("ts_ms") or time.time() * 1000)
+        self._follow_target_pub.publish(msg)
+
+    def publish_follow_stop(self) -> None:
+        """교사 추종 중지 — 빈 FollowTarget publish."""
+        from gogoping_msgs.msg import FollowTarget
+        msg = FollowTarget()
+        msg.teacher_id = ""
+        msg.teacher_name = ""
+        msg.embedding = []
+        msg.ts_ms = int(time.time() * 1000)
+        self._follow_target_pub.publish(msg)
+
+    def current_tracking_state(self) -> dict | None:
+        """최근 TrackingState (없으면 None)."""
+        with self._lock:
+            return self._last_tracking_state
+
+    def _on_tracking_state(self, msg: Any) -> None:
+        """/gogoping/tracking_state 토픽 콜백."""
+        distance = float(msg.distance_m)
+        angle = float(msg.angle_deg)
+        reid_sim = float(msg.reid_sim)
+        state = {
+            "active": msg.mode in ("searching", "tracking"),
+            "matched": bool(msg.matched),
+            "distance_m": distance if not math.isnan(distance) else None,
+            "angle_deg": angle if not math.isnan(angle) else None,
+            "bbox_size_px": int(msg.bbox_size_px) or None,
+            "bbox_x1": int(msg.bbox_x1) or None,
+            "bbox_y1": int(msg.bbox_y1) or None,
+            "bbox_x2": int(msg.bbox_x2) or None,
+            "bbox_y2": int(msg.bbox_y2) or None,
+            "track_id": int(msg.track_id) or None,
+            "reid_sim": reid_sim if not math.isnan(reid_sim) else None,
+            "teacher_id": msg.teacher_id or None,
+            "updated_at": datetime.fromtimestamp(msg.ts_ms / 1000.0, tz=timezone.utc),
+        }
+        with self._lock:
+            self._last_tracking_state = state
 
 
 __all__ = [

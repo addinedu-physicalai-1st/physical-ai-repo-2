@@ -31,6 +31,7 @@ from control_service.camera_pan.ros_bridge import CameraPanBridge
 from control_service.camera_pan.router import install as install_camera_pan
 from control_service.gogoping.ros_bridge import GogopingRosBridge
 from control_service.gogoping.router import install as install_gogoping
+from control_service.routers.gogoping_follow import install as install_gogoping_follow
 from control_service.teleop.ros_bridge import RosBridge
 from control_service.teleop.router import install as install_teleop
 from control_service.waypoints.ros_bridge import WaypointsRosBridge
@@ -237,6 +238,8 @@ _camera_pan_hub = install_camera_pan(app, _camera_pan_bridge)
 # waypoints_bridge 도 주입 — /debug/pose 에서 AMCL /initialpose 도 함께 publish (RViz 동기화).
 _gogoping_bridge = GogopingRosBridge()
 install_gogoping(app, _gogoping_bridge, _waypoints_bridge)
+# gogoping follow — POST /api/gogoping/follow/{start,stop} + GET /state
+install_gogoping_follow(app, _gogoping_bridge)
 
 
 # ─── FSM state 전이 ↔ waypoints active goal 동기화 ─────────────────────────────

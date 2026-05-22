@@ -3,6 +3,7 @@ import { ref, type Ref } from 'vue';
 export type StreamStatus = 'connecting' | 'open' | 'streaming' | 'closed';
 export interface UseVideoStream {
   frameUrl: Ref<string | null>;
+  currentBlob: Ref<Blob | null>;
   status: Ref<StreamStatus>;
   stop(): void;
 }
@@ -33,6 +34,7 @@ export function useVideoStream(
   );
 
   const frameUrl = ref<string | null>(null);
+  const currentBlob = ref<Blob | null>(null);
   const status = ref<StreamStatus>('connecting');
   let prevUrl: string | null = null;
   const clientId = `robot-web-${uuid()}`;
@@ -98,6 +100,7 @@ export function useVideoStream(
       if (!buf || buf.byteLength <= HEADER_BYTES) return;
       const jpeg = new Uint8Array(buf, HEADER_BYTES);
       const blob = new Blob([jpeg], { type: 'image/jpeg' });
+      currentBlob.value = blob;
       const url = createURL(blob);
       if (prevUrl) revokeURL(prevUrl);
       prevUrl = url;
@@ -116,5 +119,5 @@ export function useVideoStream(
     frameUrl.value = null;
   }
 
-  return { frameUrl, status, stop };
+  return { frameUrl, currentBlob, status, stop };
 }

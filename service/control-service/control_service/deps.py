@@ -47,3 +47,29 @@ async def require_device_token(
     """robot-web 등 디바이스 전용 endpoint — 헤더 X-Device-Token 검증."""
     if not x_device_token or x_device_token != settings.robot_device_token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid device token")
+
+
+def _make_require_teacher_or_device_token():
+    """교사 세션 쿠키 또는 X-Device-Token 헤더 둘 중 하나라도 통과하면 OK.
+
+    fastapi_users.current_user(optional=True) 를 FastAPI DI 체인으로 사용해야
+    테스트의 get_session override 가 정상 동작한다 (모듈 import 시점에 해석되면
+    override 무력화).
+    """
+    from control_service.auth import fastapi_users
+    optional_user = fastapi_users.current_user(active=True, optional=True)
+
+    async def _dep(
+        x_device_token: Optional[str] = Header(default=None, alias="X-Device-Token"),
+        user: Optional[User] = Depends(optional_user),
+    ) -> dict:
+        if x_device_token and x_device_token == settings.robot_device_token:
+            return {"actor": "device", "user": None}
+        if user is not None and user.role == "teacher":
+            return {"actor": "teacher", "user": user}
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Auth required")
+
+    return _dep
+
+
+require_teacher_or_device_token = _make_require_teacher_or_device_token()

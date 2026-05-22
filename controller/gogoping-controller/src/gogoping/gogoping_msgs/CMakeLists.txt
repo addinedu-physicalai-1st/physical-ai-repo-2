@@ -16,6 +16,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Placeholder.msg"
   "msg/Goal.msg"
   "msg/GoalStatus.msg"
+  "msg/FollowTarget.msg"
+  "msg/TrackingState.msg"
   "srv/SendCommand.srv"          # [DEPRECATED] — SetGoal.srv 사용
   "srv/SetGoal.srv"
   "srv/ForceState.srv"
