@@ -10,11 +10,30 @@ EduPing 의 D435 RealSense 카메라를 노트북 USB 에 꽂으면 자동으로
 sudo bash scripts/d435-autostart/install.sh
 ```
 
-이게 자동으로:
+[install.sh](install.sh) 가 [d435-streamer.service.template](d435-streamer.service.template) 의 placeholder
+(`__USER__` / `__GROUP__` / `__HOME__` / `__REPO_ROOT__` / `__PYTHON__`) 를 현재 환경에 맞춰
+치환한 뒤 `/etc/systemd/system/d435-streamer.service` 로 설치합니다. 동시에:
 
-- `/etc/systemd/system/d435-streamer.service` 설치 (streamer systemd unit)
 - `/etc/udev/rules.d/99-d435-autostart.rules` 설치 (USB hotplug rule)
 - `systemctl daemon-reload` + `udevadm trigger` (이미 꽂혀 있어도 즉시 시작)
+
+자동 감지 규칙:
+
+| placeholder | 감지 방식 |
+|---|---|
+| `__USER__`      | `$SUDO_USER` (sudo 호출자) |
+| `__GROUP__`     | `id -gn $SUDO_USER` |
+| `__HOME__`      | `getent passwd $SUDO_USER` |
+| `__REPO_ROOT__` | `install.sh` 위치 기준 두 단계 상위 |
+| `__PYTHON__`    | 인자 → `$D435_PYTHON` → `$HOME/{miniconda3,anaconda3,miniforge3,mambaforge}/envs/pdg/bin/python` |
+
+pdg conda env 이 표준 위치에 없거나 이름이 다르면 python 경로를 직접 넘기면 됩니다:
+
+```bash
+sudo bash scripts/d435-autostart/install.sh /home/foo/.conda/envs/pdg/bin/python
+# 또는
+sudo -E D435_PYTHON=/home/foo/.conda/envs/pdg/bin/python bash scripts/d435-autostart/install.sh
+```
 
 ## 확인
 
@@ -25,15 +44,6 @@ curl -s http://localhost:8100/health | jq .depth   # 서버 frame 수신 (latest
 ```
 
 USB 뽑았다 다시 꽂아서 자동으로 stop / start 되는지 확인하면 끝.
-
-## ⚠ 본인 머신에 맞춰 수정 필요한 곳
-
-[d435-streamer.service](d435-streamer.service) 의 두 줄:
-
-- `User=joey` → 본인 리눅스 username
-- `ExecStart=...` 의 `/home/joey/...` 경로 + `/home/joey/miniconda3/envs/pdg/...` → 본인 conda 환경 path
-
-수정 후 `sudo bash scripts/d435-autostart/install.sh` 다시 실행하면 갱신됩니다.
 
 ## 제거
 
@@ -85,7 +95,7 @@ sudo bash scripts/d435-autostart/uninstall.sh
 
 | 파일 | 역할 |
 |---|---|
-| [d435-streamer.service](d435-streamer.service) | systemd unit |
+| [d435-streamer.service.template](d435-streamer.service.template) | systemd unit 템플릿 (placeholder 포함, 직접 systemctl 에 먹이지 말 것) |
 | [99-d435-autostart.rules](99-d435-autostart.rules) | udev rule (USB hotplug → SYSTEMD_WANTS) |
-| [install.sh](install.sh) | 두 파일을 /etc/ 에 복사 + reload + trigger |
+| [install.sh](install.sh) | 템플릿 렌더링 + /etc/ 설치 + reload + trigger |
 | [uninstall.sh](uninstall.sh) | install.sh 의 reverse |
