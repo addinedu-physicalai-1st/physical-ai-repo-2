@@ -1,0 +1,19 @@
+[Unit]
+Description=EduPing D435 depth streamer (auto-start on USB plug)
+# StopWhenUnneeded=yes 가 키 — udev rule 의 SYSTEMD_WANTS 가 빠지면 (USB unplug)
+# 자동 stop. 따로 stop trigger 안 만들어도 됨.
+StopWhenUnneeded=yes
+
+[Service]
+Type=simple
+User=joey
+Group=joey
+Environment=HOME=/home/joey
+# conda pdg python + ROS install 둘 다 source 한 뒤 streamer 실행.
+# bash -c 로 감싸야 source 가 작동.
+ExecStart=/bin/bash -c 'set +u; source /opt/ros/jazzy/setup.bash; source /home/joey/Desktop/physical-ai-repo-2/physical-ai-repo-2/controller/eduping-controller/install/setup.bash; exec /home/joey/miniconda3/envs/pdg/bin/python -m eduarm.d435_depth_streamer --server-host 127.0.0.1'
+# control-service 가 아직 안 떠있어도 streamer 의 reconnect backoff 가 알아서 처리.
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal
+StandardError=journal

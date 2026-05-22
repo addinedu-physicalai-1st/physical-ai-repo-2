@@ -1,0 +1,7 @@
+# Intel RealSense D435 — USB plug 감지 시 d435-streamer.service 시작.
+# product id 0b07 = D435. 다른 RealSense 모델 (D435i=0b3a, D455=0b5c) 도 같이
+# auto-start 하고 싶으면 ATTR{idProduct} 매칭을 늘리면 됨.
+#
+# SYSTEMD_WANTS = device 가 present 일 때 service Wants — service 의
+# StopWhenUnneeded=yes 와 짝지어져, unplug 시 자동 stop.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8086", ATTR{idProduct}=="0b07", TAG+="systemd", ENV{SYSTEMD_WANTS}+="d435-streamer.service"
