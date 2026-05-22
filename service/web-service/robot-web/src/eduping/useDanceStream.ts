@@ -59,6 +59,31 @@ export function useDanceStream(): UseDanceStream {
   let elapsedTimer: number | null = null;
   let endCallback: (() => void) | null = null;
 
+  // 모션 프레임을 오디오와 동일한 streamEpoch 기준으로 적용하기 위한 버퍼.
+  // 수신 즉시 적용하면 오디오보다 WARMUP_S 만큼 앞서 움직임 → 버퍼에 넣고 rAF 루프가 꺼냄.
+  interface MotionEntry { tMs: number; positions: Float32Array }
+  const motionQueue: MotionEntry[] = [];
+  let motionRafId: number | null = null;
+
+  function driveMotion(): void {
+    if (audioCtx && streamEpoch > 0 && header) {
+      const now = audioCtx.currentTime;
+      while (motionQueue.length > 0 && streamEpoch + motionQueue[0].tMs / 1000 <= now) {
+        const entry = motionQueue.shift()!;
+        currentSnapshot.value = {
+          jointNames: header.joint_names,
+          positions: entry.positions,
+          tMs: entry.tMs,
+        };
+      }
+    }
+    if (isPlaying.value || motionQueue.length > 0) {
+      motionRafId = requestAnimationFrame(driveMotion);
+    } else {
+      motionRafId = null;
+    }
+  }
+
   function url(): string {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/api/eduping/dance/stream`;
@@ -69,6 +94,11 @@ export function useDanceStream(): UseDanceStream {
       window.clearInterval(elapsedTimer);
       elapsedTimer = null;
     }
+    if (motionRafId !== null) {
+      cancelAnimationFrame(motionRafId);
+      motionRafId = null;
+    }
+    motionQueue.length = 0;
     streamEpoch = 0;
     header = null;
   }
@@ -109,21 +139,21 @@ export function useDanceStream(): UseDanceStream {
         streamEpoch = audioCtx.currentTime + WARMUP_S;
         isPlaying.value = true;
         elapsedMs.value = 0;
+        motionQueue.length = 0;
         if (elapsedTimer !== null) window.clearInterval(elapsedTimer);
         const startedAt = performance.now() + WARMUP_S * 1000;
         elapsedTimer = window.setInterval(() => {
           const e = performance.now() - startedAt;
           elapsedMs.value = Math.max(0, Math.min(durationMs.value, e));
         }, 80);
+        // 모션 드라이버 시작 — 버퍼에 쌓인 프레임을 오디오 타임라인에 맞춰 소비.
+        if (motionRafId !== null) cancelAnimationFrame(motionRafId);
+        motionRafId = requestAnimationFrame(driveMotion);
         break;
       }
       case FRAME_TYPE_MOTION:
         if (header) {
-          currentSnapshot.value = {
-            jointNames: header.joint_names,
-            positions: frame.positions,
-            tMs: frame.tMs,
-          };
+          motionQueue.push({ tMs: frame.tMs, positions: frame.positions });
         }
         break;
       case FRAME_TYPE_AUDIO:

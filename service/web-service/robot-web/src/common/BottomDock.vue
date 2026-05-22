@@ -80,7 +80,7 @@ function switchToText(): void {
 .dock {
   position: absolute;
   left: 50%;
-  bottom: 60px;
+  bottom: 40px;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;

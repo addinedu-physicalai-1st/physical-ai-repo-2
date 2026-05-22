@@ -12,11 +12,12 @@
  * dev 패널 (import.meta.env.DEV) 으로 단계 전환·탈락을 수동 트리거. 노래 단계는
  * 가상 타이머 + 선택 가능한 tempo 패턴 + 선택적 mp3 재생.
  */
-import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { EmotionId } from '@/config/robots';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
+import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
 import { useFaceDetector } from '@/composables/useFaceDetector';
 import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
@@ -510,12 +511,23 @@ watch([aliveCount, registeredCount], ([alive, reg]) => {
 const drawerOpen = ref(false);
 function toggleDrawer(): void { drawerOpen.value = !drawerOpen.value }
 
-// ---- camera PIP -------------------------------------------------------------
+// ---- 시뮬레이션 패널 (실물 follower 미연결 시만) --------------------------------
+// 메인 화면은 이전 풀스크린 카드 디자인 그대로 유지하되, OpenarmViewer 는 좌하단 플로팅
+// 패널로 분리. realActive=true 면 패널 자체를 unmount (실물 팔이 움직이니 사용자는 직접 봄).
+// 시뮬은 보조 정보라 default 최소화. 첫 펼침 전엔 three.js/URDF/STL 로드 자체를 안 함.
+const stateWs = useEdupingStateWs();
+stateWs.start();
+const simMinimized = ref(true);
+const simEverOpened = ref(false);
+watch(simMinimized, (m) => { if (!m) simEverOpened.value = true; });
+
+// ---- camera (메인 화면 중앙) ------------------------------------------------
+// 시뮬레이션 패널이 좌하단 플로팅으로 분리되면서 .arm-wrap 중앙이 비었음 → 사용자가
+// 카메라 미리보기로 채우길 원함. videoRef 는 이제 중앙 영역의 video 엘리먼트를 가리키며,
+// face detection/motion detection/emotion capture 가 모두 같은 엘리먼트를 공유.
 const videoRef = ref<HTMLVideoElement | null>(null);
-const expandedVideoRef = ref<HTMLVideoElement | null>(null);
 const cameraReady = ref(false);
 const cameraError = ref('');
-const cameraExpanded = ref(false);
 let cameraStream: MediaStream | null = null;
 
 // 카메라 선택 — AttendanceCamera/IntegratedCameraPreview 와 동일 패턴.
@@ -541,34 +553,6 @@ const emotionCapture = useEmotionCapture({
   mode: 'mugunghwa',
   enabled: () => captureArmed.value,
   onCaptured: () => { naturalShotCount.value += 1; },
-});
-
-function toggleCamera(): void {
-  if (!cameraReady.value && !cameraError.value) return;
-  cameraExpanded.value = !cameraExpanded.value;
-}
-
-// 진입 (얼굴 매칭) + 준비 (위치 확인) 단계에서 자동 확대. 노래 시작 이전엔 교사가
-// 카메라로 누가 들어왔는지 / 어디 서 있는지 봐야 하므로 PIP 보다 큰 화면이 필요.
-const STAGES_WITH_AUTO_CAMERA: Stage[] = ['entry', 'ready'];
-watch(stage, (s, prev) => {
-  const wantsCamera = STAGES_WITH_AUTO_CAMERA.includes(s);
-  const wasCamera = !!prev && STAGES_WITH_AUTO_CAMERA.includes(prev);
-  if (wantsCamera) cameraExpanded.value = true;
-  else if (wasCamera) cameraExpanded.value = false;
-});
-
-// 확대 모달의 video 에 stream attach. 모달이 열렸을 때 + stream 이 준비됐을 때 둘 다
-// 필요하므로 두 신호를 같이 본다 — 어느 쪽이 늦게 도착해도 한 번은 attach 가 실행됨.
-// v-if 로 element 가 매번 새로 생기므로 srcObject 가 null 일 때만 세팅 (재진입 안전).
-watch([cameraExpanded, cameraReady], async ([expanded, ready]) => {
-  if (!expanded || !ready || !cameraStream) return;
-  await nextTick();
-  const el = expandedVideoRef.value;
-  if (el && !el.srcObject) {
-    el.srcObject = cameraStream;
-    try { await el.play(); } catch { /* noop */ }
-  }
 });
 
 async function listCameras(): Promise<void> {
@@ -634,8 +618,6 @@ async function restartStream(): Promise<void> {
     cameraStream = null;
   }
   cameraReady.value = false;
-  // expanded 모달의 video element 도 srcObject 가 무효해지므로 다음 watch 사이클에서 재 attach.
-  if (expandedVideoRef.value) expandedVideoRef.value.srcObject = null;
   await setupCamera();
 }
 
@@ -677,7 +659,9 @@ const tracker = useFaceTracker();
 let latestTracks: TrackedFace[] = [];
 
 const identityCache = useFaceIdentityCache({
-  stableFramesRequired: 5,
+  // 등원 (한 명씩) 대비 무궁화 (최대 6명 동시) 가 다수 얼굴을 한 번에 들고 식별하느라 첫
+  // identify 까지 wait 가 길게 느껴짐. 트래커 연속성이 이미 노이즈를 컷오프하므로 3 프레임으로.
+  stableFramesRequired: 3,
   identify: async (tracks): Promise<IdentityResult[]> => identifyTracks(tracks),
 });
 
@@ -690,16 +674,24 @@ const detector = useFaceDetector({
   },
 });
 
+// /recognize-multi 로 보내기 전 max 640w 로 다운스케일. 서버 InsightFace 가 어차피 det_size
+// 640 으로 resize 하므로 정확도 영향은 거의 없는데, 디텍션 비용은 입력 해상도에 비례 →
+// 1280×720 → 640×360 로 줄면 detection 만 2~3배 빨라짐. 업로드 페이로드도 1/4 감소.
+const SEND_MAX_WIDTH = 640;
+
 async function captureFullFrame(): Promise<Blob | null> {
   const v = videoRef.value;
   if (!v || v.readyState < 2) return null;
+  const srcW = v.videoWidth;
+  const srcH = v.videoHeight;
+  const scale = srcW > SEND_MAX_WIDTH ? SEND_MAX_WIDTH / srcW : 1;
   const canvas = document.createElement('canvas');
-  canvas.width = v.videoWidth;
-  canvas.height = v.videoHeight;
+  canvas.width = Math.round(srcW * scale);
+  canvas.height = Math.round(srcH * scale);
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  ctx.drawImage(v, 0, 0);
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9));
+  ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
 }
 
 async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
@@ -1133,9 +1125,7 @@ onMounted(() => {
   armSnapshot.value = makeRestSnapshot();
   void setupCamera();
   navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
-  // 첫 mount 시 단계가 'entry' 면 watch 가 한 번 안 돌므로 직접 확대 트리거.
-  if (STAGES_WITH_AUTO_CAMERA.includes(stage.value)) cameraExpanded.value = true;
-  // 마찬가지로 첫 mount 가 entry 면 detector loop 도 시작.
+  // 첫 mount 가 entry 면 stage watch 가 한 번 안 돌므로 detector loop 직접 시작.
   if (stage.value === 'entry') startDetectorLoop();
 });
 
@@ -1161,6 +1151,7 @@ onUnmounted(() => {
     deviceChangeDebounce = null;
   }
   teardownCamera();
+  stateWs.stop();
 });
 </script>
 
@@ -1189,88 +1180,96 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="camera-pip-wrap">
-              <div class="camera-picker" @click.stop>
-                <select
-                  v-model="selectedDeviceId"
-                  :disabled="!hasCameras"
-                  class="camera-picker__select"
-                  aria-label="카메라 선택"
-                  @change="onCameraChange"
-                >
-                  <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
-                  <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
-                    {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
-                  </option>
-                </select>
-                <button
-                  type="button"
-                  class="camera-picker__rescan"
-                  aria-label="카메라 다시 스캔"
-                  title="카메라 다시 스캔"
-                  @click="rescanCameras"
-                >↻</button>
-              </div>
-              <div
-                class="camera-pip"
-                :class="{ ready: cameraReady, error: !!cameraError, motion: motionDetected, captured: emotionCapture.captured.value }"
-                :title="motionDetected ? '⚠ 움직임 감지!' : (cameraError || (cameraReady ? '카메라 작동 중 (클릭으로 확대)' : '카메라 준비 중…'))"
-                @click="toggleCamera"
+            <div class="camera-picker" @click.stop>
+              <select
+                v-model="selectedDeviceId"
+                :disabled="!hasCameras"
+                class="camera-picker__select"
+                aria-label="카메라 선택"
+                @change="onCameraChange"
               >
-                <video ref="videoRef" muted playsinline />
-                <div v-if="!cameraReady && !cameraError" class="cam-overlay">준비 중…</div>
-                <div v-if="cameraError" class="cam-overlay err">⚠ {{ cameraError }}</div>
-                <!-- 셔터 플래시 — 캡처 직후 1회. -->
-                <div
-                  v-if="emotionCapture.flashTick.value > 0"
-                  :key="emotionCapture.flashTick.value"
-                  class="cam-shutter"
-                />
-                <!-- 마지막 캡처 감정 라벨 — 짧게 표시. -->
-                <div
-                  v-if="emotionCapture.lastEmotion.value !== null"
-                  class="cam-emotion-tag"
-                  :class="`is-${emotionCapture.lastEmotion.value}`"
-                >
-                  📸 {{ emotionCapture.lastEmotion.value === 'happy' ? '활짝!' : '시무룩' }}
-                </div>
-                <!-- 라이브 HUD — armed 상태에서 얼굴 검출/감정 % 표시 (디버깅 + 사용자 피드백). -->
-                <div
-                  v-if="captureArmed && cameraReady && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
-                  class="cam-live-hud"
-                  :class="{ 'has-face': emotionCapture.faceDetected.value }"
-                >
-                  <template v-if="!emotionCapture.faceDetected.value">얼굴 찾는 중…</template>
-                  <template v-else>
-                    웃음 {{ (emotionCapture.liveHappy.value * 100).toFixed(0) }}%
-                    · 슬픔 {{ (emotionCapture.liveSad.value * 100).toFixed(0) }}%
-                  </template>
-                </div>
-                <!-- 누적 캡처 수 — 사용자가 한 게임에서 몇 번 잡혔는지. -->
-                <div v-if="naturalShotCount > 0" class="cam-shot-count">
-                  📸 {{ naturalShotCount }}
-                </div>
-                <button
-                  v-if="cameraReady"
-                  type="button"
-                  class="cam-toggle"
-                  aria-label="카메라 확대"
-                  @click.stop="toggleCamera"
-                >⤢</button>
-              </div>
+                <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+                <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+                  {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+                </option>
+              </select>
+              <button
+                type="button"
+                class="camera-picker__rescan"
+                aria-label="카메라 다시 스캔"
+                title="카메라 다시 스캔"
+                @click="rescanCameras"
+              >↻</button>
             </div>
 
             <button type="button" class="btn-icon close-btn" aria-label="닫기" @click="close">×</button>
           </header>
 
-          <!-- 메인: arm viewer + 노래 HUD 오버레이 -->
+          <!-- 메인: 카메라가 중앙을 채움. 게임 단계별 오버레이는 카메라 위에 렌더링. -->
           <main class="main-area">
-            <div class="arm-wrap">
-              <OpenarmViewer
-                source="follower"
-                :external-snapshot="armSnapshot"
-                :extra-yaw-deg="-45"
+            <div class="arm-wrap" :class="{ 'motion-flash': motionDetected }">
+              <!-- 카메라 비디오 — 중앙 전체 채움 -->
+              <video ref="videoRef" class="center-cam" muted playsinline />
+              <div v-if="!cameraReady && !cameraError" class="cam-overlay">카메라 준비 중…</div>
+              <div v-if="cameraError" class="cam-overlay err">⚠ {{ cameraError }}</div>
+
+              <!-- 셔터 플래시 -->
+              <div
+                v-if="emotionCapture.flashTick.value > 0"
+                :key="emotionCapture.flashTick.value"
+                class="cam-shutter"
               />
+              <!-- 감정 캡처 라벨 -->
+              <div
+                v-if="emotionCapture.lastEmotion.value !== null"
+                class="cam-emotion-tag"
+                :class="`is-${emotionCapture.lastEmotion.value}`"
+              >
+                📸 {{ emotionCapture.lastEmotion.value === 'happy' ? '활짝!' : '시무룩' }}
+              </div>
+              <!-- 라이브 HUD -->
+              <div
+                v-if="captureArmed && cameraReady && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
+                class="cam-live-hud"
+                :class="{ 'has-face': emotionCapture.faceDetected.value }"
+              >
+                <template v-if="!emotionCapture.faceDetected.value">얼굴 찾는 중…</template>
+                <template v-else>
+                  웃음 {{ (emotionCapture.liveHappy.value * 100).toFixed(0) }}%
+                  · 슬픔 {{ (emotionCapture.liveSad.value * 100).toFixed(0) }}%
+                </template>
+              </div>
+              <!-- 누적 캡처 수 -->
+              <div v-if="naturalShotCount > 0" class="cam-shot-count">
+                📸 {{ naturalShotCount }}
+              </div>
+
+              <!-- 참가자 확인 단계 하단 컨트롤 -->
+              <footer v-if="stage === 'entry'" class="cam-stage-foot">
+                <div class="entry-info">
+                  <div class="entry-line">
+                    참가자 확인 중
+                    <span v-if="recognitionActive" class="reco-dot" title="얼굴 인식 중" />
+                  </div>
+                  <div class="entry-sub">
+                    카메라에 보이는 친구는 자동으로 등록돼요.
+                    <strong>{{ registeredCount }}</strong> / {{ participants.length }} 명 등록됨
+                  </div>
+                </div>
+                <button type="button" class="btn-start" @click="setStage('ready')">시작</button>
+              </footer>
+
+              <!-- 준비 단계 하단 컨트롤 -->
+              <footer v-else-if="stage === 'ready'" class="cam-stage-foot">
+                <div class="entry-info">
+                  <div class="entry-line">준비 — 출발선 뒤로 멀리 가서 자리잡으세요</div>
+                  <div class="entry-sub">
+                    <strong class="ready-num">{{ readyCountdownSec }}</strong> 초 후 자동 시작
+                  </div>
+                </div>
+                <button type="button" class="btn-start" @click="setStage('song')">건너뛰기</button>
+              </footer>
+
               <div v-if="stage === 'song'" class="arm-overlay">
                 <div class="tempo-badge" :class="`tempo-${tempoPattern}`">
                   <span class="tempo-name">{{ TEMPO_LABEL[tempoPattern] }}</span>
@@ -1426,6 +1425,33 @@ onUnmounted(() => {
             </div>
           </Transition>
 
+          <!-- 좌하단: 시뮬레이션 패널 — 실물 follower 미연결 시만, default 최소화, lazy mount -->
+          <section
+            v-if="!stateWs.realActive.value"
+            class="sim-panel"
+            :class="{ minimized: simMinimized }"
+            aria-label="시뮬레이션"
+          >
+            <header class="sim-panel-head" @click="simMinimized = !simMinimized">
+              <span class="sim-panel-emoji" aria-hidden="true">🤖</span>
+              <span class="sim-panel-title">시뮬레이션</span>
+              <button
+                type="button"
+                class="btn-sim-min"
+                :aria-label="simMinimized ? '펼치기' : '최소화'"
+                @click.stop="simMinimized = !simMinimized"
+              >{{ simMinimized ? '+' : '–' }}</button>
+            </header>
+            <div v-show="!simMinimized" class="sim-panel-body">
+              <OpenarmViewer
+                v-if="simEverOpened"
+                source="follower"
+                :external-snapshot="armSnapshot"
+                :extra-yaw-deg="-45"
+              />
+            </div>
+          </section>
+
           <!-- 토스트 (등록 알림 등) — z-index 1000 으로 카메라 모달/드로어 위에 강제 표시 -->
           <Teleport to="body">
             <div class="mugung-toast-stack" aria-live="polite">
@@ -1443,86 +1469,6 @@ onUnmounted(() => {
               </TransitionGroup>
             </div>
           </Teleport>
-
-          <!-- 카메라 확대 오버레이 -->
-          <Transition name="cam-fade">
-            <div
-              v-if="cameraExpanded && cameraReady"
-              class="cam-expanded-backdrop"
-              @click.self="cameraExpanded = false"
-            >
-              <div class="cam-expanded-card">
-                <header class="cam-expanded-head">
-                  <div class="cam-expanded-title">
-                    <span class="rec-dot" /> 카메라 미리보기
-                  </div>
-                  <div class="cam-expanded-picker">
-                    <select
-                      v-model="selectedDeviceId"
-                      :disabled="!hasCameras"
-                      class="cam-expanded-select"
-                      aria-label="카메라 선택"
-                      @change="onCameraChange"
-                    >
-                      <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
-                      <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
-                        {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
-                      </option>
-                    </select>
-                    <button
-                      type="button"
-                      class="cam-expanded-rescan"
-                      aria-label="카메라 다시 스캔"
-                      title="카메라 다시 스캔"
-                      @click="rescanCameras"
-                    >↻</button>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-icon close-btn small"
-                    aria-label="카메라 축소"
-                    @click="cameraExpanded = false"
-                  >×</button>
-                </header>
-                <div class="cam-expanded-body">
-                  <video ref="expandedVideoRef" muted playsinline />
-                </div>
-                <footer v-if="stage === 'entry'" class="cam-expanded-foot entry">
-                  <div class="entry-info">
-                    <div class="entry-line">
-                      참가자 확인 중
-                      <span v-if="recognitionActive" class="reco-dot" title="얼굴 인식 중" />
-                    </div>
-                    <div class="entry-sub">
-                      카메라에 보이는 친구는 자동으로 등록돼요.
-                      <strong>{{ registeredCount }}</strong> / {{ participants.length }} 명 등록됨
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-start"
-                    @click="setStage('ready')"
-                  >시작</button>
-                </footer>
-                <footer v-else-if="stage === 'ready'" class="cam-expanded-foot ready">
-                  <div class="entry-info">
-                    <div class="entry-line">준비 — 출발선 뒤로 멀리 가서 자리잡으세요</div>
-                    <div class="entry-sub">
-                      <strong class="ready-num">{{ readyCountdownSec }}</strong> 초 후 자동 시작
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn-start"
-                    @click="setStage('song')"
-                  >건너뛰기</button>
-                </footer>
-                <p v-else class="cam-expanded-hint">
-                  관찰 단계 중에는 이 화면으로 누가 움직이는지 확인할 수 있어요.
-                </p>
-              </div>
-            </div>
-          </Transition>
 
           <!-- 드로어 (햄버거) -->
           <Transition name="drawer-fade">
@@ -1611,6 +1557,7 @@ onUnmounted(() => {
 .top-bar {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
+  /* [hamburger] [stage] [camera-picker] [close] */
   align-items: center;
   gap: 16px;
   padding: 14px 20px;
@@ -1701,14 +1648,6 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-.camera-pip-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  flex-shrink: 0;
-  width: 160px;
-}
 .camera-picker {
   display: flex;
   align-items: center;
@@ -1743,49 +1682,20 @@ onUnmounted(() => {
 }
 .camera-picker__rescan:hover { background: #f1f5f9; }
 
-.camera-pip {
-  position: relative;
-  width: 160px;
-  height: 90px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #0f172a;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
-  border: 2px solid #cbd5e1;
-  flex-shrink: 0;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  cursor: pointer;
-}
-.camera-pip.ready:hover {
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
-}
-.cam-toggle {
+/* 중앙 카메라 */
+.center-cam {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: none;
-  background: rgba(0, 0, 0, 0.65);
-  color: white;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  display: block;
 }
-.cam-toggle:hover { background: rgba(0, 0, 0, 0.85); }
-.camera-pip.ready { border-color: #16a34a; }
-.camera-pip.error { border-color: #b91c1c; }
-.camera-pip.motion {
-  border-color: #dc2626;
+.arm-wrap.motion-flash {
   animation: motion-flash 0.55s ease-in-out infinite;
+  outline: 4px solid #dc2626;
 }
-.camera-pip.captured { box-shadow: 0 0 0 3px #f0c042 inset; }
 
 .cam-shutter {
   position: absolute;
@@ -1795,6 +1705,7 @@ onUnmounted(() => {
   pointer-events: none;
   animation: cam-shutter-flash 0.6s ease-out;
   animation-iteration-count: 1;
+  z-index: 3;
 }
 @keyframes cam-shutter-flash {
   0%   { opacity: 0; }
@@ -1803,45 +1714,64 @@ onUnmounted(() => {
 }
 .cam-emotion-tag {
   position: absolute;
-  bottom: 4px;
-  left: 4px;
-  font-size: 10px;
+  bottom: 72px;
+  left: 12px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 4px 10px;
   border-radius: 999px;
   color: white;
   pointer-events: none;
+  z-index: 3;
 }
 .cam-emotion-tag.is-happy { background: rgba(45, 139, 87, 0.92); }
 .cam-emotion-tag.is-sad   { background: rgba(193, 69, 69, 0.92); }
 .cam-live-hud {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 22px;
-  z-index: 2;
-  font-size: 9px;
+  left: 12px;
+  right: 12px;
+  bottom: 72px;
+  z-index: 3;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 4px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
   color: rgba(255, 255, 255, 0.95);
   background: rgba(30, 45, 58, 0.7);
   pointer-events: none;
-  line-height: 1.2;
+  line-height: 1.4;
   text-align: center;
+  max-width: 280px;
 }
 .cam-live-hud.has-face { background: rgba(45, 110, 75, 0.8); }
 .cam-shot-count {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  font-size: 10px;
+  top: 12px;
+  left: 12px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
   color: white;
   background: rgba(0, 0, 0, 0.6);
   pointer-events: none;
+  z-index: 3;
+}
+
+/* 참가자 확인/준비 단계 하단 컨트롤 바 */
+.cam-stage-foot {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(6px);
+  z-index: 4;
 }
 
 @keyframes motion-flash {
@@ -1911,6 +1841,61 @@ onUnmounted(() => {
   min-height: 0;
 }
 .arm-wrap :deep(.openarm-viewer-wrap) { border-radius: 0; }
+
+/* ---- 시뮬레이션 플로팅 패널 (좌하단) ------------------------------------------ */
+.sim-panel {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  width: 340px;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 16px;
+  border: 1px solid rgba(190, 24, 93, 0.12);
+  box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(6px);
+  z-index: 65;  /* 메인 화면 위, 토스트(1000)·드로어·결과 오버레이 아래 */
+}
+.sim-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  color: #9d174d;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid rgba(190, 24, 93, 0.10);
+}
+.sim-panel-emoji { font-size: 16px; line-height: 1; }
+.sim-panel-title {
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  flex: 1;
+}
+.btn-sim-min {
+  border: none;
+  background: rgba(255, 255, 255, 0.7);
+  color: #9d174d;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.btn-sim-min:hover { background: white; }
+.sim-panel-body { height: 240px; display: flex; }
+.sim-panel-body :deep(.openarm-viewer-wrap) { border-radius: 0; flex: 1; }
+.sim-panel.minimized .sim-panel-body { display: none; }
 .arm-overlay {
   position: absolute;
   left: 16px;
@@ -2565,116 +2550,11 @@ onUnmounted(() => {
 }
 .btn-close-game:hover { background: #fdf2f8; }
 
-/* ---------------- camera expanded overlay ---------------- */
-.cam-expanded-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(4px);
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-.cam-expanded-card {
-  background: #0f172a;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  width: min(720px, 92vw);
-  max-height: 92dvh;
-}
-.cam-expanded-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.4);
-}
-.cam-expanded-title {
-  color: white;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.cam-expanded-picker {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  max-width: 320px;
-  margin: 0 12px;
-}
-.cam-expanded-select {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.92);
-  color: #1f3a4d;
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-}
-.cam-expanded-select:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.cam-expanded-rescan {
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 8px;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 14px;
-  font-family: inherit;
-  color: #5b7a8c;
-}
-.cam-expanded-rescan:hover { background: white; }
-.cam-expanded-body {
-  flex: 1;
-  background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-}
-.cam-expanded-body video {
-  width: 100%;
-  height: auto;
-  max-height: 70dvh;
-  object-fit: contain;
-  transform: scaleX(-1);
-  display: block;
-}
-.cam-expanded-hint {
-  margin: 0;
-  padding: 10px 16px 14px;
-  font-size: 12px;
-  color: #cbd5e1;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.4);
-}
-.cam-expanded-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-  background: rgba(0, 0, 0, 0.55);
-}
 .entry-info {
   color: white;
   text-align: left;
   min-width: 0;
+  flex: 1;
 }
 .entry-line {
   font-size: 14px;
@@ -2730,9 +2610,6 @@ onUnmounted(() => {
 }
 .btn-start:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(22, 163, 74, 0.55); }
 .btn-start:active { transform: translateY(1px); box-shadow: 0 3px 8px rgba(22, 163, 74, 0.45); }
-
-.cam-fade-enter-active, .cam-fade-leave-active { transition: opacity 0.22s ease; }
-.cam-fade-enter-from, .cam-fade-leave-to { opacity: 0; }
 
 /* ---------------- drawer ---------------- */
 .drawer-backdrop {
@@ -2845,8 +2722,6 @@ onUnmounted(() => {
   .top-bar { padding: 10px 12px; gap: 10px; min-height: 80px; }
   .stage-label { font-size: 22px; }
   .stage-helper { font-size: 11px; }
-  .camera-pip-wrap { width: 120px; }
-  .camera-pip { width: 120px; height: 68px; }
   .btn-icon { width: 44px; height: 44px; border-radius: 12px; }
   .arm-wrap { margin: 12px 12px 0; }
   .bottom-strip { padding: 10px 12px 14px; }

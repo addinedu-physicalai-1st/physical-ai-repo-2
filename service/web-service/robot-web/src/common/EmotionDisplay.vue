@@ -127,7 +127,7 @@ const showBubble = computed(() => !!bubbleText.value);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-bottom: 14vh;
+  padding-bottom: 4vh;
 }
 
 /* 세로 휴대전화: hamburger(우상단) + 하단 BottomDock 만 — pill strip 제거됨 */

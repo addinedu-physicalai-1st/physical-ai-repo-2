@@ -35,6 +35,10 @@ stateWs.start();
 const cameraMinimized = ref(false);
 const musicMinimized = ref(false);
 const simMinimized = ref(false);
+// 시뮬 패널이 한 번이라도 열리기 전엔 URDF 로드 자체를 하지 않음.
+// realActive=true 면 패널이 unmount 되므로 어차피 로드 없음.
+const simEverOpened = ref(false);
+watch(simMinimized, (m) => { if (!m) simEverOpened.value = true; });
 
 const items = ref<DanceItem[]>([]);
 const loading = ref(false);
@@ -261,7 +265,7 @@ onUnmounted(() => {
           >{{ simMinimized ? '+' : '–' }}</button>
         </header>
         <div v-show="!simMinimized" class="panel-body panel-body-sim">
-          <OpenarmViewer source="follower" :external-snapshot="stream.currentSnapshot.value" />
+          <OpenarmViewer v-if="simEverOpened" source="follower" :external-snapshot="stream.currentSnapshot.value" />
         </div>
       </section>
 
@@ -535,6 +539,20 @@ onUnmounted(() => {
   padding: 10px 12px;
   border-radius: 10px;
   font-size: 13px;
+}
+
+/* --- 태블릿: 패널 플로팅 유지하되 크기 축소 --- */
+@media (min-width: 801px) and (max-width: 1280px) {
+  .panel-top-left  { width: 210px; }
+  .panel-top-right { width: 220px; }
+  .panel-body-camera :deep(.cam-panel video) { height: 120px; }
+  .np-art { width: 44px; height: 44px; }
+  .np-title { font-size: 12px; }
+  .np-hint { font-size: 11px; }
+  .track-name { font-size: 12px; }
+  .track-sub { font-size: 10px; }
+  .panel-title { font-size: 12px; }
+  .track-list-wrap { max-height: 40vh; }
 }
 
 /* --- 좁은 화면: 패널을 위/중/아래로 쌓고 폭 조정 --- */
