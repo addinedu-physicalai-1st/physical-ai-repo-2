@@ -61,6 +61,12 @@ class GraphRouterNode(Node):
         self._follow_action = self.declare_parameter(
             "follow_action", "/navigate_through_poses"
         ).value
+        # lane 보간 간격 (m). 인접 vertex 사이를 이 간격으로 잘라 NavigateThroughPoses 에
+        # dense pose 시퀀스로 던짐 → nav2 planner 가 짧은 구간만 plan 해서 lane 거의 그대로 추종.
+        # 0 또는 음수면 보간 비활성 (legacy: vertex pose 만 던짐).
+        self._interp_step = float(self.declare_parameter(
+            "lane_interpolation_step", 0.15
+        ).value)
 
         # reload_graph 서비스가 동일 경로로 다시 로드할 수 있게 인스턴스에 보관
         self._wp_path = wp_path
@@ -227,19 +233,8 @@ class GraphRouterNode(Node):
             self._dbg(f"abort: graph error {e}", level="err")
             return result
 
-        # vertex sequence → PoseStamped 리스트
-        poses: list[PoseStamped] = []
-        for name in seq:
-            v = self._graph.vertices[name]
-            ps = PoseStamped()
-            ps.header.frame_id = self._frame_id
-            ps.header.stamp = self.get_clock().now().to_msg()
-            ps.pose.position.x = float(v.x)
-            ps.pose.position.y = float(v.y)
-            # yaw → quaternion (z = sin(yaw/2), w = cos(yaw/2))
-            ps.pose.orientation.z = float(math.sin(v.yaw / 2.0))
-            ps.pose.orientation.w = float(math.cos(v.yaw / 2.0))
-            poses.append(ps)
+        # vertex sequence → PoseStamped 리스트 (lane 보간 적용)
+        poses = self._build_dense_poses(seq)
 
         # nav2 FollowWaypoints 호출
         if not self._nav_ac.wait_for_server(timeout_sec=2.0):
@@ -412,6 +407,56 @@ class GraphRouterNode(Node):
         res.success = True
         res.message = f"reloaded — {n_v} vertices, {n_l} lanes"
         return res
+
+    def _make_pose(self, x: float, y: float, yaw: float) -> PoseStamped:
+        ps = PoseStamped()
+        ps.header.frame_id = self._frame_id
+        ps.header.stamp = self.get_clock().now().to_msg()
+        ps.pose.position.x = float(x)
+        ps.pose.position.y = float(y)
+        ps.pose.orientation.z = float(math.sin(yaw / 2.0))
+        ps.pose.orientation.w = float(math.cos(yaw / 2.0))
+        return ps
+
+    def _build_dense_poses(self, seq: list[str]) -> list[PoseStamped]:
+        """vertex sequence → dense PoseStamped 리스트.
+
+        인접 vertex (A,B) 사이를 직선으로 가정하고 ``self._interp_step`` 간격으로 잘라
+        중간 pose 를 삽입. 중간 pose 의 yaw 는 A→B 진행방향 (atan2(dy,dx)),
+        도착 vertex 의 yaw 는 waypoints.yaml 에 정의된 값 그대로.
+
+        보간을 끄려면 ``lane_interpolation_step`` 을 0 이하로.
+
+        lane 이 비직선 (코너) 인 경우 중간점이 벽 통과할 수 있으니, 그 lane 은
+        waypoints.yaml 에 중간 vertex 를 명시적으로 추가해서 직선 구간으로 쪼개야 함.
+        """
+        poses: list[PoseStamped] = []
+        if len(seq) == 0:
+            return poses
+        if self._interp_step <= 0.0:
+            # legacy — vertex 만
+            for name in seq:
+                v = self._graph.vertices[name]
+                poses.append(self._make_pose(v.x, v.y, v.yaw))
+            return poses
+
+        for i in range(len(seq) - 1):
+            v = self._graph.vertices[seq[i]]
+            v_next = self._graph.vertices[seq[i + 1]]
+            dx = v_next.x - v.x
+            dy = v_next.y - v.y
+            dist = math.hypot(dx, dy)
+            seg_yaw = math.atan2(dy, dx)
+            n_steps = max(1, int(math.ceil(dist / self._interp_step)))
+            for k in range(n_steps):
+                t = k / n_steps
+                poses.append(self._make_pose(
+                    v.x + dx * t, v.y + dy * t, seg_yaw,
+                ))
+        # 도착 vertex 는 자체 yaw 보존
+        last = self._graph.vertices[seq[-1]]
+        poses.append(self._make_pose(last.x, last.y, last.yaw))
+        return poses
 
     def _publish_feedback(
         self, gh: ServerGoalHandle, seq: list[str], idx: int
