@@ -77,7 +77,7 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-PLAY-004 | 무궁화꽃이 피었습니다 | EduPing UI 가 무궁화꽃 모드에 진입해 참가 아이 (최대 5명) 를 확정하고, 아래 단계 머신으로 게임을 진행한다. 외부인·등록된 비참가 아이는 모든 단계에서 무시한다. | High |
+| SR-PLAY-004 | 무궁화꽃이 피었습니다 | EduPing UI 가 무궁화꽃 모드에 진입해 참가 아이 (최대 5명) 를 확정하고, 아래 단계 머신으로 게임을 진행한다. 외부인·등록된 비참가 아이는 모든 단계에서 무시한다. · 관련: [face-tracking-cache spec](superpowers/specs/2026-05-22-face-tracking-cache-design.md) | High |
 
 #### 단계 머신
 
@@ -155,7 +155,7 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-PLAY-007 | 숨바꼭질 | GogoPing 이 숨바꼭질 모드에 진입해 UI 모집 → 운동장2 이동 → 카운트다운 → 전 웨이포인트 순회 → 복귀 → 우승자 발표 순으로 게임을 진행한다. UI 는 무궁화꽃이 피었습니다 모집 화면 패턴을 재활용한다. | High |
+| SR-PLAY-007 | 숨바꼭질 | GogoPing 이 숨바꼭질 모드에 진입해 UI 모집 → 운동장2 이동 → 카운트다운 → 전 웨이포인트 순회 → 복귀 → 우승자 발표 순으로 게임을 진행한다. UI 는 무궁화꽃이 피었습니다 모집 화면 패턴을 재활용한다. · 관련: [face-tracking-cache spec](superpowers/specs/2026-05-22-face-tracking-cache-design.md) | High |
 
 #### 단계 머신
 
@@ -349,8 +349,8 @@ last_synced: "2026-05-13T14:08:22"
 
 | S ID | Name | Description | Priority |
 | --- | --- | --- | --- |
-| SR-IN-006 | 등원 시각 기록 | Control Server 가 DB attendance 테이블에 child_id, time, type=IN 으로 등원 시각을 INSERT 한다. | High |
-| SR-OUT-006 | 하원 시각 기록 | Control Server 가 DB attendance 테이블에 type=OUT 으로 하원 시각을 INSERT 한 후 같은 트랜잭션에서 `ai_job(kind=report)` INSERT 로 일과 보고서 생성 작업을 enqueue 한다. | High |
+| SR-IN-006 | 등원 시각 기록 | Control Server 가 DB attendance 테이블에 child_id, time, type=IN 으로 등원 시각을 INSERT 한다. · 관련: [face-tracking-cache spec](superpowers/specs/2026-05-22-face-tracking-cache-design.md) | High |
+| SR-OUT-006 | 하원 시각 기록 | Control Server 가 DB attendance 테이블에 type=OUT 으로 하원 시각을 INSERT 한 후 같은 트랜잭션에서 `ai_job(kind=report)` INSERT 로 일과 보고서 생성 작업을 enqueue 한다. · 관련: [face-tracking-cache spec](superpowers/specs/2026-05-22-face-tracking-cache-design.md) | High |
 
 ### 6.3 통신 인터페이스
 
