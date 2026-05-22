@@ -173,12 +173,14 @@ async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> 
   const video = videoRef.value;
   if (!video || video.readyState < 2) return [];
   const form = new FormData();
+  const trackOrder: TrackedFace[] = [];
   for (const t of tracks) {
     const blob = await cropTrack(video, t.bbox);
     if (!blob) continue;
     form.append('files', blob, `track-${t.trackId}.jpg`);
+    trackOrder.push(t);
   }
-  const trackOrder = tracks;
+  if (trackOrder.length === 0) return [];
   try {
     const res = await fetch('/api/attendance/recognize-crops', {
       method: 'POST',
