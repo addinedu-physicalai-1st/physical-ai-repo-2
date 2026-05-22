@@ -54,6 +54,12 @@ withDefaults(defineProps<{ name: string; size?: number | string }>(), {
       <line x1="12" y1="17" x2="12.01" y2="17" />
     </template>
 
+    <!-- camera -->
+    <template v-else-if="name === 'camera'">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </template>
+
     <!-- music: 율동 -->
     <template v-else-if="name === 'music'">
       <path d="M9 18V5l12-2v13" />
