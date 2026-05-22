@@ -26,6 +26,8 @@ const props = defineProps<{
   /** 파일명·DB 메타 — 보고서 합성용. */
   robot: string;
   mode: string;
+  /** 추론 주기(ms). 생략 시 기본값(200ms). 율동처럼 rAF 경합이 있는 경우 늘려서 전달. */
+  inferIntervalMs?: number;
 }>();
 
 const emit = defineEmits<{
@@ -48,6 +50,7 @@ const emotionCapture = useEmotionCapture({
   mode: props.mode,
   enabled: () => props.armed,
   onCaptured: (info) => emit('captured', info),
+  inferIntervalMs: props.inferIntervalMs,
 });
 
 const EMOTION_SUSTAIN_MAX = 3;

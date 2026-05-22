@@ -51,6 +51,8 @@ export interface EmotionCaptureOptions {
   enabled: () => boolean;
   /** 캡처가 성공했을 때 부모에게 알림 */
   onCaptured?: (info: { emotion: 'happy' | 'sad'; score: number; photoId: number; url: string }) => void;
+  /** 추론 주기(ms). 기본 200(5fps). 율동처럼 다른 무거운 루프와 공존할 때 늘려서 GPU 경합 줄임. */
+  inferIntervalMs?: number;
 }
 
 export interface EmotionCaptureHandle {
@@ -140,6 +142,10 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
     const api = _faceApi;
     if (!api) return;
     inflight = true;
+    // 추론 전 한 프레임 yield — driveMotion rAF 등 렌더링 콜백이 먼저 실행되도록.
+    // WebGL readback(gl.readPixels)이 메인 스레드를 블록하기 전에 rAF 를 소진시켜
+    // 율동 모션·오디오 싱크 지연을 최소화한다.
+    await new Promise<void>((r) => requestAnimationFrame(r));
     const nowMs = Date.now();
     const inCooldown = nowMs < captureCooldownUntil;
     try {
@@ -283,7 +289,7 @@ export function useEmotionCapture(options: EmotionCaptureOptions): EmotionCaptur
       if (!api) return;
       timer = window.setInterval(() => {
         void tick();
-      }, INFER_INTERVAL_MS);
+      }, options.inferIntervalMs ?? INFER_INTERVAL_MS);
     });
   }
 

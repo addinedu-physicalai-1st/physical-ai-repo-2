@@ -156,6 +156,7 @@ onUnmounted(() => {
             :reset-key="captureResetKey"
             robot="eduping"
             mode="dance"
+            :infer-interval-ms="600"
           />
         </div>
       </section>
