@@ -17,6 +17,7 @@
 # 즉 UI 는 FSM trigger 이름 (assist_request, manual_request, fault 등) 을 몰라도 됨.
 
 string mode             # "IDLE" / "ASSIST" / "PLAY" / "MANUAL" / "RETURNING"
-string task             # "goto" / "follow" / "lullaby" / "hideseek" — mode=ASSIST/PLAY 시
+string task             # "goto" / "follow" / "lullaby" / "patrol" / "hideseek" — mode=ASSIST/PLAY 시
 string destination_key  # named_pose 키 — task=goto 시
 string target_id        # child_id / teacher_id — follow / hideseek 시
+string[] search_waypoints  # vertex name 리스트 — task=patrol (전체 순회) / hideseek (탐색 경로)
