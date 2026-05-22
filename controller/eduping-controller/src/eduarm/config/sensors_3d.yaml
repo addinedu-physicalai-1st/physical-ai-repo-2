@@ -1,0 +1,30 @@
+# D435 → MoveIt OccupancyMapMonitor 입력 — DepthImageOctomapUpdater 가 depth image
+# 한 장씩 받아 planning scene 의 octomap 을 갱신한다. `octomap_server` 별도 노드 불필요.
+#
+# image_topic 은 d435_camera.launch.py 에서 `camera_name:=d435` 로 띄운 realsense2_camera
+# 가 publish 하는 raw depth 와 일치 (`align_depth.enable:=false` — depth 본연 intrinsics
+# 그대로 사용; aligned-to-color 는 색감용일 뿐 octomap 정확도엔 의미 없음).
+#
+# frame_id 는 image 메시지 header.frame_id 그대로 따라가 — TF 로 planning frame 까지
+# transform 된다. realsense2_camera 가 `camera_name:=d435` 로 시작되면 frame 이름이
+# `d435_depth_optical_frame` 이 돼서 URDF (openarm_description v10.urdf.xacro:93-121) 의
+# 정의와 일치, 별도 static_transform_publisher 불필요.
+#
+# clipping plane / shadow / padding 은 MoveIt 권장값에서 D435 의 ~0.3m 최소거리에 맞춰
+# 조정. far=3.0m 는 유치원 실내 작업거리. shadow 작게 (0.04) 두면 깊이 불연속 영역에서
+# 가짜 obstacle 잡히는 걸 줄임.
+sensors:
+  - d435_depth_camera
+
+d435_depth_camera:
+  sensor_plugin: occupancy_map_monitor/DepthImageOctomapUpdater
+  image_topic: /d435/depth/image_rect_raw
+  queue_size: 5
+  near_clipping_plane_distance: 0.3
+  far_clipping_plane_distance: 3.0
+  shadow_threshold: 0.04
+  padding_scale: 4.0
+  padding_offset: 0.03
+  max_update_rate: 5.0
+  filtered_cloud_topic: filtered_cloud
+  ns: d435_octomap

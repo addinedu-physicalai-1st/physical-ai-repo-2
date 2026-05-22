@@ -16,6 +16,12 @@ import URDFLoader from 'urdf-loader';
 import { useEdupingStateWs, type JointSnapshot } from '@/composables/useEdupingStateWs';
 import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 import Icon from '@/common/Icon.vue';
+import {
+  useDepthCloudInScene,
+  type HandBbox,
+  type UseDepthCloudInScene,
+} from './useDepthCloudInScene';
+import type { UseDepthStream } from './useDepthStream';
 
 interface CameraSyncState {
   position: [number, number, number];
@@ -39,6 +45,17 @@ const props = withDefaults(
     linkCamera?: boolean;
     /** QWebEngine compare 등 — 낮은 DPR·FPS 로 GPU 부하 감소. */
     renderLite?: boolean;
+    /** D435 라이브 포인트 클라우드 합성 — 뎁스카메라 뷰 모드에서만 true. */
+    showDepthCloud?: boolean;
+    /** 부모가 만든 depth WS 인스턴스를 공유 — DepthViewer 가 HUD/추적용으로 한 개,
+     *  cloud 용으로 별도 WS 안 띄우게. */
+    depthStream?: UseDepthStream | null;
+    depthPointSize?: number;
+    depthCloudScale?: number;
+    depthMaxM?: number;
+    depthColorMode?: 'rgb' | 'depth';
+    /** 손 bbox (image-uv 좌표) — null 이면 전체 cloud, 값 있으면 그 안만. */
+    handBbox?: HandBbox | null;
   }>(),
   {
     source: 'leader',
@@ -48,6 +65,13 @@ const props = withDefaults(
     cameraSync: null,
     linkCamera: false,
     renderLite: false,
+    showDepthCloud: false,
+    depthStream: null,
+    depthPointSize: 4.0,
+    depthCloudScale: 1.0,
+    depthMaxM: 3.0,
+    depthColorMode: 'rgb',
+    handBbox: null,
   },
 );
 
@@ -83,6 +107,7 @@ let scene: THREE.Scene | null = null;
 let camera: THREE.PerspectiveCamera | null = null;
 let controls: OrbitControls | null = null;
 let robot: any = null;
+let depthCloud: UseDepthCloudInScene | null = null;
 let animationId = 0;
 let resizeObserver: ResizeObserver | null = null;
 /** False until URDF + STL meshes are in GPU — blocks pose apply during compare warmup. */
@@ -707,6 +732,23 @@ function loadUrdf(): void {
       wrapper.rotation.y = (props.extraYawDeg * Math.PI) / 180;
       scene!.add(wrapper);
       robot = loaded;
+      // 뎁스카메라 뷰 모드에서만 cloud composable 마운트. URDF 의 d435_depth_optical_frame
+      // link 가 부모 chain 으로 모든 좌표 변환을 처리하므로 cloud 가 robot 과 함께 움직임.
+      if (props.showDepthCloud && props.depthStream && !depthCloud) {
+        depthCloud = useDepthCloudInScene({
+          robot,
+          depthStream: props.depthStream,
+          pointSize: props.depthPointSize,
+          cloudScale: props.depthCloudScale,
+          maxDepthM: props.depthMaxM,
+          colorMode: props.depthColorMode,
+          // D435 FoV wireframe pyramid — near=0.3m, far=depthMaxM. 녹색 lines, opt 0.5.
+          // useDepthCloudInScene 가 default true 라 적었지만 실제 함수는 undefined 면
+          // 그리지 않음 (`if (frustum || !opts.showFrustum) return;`). 명시 true 로 강제.
+          showFrustum: true,
+        });
+        if (props.handBbox) depthCloud.setHandBbox(props.handBbox);
+      }
       // STL loads are async — viewer-ready only after mesh poll passes.
       window.setTimeout(() => waitForMeshesThenFinish(), 50);
     },
@@ -797,6 +839,14 @@ onMounted(() => {
   }
 });
 
+// handBbox prop 가 바뀔 때마다 depth cloud 의 bbox 필터를 갈음.
+watch(
+  () => props.handBbox,
+  (next) => {
+    depthCloud?.setHandBbox(next ?? null);
+  },
+);
+
 onBeforeUnmount(() => {
   cancelMeshReadyPoll();
   _meshesLoaded = false;
@@ -804,6 +854,8 @@ onBeforeUnmount(() => {
   clearJointHighlight();
   _highlightMaterial?.dispose();
   _highlightMaterial = null;
+  depthCloud?.dispose();
+  depthCloud = null;
   stateWs.stop();
   cancelAnimationFrame(animationId);
   resizeObserver?.disconnect();

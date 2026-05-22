@@ -14,6 +14,9 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        # octomap_demo: sensors_3d.yaml (MoveIt OccupancyMapMonitor 설정) + RViz preset.
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -32,6 +35,12 @@ setup(
             'routines_player_node = eduarm.routines_player_node:main',
             # bringup 직후 양팔 JTC 에 hold-pose 보간 goal 을 보내 시작 jerk 완화.
             'soft_start_node = eduarm.soft_start_node:main',
+            # Phase 4 — PointStamped target → TwistStamped (servo_node 입력).
+            'servo_reach_node = eduarm.servo_reach_node:main',
+            # D435 → control-service WS 스트리머. d435_depth.launch.py 가 호출.
+            'd435_depth_streamer = eduarm.d435_depth_streamer:main',
+            # 하이파이브 hand_point → IK → JointTrajectory. highfive_sim.launch.py 가 호출.
+            'highfive_node = eduarm.highfive_node:main',
         ],
     },
 )

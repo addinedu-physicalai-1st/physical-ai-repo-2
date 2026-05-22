@@ -39,6 +39,7 @@ try:
     from builtin_interfaces.msg import Duration
     from control_msgs.action import FollowJointTrajectory, GripperCommand
     from controller_manager_msgs.srv import SwitchController
+    from geometry_msgs.msg import PointStamped
     from rclpy.action import ActionClient
     from rclpy.node import Node
     from sensor_msgs.msg import JointState
@@ -63,6 +64,8 @@ class BridgeUnavailable(RuntimeError):
 TOPIC_LEADER = "/eduping/leader/joint_states"
 TOPIC_FOLLOWER = "/joint_states"
 TOPIC_TRAJECTORY = "/eduping/joint_trajectory"
+TOPIC_HIGHFIVE_HAND_POINT = "/eduping/highfive/hand_point"
+HIGHFIVE_HAND_FRAME = "d435_depth_optical_frame"
 
 # routine 타입
 KIND_DANCE = "dance"
@@ -191,6 +194,11 @@ class EdupingRosBridge:
             rclpy.init()
         self._node = rclpy.create_node("control_eduping_bridge")
         self._js_pub = self._node.create_publisher(JointTrajectory, TOPIC_TRAJECTORY, 10)
+        # Highfive hand-target — DepthViewer 가 POST 한 (x,y,z) 를 ROS PointStamped 로
+        # forward. highfive_node 가 이 topic 을 subscribe 해서 TF → IK → JointTrajectory.
+        self._highfive_pub = self._node.create_publisher(
+            PointStamped, TOPIC_HIGHFIVE_HAND_POINT, 10,
+        )
         self._node.create_subscription(JointState, TOPIC_LEADER, self._on_leader, 50)
         self._node.create_subscription(JointState, TOPIC_FOLLOWER, self._on_follower, 50)
         # Real follower action clients — server 가 아직 안 떠 있을 수 있으니 wait 은 send 시점.
@@ -487,6 +495,27 @@ class EdupingRosBridge:
                 samples=[],
             )
         return {"active": True, "kind": kind, "name": name}
+
+    # ---------- highfive ----------------------------------------------------
+
+    def publish_highfive_target(
+        self, x: float, y: float, z: float, frame_id: str = HIGHFIVE_HAND_FRAME,
+    ) -> None:
+        """DepthViewer 가 보낸 손 위치를 ROS PointStamped 로 forward.
+
+        highfive_node 가 /eduping/highfive/hand_point 을 subscribe → TF (frame_id →
+        world) → IK → JointTrajectory publish. frame_id 기본값은 D435 optical frame
+        (DepthViewer 의 unproject 결과 좌표계와 일치).
+        """
+        if self._node is None:
+            raise BridgeUnavailable("EdupingRosBridge not started")
+        msg = PointStamped()
+        msg.header.stamp = self._node.get_clock().now().to_msg()
+        msg.header.frame_id = frame_id
+        msg.point.x = float(x)
+        msg.point.y = float(y)
+        msg.point.z = float(z)
+        self._highfive_pub.publish(msg)
 
     # ---------- live teleop (녹화 / 재생과 독립) -----------------------------
 

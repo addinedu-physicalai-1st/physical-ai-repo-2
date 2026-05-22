@@ -646,4 +646,39 @@
     <limit effort="333" lower="0.0" upper="0.044" velocity="10.0"/>
     <mimic joint="openarm_right_finger_joint1"/>
   </joint>
+  <link name="d435_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <!-- 실 D435 비율: depth 25mm × width 90mm × height 25mm — X=lens 방향, Y=가로축. -->
+      <geometry>
+        <box size="0.025 0.09 0.025"/>
+      </geometry>
+      <material name="d435_dark_gray">
+        <color rgba="0.15 0.15 0.18 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <box size="0.025 0.09 0.025"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="0.07"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="d435_mount_joint" type="fixed">
+    <parent link="openarm_body_link0"/>
+    <child link="d435_link"/>
+    <origin rpy="0 0 0" xyz="0.05 0.0 0.62"/>
+  </joint>
+  <link name="d435_depth_optical_frame"/>
+  <joint name="d435_depth_optical_joint" type="fixed">
+    <parent link="d435_link"/>
+    <child link="d435_depth_optical_frame"/>
+    <!-- REP-103 광학: Z forward, X right, Y down. ROS 표준 (X forward) 에서 회전. -->
+    <origin rpy="-1.5708 0 -1.5708" xyz="0 0 0"/>
+  </joint>
 </robot>

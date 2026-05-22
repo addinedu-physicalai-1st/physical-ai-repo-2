@@ -288,6 +288,13 @@ class HighfiveNode(Node):
         ik = PositionIKRequest()
         ik.group_name = arm.group
         ik.ik_link_name = arm.ee_link
+        # avoid_collisions: True 면 octomap + SRDF self-collision 모델을 검사해 IK 해를
+        # 필터링한다. 안전 상으로는 True 가 맞지만 (어린이 다른 손, 책상 안에 EE 박힘
+        # 방지) — highfive_sim.launch.py 가 sensors_3d 로 octomap 을 로드하지 않은 sim
+        # 환경에선 빈 planning scene + SRDF 의 보수적 collision pair 가 IK 를 전부
+        # reject 한다 (실측: 모든 candidate orientation 에서 fail). sim 데모를 우선
+        # 통과시키기 위해 False. 실하드웨어 데모 전에 octomap_demo.launch.py 의
+        # sensors_3d.yaml 주입을 highfive_sim 에도 합치고 다시 True 로.
         ik.avoid_collisions = False
         ps = PoseStamped()
         ps.header.frame_id = BASE_FRAME

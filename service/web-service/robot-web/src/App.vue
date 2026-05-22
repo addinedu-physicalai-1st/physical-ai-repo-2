@@ -14,6 +14,7 @@ import StartOverlay from '@/common/StartOverlay.vue';
 import AttendanceCamera from '@/eduping/AttendanceCamera.vue';
 import DanceManager from '@/eduping/DanceManager.vue';
 import DancePlayPopup from '@/eduping/DancePlayPopup.vue';
+import DepthViewer from '@/eduping/DepthViewer.vue';
 import GreetingManager from '@/eduping/GreetingManager.vue';
 import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
 import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
@@ -66,6 +67,10 @@ const showDancePopup = computed(() => robot.value.id === 'eduping' && currentMod
 const showGreetingManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '등하원 인사 설정');
 const showMugunghwaArm = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화 율동 등록');
 const showMugunghwa = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화꽃이 피었습니다');
+// 뎁스카메라 뷰 — D435 depth view + palm tracker + 하이파이브 IK 트리거.
+// DepthViewer 내부에서 useDepthStream + useHandTracker + postHighfiveHandTarget 처리.
+// 4b98dc6 에서 컴포넌트는 추가됐는데 App.vue 마운트가 빠져있어 UI 에서 못 보였다.
+const showHighfive = computed(() => robot.value.id === 'eduping' && currentMode.value === '뎁스카메라 뷰');
 
 const showGogopingManual = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '수동'
@@ -193,6 +198,7 @@ function handleStart(): void {
     <GreetingManager v-if="showGreetingManager" />
     <MugunghwaArmManager v-if="showMugunghwaArm" />
     <MugunghwaGame v-if="showMugunghwa" />
+    <DepthViewer v-if="showHighfive" />
     <CameraView v-if="showGogopingManual" />
     <PanTiltControl v-if="showGogopingManual" />
     <FollowFaceAuth

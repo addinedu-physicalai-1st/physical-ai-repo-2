@@ -16,6 +16,8 @@ from fastapi import FastAPI
 from control_service.streaming import config as scfg
 from control_service.streaming.admin_router import make_admin_router
 from control_service.streaming.client_registry import ClientRegistry
+from control_service.streaming.depth_hub import DepthHub
+from control_service.streaming.depth_ws_router import make_depth_ws_router
 from control_service.streaming.frame_hub import FrameHub
 from control_service.streaming.robot_controller import RobotController
 from control_service.streaming.udp_receiver import UdpFrameReceiver
@@ -29,12 +31,19 @@ app = FastAPI(title="Pingdergarten Streaming", version="0.1.0")
 
 # 모듈 전역 — uvicorn 단일 worker 가정.
 _hub = FrameHub()
+# D435 depth 스트림 fan-out 용 별도 hub. 영상 (FrameHub) 과 인터페이스만 비슷할 뿐
+# 와이어 포맷 (uint16 depth + JPEG color) 이 달라서 분리.
+_depth_hub = DepthHub()
 _registry = ClientRegistry()
 _controller = RobotController()
 _receivers: list[UdpFrameReceiver] = []
 
 app.include_router(make_admin_router(_controller))
 app.include_router(make_ws_router(_registry, _hub))
+# /ws/depth-stream/producer/{robot} + /ws/depth-stream (consumer) — 4b98dc6 에서
+# 모듈은 추가됐는데 여기 include 가 빠져있어 producer connect 가 HTTP 403 (route
+# 미등록) 으로 막혔던 것. eduping D435 streamer 가 이 producer 로 frame 을 push.
+app.include_router(make_depth_ws_router(_registry, _depth_hub))
 
 
 @app.on_event("startup")
