@@ -155,12 +155,6 @@ uniform vec2 uRBrowCenter; uniform float uRBrowHalfLen; uniform float uRBrowThic
 
 uniform vec2 uMouthCenter; uniform float uMouthHalfWidth; uniform float uMouthBow; uniform float uMouthThickness; uniform float uMouthOpenness;
 
-uniform vec2 uHandSize;
-uniform vec2 uHand1Center;
-uniform vec2 uHand2Center;
-uniform float uHand1Tilt;
-uniform float uHand2Tilt;
-uniform float uHandsActive;
 uniform float uCheeks;
 uniform vec3 uCheeksColor;
 
@@ -312,20 +306,6 @@ void main() {
   float dMouth = mouthSDF(uv, uMouthCenter, uMouthHalfWidth, uMouthBow, uMouthThickness, uMouthOpenness);
 
   float d = min(min(dEye, dBrow), dMouth);
-
-  // hello 일 때만 활성화되는 두 작대기 (양손) — \ ↔ / 회전
-  if (uHandsActive > 0.5) {
-    // 손목(작대기 아래쪽 끝) 을 회전축으로 → 자연스러운 흔들기
-    vec2 pivot1 = uHand1Center - vec2(0.0, uHandSize.y);
-    vec2 q1 = rot(uHand1Tilt) * (uv - pivot1) - vec2(0.0, uHandSize.y);
-    float dHand1 = sdRoundBox(q1, uHandSize, min(uHandSize.x, uHandSize.y) * 0.6);
-
-    vec2 pivot2 = uHand2Center - vec2(0.0, uHandSize.y);
-    vec2 q2 = rot(uHand2Tilt) * (uv - pivot2) - vec2(0.0, uHandSize.y);
-    float dHand2 = sdRoundBox(q2, uHandSize, min(uHandSize.x, uHandSize.y) * 0.6);
-
-    d = min(d, min(dHand1, dHand2));
-  }
 
   float aa = max(fwidth(d) * 1.2, 0.002);
   float mask = 1.0 - smoothstep(-aa, aa, d);
@@ -594,12 +574,6 @@ function setupRenderer(canvas: HTMLCanvasElement): void {
       uMouthThickness: { value: 0 },
       uMouthOpenness: { value: 0 },
 
-      uHandSize: { value: new THREE.Vector2(0.06, 0.35) },
-      uHand1Center: { value: new THREE.Vector2() },
-      uHand2Center: { value: new THREE.Vector2() },
-      uHand1Tilt: { value: 0.0 },
-      uHand2Tilt: { value: 0.0 },
-      uHandsActive: { value: 0.0 },
       uCheeks: { value: 0.0 },
       uCheeksColor: { value: new THREE.Vector3(1, 0.4, 0.5) },
 
@@ -698,9 +672,6 @@ function tick(): void {
   }
 
   // 표정별 idle 모션
-  let handsActive = 0;
-  let hand1Tilt = 0;
-  let hand2Tilt = 0;
   if (props.emotion === 'hello') {
     // 입: 작은 o ↔ 큰 O 천천히 (1.8s 주기)
     const mouthPhase = ((now / 1800) % 1) * Math.PI * 2;
@@ -711,13 +682,6 @@ function tick(): void {
       thickness: Math.max(displayed.M.thickness, 0.048),
       halfWidth: lerp(0.08, 0.15, mt),
     };
-    // 양손 작대기: \ ↔ / 좌우 흔들기 (0.55s 주기, ±45°)
-    // 두 손이 거울 대칭으로 움직이도록 부호 반대 — 양손을 안팎으로 펼치는 인사 동작
-    handsActive = 1;
-    const handPhase = ((now / 550) % 1) * Math.PI * 2;
-    const swing = Math.sin(handPhase) * (Math.PI / 4);
-    hand1Tilt = swing;
-    hand2Tilt = -swing;
   }
 
   material.uniforms.uTime.value = now / 1000;
@@ -844,12 +808,6 @@ function tick(): void {
   applyBrowUniforms('L', renderBL);
   applyBrowUniforms('R', renderBR);
   applyMouthUniforms(renderM);
-
-  material.uniforms.uHandsActive.value = handsActive;
-  (material.uniforms.uHand1Center.value as THREE.Vector2).set(-1.05, -0.55);
-  (material.uniforms.uHand2Center.value as THREE.Vector2).set(1.05, -0.55);
-  material.uniforms.uHand1Tilt.value = hand1Tilt;
-  material.uniforms.uHand2Tilt.value = hand2Tilt;
 
   const [r, g, b] = hexToRgb(props.accent);
   (material.uniforms.uAccent.value as THREE.Vector3).set(r, g, b);
