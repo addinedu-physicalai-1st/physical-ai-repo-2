@@ -838,25 +838,25 @@ async function cropTrack(video: HTMLVideoElement, bbox: Bbox): Promise<Blob | nu
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
 }
 
-let recognizeRafId: number | null = null;
+let detectorRafId: number | null = null;
 
 function startDetectorLoop(): void {
-  if (recognizeRafId !== null) return;
+  if (detectorRafId !== null) return;
   detector.start();
   recognitionActive.value = true;
   const tick = async (): Promise<void> => {
     if (videoRef.value && videoRef.value.readyState >= 2) {
       try { await detector.send(videoRef.value); } catch { /* noop */ }
     }
-    recognizeRafId = requestAnimationFrame(() => void tick());
+    detectorRafId = requestAnimationFrame(() => void tick());
   };
-  recognizeRafId = requestAnimationFrame(() => void tick());
+  detectorRafId = requestAnimationFrame(() => void tick());
 }
 
 function stopDetectorLoop(): void {
-  if (recognizeRafId !== null) {
-    cancelAnimationFrame(recognizeRafId);
-    recognizeRafId = null;
+  if (detectorRafId !== null) {
+    cancelAnimationFrame(detectorRafId);
+    detectorRafId = null;
   }
   detector.close();
   tracker.reset();
