@@ -6,12 +6,14 @@ StopWhenUnneeded=yes
 
 [Service]
 Type=simple
-User=joey
-Group=joey
-Environment=HOME=/home/joey
+# 아래 placeholder 들은 install.sh 가 sed 로 치환. 이 템플릿을 systemctl 에 직접
+# 먹이지 말 것 — 렌더링 결과만 /etc/systemd/system/d435-streamer.service 로 간다.
+User=__USER__
+Group=__GROUP__
+Environment=HOME=__HOME__
 # conda pdg python + ROS install 둘 다 source 한 뒤 streamer 실행.
 # bash -c 로 감싸야 source 가 작동.
-ExecStart=/bin/bash -c 'set +u; source /opt/ros/jazzy/setup.bash; source /home/joey/Desktop/physical-ai-repo-2/physical-ai-repo-2/controller/eduping-controller/install/setup.bash; exec /home/joey/miniconda3/envs/pdg/bin/python -m eduarm.d435_depth_streamer --server-host 127.0.0.1'
+ExecStart=/bin/bash -c 'set +u; source /opt/ros/jazzy/setup.bash; source __REPO_ROOT__/controller/eduping-controller/install/setup.bash; exec __PYTHON__ -m eduarm.d435_depth_streamer --server-host 127.0.0.1'
 # control-service 가 아직 안 떠있어도 streamer 의 reconnect backoff 가 알아서 처리.
 Restart=on-failure
 RestartSec=2
