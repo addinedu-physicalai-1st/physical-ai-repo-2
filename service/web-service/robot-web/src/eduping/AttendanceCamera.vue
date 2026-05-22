@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, inject, ref, onBeforeUnmount, onMounted, watch } from 'vue';
-import { FaceMesh, type Results } from '@mediapipe/face_mesh';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { pickExternalCamera } from '@/composables/selectExternalCamera';
+import { useFaceDetector } from '@/composables/useFaceDetector';
+import { useFaceTracker, type Bbox, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
 
 const props = defineProps<{
   /** 'IN' (등원) or 'OUT' (하원). null 이면 카메라 정지. */
@@ -48,7 +50,6 @@ const selectedDeviceId = ref<string>('');
 const hasCameras = computed(() => cameras.value.length > 0);
 
 let stream: MediaStream | null = null;
-let faceMesh: FaceMesh | null = null;
 let rafId: number | null = null;
 let busy = false;
 
@@ -56,24 +57,9 @@ let busy = false;
 // 같은 어린이가 즉시 하원 처리되는 사고를 막는다. 다른 어린이는 영향 없음 (줄 처리 가능).
 const childCooldowns = new Map<number, number>();
 
-// 클라이언트 사이드 face presence 사전 필터 — 빈 프레임을 서버로 보내지 않기 위해
-// mediapipe FaceMesh 로 로컬 detection 후 안정적으로 잡힐 때만 /recognize 호출.
-let stableFrameCount = 0;
-let lastRecognizeAt = 0;
-
 const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
 const COOLDOWN_MS = 8000;
-// 얼굴이 연속 N 프레임 (rAF 60Hz 기준 ~133ms) 이상 잡혀야 안정적이라 판정
-const STABLE_FRAMES_REQUIRED = 8;
-// 매칭 실패해도 최소 이 간격은 두고 다음 recognize 시도 (CPU/네트워크 보호)
-const MIN_RECOGNIZE_INTERVAL_MS = 1500;
-
-interface RecognizeResult {
-  matched: boolean;
-  child_id: number | null;
-  child_name: string | null;
-  distance: number | null;
-}
+const STABLE_FRAMES_REQUIRED = 5;  // 트래커 연속성이 노이즈 컷오프 역할
 
 interface CheckResult {
   child_id: number;
@@ -163,18 +149,72 @@ function scheduleListCamerasOnDeviceChange(): void {
   }, 400);
 }
 
-function setupFaceMesh(): void {
-  faceMesh = new FaceMesh({
-    locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`,
-  });
-  faceMesh.setOptions({
-    maxNumFaces: 1,
-    refineLandmarks: false,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.6,
-  });
-  faceMesh.onResults(handleFaceResults);
+const tracker = useFaceTracker();
+let latestTracks: TrackedFace[] = [];
+
+const identityCache = useFaceIdentityCache({
+  stableFramesRequired: STABLE_FRAMES_REQUIRED,
+  identify: async (tracks): Promise<IdentityResult[]> => {
+    return identifyTracks(tracks);
+  },
+});
+
+const detector = useFaceDetector({
+  onDetections: (faces) => {
+    latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
+    void identityCache.feed(latestTracks).then(() => {
+      void maybeCheckInOrOut();
+    });
+  },
+});
+
+/** 새 stable track 들의 face crop 만 추출해 /recognize-crops 호출. */
+async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return [];
+  const form = new FormData();
+  for (const t of tracks) {
+    const blob = await cropTrack(video, t.bbox);
+    if (!blob) continue;
+    form.append('files', blob, `track-${t.trackId}.jpg`);
+  }
+  const trackOrder = tracks;
+  try {
+    const res = await fetch('/api/attendance/recognize-crops', {
+      method: 'POST',
+      headers: { 'X-Device-Token': DEVICE_TOKEN },
+      body: form,
+    });
+    if (!res.ok) return [];
+    const body = await res.json() as {
+      matches: Array<{ matched: boolean; child_id: number | null; child_name: string | null; distance: number | null }>;
+    };
+    return body.matches.map((m, i) => ({
+      trackId: trackOrder[i].trackId,
+      childId: m.matched ? m.child_id : null,
+      childName: m.matched ? m.child_name : null,
+      distance: m.distance,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function cropTrack(video: HTMLVideoElement, bbox: Bbox): Promise<Blob | null> {
+  const [x1, y1, x2, y2] = bbox;
+  const padX = (x2 - x1) * 0.15;
+  const padY = (y2 - y1) * 0.15;
+  const sx = Math.max(0, x1 - padX);
+  const sy = Math.max(0, y1 - padY);
+  const sw = Math.min(video.videoWidth - sx, (x2 - x1) + padX * 2);
+  const sh = Math.min(video.videoHeight - sy, (y2 - y1) + padY * 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(sw);
+  canvas.height = Math.round(sh);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
 }
 
 function teardown(): void {
@@ -182,10 +222,9 @@ function teardown(): void {
     cancelAnimationFrame(rafId);
     rafId = null;
   }
-  if (faceMesh) {
-    faceMesh.close();
-    faceMesh = null;
-  }
+  detector.close();
+  tracker.reset();
+  identityCache.reset();
   if (stream) {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
@@ -193,34 +232,8 @@ function teardown(): void {
   if (videoRef.value) videoRef.value.srcObject = null;
   status.value = '';
   lastResult.value = null;
-  stableFrameCount = 0;
-  lastRecognizeAt = 0;
+  latestTracks = [];
   childCooldowns.clear();
-}
-
-async function captureFrame(): Promise<Blob | null> {
-  const video = videoRef.value;
-  const canvas = canvasRef.value;
-  if (!video || !canvas) return null;
-  if (video.readyState < 2) return null;
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(video, 0, 0);
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
-}
-
-async function recognize(blob: Blob): Promise<RecognizeResult | null> {
-  const form = new FormData();
-  form.append('file', blob, 'frame.jpg');
-  const res = await fetch('/api/attendance/recognize', {
-    method: 'POST',
-    headers: { 'X-Device-Token': DEVICE_TOKEN },
-    body: form,
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as RecognizeResult;
 }
 
 async function check(child_id: number, type: 'IN' | 'OUT'): Promise<CheckResult | null> {
@@ -236,51 +249,26 @@ async function check(child_id: number, type: 'IN' | 'OUT'): Promise<CheckResult 
   return (await res.json()) as CheckResult;
 }
 
-function handleFaceResults(results: Results): void {
+async function maybeCheckInOrOut(): Promise<void> {
   if (props.mode === null) return;
-
-  const hasFace = !!results.multiFaceLandmarks?.[0];
-  if (!hasFace) {
-    stableFrameCount = 0;
-    if (!lastResult.value) status.value = '얼굴 인식 중...';
-    return;
-  }
-
-  stableFrameCount += 1;
-  if (stableFrameCount < STABLE_FRAMES_REQUIRED) return;
   if (busy) return;
-  if (Date.now() - lastRecognizeAt < MIN_RECOGNIZE_INTERVAL_MS) return;
-
-  void runRecognize();
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
+    const cd = childCooldowns.get(childId) ?? 0;
+    if (Date.now() < cd) continue;
+    await performCheck(childId);
+    return; // 한 frame 에 한 명만 처리 (busy guard 와 함께)
+  }
+  if (!lastResult.value) status.value = '얼굴 인식 중...';
 }
 
-async function runRecognize(): Promise<void> {
+async function performCheck(childId: number): Promise<void> {
   if (props.mode === null) return;
   busy = true;
-  lastRecognizeAt = Date.now();
   try {
-    const blob = await captureFrame();
-    if (!blob) return;
-    const result = await recognize(blob);
-    if (!result) {
-      status.value = '서버 오류';
-      return;
-    }
-    if (!result.matched) {
-      status.value = '얼굴 인식 중...';
-      return;
-    }
-    // 인식된 어린이가 cooldown 중이면 check 호출하지 않음.
-    // 다른 어린이는 같은 tick 에선 알 수 없지만 다음 안정 프레임에서 처리.
-    const matchedChildId = result.child_id!;
-    const cd = childCooldowns.get(matchedChildId) ?? 0;
-    if (Date.now() < cd) {
-      // 여전히 같은 어린이 — 마지막 결과 카드 유지
-      return;
-    }
-
-    status.value = `${result.child_name} 어린이 확인 중...`;
-    const checked = await check(matchedChildId, props.mode);
+    status.value = `확인 중...`;
+    const checked = await check(childId, props.mode);
     if (!checked) {
       status.value = '출결 기록 실패';
       return;
@@ -294,8 +282,6 @@ async function runRecognize(): Promise<void> {
     childCooldowns.set(checked.child_id, Date.now() + COOLDOWN_MS);
     status.value = '';
     if (!checked.already) {
-      // hold emotion 'hello' 짧게 표시 — WebRTC server TTS 는 fire-and-forget 이라
-      // 정확한 duration 동안 hold 는 불가. 1.5s 정도 짧게 잡고 종료.
       void modeStore.holdEmotionDuring('hello', async () => {
         voiceController?.speak(buildGreeting(checked.child_name, checked.type));
         await new Promise((r) => setTimeout(r, 1500));
@@ -307,12 +293,10 @@ async function runRecognize(): Promise<void> {
 }
 
 async function loop(): Promise<void> {
-  if (videoRef.value && faceMesh && videoRef.value.readyState >= 2) {
-    await faceMesh.send({ image: videoRef.value });
+  if (videoRef.value && videoRef.value.readyState >= 2) {
+    await detector.send(videoRef.value);
   }
-  rafId = requestAnimationFrame(() => {
-    void loop();
-  });
+  rafId = requestAnimationFrame(() => { void loop(); });
 }
 
 watch(
@@ -324,11 +308,9 @@ watch(
     }
     try {
       await setupCamera();
-      if (!faceMesh) setupFaceMesh();
+      detector.start();
       status.value = '얼굴 인식 중...';
       lastResult.value = null;
-      stableFrameCount = 0;
-      lastRecognizeAt = 0;
       // childCooldowns 는 reset 하지 않음 — IN→OUT 전환 시 같은 어린이가
       // 즉시 다른 type 으로 또 trigger 되는 것을 방지
       if (rafId === null) {
