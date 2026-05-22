@@ -686,7 +686,8 @@ class EdupingRosBridge:
         self._js_pub.publish(msg)
         # 내부 보간 루프 시동 — UI follower 채널 (sim 검수용). 실물 publish 시엔
         # 실제 robot 의 /joint_states 가 _follower 를 덮어쓰니 시각화도 실제 거동.
-        self._start_playback(routine.joint_names, routine.keyframes, speed, ramp_s)
+        # target=='real' 이면 루프가 그리퍼 finger joint 도 throttled action goal 로 흘림.
+        self._start_playback(routine.joint_names, routine.keyframes, speed, ramp_s, target)
 
         result = {
             "ok": True,
@@ -784,7 +785,7 @@ class EdupingRosBridge:
 
         self._last_return_home_at = now_mono
         self._js_pub.publish(msg)
-        self._start_playback(routine.joint_names, routine.keyframes, 1.0, ramp_s)
+        self._start_playback(routine.joint_names, routine.keyframes, 1.0, ramp_s, target)
         # 모션 duration + 0.3s tail 동안 /state WS 를 50Hz burst 모드로.
         self._burst_until_s = now_mono + routine.duration_s + 0.3
 
@@ -838,10 +839,11 @@ class EdupingRosBridge:
         try:
             idx_right = [names.index(n) for n in right_arm]
             idx_left = [names.index(n) for n in left_arm]
-            idx_rgrip = names.index(right_grip)
-            idx_lgrip = names.index(left_grip)
         except ValueError as e:
             raise ValueError(f"녹화에 URDF joint 누락 — re-record 필요: {e}") from None
+        # 그리퍼는 _playback_loop 의 throttled streaming 이 담당. 녹화에 finger joint 없으면
+        # 그쪽에서 silently skip — 양팔 trajectory 만 보냄.
+        _ = right_grip, left_grip
 
         # 양팔 trajectory goal 빌드
         right_goal = FollowJointTrajectory.Goal()
@@ -873,20 +875,9 @@ class EdupingRosBridge:
             right_goal.trajectory.points.append(r_pt)
             left_goal.trajectory.points.append(l_pt)
 
-        # 그리퍼 — 마지막 keyframe 값을 단발로
-        final = routine.keyframes[-1].pos
-        rgrip_goal = GripperCommand.Goal()
-        rgrip_goal.command.position = float(final[idx_rgrip])
-        rgrip_goal.command.max_effort = 5.0
-        lgrip_goal = GripperCommand.Goal()
-        lgrip_goal.command.position = float(final[idx_lgrip])
-        lgrip_goal.command.max_effort = 5.0
-
         targets = [
             ("right_arm", self._ac_right_arm, right_goal),
             ("left_arm", self._ac_left_arm, left_goal),
-            ("right_gripper", self._ac_right_gripper, rgrip_goal),
-            ("left_gripper", self._ac_left_gripper, lgrip_goal),
         ]
         status: dict[str, str] = {}
         for label, client, goal in targets:
@@ -951,6 +942,7 @@ class EdupingRosBridge:
         keyframes: list[Any],
         speed: float,
         ramp_s: float,
+        target: str = "sim",
     ) -> None:
         self._stop_playback()
         self._playback_stop.clear()
@@ -966,7 +958,7 @@ class EdupingRosBridge:
                 start_pos = None
         self._playback_thread = threading.Thread(
             target=self._playback_loop,
-            args=(list(joint_names), list(keyframes), float(speed), float(ramp_s), start_pos),
+            args=(list(joint_names), list(keyframes), float(speed), float(ramp_s), start_pos, target),
             name="eduping-playback",
             daemon=True,
         )
@@ -986,6 +978,7 @@ class EdupingRosBridge:
         speed: float,
         ramp_s: float,
         start_pos: list[float] | None,
+        target: str,
     ) -> None:
         if not keyframes:
             return
@@ -994,6 +987,54 @@ class EdupingRosBridge:
         # start_pos 없거나 길이 불일치면 ramp 스킵 — keyframe[0] 부터 바로 시작.
         if start_pos is None or len(start_pos) != len(target_first):
             ramp_s = 0.0
+
+        # 실물 재생 시 그리퍼는 GripperActionController 가 trajectory 를 못 받음 →
+        # 매 tick 보간한 finger joint 값을 throttled (1mm + 50ms) GripperCommand 로 흘려보냄.
+        # 텔레옵 _maybe_send_gripper_goal 과 같은 정책. sim 재생 시엔 스킵.
+        stream_grip = target == "real"
+        grip_right_idx = -1
+        grip_left_idx = -1
+        if stream_grip:
+            try:
+                grip_right_idx = names.index("openarm_right_finger_joint1")
+            except ValueError:
+                grip_right_idx = -1
+            try:
+                grip_left_idx = names.index("openarm_left_finger_joint1")
+            except ValueError:
+                grip_left_idx = -1
+        grip_right_last: float | None = None
+        grip_left_last: float | None = None
+        grip_right_sent_s = 0.0
+        grip_left_sent_s = 0.0
+
+        def _try_send(side: str, value: float, now_s: float) -> None:
+            nonlocal grip_right_last, grip_left_last, grip_right_sent_s, grip_left_sent_s
+            if side == "right":
+                ac = self._ac_right_gripper
+                last_val = grip_right_last
+                last_sent = grip_right_sent_s
+            else:
+                ac = self._ac_left_gripper
+                last_val = grip_left_last
+                last_sent = grip_left_sent_s
+            if ac is None or not ac.server_is_ready():
+                return
+            if last_val is not None and abs(value - last_val) < TELEOP_GRIP_THRESHOLD_M:
+                return
+            if last_sent > 0.0 and (now_s - last_sent) < TELEOP_GRIP_MIN_INTERVAL_S:
+                return
+            goal = GripperCommand.Goal()
+            goal.command.position = value
+            goal.command.max_effort = 5.0
+            ac.send_goal_async(goal)
+            if side == "right":
+                grip_right_last = value
+                grip_right_sent_s = now_s
+            else:
+                grip_left_last = value
+                grip_left_sent_s = now_s
+
         start = time.monotonic()
         end_t = float(keyframes[-1].t)
         while not self._playback_stop.is_set():
@@ -1010,10 +1051,26 @@ class EdupingRosBridge:
                     pos = [float(x) for x in keyframes[-1].pos]
                     with self._lock:
                         self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
+                    # 끝점 그리퍼 값 강제 발사 — 직전 throttle 로 마지막 send 가 50ms 안에
+                    # 끼었어도 최종 위치 보장.
+                    if stream_grip:
+                        if grip_right_idx >= 0:
+                            grip_right_last = None  # threshold 우회
+                            grip_right_sent_s = 0.0  # interval 우회
+                            _try_send("right", float(pos[grip_right_idx]), now)
+                        if grip_left_idx >= 0:
+                            grip_left_last = None
+                            grip_left_sent_s = 0.0
+                            _try_send("left", float(pos[grip_left_idx]), now)
                     break
                 pos = _interp_keyframes(keyframes, t)
             with self._lock:
                 self._follower = _JsState(joint_names=list(names), positions=pos, received_at_s=now)
+            if stream_grip:
+                if grip_right_idx >= 0:
+                    _try_send("right", float(pos[grip_right_idx]), now)
+                if grip_left_idx >= 0:
+                    _try_send("left", float(pos[grip_left_idx]), now)
             time.sleep(period)
 
 
