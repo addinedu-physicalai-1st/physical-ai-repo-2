@@ -22,7 +22,6 @@ function buildGreeting(name: string, type: 'IN' | 'OUT'): string {
 }
 
 const videoRef = ref<HTMLVideoElement | null>(null);
-const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const status = ref<string>('');
 const lastResult = ref<{
@@ -365,7 +364,6 @@ onBeforeUnmount(() => {
       </div>
       <div class="video-wrap">
         <video ref="videoRef" muted playsinline class="video" />
-        <canvas ref="canvasRef" hidden />
       </div>
       <p v-if="status && !lastResult" class="status">{{ status }}</p>
 
