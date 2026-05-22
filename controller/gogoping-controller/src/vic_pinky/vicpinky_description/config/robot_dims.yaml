@@ -3,26 +3,34 @@
 #   1) vicpinky_description/urdf/robot_core.xacro (URDF 시각/TF/collision)
 #   2) vicpinky_bringup/bringup.py            (실 주행 odom + cmd_vel 변환)
 # 공장 baseline 은 robot_dims.factory.yaml 별도 보존.
+#
+# v1.0.0 base: base_link 가 휠축 중심 (chassis 중심 아님!)
+#   - chassis 는 base_link 기준 x = -chassis_length/2 + 0.1 = -0.2 centered
+#   - chassis_length=0.6 일 때 chassis 는 x ∈ [-0.5, +0.1]
+#   - LIDAR mount (z=0.18) 는 base_link 위 → robot 앞쪽 10cm / 뒤쪽 50cm
+#
+# ⚠️ v1.0.0 xacro 가 directly 사용하지 않는 필드 (chassis.z_offset, caster.x/y,
+#    wheel.x_offset/z_offset) 는 urdf-tuner GUI 호환을 위해 유지. 편집해도 URDF 안 바뀜.
 
 chassis:
   length: 0.6
-  width: 0.55
-  height: 0.128
-  z_offset: 0.087
+  width: 0.4         # v1.0.0 default (실 로봇)
+  height: 0.14
+  z_offset: 0.0      # (unused) v1.0.0 가 wheel_diameter/2 로 자동 계산
 caster:
-  radius: 0.0435
-  x: 0.244
-  y: 0.094
+  radius: 0.0325     # v1.0.0: wheel_diameter/2 = 0.065/2
+  x: 0.4             # (unused) v1.0.0 가 chassis_length/2 + 0.1 로 계산
+  y: 0.1             # (unused) v1.0.0 가 chassis_width/2 - 0.1 로 계산
 wheel:
   radius: 0.0825
   thickness: 0.05
-  separation: 0.4288
-  x_offset: 0.0
-  z_offset: -0.0048
+  separation: 0.475  # v1.0.0 default — 실 휠 간격
+  x_offset: 0.0      # (unused) v1.0.0 가 wheel 을 base_link 원점에 둠
+  z_offset: 0.0      # (unused) 동일
 lidar:
-  mount_x: 0.185
+  mount_x: 0.0       # base_link 위 (휠축)
   mount_y: 0.0
-  mount_z: 0.12
+  mount_z: 0.18      # v1.0.0 default
   mount_roll: 0.0
   mount_pitch: 0.0
   mount_yaw: 0.0
@@ -31,4 +39,4 @@ lidar:
   laser_z: 0.03
   laser_roll: 0.0
   laser_pitch: 0.0
-  laser_yaw: 3.1416
+  laser_yaw: 3.1416  # 180° — LIDAR 방향
