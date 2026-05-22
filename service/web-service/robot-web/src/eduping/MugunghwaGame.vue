@@ -666,24 +666,10 @@ function teardownCamera(): void {
   cameraReady.value = false;
 }
 
-// ---- recognize-multi 응답 타입 (observation / eliminationWait 단계 전용) ------
-// 진입 단계는 아래의 useFaceDetector + useFaceTracker + useFaceIdentityCache 조합으로
-// 전환됐고, 관찰/탈락대기 단계는 임시로 풀 프레임 recognize-multi 를 계속 사용 —
-// Task 9 에서 캐시 기반으로 정리 예정.
-interface RecognizeSingleMatch {
-  matched: boolean;
-  child_id: number | null;
-  child_name: string | null;
-  distance: number | null;
-  bbox: number[] | null;  // [x1, y1, x2, y2] in source-image pixels
-}
-interface RecognizeMultiResult {
-  matches: RecognizeSingleMatch[];
-}
-
-// ---- entry 단계 face recognition (tracker + identity cache) ----------------
-// observation / eliminationWait 단계는 아직 recognizeMulti (서버 전체 프레임) 사용 —
-// Task 9 에서 캐시 기반으로 정리 예정.
+// ---- face recognition (tracker + identity cache) ---------------------------
+// 모든 단계 (entry / observation / eliminationWait) 가 동일한 detector + tracker +
+// identity cache 파이프라인을 공유한다. detector loop 는 entry 진입 시 시작돼
+// end 단계에서 종료되며, 그 사이에는 latestTracks 와 identityCache 가 항상 최신.
 const recognitionActive = ref(false);
 
 const tracker = useFaceTracker();
@@ -713,18 +699,6 @@ async function captureFullFrame(): Promise<Blob | null> {
   if (!ctx) return null;
   ctx.drawImage(v, 0, 0);
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9));
-}
-
-async function recognizeMulti(blob: Blob): Promise<RecognizeMultiResult | null> {
-  const form = new FormData();
-  form.append('file', blob, 'frame.jpg');
-  const res = await fetch('/api/attendance/recognize-multi', {
-    method: 'POST',
-    headers: { 'X-Device-Token': DEVICE_TOKEN },
-    body: form,
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as RecognizeMultiResult;
 }
 
 function cropFaceDataUrl(bitmap: ImageBitmap, bbox: number[]): string {
@@ -930,62 +904,50 @@ function frameDiffNormalized(a: ImageData, b: ImageData): number {
   return sad / ((n / 4) * 255);
 }
 
-async function captureObservationBaseline(): Promise<void> {
-  // 관찰 진입 시점의 각 등록 아이의 bbox 중심 캡처. 첫 시도에서 어떤 아이가 잠깐
-  // 카메라 밖에 있었거나 검출 실패한 경우를 대비해 최대 3회 재시도. 이미 잡힌
-  // child_id 는 덮어쓰지 않음 — 첫 안정 위치를 기준점으로 유지.
+function captureObservationBaseline(): void {
+  // 관찰 진입 순간의 tracker bbox 중심을 child_id 별로 기록. 식별된 트랙만 baseline 으로
+  // 쓰고, 누락된 child 는 probeMoversAndMaybeEliminate 가 다음 frame 에서 지연 채움.
   observationBasePositions.clear();
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (stage.value !== 'observation') return;
-    const blob = await captureFullFrame();
-    if (blob) {
-      const result = await recognizeMulti(blob);
-      for (const m of result?.matches ?? []) {
-        if (!m.matched || m.child_id == null || !m.bbox || m.bbox.length !== 4) continue;
-        if (observationBasePositions.has(m.child_id)) continue;
-        const [x1, y1, x2, y2] = m.bbox;
-        observationBasePositions.set(m.child_id, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
-      }
-    }
-    // 등록된 모든 아이가 baseline 에 잡혔으면 조기 종료.
-    const registeredIds = participants.value.filter((p) => p.registered).map((p) => p.id);
-    const allHave = registeredIds.every((id) => observationBasePositions.has(id));
-    if (allHave && observationBasePositions.size > 0) break;
-    if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
+    const [x1, y1, x2, y2] = t.bbox;
+    observationBasePositions.set(childId, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
   }
 }
 
-async function probeMoversAndMaybeEliminate(): Promise<void> {
-  if (moverProbeInflight) return;
+function probeMoversAndMaybeEliminate(): void {
+  if (moverProbeInflight) return;  // 짧은 재진입 차단 (TTS race)
   if (stage.value !== 'observation') return;
   moverProbeInflight = true;
   try {
-    const blob = await captureFullFrame();
-    if (!blob) return;
-    const result = await recognizeMulti(blob);
-    if (!result?.matches?.length) return;
+    // 등록된 아이 중 baseline 누락된 것이 있으면 지연 baseline (이번 frame 의 bbox 로).
+    for (const t of latestTracks) {
+      const childId = identityCache.getChildId(t.trackId);
+      if (childId == null) continue;
+      if (observationBasePositions.has(childId)) continue;
+      const [x1, y1, x2, y2] = t.bbox;
+      observationBasePositions.set(childId, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
+    }
 
     type Candidate = { id: number; name: string; dist: number };
     const candidates: Candidate[] = [];
-    for (const m of result.matches) {
-      if (!m.matched || m.child_id == null || !m.bbox || m.bbox.length !== 4) continue;
-      const base = observationBasePositions.get(m.child_id);
+    for (const t of latestTracks) {
+      const childId = identityCache.getChildId(t.trackId);
+      if (childId == null) continue;
+      const base = observationBasePositions.get(childId);
       if (!base) continue;
-      const [x1, y1, x2, y2] = m.bbox;
+      const [x1, y1, x2, y2] = t.bbox;
       const cx = (x1 + x2) / 2;
       const cy = (y1 + y2) / 2;
       const dist = Math.hypot(cx - base.x, cy - base.y);
-      const p = participants.value.find((x) => x.id === m.child_id);
+      const p = participants.value.find((x) => x.id === childId);
       if (!p || !p.registered || p.eliminated) continue;
-      candidates.push({ id: m.child_id, name: m.child_name ?? p.name, dist });
+      candidates.push({ id: childId, name: p.name, dist });
     }
     if (candidates.length === 0) return;
 
-    // strict: 변위 ≥ MOVER_DISPLACEMENT_PX 인 모든 아이 탈락
     let toEliminate = candidates.filter((c) => c.dist >= MOVER_DISPLACEMENT_PX);
-
-    // loose fallback: strict 통과한 사람이 없지만 motion 은 분명히 잡힘 →
-    // 가장 많이 움직인 한 명을 탈락 (loose 임계 이상).
     if (toEliminate.length === 0) {
       const maxDist = Math.max(...candidates.map((c) => c.dist));
       if (maxDist >= MOVER_DISPLACEMENT_LOOSE_PX) {
@@ -993,7 +955,6 @@ async function probeMoversAndMaybeEliminate(): Promise<void> {
       }
     }
     if (toEliminate.length === 0) {
-      // 모션 감지는 됐지만 누가 움직였는지 식별 실패 — 디버깅 토스트로 변위 노출
       const maxDist = candidates.length
         ? Math.max(...candidates.map((c) => c.dist))
         : 0;
@@ -1010,27 +971,19 @@ async function probeMoversAndMaybeEliminate(): Promise<void> {
     const names = toEliminate.map((m) => m.name).join(', ');
     pushToast(`${names} 어린이 탈락했습니다`);
     void tts.speak(`${names} 어린이 탈락했습니다`).catch(() => { /* noop */ });
-    // 자동 전이 — 한 명이라도 탈락하면 즉시 탈락 대기 단계.
     setStage('eliminationWait');
   } finally {
     moverProbeInflight = false;
   }
 }
 
-const OBSERVATION_PERIODIC_PROBE_MS = 1500;
-let observationPeriodicTimer: number | null = null;
-
 function startMotionDetection(): void {
   stopMotionDetection();
   // baseline 즉시 캡처. 비디오 readyState 가 아직 낮을 수 있으니 첫 tick 에서 재시도.
   motionBaseline = captureMotionFrame();
   motionDetected.value = false;
-  // 동시에 recognize-multi 로 등록 아이들의 baseline 위치도 캡처 — 비동기 + 재시도.
-  void captureObservationBaseline();
-  // 모션 이벤트 외에도 1.5초마다 주기적으로 probe — 천천히 살금살금 움직이는 경우 catch.
-  observationPeriodicTimer = window.setInterval(() => {
-    if (stage.value === 'observation') void probeMoversAndMaybeEliminate();
-  }, OBSERVATION_PERIODIC_PROBE_MS);
+  // 등록 아이들의 bbox 중심 baseline — tracker 캐시에서 즉시 동기로 채움.
+  captureObservationBaseline();
   motionTimer = window.setInterval(() => {
     if (stage.value !== 'observation') return;
     if (!motionBaseline) {
@@ -1045,9 +998,9 @@ function startMotionDetection(): void {
       const now = performance.now();
       if (now - lastMotionAnnouncementAt > MOTION_TTS_COOLDOWN_MS) {
         lastMotionAnnouncementAt = now;
-        // recognize-multi 로 누가 움직였는지 식별 → 자동 탈락 + 전이 시도. 식별 실패하면
-        // 카메라 flash 만 남고 교사가 직접 ✕ 로 처리.
-        void probeMoversAndMaybeEliminate();
+        // tracker bbox + identity cache 로 누가 움직였는지 식별 → 자동 탈락 + 전이 시도.
+        // 식별 실패하면 카메라 flash 만 남고 교사가 직접 ✕ 로 처리.
+        probeMoversAndMaybeEliminate();
       }
     } else {
       motionDetected.value = false;
@@ -1059,10 +1012,6 @@ function stopMotionDetection(): void {
   if (motionTimer !== null) {
     window.clearInterval(motionTimer);
     motionTimer = null;
-  }
-  if (observationPeriodicTimer !== null) {
-    window.clearInterval(observationPeriodicTimer);
-    observationPeriodicTimer = null;
   }
   motionBaseline = null;
   motionDetected.value = false;
@@ -1182,48 +1131,38 @@ const ELIM_WAIT_REQUIRED_ABSENT_CHECKS = 3;
 const eliminationWaitIds = new Set<number>();
 let eliminationWaitTimer: number | null = null;
 let elimAbsentStreak = 0;
-let elimWaitInflight = false;
 
-async function eliminationWaitTick(): Promise<void> {
+function eliminationWaitTick(): void {
   if (stage.value !== 'eliminationWait') return;
-  if (elimWaitInflight) return;
   if (eliminationWaitIds.size === 0) {
     // 안전망 — 새로 탈락한 아이가 없는 상태로 진입했으면 즉시 노래로 복귀
     setStage('song');
     return;
   }
-  elimWaitInflight = true;
-  try {
-    const blob = await captureFullFrame();
-    if (!blob) return;
-    const result = await recognizeMulti(blob);
-    if (!result) return;
-    const allMatches = result.matches ?? [];
-    const totalFacesDetected = allMatches.length;
-    const presentIds = new Set<number>();
-    for (const m of allMatches) {
-      if (m.matched && m.child_id != null) presentIds.add(m.child_id);
+  // tracker + identity cache 로 탈락자의 잔존 여부 판단. recognize 호출 없이 매 tick 즉시.
+  const totalFacesDetected = latestTracks.length;
+  const presentIds = new Set<number>();
+  for (const t of latestTracks) {
+    const cid = identityCache.getChildId(t.trackId);
+    if (cid != null) presentIds.add(cid);
+  }
+  const matchedEliminatedVisible = Array.from(eliminationWaitIds).some(
+    (id) => presentIds.has(id),
+  );
+  // 화면에 남아있어야 정상인 인원 — 등록됐고 탈락 안 한 아이들.
+  const expectedRemaining = participants.value.filter(
+    (p) => p.registered && !p.eliminated,
+  ).length;
+  const tooManyFaces = totalFacesDetected > expectedRemaining;
+  const stillVisible = matchedEliminatedVisible || tooManyFaces;
+  if (stillVisible) {
+    elimAbsentStreak = 0;
+  } else {
+    elimAbsentStreak += 1;
+    if (elimAbsentStreak >= ELIM_WAIT_REQUIRED_ABSENT_CHECKS) {
+      // 모든 탈락자가 시야 밖 (식별 + face count 둘 다 만족) → 게임 계속
+      setStage('song');
     }
-    const matchedEliminatedVisible = Array.from(eliminationWaitIds).some(
-      (id) => presentIds.has(id),
-    );
-    // 화면에 남아있어야 정상인 인원 — 등록됐고 탈락 안 한 아이들.
-    const expectedRemaining = participants.value.filter(
-      (p) => p.registered && !p.eliminated,
-    ).length;
-    const tooManyFaces = totalFacesDetected > expectedRemaining;
-    const stillVisible = matchedEliminatedVisible || tooManyFaces;
-    if (stillVisible) {
-      elimAbsentStreak = 0;
-    } else {
-      elimAbsentStreak += 1;
-      if (elimAbsentStreak >= ELIM_WAIT_REQUIRED_ABSENT_CHECKS) {
-        // 모든 탈락자가 시야 밖 (식별 + face count 둘 다 만족) → 게임 계속
-        setStage('song');
-      }
-    }
-  } finally {
-    elimWaitInflight = false;
   }
 }
 
@@ -1240,7 +1179,7 @@ function startEliminationWait(): void {
   }
   elimAbsentStreak = 0;
   pushToast('탈락한 친구는 자리에서 벗어나주세요');
-  eliminationWaitTimer = window.setInterval(() => { void eliminationWaitTick(); }, ELIM_WAIT_POLL_MS);
+  eliminationWaitTimer = window.setInterval(eliminationWaitTick, ELIM_WAIT_POLL_MS);
 }
 
 function stopEliminationWait(): void {
@@ -1250,7 +1189,6 @@ function stopEliminationWait(): void {
   }
   eliminationWaitIds.clear();
   elimAbsentStreak = 0;
-  elimWaitInflight = false;
 }
 
 watch(stage, (s, prev) => {
