@@ -1,38 +1,17 @@
-"""gogoping_follow 튜닝 상수."""
+"""gogoping_follow 튜닝 상수 — Nav2 통합."""
 
-# --- ReID ---
-REID_BACKBONE = "osnet_x0_25"
-REID_FEATURE_DIM = 512
-REID_GALLERY_MAX = 50
-REID_AUTO_CALIB_INTERVAL = 30   # frame 마다 갤러리 확장 평가
-REID_AUTO_CALIB_THRESH = 0.94   # 코사인 sim 이하 시 새 템플릿 추가
-REID_LOCK_FRAMES = 5            # ID 락 안정화 프레임 수
+# ---------- Follow geometry ----------
+FOLLOW_DISTANCE_M = 1.5       # target 의 뒤 몇 m 지점을 goal 로 삼나
+GOAL_CHANGE_THRESHOLD_M = 0.3 # 이전 goal 과 이 만큼 떨어져야 새 goal 발행
 
-# --- HSV fallback ---
-HSV_BINS = (16, 16, 16)         # 16H + 16S + 16V
+# ---------- LiDAR fusion ----------
+LIDAR_BEARING_WINDOW_DEG = 5.0  # bbox bearing ±이 각도 의 LiDAR 빔 평균
+LIDAR_MAX_M = 8.0               # 이 이상이면 측정 신뢰 안 함
 
-# --- YOLO detector ---
-YOLO_MODEL_NAME = "yolov8s.pt"  # 또는 ncnn 변환본 경로
-YOLO_CONF_THRESHOLD = 0.40
-YOLO_PERSON_CLASS_ID = 0
+# ---------- Control loop ----------
+NAV2_GOAL_HZ = 2.0            # control loop 주기 — Nav2 액션 reissue 검사
+STATE_STALE_TIMEOUT_S = 5.0   # /gogoping/tracking_state 가 이 시간 안 오면 lost
 
-# --- P 컨트롤 ---
-KP_DIST = 0.003                  # bbox area 기반 linear_x
-KP_ANGLE = 0.001                 # bbox center offset 기반 angular_z
-TARGET_BBOX_AREA_PX = 360        # 목표 bbox 한 변 (sqrt(area))
-ANGLE_DEADZONE_PX = 45           # 카메라 중심 ±45px 안은 회전 안 함
-
-# --- 속도 한계 ---
-LINEAR_X_MAX = 0.30              # m/s
-ANGULAR_Z_MAX = 0.80             # rad/s
-
-# --- LiDAR clamp ---
-LIDAR_HARD_STOP_M = 0.30         # 이하 거리 진입 시 즉시 정지
-LIDAR_SLOW_M = 0.60              # 이하 거리에서 linear_x 0.5x
-
-# --- 매칭 loss 처리 ---
-LOST_TIMEOUT_S = 5.0             # 시야 로스트 후 searching 진입 전 대기
-
-# --- Publish rate ---
-TRACKING_STATE_HZ = 5            # tracking_state publish 주기
-CMD_VEL_HZ = 20
+# ---------- frame names ----------
+MAP_FRAME = "map"
+BASE_FRAME = "base_link"

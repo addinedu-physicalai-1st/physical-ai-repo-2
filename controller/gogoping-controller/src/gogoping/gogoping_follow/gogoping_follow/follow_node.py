@@ -1,179 +1,139 @@
-"""gogoping_follow ROS 노드 — Image + Scan + FollowTarget → cmd_vel + TrackingState.
+"""gogoping_follow ROS 노드 — tracking_state + scan + tf → Nav2 NavigateToPose.
 
-Image frame 마다 단일 target YOLO + ReID 매칭 → bbox + LiDAR clamp 로 P 컨트롤.
+control loop (NAV2_GOAL_HZ):
+1. 최신 tracking_state 가 stale 또는 mode != "tracking" → cancel goal + return
+2. bbox bearing + LiDAR 거리 fusion → target world pose
+3. target 의 1.5m 뒤 위치 = goal
+4. 이전 goal 과 0.3m 이상 차이 시에만 새 goal send (Nav2 reissue spam 회피)
 """
+from __future__ import annotations
+
 import math
 import time
 
 import rclpy
-from cv_bridge import CvBridge
-from geometry_msgs.msg import Twist
+import tf2_geometry_msgs  # noqa: F401 — import side-effect 로 PoseStamped 변환 등록
+from geometry_msgs.msg import Pose, PoseWithCovarianceStamped
 from rclpy.node import Node
-from sensor_msgs.msg import Image, LaserScan
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
+from sensor_msgs.msg import LaserScan
+from tf2_ros import Buffer, TransformListener
 
 from gogoping_msgs.msg import FollowTarget, TrackingState
 
 from gogoping_follow.config import (
-    CMD_VEL_HZ,
-    TRACKING_STATE_HZ,
-    LOST_TIMEOUT_S,
+    GOAL_CHANGE_THRESHOLD_M,
+    NAV2_GOAL_HZ,
+    STATE_STALE_TIMEOUT_S,
 )
-from gogoping_follow.teacher_detector import Detection, TeacherDetector
-from gogoping_follow.teacher_follower import TeacherFollower
+from gogoping_follow.nav2_client import Nav2Client
+from gogoping_follow.target_pose_estimator import estimate_follow_goal
 
 
 class FollowNode(Node):
     def __init__(self) -> None:
         super().__init__("gogoping_follow_node")
-        self._bridge = CvBridge()
-        self._detector: TeacherDetector | None = None
-        self._follower = TeacherFollower(image_width=640)
+
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
+        self._nav2 = Nav2Client(self)
 
         self._target_id: str = ""
-        self._target_name: str = ""
-        self._last_detection: Detection | None = None
-        self._last_detection_ts: float = 0.0
-        self._last_lidar_front_min: float = 10.0
+        self._last_state: TrackingState | None = None
+        self._last_state_ts: float = 0.0
+        self._last_scan: LaserScan | None = None
+        self._robot_map_pose: Pose | None = None
+        self._last_goal: Pose | None = None
 
-        self.create_subscription(Image, "/camera/image_raw", self._on_image, 10)
-        self.create_subscription(LaserScan, "/scan", self._on_scan, 10)
         self.create_subscription(
-            FollowTarget, "/gogoping/follow_target", self._on_follow_target, 10
+            TrackingState, "/gogoping/tracking_state", self._on_tracking_state, 10,
         )
-        self._cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
-        self._state_pub = self.create_publisher(
-            TrackingState, "/gogoping/tracking_state", 10
+        # LiDAR 는 sllidar_node 가 /gogoping/scan namespace 로 publish.
+        # AMCL/Nav2 와 동일 토픽 사용 — laser_scan_polygon_filter 거친 scan_filtered 보다
+        # raw scan 이 LiDAR fusion 의 정면 거리 추정에 더 단순.
+        self.create_subscription(LaserScan, "/gogoping/scan", self._on_scan, 10)
+        self.create_subscription(
+            FollowTarget, "/gogoping/follow_target", self._on_follow_target, 10,
         )
-        self.create_timer(1.0 / CMD_VEL_HZ, self._tick_control)
-        self.create_timer(1.0 / TRACKING_STATE_HZ, self._tick_state)
+        # AMCL publisher 가 TRANSIENT_LOCAL durability — late joiner (우리) 도 마지막 pose
+        # 한 번은 받도록 같은 QoS 로 구독. AMCL 은 robot 정지 시 publish 멈춤 → 그 사이
+        # follow_node 시작하면 last cached msg 라도 받아야 _robot_map_pose set 됨.
+        amcl_qos = QoSProfile(
+            depth=10,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(
+            PoseWithCovarianceStamped, "/amcl_pose", self._on_amcl_pose, amcl_qos,
+        )
+
+        self.create_timer(1.0 / NAV2_GOAL_HZ, self._tick_control)
+
         self.get_logger().info(
-            "FollowNode initialized — waiting for FollowTarget (YOLO+ReID lazy-load on first target)"
+            "FollowNode initialized — Nav2 NavigateToPose 액션 client. "
+            "waiting for /gogoping/tracking_state + /scan + /amcl_pose."
         )
 
-    def _ensure_detector(self) -> TeacherDetector | None:
-        if self._detector is not None:
-            return self._detector
-        try:
-            self._detector = TeacherDetector()
-            self.get_logger().info("TeacherDetector ready (YOLO + ReID loaded)")
-        except RuntimeError as e:
-            self.get_logger().warn(f"TeacherDetector lazy-load failed: {e}")
-            self._detector = None
-        return self._detector
-
+    # ---------- subscriptions ----------
     def _on_follow_target(self, msg: FollowTarget) -> None:
         if not msg.teacher_id:
             self._target_id = ""
-            self._target_name = ""
-            self._last_detection = None
-            if self._detector is not None:
-                self._detector.clear_target()
-            self.get_logger().info("FollowTarget stop")
-            return
-        detector = self._ensure_detector()
-        if detector is None:
-            self.get_logger().warn("Cannot start follow — detector unavailable")
+            self._last_state = None
+            self._nav2.cancel_current()
+            self._last_goal = None
+            self.get_logger().info("FollowTarget stop — goal cancel")
             return
         self._target_id = msg.teacher_id
-        self._target_name = msg.teacher_name
-        detector.set_target(list(msg.embedding))
         self.get_logger().info(
             f"FollowTarget start: {msg.teacher_name} ({msg.teacher_id[:8]}...)"
         )
 
-    def _on_image(self, msg: Image) -> None:
-        if not self._target_id:
-            self._last_detection = None
-            return
-        detector = self._ensure_detector()
-        if detector is None:
-            return
-        try:
-            frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        except Exception as e:
-            self.get_logger().warn(f"cv_bridge convert failed: {e}")
-            return
-        det = detector.step(frame)
-        if det is not None:
-            self._last_detection = det
-            self._last_detection_ts = time.time()
+    def _on_tracking_state(self, msg: TrackingState) -> None:
+        self._last_state = msg
+        self._last_state_ts = time.time()
 
     def _on_scan(self, msg: LaserScan) -> None:
-        n = len(msg.ranges)
-        if n == 0:
-            return
-        center = n // 2
-        window = max(1, n // 24)  # ±7.5° approx of ±15° area
-        front = [
-            r for r in msg.ranges[center - window : center + window]
-            if not math.isinf(r) and not math.isnan(r) and r > 0.05
-        ]
-        self._last_lidar_front_min = min(front) if front else 10.0
+        self._last_scan = msg
 
+    def _on_amcl_pose(self, msg: PoseWithCovarianceStamped) -> None:
+        self._robot_map_pose = msg.pose.pose
+
+    # ---------- control loop ----------
     def _tick_control(self) -> None:
         if not self._target_id:
             return
-        det = self._last_detection
-        if det is None or (time.time() - self._last_detection_ts) > LOST_TIMEOUT_S:
-            self._cmd_pub.publish(Twist())  # safety stop
-            return
-        x1, y1, x2, y2 = det.bbox
-        cx = (x1 + x2) / 2.0
-        size = math.sqrt(max(1, (x2 - x1) * (y2 - y1)))
-        cmd = self._follower.step(
-            bbox_center_x=cx,
-            bbox_size_px=size,
-            lidar_min_m=self._last_lidar_front_min,
-        )
-        twist = Twist()
-        twist.linear.x = cmd.linear_x
-        twist.angular.z = cmd.angular_z
-        self._cmd_pub.publish(twist)
 
-    def _tick_state(self) -> None:
-        msg = TrackingState()
+        state = self._last_state
         now = time.time()
-        if not self._target_id:
-            msg.mode = "idle"
-            msg.matched = False
-            msg.distance_m = float("nan")
-            msg.angle_deg = float("nan")
-            msg.bbox_size_px = 0
-            msg.bbox_x1 = 0
-            msg.bbox_y1 = 0
-            msg.bbox_x2 = 0
-            msg.bbox_y2 = 0
-            msg.track_id = 0
-            msg.reid_sim = float("nan")
-        elif self._last_detection is not None and (now - self._last_detection_ts) < LOST_TIMEOUT_S:
-            msg.mode = "tracking"
-            msg.matched = True
-            msg.distance_m = float(self._last_lidar_front_min)
-            x1, y1, x2, y2 = self._last_detection.bbox
-            offset_px = self._follower.image_center - (x1 + x2) / 2.0
-            msg.angle_deg = float(offset_px * 0.1)  # rough estimate
-            msg.bbox_size_px = int(math.sqrt(max(1, (x2 - x1) * (y2 - y1))))
-            msg.bbox_x1 = int(x1)
-            msg.bbox_y1 = int(y1)
-            msg.bbox_x2 = int(x2)
-            msg.bbox_y2 = int(y2)
-            msg.track_id = 0  # ByteTrack 미통합 — 별도 perception 노드에서 채우게 됨
-            msg.reid_sim = float(self._last_detection.reid_sim)
-        else:
-            msg.mode = "searching"
-            msg.matched = False
-            msg.distance_m = float("nan")
-            msg.angle_deg = float("nan")
-            msg.bbox_size_px = 0
-            msg.bbox_x1 = 0
-            msg.bbox_y1 = 0
-            msg.bbox_x2 = 0
-            msg.bbox_y2 = 0
-            msg.track_id = 0
-            msg.reid_sim = float("nan")
-        msg.teacher_id = self._target_id
-        msg.ts_ms = int(now * 1000)
-        self._state_pub.publish(msg)
+        stale = state is None or (now - self._last_state_ts) > STATE_STALE_TIMEOUT_S
+        not_tracking = state is None or state.mode != "tracking" or not state.matched
+
+        if stale or not_tracking:
+            if self._last_goal is not None:
+                self._nav2.cancel_current()
+                self._last_goal = None
+            return
+
+        assert state is not None
+        estimate = estimate_follow_goal(
+            angle_deg=float(state.angle_deg),
+            scan=self._last_scan,
+            tf_buffer=self._tf_buffer,
+            robot_map_pose=self._robot_map_pose,
+        )
+        if estimate is None:
+            return
+
+        if self._last_goal is None or _pose_distance(self._last_goal, estimate.goal) >= GOAL_CHANGE_THRESHOLD_M:
+            self._nav2.send_goal(estimate.goal)
+            self._last_goal = estimate.goal
+
+
+def _pose_distance(a: Pose, b: Pose) -> float:
+    return math.hypot(
+        b.position.x - a.position.x,
+        b.position.y - a.position.y,
+    )
 
 
 def main() -> None:

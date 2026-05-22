@@ -41,6 +41,9 @@ dependencies = [
   "feetech-servo-sdk>=1.0",
   # AI Hub vision 추론 (YOLO-World) — 첫 실행 시 가중치 자동 다운로드
   "ultralytics>=8.4,<9",
+  # ultralytics 의 ByteTrack 이 Linear Assignment Problem solver 로 lap 사용.
+  # gogoping_perception 의 yolo.track(tracker="bytetrack.yaml") 에 필수.
+  "lap>=0.5.12",
   # 휴대전화 STT (MediaRecorder 클립 → /api/stt). 첫 실행 시 모델(tiny ~75MB) 자동 다운로드.
   "faster-whisper>=1.0",
   # ROS 2 jazzy 빌드 — colcon + rosidl_generator_* 가 empy 3.x API 사용 (4.x 와 비호환).

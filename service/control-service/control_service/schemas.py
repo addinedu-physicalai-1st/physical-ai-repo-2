@@ -225,4 +225,4 @@ class FollowStateOut(BaseModel):
     bbox_y2: int | None = None
     track_id: int | None = None
     reid_sim: float | None = None
-    updated_at: datetime | None = None
+    updated_at_ms: int | None = None

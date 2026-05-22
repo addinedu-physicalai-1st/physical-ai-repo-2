@@ -1,10 +1,12 @@
-"""POST /api/gogoping/follow/start, /stop + GET /state.
+"""POST /api/gogoping/follow/start, /stop + GET /state + WS /ws/tracking-state.
 
 Client → backend 로 embedding 전달 없음. backend 가 teacher_id 로 teacher_face_embedding 테이블 lookup → ROS publish.
 """
+import asyncio
+import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,21 +19,26 @@ from control_service.schemas import (
 from control_db.models import TeacherFaceEmbedding, User
 from control_db.session import get_session
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/gogoping/follow", tags=["gogoping-follow"])
 
 # module-level hooks — install() wires bridge methods (테스트는 monkeypatch).
 publish_follow_target = None  # type: ignore
 publish_follow_stop = None    # type: ignore
 current_tracking_state = None # type: ignore
+_bridge = None  # type: ignore
 
 
 def install(app, bridge) -> None:
     """main.py 가 lifespan 에서 호출 — bridge 메서드를 module-level hook 에 wire 후 라우터 include."""
-    global publish_follow_target, publish_follow_stop, current_tracking_state
+    global publish_follow_target, publish_follow_stop, current_tracking_state, _bridge
     publish_follow_target = bridge.publish_follow_target
     publish_follow_stop = bridge.publish_follow_stop
     current_tracking_state = bridge.current_tracking_state
+    _bridge = bridge
     app.include_router(router)
+    _install_tracking_state_ws(app, bridge)
 
 
 @router.post("/start", response_model=FollowStateOut)
@@ -95,3 +102,39 @@ async def follow_state(
     if s is None:
         return FollowStateOut(active=False)
     return FollowStateOut(**s)
+
+
+def _install_tracking_state_ws(app, bridge) -> None:
+    """``/ws/tracking-state`` WebSocket — bridge 의 /gogoping/tracking_state fan-out (5 Hz)."""
+
+    @app.websocket("/ws/tracking-state")
+    async def tracking_state_ws(ws: WebSocket) -> None:
+        await ws.accept()
+        loop = asyncio.get_event_loop()
+        queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=10)
+
+        def _on_state(payload: dict) -> None:
+            # ros spin thread 에서 호출 — main loop 의 queue 에 thread-safe put
+            try:
+                loop.call_soon_threadsafe(queue.put_nowait, payload)
+            except asyncio.QueueFull:
+                # 클라이언트가 느리면 drop — 5 Hz publish 의 다음 메시지로 회복
+                pass
+
+        unreg = bridge.register_tracking_state_callback(_on_state)
+
+        # 연결 즉시 latest state 보냄 — 새 클라이언트가 늦게 붙어도 즉시 표시
+        latest = bridge.current_tracking_state()
+        if latest is not None:
+            await ws.send_json(latest)
+
+        try:
+            while True:
+                payload = await queue.get()
+                await ws.send_json(payload)
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"tracking-state WS 오류: {e}")
+        finally:
+            unreg()
