@@ -11,6 +11,7 @@
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
+import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
 import IntegratedCameraPreview from '@/noriarm/IntegratedCameraPreview.vue';
@@ -27,6 +28,17 @@ interface DanceItem {
 
 const mode = useModeStore();
 const stream = useDanceStream();
+const stateWs = useEdupingStateWs();
+stateWs.start();
+
+// 패널 최소화 상태 — 헤더만 남기고 본문 접음.
+const cameraMinimized = ref(false);
+const musicMinimized = ref(false);
+const simMinimized = ref(false);
+// 시뮬 패널이 한 번이라도 열리기 전엔 URDF 로드 자체를 하지 않음.
+// realActive=true 면 패널이 unmount 되므로 어차피 로드 없음.
+const simEverOpened = ref(false);
+watch(simMinimized, (m) => { if (!m) simEverOpened.value = true; });
 
 const items = ref<DanceItem[]>([]);
 const loading = ref(false);
@@ -73,7 +85,12 @@ async function refresh(): Promise<void> {
 }
 
 function requestPlay(item: DanceItem): void {
-  // 클릭 즉시 재생 X — 안전을 위해 확인 팝업 띄움.
+  // 이미 재생 중인 곡 카드 클릭 = 즉시 정지 (item-icon 이 이미 stop 으로 바뀌어 있는 상태).
+  if (item.slug === playingSlug.value) {
+    stop();
+    return;
+  }
+  // 다른 곡 — 클릭 즉시 재생 X. 안전을 위해 확인 팝업 띄움.
   pendingItem.value = item;
 }
 
@@ -107,79 +124,151 @@ onMounted(() => {
 });
 onUnmounted(() => {
   stream.close();
+  stateWs.stop();
 });
 </script>
 
 <template>
   <Transition name="fade">
     <div class="popup-overlay" @click.self="close">
-      <Transition name="pop" appear>
-        <div class="popup-card" role="dialog" aria-modal="true" aria-label="율동 선택">
-          <header class="popup-head">
-            <h2>
-              <Icon name="music" :size="22" />
-              어떤 율동 출까요?
-            </h2>
-            <button type="button" class="btn-close" aria-label="닫기" @click="close">×</button>
-          </header>
+      <button type="button" class="close-fab" aria-label="닫기" @click="close">×</button>
 
-          <div class="popup-body">
-            <div class="viewer-pane">
-              <OpenarmViewer source="follower" :external-snapshot="stream.currentSnapshot.value" />
-              <div class="emotion-pip">
-                <IntegratedCameraPreview
-                  :armed="captureArmed"
-                  :reset-key="captureResetKey"
-                  robot="eduping"
-                  mode="dance"
-                />
-              </div>
-              <div v-if="playingItem" class="now-playing">
-                <div class="np-name">
-                  <Icon name="music" :size="16" />
-                  <strong>{{ playingItem.display_name }}</strong>
-                </div>
-                <div class="np-progress">
-                  <div class="np-bar"><div class="np-fill" :style="{ width: `${progressPct}%` }" /></div>
-                  <span class="np-time">{{ playElapsedS.toFixed(1) }} / {{ playDurationS.toFixed(1) }}s</span>
-                </div>
-                <button type="button" class="btn-stop" @click="stop">
-                  <Icon name="stop" :size="14" /> 정지
-                </button>
-              </div>
+      <!-- 카메라: 좌상단 -->
+      <section
+        class="panel panel-top-left"
+        :class="{ minimized: cameraMinimized }"
+        role="dialog"
+        aria-label="카메라"
+      >
+        <header class="panel-head" @click="cameraMinimized = !cameraMinimized">
+          <Icon name="camera" :size="16" />
+          <span class="panel-title">카메라</span>
+          <button
+            type="button"
+            class="btn-min"
+            :aria-label="cameraMinimized ? '펼치기' : '최소화'"
+            @click.stop="cameraMinimized = !cameraMinimized"
+          >{{ cameraMinimized ? '+' : '–' }}</button>
+        </header>
+        <div v-show="!cameraMinimized" class="panel-body panel-body-camera">
+          <IntegratedCameraPreview
+            :armed="captureArmed"
+            :reset-key="captureResetKey"
+            robot="eduping"
+            mode="dance"
+            :infer-interval-ms="600"
+          />
+        </div>
+      </section>
+
+      <!-- 음악 플레이어: 우상단 -->
+      <section
+        class="panel panel-top-right panel-music"
+        :class="{ minimized: musicMinimized }"
+        role="dialog"
+        aria-label="음악"
+      >
+        <header class="panel-head" @click="musicMinimized = !musicMinimized">
+          <Icon name="music" :size="16" />
+          <span class="panel-title">음악</span>
+          <button
+            type="button"
+            class="btn-min"
+            :aria-label="musicMinimized ? '펼치기' : '최소화'"
+            @click.stop="musicMinimized = !musicMinimized"
+          >{{ musicMinimized ? '+' : '–' }}</button>
+        </header>
+        <div v-show="!musicMinimized" class="panel-body">
+          <!-- Now playing card (앨범 아트 느낌) -->
+          <div class="np-card" :class="{ idle: !playingItem }">
+            <div class="np-art">
+              <Icon name="music" :size="playingItem ? 42 : 36" />
             </div>
-
-            <aside class="list-pane">
-              <div v-if="loading" class="hint">불러오는 중…</div>
-              <div v-else-if="error" class="err">{{ error }}</div>
-              <ul v-else-if="items.length > 0" class="list">
-                <li
-                  v-for="item in items"
-                  :key="item.slug"
-                  class="item"
-                  :class="{ playing: item.slug === playingSlug }"
-                  @click="requestPlay(item)"
-                >
-                  <div class="item-icon">
-                    <Icon :name="item.slug === playingSlug ? 'stop' : 'play'" :size="18" />
-                  </div>
-                  <div class="item-meta">
-                    <div class="item-name">{{ item.display_name }}</div>
-                    <div class="item-sub">
-                      <span v-if="item.duration_s">{{ item.duration_s.toFixed(1) }}초</span>
-                      <span v-if="item.has_song === false" class="warn">곡 없음</span>
-                    </div>
-                  </div>
-                </li>
-              </ul>
-              <div v-else class="hint">
-                저장된 율동이 없어요.<br/>
-                <small>'율동 등록' 모드에서 새 곡을 추가하세요.</small>
+            <div class="np-meta">
+              <div class="np-title">
+                {{ playingItem?.display_name ?? '재생 중인 곡 없음' }}
               </div>
-            </aside>
+              <div v-if="playingItem" class="np-bar">
+                <div class="np-fill" :style="{ width: `${progressPct}%` }" />
+              </div>
+              <div v-if="playingItem" class="np-time">
+                {{ playElapsedS.toFixed(1) }} / {{ playDurationS.toFixed(1) }}s
+              </div>
+              <div v-else class="np-hint">아래 목록에서 한 곡을 골라주세요.</div>
+            </div>
+            <button
+              v-if="playingItem"
+              type="button"
+              class="np-ctrl"
+              aria-label="정지"
+              @click="stop"
+            >
+              <Icon name="stop" :size="22" />
+            </button>
+          </div>
+
+          <!-- Track list -->
+          <div class="track-list-wrap">
+            <div v-if="loading" class="hint">불러오는 중…</div>
+            <div v-else-if="error" class="err">{{ error }}</div>
+            <ul v-else-if="items.length > 0" class="track-list">
+              <li
+                v-for="(item, idx) in items"
+                :key="item.slug"
+                class="track"
+                :class="{ playing: item.slug === playingSlug }"
+                @click="requestPlay(item)"
+              >
+                <div class="track-num">
+                  <Icon
+                    v-if="item.slug === playingSlug"
+                    name="stop"
+                    :size="14"
+                  />
+                  <span v-else>{{ String(idx + 1).padStart(2, '0') }}</span>
+                </div>
+                <div class="track-meta">
+                  <div class="track-name">{{ item.display_name }}</div>
+                  <div class="track-sub">
+                    <span v-if="item.duration_s">{{ item.duration_s.toFixed(1) }}초</span>
+                    <span v-if="item.has_song === false" class="warn">곡 없음</span>
+                  </div>
+                </div>
+                <div class="track-play-icon">
+                  <Icon :name="item.slug === playingSlug ? 'stop' : 'play'" :size="16" />
+                </div>
+              </li>
+            </ul>
+            <div v-else class="hint">
+              저장된 율동이 없어요.<br />
+              <small>'율동 등록' 모드에서 새 곡을 추가하세요.</small>
+            </div>
           </div>
         </div>
-      </Transition>
+      </section>
+
+      <!-- 시뮬레이션: 좌하단. 실물 팔로워 연결 시 숨김. -->
+      <section
+        v-if="!stateWs.realActive.value"
+        class="panel panel-bottom-left"
+        :class="{ minimized: simMinimized }"
+        role="dialog"
+        aria-label="시뮬레이션"
+      >
+        <header class="panel-head" @click="simMinimized = !simMinimized">
+          <Icon name="robot" :size="16" />
+          <span class="panel-title">시뮬레이션</span>
+          <button
+            type="button"
+            class="btn-min"
+            :aria-label="simMinimized ? '펼치기' : '최소화'"
+            @click.stop="simMinimized = !simMinimized"
+          >{{ simMinimized ? '+' : '–' }}</button>
+        </header>
+        <div v-show="!simMinimized" class="panel-body panel-body-sim">
+          <OpenarmViewer v-if="simEverOpened" source="follower" :external-snapshot="stream.currentSnapshot.value" />
+        </div>
+      </section>
 
       <Transition name="fade">
         <div v-if="pendingItem" class="confirm-overlay" @click.self="cancelPlay">
@@ -208,220 +297,243 @@ onUnmounted(() => {
 .popup-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  /* 로봇 얼굴이 또렷이 보이도록 dim/blur 제거. 클릭은 여전히 차단 (투명 + auto). */
+  background: transparent;
   z-index: 60;
 }
-.popup-card {
-  background: white;
-  width: 100dvw;
-  height: 100dvh;
+
+.close-fab {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.close-fab:hover { background: white; color: #1e293b; }
+
+/* --- 플로팅 패널 공통 --- */
+.panel {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.45);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  backdrop-filter: blur(6px);
 }
-.popup-head {
+.panel-top-left    { top: 18px;  left: 18px;  width: 360px; }
+.panel-top-right   { top: 18px;  right: 18px; width: 380px; max-height: calc(100dvh - 36px); }
+.panel-bottom-left { bottom: 18px; left: 18px; width: 360px; }
+
+.panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px 32px 16px;
-  background: linear-gradient(135deg, rgba(252, 231, 243, 0.9) 0%, rgba(253, 242, 248, 0.95) 100%);
-  border-bottom: 1px solid rgba(236, 72, 153, 0.12);
+  gap: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+  color: #9d174d;
+  cursor: pointer;
+  user-select: none;
 }
-.popup-head h2 {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 22px;
-  color: #be185d;
-  letter-spacing: -0.01em;
+.panel-title {
+  font-weight: 700;
+  font-size: 14px;
+  flex: 1;
 }
-.btn-close {
-  background: rgba(255, 255, 255, 0.7);
+.btn-min {
   border: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  font-size: 26px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #9d174d;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 16px;
   line-height: 1;
-  color: #94748b;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.btn-close:hover { background: white; color: #475569; }
+.btn-min:hover { background: white; }
+.panel.minimized .panel-body { display: none; }
 
-.popup-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr clamp(320px, 32vw, 480px);
-  gap: 0;
-  min-height: 0;
-}
-.viewer-pane {
-  position: relative;
-  background: #f8fafc;
+.panel-body {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-.viewer-pane :deep(canvas) {
-  display: block;
+.panel-body-camera { padding: 0; }
+.panel-body-camera :deep(.cam-panel) {
+  width: 100%;
+  border-radius: 0;
 }
-/* OpenarmViewer 가 viewer-pane 을 채우도록 */
-.viewer-pane > :first-child {
-  flex: 1;
-  min-height: 0;
+.panel-body-camera :deep(.cam-panel video) {
+  height: 220px;
 }
+.panel-body-sim { height: 280px; }
+.panel-body-sim :deep(.openarm-viewer-wrap) { border-radius: 0; }
 
-.emotion-pip {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 4;
-}
+/* --- 음악 플레이어 --- */
+.panel-music .panel-body { padding: 14px 14px 10px; gap: 12px; }
 
-.now-playing {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  background: rgba(255, 255, 255, 0.95);
+.np-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
   border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  backdrop-filter: blur(6px);
+  background: linear-gradient(135deg, #ec4899 0%, #f59e0b 100%);
+  color: white;
+  box-shadow: 0 12px 24px -10px rgba(236, 72, 153, 0.45);
 }
-.np-name {
+.np-card.idle {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #64748b;
+  box-shadow: none;
+}
+.np-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #334155;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.np-card.idle .np-art { background: rgba(100, 116, 139, 0.1); }
+
+.np-meta { flex: 1; min-width: 0; }
+.np-title {
+  font-weight: 800;
   font-size: 15px;
-}
-.np-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
 }
 .np-bar {
-  flex: 1;
-  height: 6px;
-  background: #fce7f3;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 999px;
   overflow: hidden;
 }
 .np-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ec4899, #f59e0b);
+  background: white;
   border-radius: 999px;
   transition: width 0.1s linear;
 }
 .np-time {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 11px;
+  opacity: 0.9;
+  margin-top: 4px;
   font-variant-numeric: tabular-nums;
-  min-width: 80px;
-  text-align: right;
 }
-.btn-stop {
-  align-self: flex-start;
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 6px 14px;
-  font-weight: 600;
-  font-size: 13px;
+.np-hint { font-size: 12px; opacity: 0.8; }
+.np-ctrl {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  transition: background 0.12s, transform 0.08s;
 }
-.btn-stop:hover { background: #fee2e2; }
+.np-ctrl:hover { background: rgba(255, 255, 255, 0.35); }
+.np-ctrl:active { transform: scale(0.95); }
 
-.list-pane {
-  background: white;
-  border-left: 1px solid #f1f5f9;
+.track-list-wrap {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 14px 12px;
+  max-height: 48vh;
 }
-.list {
+.track-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
-.item {
+.track {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
+  padding: 10px 8px;
+  border-radius: 10px;
   cursor: pointer;
-  background: #fdf2f8;
-  border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s, transform 0.05s;
+  transition: background 0.1s;
 }
-.item:hover {
-  background: #fce7f3;
-  border-color: #f9a8d4;
-}
-.item:active { transform: translateY(1px); }
-.item.playing {
-  background: #ec4899;
-  border-color: #be185d;
-}
-.item.playing .item-name,
-.item.playing .item-sub,
-.item.playing .item-icon {
-  color: white;
-}
-.item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(236, 72, 153, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #be185d;
+.track:hover { background: #fdf2f8; }
+.track.playing { background: #fce7f3; }
+.track-num {
+  width: 26px;
+  text-align: center;
+  font-size: 13px;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
-.item.playing .item-icon {
-  background: rgba(255, 255, 255, 0.25);
-}
-.item-meta { min-width: 0; flex: 1; }
-.item-name {
-  font-weight: 700;
-  font-size: 15px;
-  color: #334155;
+.track.playing .track-num { color: #ec4899; }
+.track-meta { flex: 1; min-width: 0; }
+.track-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.item-sub {
+.track.playing .track-name { color: #be185d; }
+.track-sub {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 11px;
   color: #94a3b8;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
-.item-sub .warn { color: #b45309; }
+.track-sub .warn { color: #b45309; }
+.track-play-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(236, 72, 153, 0.08);
+  color: #be185d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.track:hover .track-play-icon,
+.track.playing .track-play-icon { opacity: 1; }
+.track.playing .track-play-icon { background: #ec4899; color: white; }
+
 .hint {
   text-align: center;
   color: #94a3b8;
-  font-size: 14px;
-  padding: 28px 12px;
+  font-size: 13px;
+  padding: 24px 12px;
   line-height: 1.6;
 }
-.hint small { color: #cbd5e1; font-size: 12px; }
+.hint small { color: #cbd5e1; font-size: 11px; }
 .err {
   color: #b91c1c;
   background: #fef2f2;
@@ -430,25 +542,43 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-/* 모바일 / 좁은 화면 — 위·아래 2단으로 */
-@media (max-width: 720px) {
-  .popup-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+/* --- 태블릿: 패널 플로팅 유지하되 크기 축소 --- */
+@media (min-width: 801px) and (max-width: 1280px) {
+  .panel-top-left  { width: 210px; }
+  .panel-top-right { width: 220px; }
+  .panel-body-camera :deep(.cam-panel video) { height: 120px; }
+  .np-art { width: 44px; height: 44px; }
+  .np-title { font-size: 12px; }
+  .np-hint { font-size: 11px; }
+  .track-name { font-size: 12px; }
+  .track-sub { font-size: 10px; }
+  .panel-title { font-size: 12px; }
+  .track-list-wrap { max-height: 40vh; }
+}
+
+/* --- 좁은 화면: 패널을 위/중/아래로 쌓고 폭 조정 --- */
+@media (max-width: 800px), (pointer: coarse) {
+  .panel-top-left,
+  .panel-top-right,
+  .panel-bottom-left {
+    position: static;
+    width: calc(100vw - 24px);
+    margin: 0 auto;
   }
-  .list-pane {
-    border-left: none;
-    border-top: 1px solid #f1f5f9;
-    max-height: 40vh;
+  .popup-overlay {
+    padding: 60px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
   }
+  .panel-body-camera { height: 220px; }
+  .panel-body-sim { height: 240px; }
+  .track-list-wrap { max-height: 36vh; }
 }
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.18s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-.pop-enter-active { transition: opacity 0.22s ease, transform 0.22s cubic-bezier(.16,1,.3,1); }
-.pop-leave-active { transition: opacity 0.16s ease, transform 0.16s ease; }
-.pop-enter-from { opacity: 0; transform: scale(0.94) translateY(10px); }
-.pop-leave-to { opacity: 0; transform: scale(0.97); }
 
 .confirm-overlay {
   position: fixed;

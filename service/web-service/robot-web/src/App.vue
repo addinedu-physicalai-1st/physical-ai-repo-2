@@ -29,6 +29,7 @@ import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
 import FollowFaceAuth from '@/gogoping/FollowFaceAuth.vue';
 import HideAndSeekGame from '@/gogoping/HideAndSeekGame.vue';
+import FollowMode from '@/gogoping/FollowMode.vue';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
 import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
 
@@ -107,6 +108,14 @@ const showGogopingFollowAuth = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '추종'
 );
 
+// 인증 완료 여부를 별도 ref 로 관리 — FollowFaceAuth 내부 상태(succeeded)를 직접 알 수 없으므로
+// authenticated event 수신 시점에 App 레벨에서 마킹.
+const followAuthenticated = ref(false);
+
+const showGogopingFollowMode = computed(
+  () => robot.value.id === 'gogoping' && currentMode.value === '추종' && followAuthenticated.value
+);
+
 async function onFollowAuthenticated(payload: { name: string; teacher_id: string }): Promise<void> {
   voiceController.speak(`${payload.name} 선생님 확인 완료, 추종을 시작합니다.`);
   try {
@@ -129,9 +138,11 @@ async function onFollowAuthenticated(payload: { name: string; teacher_id: string
       /* 오프라인 — UI 는 진행, ROS 추종은 미동작 */
     }
   }
+  followAuthenticated.value = true;
 }
 
 async function onFollowAuthCancel(): Promise<void> {
+  followAuthenticated.value = false;
   try {
     await fetch('/api/gogoping/follow/stop', {
       method: 'POST',
@@ -151,6 +162,24 @@ async function onFollowAuthCancel(): Promise<void> {
   }
 }
 
+// FollowMode 내 정지 버튼 핸들러 — 로봇 정지 API 호출 후 모드를 대기로 복귀.
+async function onFollowStop(): Promise<void> {
+  try {
+    await fetch('/api/gogoping/follow/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Device-Token': DEVICE_TOKEN },
+      body: '{}',
+    });
+  } catch { /* 오프라인 — UI 는 진행 */ }
+  mode.setMode('대기');
+  try {
+    await postModeClick('대기', robot.value.id);
+  } catch {
+    /* 무시 */
+  }
+  followAuthenticated.value = false;
+}
+
 // 추종 → 다른 mode 전이 시 follow/stop 호출 (FollowFaceAuth cancel 경로와 중복돼도 backend idempotent).
 let _prevModeForFollow = currentMode.value;
 watch(currentMode, async (newMode) => {
@@ -162,6 +191,7 @@ watch(currentMode, async (newMode) => {
         body: '{}',
       });
     } catch { /* ignore */ }
+    followAuthenticated.value = false;
   }
   _prevModeForFollow = newMode;
 });
@@ -208,6 +238,11 @@ function handleStart(): void {
       @cancel="onFollowAuthCancel"
     />
     <HideAndSeekGame v-if="showGogopingHideAndSeek" />
+    <FollowMode
+      v-if="showGogopingFollowMode"
+      class="gogoping-follow-mode-layer"
+      @stop="onFollowStop"
+    />
     <Transition name="err-fade">
       <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}
@@ -294,6 +329,18 @@ function handleStart(): void {
     font-size: 11px;
     padding: 6px 12px;
   }
+}
+
+/* FollowFaceAuth PiP(z-index:50) 아래에 위치 — 인증 완료 후 메인 영역 전체를 차지 */
+.gogoping-follow-mode-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(15, 20, 18, 0.95);
+  padding: 40px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 가로 휴대전화: brand 는 dock 과 겹치므로 숨김, voice-err 는 좁은 화면용 사이즈 */

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 /**
  * 숨바꼭질 모집 단계.
- * 좌: GogoPing 라이브 카메라 (얼굴 매칭으로 자동 등록되는 모습 확인).
- * 우: 등록 어린이 명단 카드 (무궁화 entry 패턴 — 등록 시 핑크 체크, 미등록 회색 대기).
- *     카드 탭으로 수동 토글도 가능.
+ * 좌: GogoPing 라이브 카메라 + 얼굴 자동 등록 (face tracker 캐시).
+ * 우: 등록 어린이 명단 카드 — 카드 탭으로 수동 토글 가능.
  */
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import CameraView from '../CameraView.vue';
 import type { Participant } from '../useHideAndSeekState';
+import { useFaceDetector } from '@/composables/useFaceDetector';
+import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
+import { mapMatchesToTracks, postRecognizeMulti } from '@/composables/identifyTracksFromFrame';
 
 const props = defineProps<{
   participants: Participant[];
@@ -16,10 +19,85 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   toggle: [id: number];
+  register: [id: number];
   start: [];
 }>();
 
 const canStart = computed(() => props.registeredCount > 0);
+
+const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
+const STABLE_FRAMES_REQUIRED = 5;
+
+const cameraViewRef = ref<{ getImgEl: () => HTMLImageElement | null } | null>(null);
+const captureCanvasRef = ref<HTMLCanvasElement | null>(null);
+const cameraImgEl = computed(() => cameraViewRef.value?.getImgEl() ?? null);
+
+const tracker = useFaceTracker();
+let latestTracks: TrackedFace[] = [];
+
+const identityCache = useFaceIdentityCache({
+  stableFramesRequired: STABLE_FRAMES_REQUIRED,
+  identify: async (tracks): Promise<IdentityResult[]> => identifyTracks(tracks),
+});
+
+const detector = useFaceDetector({
+  onDetections: (faces) => {
+    latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
+    void identityCache.feed(latestTracks).then(applyBindings);
+  },
+});
+
+let rafId: number | null = null;
+
+async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
+  const canvas = captureCanvasRef.value;
+  if (!canvas) return [];
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85),
+  );
+  if (!blob) return [];
+  const matches = await postRecognizeMulti(blob, DEVICE_TOKEN);
+  return mapMatchesToTracks(tracks, matches).map((p) => p.result);
+}
+
+function applyBindings(): void {
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
+    const p = props.participants.find((x) => x.id === childId);
+    if (!p || p.registered) continue;
+    emit('register', childId);
+  }
+}
+
+async function loop(): Promise<void> {
+  const img = cameraImgEl.value;
+  const canvas = captureCanvasRef.value;
+  if (img && canvas && img.complete && img.naturalWidth > 0) {
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      try { await detector.send(canvas); } catch { /* noop */ }
+    }
+  }
+  rafId = requestAnimationFrame(() => { void loop(); });
+}
+
+onMounted(() => {
+  detector.start();
+  rafId = requestAnimationFrame(() => { void loop(); });
+});
+
+onBeforeUnmount(() => {
+  if (rafId !== null) cancelAnimationFrame(rafId);
+  rafId = null;
+  detector.close();
+  tracker.reset();
+  identityCache.reset();
+  latestTracks = [];
+});
 </script>
 
 <template>
@@ -31,7 +109,8 @@ const canStart = computed(() => props.registeredCount > 0);
 
     <div class="body">
       <div class="camera-wrap">
-        <CameraView />
+        <CameraView ref="cameraViewRef" />
+        <canvas ref="captureCanvasRef" hidden />
       </div>
 
       <ul class="roster">

@@ -65,6 +65,10 @@ export function useGogopingStateWs(): { stop: () => void } {
         if (snap.robot_id && snap.robot_id !== 'gogoping') return;
         const label = snapshotToModeLabel(snap);
         if (label && label !== mode.currentMode) {
+          // 추종 모드 진행 중인데 BT 가 아직 IDLE snapshot (ASSIST 진입 전) 이면
+          // mode 를 '대기' 로 강제 전이하지 않음 — 인증 모달이 사라지는 race 차단.
+          // 사용자 명시적 정지 / 다른 모드 선택은 별도 경로 (정지 버튼, 메뉴 click) 로 처리.
+          if (mode.currentMode === '추종' && label === '대기') return;
           mode.setMode(label);  // postModeClick 발동 안 함 — 무한루프 회피
         }
       } catch {

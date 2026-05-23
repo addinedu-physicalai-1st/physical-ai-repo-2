@@ -124,6 +124,7 @@ function restart(): void {
             :participants="state.participants"
             :registered-count="state.registeredCount"
             @toggle="onRecruitToggle"
+            @register="actions.registerParticipant"
             @start="onRecruitStart"
           />
           <MoveToPlayPhase

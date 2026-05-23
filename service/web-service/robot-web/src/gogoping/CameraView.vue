@@ -8,6 +8,9 @@ const injected = inject(VIDEO_STREAM_KEY, null);
 const stream = injected ?? useVideoStream('gogoping');
 const cameraPan = inject(CAMERA_PAN_KEY);
 
+const imgEl = ref<HTMLImageElement | null>(null);
+defineExpose({ getImgEl: (): HTMLImageElement | null => imgEl.value });
+
 function statusClass(s: StreamStatus): string {
   if (s === 'streaming') return 'ok';
   if (s === 'open') return 'warn';
@@ -50,7 +53,13 @@ onBeforeUnmount(() => { if (!injected) stream.stop(); });
     @pointerup="viewPointerUp"
     @pointercancel="viewPointerUp"
   >
-    <img v-if="stream.frameUrl.value" :src="stream.frameUrl.value" class="frame" alt="camera" />
+    <img
+      v-if="stream.frameUrl.value"
+      ref="imgEl"
+      :src="stream.frameUrl.value"
+      class="frame"
+      alt="camera"
+    />
     <div v-else class="placeholder">영상 대기 중…</div>
     <div class="status" :class="statusClass(stream.status.value)">●</div>
     <div v-if="cameraPan" class="angles">

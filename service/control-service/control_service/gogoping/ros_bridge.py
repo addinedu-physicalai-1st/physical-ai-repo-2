@@ -17,7 +17,6 @@ import math
 import os
 import threading
 import time
-from datetime import datetime, timezone
 from typing import Any, Callable
 
 from .mode_to_goal import Goal
@@ -100,6 +99,7 @@ class GogopingRosBridge:
         self._follow_target_pub: Any = None   # /gogoping/follow_target publisher
         self._tracking_state_sub: Any = None  # /gogoping/tracking_state subscriber
         self._last_tracking_state: dict | None = None
+        self._tracking_state_callbacks: list[Callable[[dict], None]] = []
         self._executor: Any = None
 
     # ----------------------------------------------------------- lifecycle
@@ -538,6 +538,24 @@ class GogopingRosBridge:
         with self._lock:
             return self._last_tracking_state
 
+    def register_tracking_state_callback(
+        self, cb: Callable[[dict], None],
+    ) -> Callable[[], None]:
+        """tracking_state dict 가 갱신될 때마다 호출되는 callback 등록.
+
+        반환된 unregister 함수를 호출하면 등록 해제. 일반적으로 WS handler 가
+        연결 시 register, 종료 시 unregister 한다.
+        """
+        with self._lock:
+            self._tracking_state_callbacks.append(cb)
+
+        def _unregister() -> None:
+            with self._lock:
+                if cb in self._tracking_state_callbacks:
+                    self._tracking_state_callbacks.remove(cb)
+
+        return _unregister
+
     def _on_tracking_state(self, msg: Any) -> None:
         """/gogoping/tracking_state 토픽 콜백."""
         distance = float(msg.distance_m)
@@ -556,10 +574,21 @@ class GogopingRosBridge:
             "track_id": int(msg.track_id) or None,
             "reid_sim": reid_sim if not math.isnan(reid_sim) else None,
             "teacher_id": msg.teacher_id or None,
-            "updated_at": datetime.fromtimestamp(msg.ts_ms / 1000.0, tz=timezone.utc),
+            # WS JSON 직렬화에 datetime 객체는 부담 — int ms 로 통일.
+            "updated_at_ms": int(msg.ts_ms),
         }
         with self._lock:
             self._last_tracking_state = state
+            callbacks = list(self._tracking_state_callbacks)
+        # lock 해제 후 invoke — callback 안에서 다시 bridge 호출 시 deadlock 회피
+        for cb in callbacks:
+            try:
+                cb(state)
+            except Exception as e:  # noqa: BLE001
+                try:
+                    self._node.get_logger().warning(f"tracking_state callback error: {e}")
+                except Exception:
+                    pass
 
 
 __all__ = [

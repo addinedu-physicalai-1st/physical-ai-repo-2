@@ -413,10 +413,28 @@ async def dance_stream_ws(websocket: WebSocket) -> None:
             logger.exception("background %s 실패", name)
 
     async def stream_dance(slug: str) -> None:
-        # play_routine 은 JointTrajectory publish + _playback_loop 시동 (즉시) +
-        # _send_real_follower_goals (action server 대기 최대 6s) 를 한꺼번에 함.
-        # background 로 던져서 WS frame streaming 즉시 시작.
-        asyncio.create_task(_bg("play_routine", bridge.play_routine, KIND_DANCE, slug, target="real"))
+        # 오디오-실물 팔 싱크 보정:
+        # play_routine 을 먼저 동기 실행해 action goal 을 보낸 뒤,
+        # 팔이 ramp_s 후 첫 키프레임에 도달하는 시점과
+        # 브라우저 오디오가 HEADER+250ms 후 t=0 을 재생하는 시점을 맞춘다.
+        # delay = max(0, ramp_s - 0.25)  ← 0.25 는 frontend WARMUP_S 와 동일해야 함.
+        _AUDIO_WARMUP_S = 0.25  # must match WARMUP_S in useDanceStream.ts
+        ramp_s = 0.0
+        try:
+            result = await asyncio.to_thread(
+                bridge.play_routine, KIND_DANCE, slug, target="real"
+            )
+            ramp_s = float(result.get("ramp_s", 0.0))
+        except (FileNotFoundError, ValueError, BridgeUnavailable) as e:
+            await websocket.send_text(json.dumps({"type": "error", "msg": str(e)}))
+            return
+        except Exception:  # noqa: BLE001
+            logger.exception("play_routine 실패 — stream 계속")
+
+        delay_s = max(0.0, ramp_s - _AUDIO_WARMUP_S)
+        if delay_s > 0:
+            await asyncio.sleep(delay_s)
+
         try:
             async for ftype, t_ms, payload in iter_dance_frames(bridge.routines_root, slug, realtime=True):
                 await websocket.send_bytes(bytes([ftype]) + t_ms.to_bytes(8, "big") + payload)

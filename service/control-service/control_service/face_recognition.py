@@ -77,3 +77,5 @@ def extract_embeddings_all(image_bytes: bytes) -> list[dict]:
         }
         for f in faces
     ]
+
+

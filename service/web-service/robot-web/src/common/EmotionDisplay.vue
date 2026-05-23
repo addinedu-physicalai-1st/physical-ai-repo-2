@@ -34,10 +34,6 @@ const showStatus = computed(() => state.value in statusLabel);
 const activeLabel = computed(() => statusLabel[state.value] ?? '');
 const activeColor = computed(() => statusColor[state.value] ?? '#fff');
 
-// 웨이크워드 대기 중일 때 로봇이 사용자에게 말 거는 형태의 말풍선
-const showWakePrompt = computed(
-  () => voiceMode.value === 'voice' && state.value === 'idle'
-);
 const wakePromptText = computed(
   () => `"${robot.value.wakeWord}" 을 부르고 명령해주세요`
 );
@@ -51,33 +47,20 @@ const liveUserText = computed(() => {
   return sttText.value.trim();
 });
 
-/** 큰 자막 버블: 사용자 음성 인식 글자(stt)는 넣지 않고 로봇 말만 보여 준다. */
-const visibleText = computed(() => {
+/** 말풍선 텍스트 — idle 음성 모드: 호출 안내. listening: '듣고 있어요'.
+ *  speaking/cooldown 동안 robotReply 가 있으면 그걸 표시 (TTS). */
+const bubbleText = computed(() => {
+  if (state.value === 'idle' && voiceMode.value === 'voice') {
+    return wakePromptText.value;
+  }
   const reply = robotReply.value.trim();
+  if (reply) return reply;
   if (state.value === 'listening' || state.value === 'wake_detected') {
-    if (reply) {
-      return robotReply.value;
-    }
     return '듣고 있어요…';
-  }
-  if (state.value === 'dispatching') {
-    return '';
-  }
-  if (state.value === 'speaking' || state.value === 'cooldown') {
-    return robotReply.value;
   }
   return '';
 });
-
-/** `state` 를 Transition key 로 쓰면 speaking→cooldown→idle 마다 자막이 다시 팝업한다 — 문장 단위로만 전환. */
-const subtitleTransitionKey = computed(() => {
-  const r = robotReply.value.trim();
-  if (r) return r;
-  if (state.value === 'listening' || state.value === 'wake_detected') {
-    return '__listening_hint__';
-  }
-  return visibleText.value || '__empty__';
-});
+const showBubble = computed(() => !!bubbleText.value);
 </script>
 
 <template>
@@ -89,8 +72,8 @@ const subtitleTransitionKey = computed(() => {
         :style="{ '--accent': accent }"
       >
         <Transition name="bubble-pop">
-          <div v-if="showWakePrompt" class="wake-bubble" role="status">
-            {{ wakePromptText }}
+          <div v-if="showBubble" class="wake-bubble" role="status">
+            {{ bubbleText }}
           </div>
         </Transition>
         <span class="notch">
@@ -126,16 +109,6 @@ const subtitleTransitionKey = computed(() => {
         </div>
       </div>
 
-      <!-- Premium Subtitle Overlay (Moved Outside for Clarity) -->
-      <div class="subtitle-container" v-if="visibleText">
-        <Transition name="subtitle-fade">
-          <div :key="subtitleTransitionKey" class="subtitle-text">
-            <span :class="`${state}-text`">
-              {{ visibleText }}
-            </span>
-          </div>
-        </Transition>
-      </div>
       <div class="user-subtitle-container" v-if="liveUserText">
         <Transition name="subtitle-fade">
           <div :key="`user-${liveUserText}`" class="user-subtitle-text">
@@ -154,7 +127,7 @@ const subtitleTransitionKey = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-bottom: 14vh;
+  padding-bottom: 4vh;
 }
 
 /* 세로 휴대전화: hamburger(우상단) + 하단 BottomDock 만 — pill strip 제거됨 */
@@ -214,7 +187,7 @@ const subtitleTransitionKey = computed(() => {
   top: -28px;
   left: -16px;
   transform: translateY(-100%);
-  max-width: 320px;
+  max-width: 480px;
   padding: 14px 22px;
   background: #ffffff;
   color: #2a3441;
@@ -224,7 +197,6 @@ const subtitleTransitionKey = computed(() => {
   border-radius: 22px;
   border: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
-  white-space: nowrap;
   z-index: 3;
   animation: bubble-bob 3.2s ease-in-out infinite;
 }
@@ -423,13 +395,6 @@ const subtitleTransitionKey = computed(() => {
   width: 100%;
 }
 
-/* --- PREMIUM SUBTITLES --- */
-.subtitle-container {
-  width: min(75vw, 600px);
-  z-index: 10;
-  pointer-events: none;
-}
-
 .user-subtitle-container {
   width: min(68vw, 520px);
   margin-top: -18px;
@@ -452,14 +417,6 @@ const subtitleTransitionKey = computed(() => {
   }
   .actor-wrapper {
     gap: 18px;
-  }
-  .subtitle-container {
-    width: min(92vw, 600px);
-  }
-  .subtitle-text {
-    font-size: 1.05rem;
-    padding: 12px 18px;
-    border-radius: 18px;
   }
   .user-subtitle-container {
     width: min(88vw, 520px);
@@ -506,32 +463,15 @@ const subtitleTransitionKey = computed(() => {
     display: none;
   }
 
-  /* 자막을 상단 overlay 로 빼서 BottomDock 가림 방지.
-     hamburger (44px + 우측 margin 10px) 만 피하면 됨. */
-  .subtitle-container {
+  /* 사용자 STT 자막 — hamburger (44px + 우측 margin 10px) 만 피하면 됨. */
+  .user-subtitle-container {
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 44px);
     left: 6px;
     right: 66px;
     width: auto;
-    z-index: 25;
-  }
-  .user-subtitle-container {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 82px);
-    left: 6px;
-    right: 66px;
-    width: auto;
     margin-top: 0;
     z-index: 24;
-  }
-  .subtitle-text {
-    font-size: 0.95rem;
-    font-weight: 800;
-    padding: 7px 13px;
-    border-radius: 12px;
-    background: rgba(10, 13, 20, 0.92);
-    border-color: rgba(255, 255, 255, 0.2);
   }
   .user-subtitle-text {
     font-size: 0.78rem;
@@ -543,27 +483,6 @@ const subtitleTransitionKey = computed(() => {
     padding: 2px 8px 2px 6px;
   }
   .status-label { font-size: 9px; }
-
-  /* actor-wrapper 의 subtitle-container 자식들이 모두 fixed 가 됐으므로 wrapper 의
-     gap 영향 없음. face 가 단독으로 중앙에 자리잡음. */
-}
-
-.subtitle-text {
-  background: rgba(10, 13, 20, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
-  padding: 16px 32px;
-  color: white;
-  text-align: center;
-  font-size: 1.35rem;
-  font-weight: 700;
-  line-height: 1.45;
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(0, 0, 0, 0.1);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .user-subtitle-text {
@@ -584,20 +503,6 @@ const subtitleTransitionKey = computed(() => {
 .user-listening-text {
   color: #d9f99d;
   opacity: 0.95;
-}
-
-.listening-text {
-  color: #a3e635; /* Neon lime */
-  opacity: 0.9;
-}
-
-.thinking-text {
-  color: #60a5fa; /* Soft blue */
-}
-
-.speaking-text {
-  color: white;
-  font-size: 1.3rem;
 }
 
 /* Animations */

@@ -54,10 +54,41 @@ export function useDanceStream(): UseDanceStream {
 
   let ws: WebSocket | null = null;
   let audioCtx: AudioContext | null = null;
+  // streamEpoch: motion·elapsed timeline 의 render-clock 기준점. 이 시각에 "audio t=0 이
+  //   들린다" 고 가정. 모션 buffer 와 visual elapsed 가 이걸 따라감.
+  // audioEpoch:  src.start() 에 넘기는 render-clock 시각. streamEpoch 보다 outputLatency
+  //   만큼 일찍. spec 상 src.start(T) 로 render 한 샘플은 T + outputLatency 에 speaker
+  //   에 도달하므로, 결과적으로 speaker reach time = streamEpoch 로 맞춰짐.
   let streamEpoch = 0;
+  let audioEpoch = 0;
   let header: StreamHeader | null = null;
   let elapsedTimer: number | null = null;
   let endCallback: (() => void) | null = null;
+
+  // 모션 프레임을 오디오와 동일한 streamEpoch 기준으로 적용하기 위한 버퍼.
+  // 수신 즉시 적용하면 오디오보다 WARMUP_S 만큼 앞서 움직임 → 버퍼에 넣고 rAF 루프가 꺼냄.
+  interface MotionEntry { tMs: number; positions: Float32Array }
+  const motionQueue: MotionEntry[] = [];
+  let motionRafId: number | null = null;
+
+  function driveMotion(): void {
+    if (audioCtx && streamEpoch > 0 && header) {
+      const now = audioCtx.currentTime;
+      while (motionQueue.length > 0 && streamEpoch + motionQueue[0].tMs / 1000 <= now) {
+        const entry = motionQueue.shift()!;
+        currentSnapshot.value = {
+          jointNames: header.joint_names,
+          positions: entry.positions,
+          tMs: entry.tMs,
+        };
+      }
+    }
+    if (isPlaying.value || motionQueue.length > 0) {
+      motionRafId = requestAnimationFrame(driveMotion);
+    } else {
+      motionRafId = null;
+    }
+  }
 
   function url(): string {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -69,7 +100,13 @@ export function useDanceStream(): UseDanceStream {
       window.clearInterval(elapsedTimer);
       elapsedTimer = null;
     }
+    if (motionRafId !== null) {
+      cancelAnimationFrame(motionRafId);
+      motionRafId = null;
+    }
+    motionQueue.length = 0;
     streamEpoch = 0;
+    audioEpoch = 0;
     header = null;
   }
 
@@ -92,7 +129,7 @@ export function useDanceStream(): UseDanceStream {
     const src = audioCtx.createBufferSource();
     src.buffer = audioBuf;
     src.connect(audioCtx.destination);
-    src.start(Math.max(audioCtx.currentTime, streamEpoch + tMs / 1000));
+    src.start(Math.max(audioCtx.currentTime, audioEpoch + tMs / 1000));
   }
 
   function handleBinary(buf: ArrayBuffer): void {
@@ -107,23 +144,31 @@ export function useDanceStream(): UseDanceStream {
             (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         }
         streamEpoch = audioCtx.currentTime + WARMUP_S;
+        // outputLatency: 시스템·드라이버가 보고하는 render → speaker 지연 (수십~수백 ms).
+        // 미지원 브라우저는 0 또는 undefined → baseLatency 로 fallback, 그것도 없으면 0.
+        // 이 값만큼 audio 스케줄을 앞당겨야 streamEpoch 시각에 실제 소리가 나옴.
+        const audioLatency =
+          (typeof audioCtx.outputLatency === 'number' && audioCtx.outputLatency > 0
+            ? audioCtx.outputLatency
+            : audioCtx.baseLatency) || 0;
+        audioEpoch = streamEpoch - audioLatency;
         isPlaying.value = true;
         elapsedMs.value = 0;
+        motionQueue.length = 0;
         if (elapsedTimer !== null) window.clearInterval(elapsedTimer);
         const startedAt = performance.now() + WARMUP_S * 1000;
         elapsedTimer = window.setInterval(() => {
           const e = performance.now() - startedAt;
           elapsedMs.value = Math.max(0, Math.min(durationMs.value, e));
         }, 80);
+        // 모션 드라이버 시작 — 버퍼에 쌓인 프레임을 오디오 타임라인에 맞춰 소비.
+        if (motionRafId !== null) cancelAnimationFrame(motionRafId);
+        motionRafId = requestAnimationFrame(driveMotion);
         break;
       }
       case FRAME_TYPE_MOTION:
         if (header) {
-          currentSnapshot.value = {
-            jointNames: header.joint_names,
-            positions: frame.positions,
-            tMs: frame.tMs,
-          };
+          motionQueue.push({ tMs: frame.tMs, positions: frame.positions });
         }
         break;
       case FRAME_TYPE_AUDIO:
