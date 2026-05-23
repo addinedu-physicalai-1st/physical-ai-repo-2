@@ -29,45 +29,8 @@ import { useVoiceStore } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
 import type { IntentResponse } from './useIntentDispatch';
 
-// ONNX wake 분류기 점수 임계값 — cycle 6 evaluate.py 측정값.
-const WAKE_THRESHOLDS: Record<string, number> = {
-  eduping: 0.99,
-  gogoping: 0.99,
-  noriarm: 0.99,
-};
-
-// 기본값 = v2 (livekit-wakeword 학습 결과, `*_v2.onnx`). 이전 cycle-6 Korean 모델로
-// 돌리려면 `?wake=v1`. `?th=` 로 threshold override, `?nogate=1` 로 RMS+VAD 우회,
-// `?debug=1` 로 매 inference score 를 console.log (v2 default 일 땐 자동 on).
-function readWakeVariant(): {
-  variant: string | undefined;
-  threshold: number;
-  bypassGate: boolean;
-  debug: boolean;
-} {
-  if (typeof window === 'undefined') {
-    return { variant: 'v2', threshold: 0.6, bypassGate: false, debug: true };
-  }
-  const q = new URLSearchParams(window.location.search);
-  // 명시적 `?wake=v1` 또는 `?wake=cycle6` → undefined (기존 cycle-6 분류기 사용).
-  // 그 외 (값 없음 / `?wake=v2` / 다른 모든 값) → v2.
-  const raw = q.get('wake');
-  let variant: string | undefined;
-  if (raw === 'v1' || raw === 'cycle6' || raw === 'old') {
-    variant = undefined;
-  } else {
-    variant = raw || 'v2';
-  }
-  const thStr = q.get('th');
-  const parsedTh = thStr ? Number(thStr) : Number.NaN;
-  const defaultTh = variant === 'v2' ? 0.6 : 0.99;
-  const threshold = Number.isFinite(parsedTh) && parsedTh > 0 && parsedTh < 1
-    ? parsedTh
-    : defaultTh;
-  const bypassGate = q.get('nogate') === '1';
-  const debug = q.get('debug') === '1' || variant === 'v2';
-  return { variant, threshold, bypassGate, debug };
-}
+// livekit-wakeword Piper 학습 분류기 점수 임계값 — 모든 robot 공통.
+const WAKE_THRESHOLD = 0.6;
 
 // 호출어 사이클 효과음 — listening 시작/종료 신호. Ubuntu Yaru sound theme
 // (bell.oga / complete.oga, CC-BY-SA-4.0) 를 mp3 로 변환해 번들.
@@ -192,24 +155,9 @@ export function useVoiceController(robot: RobotConfig): {
     armListeningTimer();
   }
 
-  const wakeCfg = readWakeVariant();
-  if (wakeCfg.variant || wakeCfg.bypassGate || wakeCfg.debug) {
-    console.log(
-      `[wake] variant='${wakeCfg.variant ?? 'default'}' threshold=${wakeCfg.threshold}` +
-      ` bypassGate=${wakeCfg.bypassGate} debug=${wakeCfg.debug}`,
-    );
-  }
-  // 1초당 ~4 inference 까지만 score log — 콘솔 폭주 방지.
-  let lastScoreLogAt = 0;
   const wakeWord = useWakeWord({
     robotIds: [robot.id],
-    thresholds: {
-      [robot.id]: wakeCfg.variant
-        ? wakeCfg.threshold
-        : (WAKE_THRESHOLDS[robot.id] ?? 0.99),
-    },
-    modelVariant: wakeCfg.variant,
-    bypassGate: wakeCfg.bypassGate,
+    thresholds: { [robot.id]: WAKE_THRESHOLD },
     cooldownMs: 2500,
     // PC connected + (idle OR speaking) 일 때 추론. speaking 도중 허용해서 mid-TTS
     // barge-in 가능. listening/dispatching/wake_detected/cooldown 동안은 skip.
@@ -219,21 +167,11 @@ export function useVoiceController(robot: RobotConfig): {
     onWake: () => {
       try { onWakeDetected(); } catch (e) { voice.setError((e as Error).message); }
     },
-    onScore: (LOG_VOICE_DEBUG || wakeCfg.debug)
-      ? (s) => {
-          const now = performance.now();
-          if (now - lastScoreLogAt < 250) return;
-          lastScoreLogAt = now;
-          console.log('[wake]', s);
-        }
-      : undefined,
+    onScore: LOG_VOICE_DEBUG ? (s) => console.log('[wake]', s) : undefined,
     onError: (m) => voice.setError(`wake: ${m}`),
   });
 
   function handleDcMessage(msg: DcMsg): void {
-    if (wakeCfg.debug && (msg.type === 'stt_final' || msg.type === 'intent')) {
-      console.log(`[voice] ${msg.type}`, msg);
-    }
     switch (msg.type) {
       case 'stt_final':
         onSttFinal(String(msg.text ?? ''));
