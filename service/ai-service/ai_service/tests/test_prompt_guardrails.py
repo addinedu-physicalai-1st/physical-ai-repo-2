@@ -2,7 +2,7 @@
 
 import pytest
 
-from ai_service.prompts import chat_system
+from ai_service.prompts import chat_system, display_name
 
 
 @pytest.mark.parametrize("robot", ["eduping", "gogoping", "noriarm"])
@@ -12,4 +12,4 @@ def test_chat_system_includes_shared_child_safe_block(robot: str) -> None:
     assert "유치원 친구" in out and "반복하지 말고" in out
     assert "무의미·말장난" in out
     assert "우주·별" in out
-    assert "선생님께 여쭤보는 게 좋을 것 같아요" in out
+    assert f"{display_name(robot)}은 잘 모르겠어요." in out

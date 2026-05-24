@@ -2,4 +2,4 @@
 
 
 def teacher_idk_line(display_name: str) -> str:
-    return f"{display_name}은 잘 모르겠어요. 선생님께 여쭤보는 게 좋을 것 같아요."
+    return f"{display_name}은 잘 모르겠어요."
