@@ -667,30 +667,38 @@ class MapView(QWidget):
                 qp.setPen(QPen(QColor(border_color), border_width))
                 qp.setBrush(QBrush(QColor(fill_color)))
                 qp.drawEllipse(p, r, r)
-                # patrol overlay: 동그라미 안에 번호 (1-based) 또는 X
-                if p_idx is not None:
-                    overlay_fsize = max(7, int(round(8 * z)))
+                # patrol overlay — 동그라미 안에는 visited 시 ✕ 만. 번호는 라벨박스 prefix.
+                if p_is_visited:
+                    overlay_fsize = max(8, int(round(9 * z)))
                     qp.setFont(QFont("", overlay_fsize, QFont.Bold))
                     overlay_rect = QRectF(p.x() - r, p.y() - r, 2 * r, 2 * r)
-                    if p_is_visited:
-                        qp.setPen(QColor("#1A1A1A"))
-                        qp.drawText(overlay_rect, Qt.AlignCenter, "✕")
-                    else:
-                        # 진행 중 vertex 는 검은 굵은 숫자, 대기는 진한 보라
-                        qp.setPen(QColor("#1A1A1A") if p_is_now else QColor("#3A1A6B"))
-                        qp.drawText(overlay_rect, Qt.AlignCenter, str(p_idx + 1))
-                # 라벨: z 가 이미 sqrt(zoom) 이므로 그대로 사용 (인접 충돌 완화)
+                    qp.setPen(QColor("#1A1A1A"))
+                    qp.drawText(overlay_rect, Qt.AlignCenter, "✕")
+                # 라벨: 번호 prefix (patrol 대상 + 미방문) — 잘리지 않게 박스 안에.
+                label_text = w["name"]
+                if p_idx is not None and not p_is_visited:
+                    label_text = f"#{p_idx + 1} {w['name']}"
                 fsize = max(7, int(round(7 * z)))
                 qp.setFont(QFont("", fsize, QFont.Bold))
                 fm = qp.fontMetrics()
-                tw = fm.horizontalAdvance(w["name"]) + 6
+                tw = fm.horizontalAdvance(label_text) + 6
                 th = fm.height() + 2
                 lbl = QRectF(p.x() - tw / 2, p.y() + r + 2, tw, th)
                 qp.setPen(Qt.NoPen)
-                qp.setBrush(QBrush(QColor(255, 255, 255, 210)))
+                # 진행 중 vertex 라벨 박스 강조 (옅은 노랑 배경)
+                if p_is_now:
+                    qp.setBrush(QBrush(QColor(255, 230, 150, 230)))
+                else:
+                    qp.setBrush(QBrush(QColor(255, 255, 255, 210)))
                 qp.drawRoundedRect(lbl, 3, 3)
-                qp.setPen(QColor("#1A1A1A"))
-                qp.drawText(lbl, Qt.AlignCenter, w["name"])
+                # 텍스트 색 — 진행 중은 진한 주황, 대기는 진한 보라, 기본은 검은
+                if p_is_now:
+                    qp.setPen(QColor("#7A3A00"))
+                elif p_idx is not None:
+                    qp.setPen(QColor("#3A1A6B"))
+                else:
+                    qp.setPen(QColor("#1A1A1A"))
+                qp.drawText(lbl, Qt.AlignCenter, label_text)
         # 로봇 마커
         if self._robot is not None:
             p = self._map_to_widget(self._robot["x"], self._robot["y"])
@@ -1182,7 +1190,12 @@ class WaypointMapCard(QFrame):
             idx = int(idx)
         except (TypeError, ValueError):
             idx = -1
-        self._map.set_patrol(list(verts), idx)
+        verts_list = list(verts)
+        # 완료 (idx >= N) 또는 idle (idx < 0) → overlay 해제, 원래 상태로 복원
+        if idx < 0 or idx >= len(verts_list):
+            self._map.set_patrol(None, -1)
+            return
+        self._map.set_patrol(verts_list, idx)
 
     def _refresh_list(self) -> None:
         import httpx

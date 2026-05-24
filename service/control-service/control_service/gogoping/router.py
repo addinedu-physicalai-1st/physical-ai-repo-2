@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -130,10 +131,9 @@ class IdleTimeoutResponse(BaseModel):
 
 
 class PatrolRequest(BaseModel):
-    """admin UI [순찰] 버튼이 POST 하는 payload.
+    """admin UI [순찰] 버튼이 POST 하는 payload — 현재 옵션 없음.
 
-    현재는 별도 옵션 없음 — group 필드가 채워진 모든 vertex 를 robot 의 현재
-    위치에서 nearest-neighbor 순서로 순회한다.
+    모든 group 카테고리를 랜덤 순서로 순회 (그룹 내는 robot 위치 NN 정렬).
     """
     pass
 
@@ -141,12 +141,13 @@ class PatrolRequest(BaseModel):
 class PatrolResponse(BaseModel):
     accepted: bool
     reason: str = ""
-    # nearest-neighbor 정렬된 vertex 이름 리스트 (echo)
+    # 셔플된 그룹 순서 (echo)
+    group_order: list[str] = []
+    # 정렬된 vertex 리스트 (echo, 그룹 순서 + 그룹 내 NN)
     vertices: list[str] = []
     # 사용된 시작 좌표 — robot pose 못 받으면 첫 vertex 의 좌표
     start_x: float = 0.0
     start_y: float = 0.0
-    # robot pose 가 실제로 사용됐는지 (False 면 fallback)
     used_robot_pose: bool = False
 
 
@@ -279,17 +280,26 @@ def install(
 
     @router.post("/debug/patrol", response_model=PatrolResponse)
     async def trigger_patrol(req: PatrolRequest) -> PatrolResponse:
-        """[디버그] group 필드 있는 모든 vertex 를 nearest-neighbor 순서로 순찰.
+        """[디버그] 모든 그룹을 랜덤 순서로 순회 — 그룹 내는 robot 위치 NN 정렬.
 
-        - waypoints.yaml 의 ``group`` 채워진 vertex 만 후보 (복도/충전소 등 제외)
-        - robot 의 현재 위치 (``/gogoping/state`` 의 ``robot_pose``) 에서 가장 가까운
-          후보부터 시작 → 거기서 가장 가까운 미방문 → 반복 (그리디 NN traversal)
-        - robot pose 못 받으면 첫 후보의 좌표를 시작점으로 fallback
+        - waypoints.yaml 의 ``group`` 채워진 vertex 만 후보 (group=None 제외)
+        - 그룹 리스트 ``random.shuffle`` → 그 순서대로 순회
+        - 첫 그룹: ``/gogoping/state`` 의 ``robot_pose`` 에서 NN 시작 (없으면 그룹 첫 vertex)
+        - 다음 그룹들: 이전 그룹의 마지막 vertex 좌표에서 NN 시작
+        - 결과: 모든 group vertex 가 하나의 search_waypoints 리스트에 들어감
         """
         wps, _ = await asyncio.to_thread(yaml_store.load)
-        candidates = [(w.name, float(w.x), float(w.y)) for w in wps if w.group]
-        if not candidates:
+        groups: dict[str, list[tuple[str, float, float]]] = {}
+        for w in wps:
+            if w.group:
+                groups.setdefault(w.group, []).append(
+                    (w.name, float(w.x), float(w.y))
+                )
+        if not groups:
             return PatrolResponse(accepted=False, reason="no_grouped_vertices")
+
+        group_order = list(groups.keys())
+        random.shuffle(group_order)
 
         latest = bridge.get_latest_state() or {}
         pose = latest.get("robot_pose") if isinstance(latest, dict) else None
@@ -299,20 +309,22 @@ def install(
             cur_x, cur_y = float(pose["x"]), float(pose["y"])
             used_robot_pose = True
         else:
-            cur_x, cur_y = candidates[0][1], candidates[0][2]
+            first_grp = groups[group_order[0]]
+            cur_x, cur_y = first_grp[0][1], first_grp[0][2]
             used_robot_pose = False
         start_x, start_y = cur_x, cur_y
 
-        remaining = list(candidates)
         ordered: list[str] = []
-        while remaining:
-            best = min(
-                remaining,
-                key=lambda w: (w[1] - cur_x) ** 2 + (w[2] - cur_y) ** 2,
-            )
-            ordered.append(best[0])
-            cur_x, cur_y = best[1], best[2]
-            remaining.remove(best)
+        for grp_name in group_order:
+            remaining = list(groups[grp_name])
+            while remaining:
+                best = min(
+                    remaining,
+                    key=lambda w: (w[1] - cur_x) ** 2 + (w[2] - cur_y) ** 2,
+                )
+                ordered.append(best[0])
+                cur_x, cur_y = best[1], best[2]
+                remaining.remove(best)
 
         goal = Goal(
             mode="PLAY", task="hideseek",
@@ -322,10 +334,12 @@ def install(
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
             logger.warning(
-                f"Patrol SetGoal 거부: vertices={ordered!r} reason={reason!r}"
+                f"Patrol SetGoal 거부: group_order={group_order!r} "
+                f"vertices={ordered!r} reason={reason!r}"
             )
         return PatrolResponse(
             accepted=accepted, reason=reason,
+            group_order=group_order,
             vertices=ordered,
             start_x=start_x, start_y=start_y,
             used_robot_pose=used_robot_pose,
