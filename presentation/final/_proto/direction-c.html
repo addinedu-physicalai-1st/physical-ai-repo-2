@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C · Dark Product Keynote — pingdergarten</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+
+  <style>
+    :root{
+      --bg:#16120F; --bg2:#1F1813; --line:rgba(255,225,210,.10);
+      --white:#F6EEE8; --muted:#B6A89E; --faint:#7C7068;
+      --pink:#FF9FB6; --mint:#84E6CD; --lav:#C6ADF2; --butter:#FFD98A; --sky:#9AC8FF;
+      --glassBorder:rgba(255,235,225,.14);
+    }
+    html,body{background:var(--bg);}
+    /* reveal.js paints .reveal-viewport on top of body — force it dark */
+    .reveal-viewport,html.reveal-viewport{background:var(--bg)!important;}
+    .reveal{font-family:'Pretendard Variable',system-ui,sans-serif;color:var(--white);}
+    .reveal h1,.reveal h2,.reveal h3{font-family:'Jua','Pretendard Variable',sans-serif;font-weight:400;line-height:1.05;letter-spacing:-.01em;margin:0;}
+    .reveal .slides{text-align:left;}
+    .reveal section{background:transparent;}
+
+    .bg-deco{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;}
+    .orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.32;}
+    .grid{position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(ellipse 75% 75% at 50% 45%,#000 40%,transparent 100%);}
+
+    .stage{position:relative;z-index:1;height:720px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;}
+    .pad{padding:0 86px;}
+
+    .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:'Jua';font-size:14.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);}
+    .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--pink);box-shadow:0 0 14px 2px var(--pink);}
+
+    .glass{background:linear-gradient(150deg,rgba(255,248,243,.07),rgba(255,248,243,.025));border:1px solid var(--glassBorder);border-radius:22px;backdrop-filter:blur(8px);padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.07);}
+
+    .chip{display:inline-flex;align-items:center;gap:8px;font-family:'Jua';font-size:15px;padding:9px 17px;border-radius:999px;color:var(--white);background:rgba(255,159,182,.13);border:1px solid rgba(255,159,182,.3);}
+    .chip.mint{background:rgba(132,230,205,.12);border-color:rgba(132,230,205,.3);}
+    .chip.butter{background:rgba(255,217,138,.12);border-color:rgba(255,217,138,.3);}
+    .material-icons-round{font-family:'Material Icons Round';line-height:1;vertical-align:middle;}
+    .glow-pink{text-shadow:0 0 26px rgba(255,159,182,.55);}
+
+    .r{opacity:0;transform:translateY(18px) scale(.99);transition:opacity .6s ease,transform .6s cubic-bezier(.22,.7,.3,1);}
+    .reveal section.go .r{opacity:1;transform:none;}
+    .go .r{transition-delay:calc(var(--i,0)*75ms);}
+    @keyframes pulse{0%,100%{opacity:.32}50%{opacity:.5}}
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- ===== 1 · TITLE ===== -->
+  <section data-transition="fade">
+    <div class="bg-deco">
+      <div class="grid"></div>
+      <div class="orb" style="width:520px;height:520px;background:#FF9FB6;top:-160px;left:-120px;animation:pulse 6s ease-in-out infinite;"></div>
+      <div class="orb" style="width:460px;height:460px;background:#84E6CD;bottom:-180px;right:-100px;animation:pulse 7s ease-in-out infinite;"></div>
+      <div class="orb" style="width:300px;height:300px;background:#C6ADF2;top:120px;right:180px;opacity:.22;"></div>
+    </div>
+    <div class="stage" style="align-items:center;text-align:center;">
+      <p class="eyebrow r" style="--i:0;"><span class="dot"></span>ADDINEDU · VLA 최종 프로젝트</p>
+      <h1 class="r glow-pink" style="--i:2;font-size:128px;color:var(--white);margin-top:24px;">
+        <span style="color:var(--pink)">ping</span><span style="color:var(--lav)">der</span><span style="color:var(--mint)">garten</span>
+      </h1>
+      <p class="r" style="--i:3;font-family:'Jua';font-size:30px;color:var(--white);margin-top:18px;">교실에 활기를, 선생님께 여유를</p>
+      <div class="r" style="--i:4;display:flex;gap:12px;margin-top:42px;">
+        <span class="chip">사랑의 에듀핑</span><span class="chip mint">팀원 6명</span><span class="chip butter">2026.04.23 — 06.04</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2 · STATS ===== -->
+  <section data-transition="fade">
+    <div class="bg-deco"><div class="grid"></div>
+      <div class="orb" style="width:360px;height:360px;background:#FF9FB6;top:-140px;right:-80px;opacity:.2;"></div>
+    </div>
+    <div class="stage pad">
+      <p class="eyebrow r" style="--i:0;"><span class="dot"></span>PROLOGUE</p>
+      <h2 class="r" style="--i:0;font-size:54px;color:var(--white);margin:14px 0 30px;">유치원의 <span style="color:var(--pink)">현실</span></h2>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px;">
+        <div class="glass r" style="--i:1;text-align:center;">
+          <p style="font-family:'Jua';color:var(--pink);font-size:15px;letter-spacing:.1em;">교사 1명당 아동</p>
+          <div style="font-family:'Jua';font-size:76px;color:var(--pink);line-height:1.05;text-shadow:0 0 30px rgba(255,159,182,.5);">15<span style="font-size:.4em;color:var(--muted)">명</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:120px;margin:10px auto 0;justify-content:center;">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--pink);box-shadow:0 0 6px var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--pink)"></span>
+          </div>
+          <p style="color:var(--muted);font-size:14px;margin-top:12px;">만 3세반 법정 기준<br>(2005년 이후 동결)</p>
+        </div>
+
+        <div class="glass r" style="--i:2;text-align:center;">
+          <p style="font-family:'Jua';color:var(--lav);font-size:15px;letter-spacing:.1em;">하루 평균 근로</p>
+          <div style="font-family:'Jua';font-size:60px;color:var(--lav);line-height:1.05;text-shadow:0 0 30px rgba(198,173,242,.45);">8<span style="font-size:.45em;color:var(--muted)">시간</span>52<span style="font-size:.45em;color:var(--muted)">분</span></div>
+          <svg viewBox="0 0 150 56" style="width:170px;margin:14px auto 0;display:block;">
+            <line x1="30" y1="42" x2="120" y2="18" stroke="var(--lav)" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="30" cy="42" r="5" fill="var(--lav)"/><circle cx="120" cy="18" r="5" fill="var(--lav)"/>
+            <text x="30" y="54" font-size="9" fill="var(--muted)" text-anchor="middle" font-family="Jua">8:22</text>
+            <text x="120" y="12" font-size="9" fill="var(--lav)" text-anchor="middle" font-family="Jua">+30분</text>
+          </svg>
+          <p style="color:var(--muted);font-size:14px;margin-top:8px;">2018 → 2021, 3년 새 30분↑</p>
+        </div>
+
+        <div class="glass r" style="--i:3;text-align:center;">
+          <p style="font-family:'Jua';color:var(--mint);font-size:15px;letter-spacing:.1em;">전직 의향</p>
+          <div style="position:relative;width:118px;height:118px;margin:10px auto 0;">
+            <svg viewBox="0 0 80 80" style="width:118px;height:118px;">
+              <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(132,230,205,.18)" stroke-width="11"/>
+              <circle cx="40" cy="40" r="32" fill="none" stroke="var(--mint)" stroke-width="11" stroke-linecap="round" stroke-dasharray="24.3 176.8" transform="rotate(-90 40 40)" style="filter:drop-shadow(0 0 5px rgba(132,230,205,.6))"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Jua';font-size:30px;color:var(--mint);">12.1%</div>
+          </div>
+          <p style="color:var(--muted);font-size:14px;margin-top:12px;">"다른 직종으로<br>옮기고 싶다"</p>
+        </div>
+      </div>
+
+      <p class="r" style="--i:4;margin-top:30px;text-align:center;color:var(--muted);font-size:21px;line-height:1.6;">
+        <span style="font-family:'Jua';color:var(--white);">한 명이 15명을, 하루 9시간 가까이</span><br>여건 불만에 직종을 떠나려는 교사도 적지 않습니다.
+      </p>
+      <p class="r" style="--i:5;margin-top:16px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.7;">
+        출처 · 영유아보육법 시행규칙 제10조 [별표2] · 보건복지부 2021 전국보육실태조사 · 육아정책연구소(KICCE) 2023
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== 3 · EDUPING ===== -->
+  <section data-transition="fade">
+    <div class="bg-deco"><div class="grid"></div>
+      <div class="orb" style="width:420px;height:420px;background:#FF9FB6;bottom:-160px;left:-80px;opacity:.22;"></div>
+      <div class="orb" style="width:300px;height:300px;background:#84E6CD;top:-80px;right:200px;opacity:.18;"></div>
+    </div>
+    <div class="stage pad" style="flex-direction:row;align-items:center;gap:62px;">
+      <div class="r" style="--i:1;flex:0 0 auto;text-align:center;">
+        <div style="position:relative;display:inline-block;">
+          <span style="position:absolute;inset:-20px;border-radius:32px;background:radial-gradient(closest-side,rgba(255,159,182,.5),transparent);filter:blur(20px);z-index:0;"></span>
+          <img src="../slides/assets/eduping-real.jpg" alt="EduPing 실물"
+               style="position:relative;z-index:1;height:476px;border-radius:24px;border:1px solid var(--glassBorder);box-shadow:0 24px 60px rgba(0,0,0,.5);object-fit:cover;"/>
+        </div>
+        <p style="color:var(--faint);font-size:14px;margin-top:14px;font-family:'Jua';">실제 제작한 EduPing</p>
+      </div>
+      <div style="flex:1;max-width:580px;">
+        <p class="eyebrow r" style="--i:0;"><span class="dot"></span>ROBOT 1 / 3</p>
+        <h1 class="r glow-pink" style="--i:1;font-size:84px;color:var(--white);margin:14px 0 4px;"><span style="color:var(--pink)">에듀</span>핑</h1>
+        <p class="r" style="--i:2;color:var(--muted);font-family:'Jua';font-size:17px;letter-spacing:.16em;">EDUPING · OPENARM</p>
+        <p class="r" style="--i:3;color:var(--white);font-size:21px;line-height:1.75;margin-top:24px;">
+          정문에 상주하며 <b style="color:var(--pink)">등원·하원 인사</b>와 <b style="color:var(--mint)">율동·무궁화꽃이 피었습니다</b>를 함께합니다.
+        </p>
+        <div class="r" style="--i:4;display:flex;gap:10px;flex-wrap:wrap;margin-top:26px;">
+          <span class="chip">등원 · 하원</span><span class="chip mint">율동</span><span class="chip butter">무궁화꽃이 피었습니다</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({width:1280,height:720,margin:0,center:false,hash:false,controls:true,progress:true,transition:'fade',transitionSpeed:'default'});
+  function play(){document.querySelectorAll('.reveal section').forEach(s=>s.classList.remove('go'));var c=Reveal.getCurrentSlide();if(c){void c.offsetWidth;c.classList.add('go');}}
+  Reveal.on('ready',play); Reveal.on('slidechanged',play);
+</script>
+</body>
+</html>

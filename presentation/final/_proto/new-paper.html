@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>색종이 공작 — pingdergarten</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root{
+      --cream:#FFFBF1; --ink:#2C2317; --muted:#7C6E5C; --faint:#A99C88;
+      --red:#FF5B5B; --yellow:#FCC332; --green:#34B97C; --blue:#3DA0F0; --grape:#9B6DFF; --orange:#FF8C42;
+      --sh-card:0 18px 36px rgba(80,52,24,.15), 0 2px 0 rgba(0,0,0,.03);
+      --sh-pop:0 7px 14px rgba(70,44,18,.22);
+    }
+    html,body{background:var(--cream);}
+    .reveal-viewport,html.reveal-viewport{background:var(--cream)!important;}
+    .reveal{font-family:'Pretendard Variable',system-ui,sans-serif;color:var(--ink);}
+    .reveal h1,.reveal h2,.reveal h3{font-family:'Jua',sans-serif;font-weight:400;line-height:1.05;margin:0;}
+    .reveal .slides{text-align:left;}
+    .reveal section{background:transparent;}
+    .jua{font-family:'Jua',sans-serif;}
+    .material-icons-round{font-family:'Material Icons Round';line-height:1;vertical-align:middle;}
+
+    .deco{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;}
+    .shape{position:absolute;filter:drop-shadow(0 10px 9px rgba(70,45,20,.16));}
+    .circle{border-radius:50%;}
+    .tri{clip-path:polygon(50% 4%,98% 96%,2% 96%);}
+    .blob{border-radius:42% 58% 63% 37% / 45% 38% 62% 55%;}
+    @keyframes bob{0%,100%{transform:translateY(0) rotate(var(--rot,0deg))}50%{transform:translateY(-14px) rotate(var(--rot,0deg))}}
+    .bob{animation:bob 7s ease-in-out infinite;}
+
+    .stage{position:relative;z-index:1;height:720px;box-sizing:border-box;padding:56px 80px;display:flex;flex-direction:column;justify-content:center;}
+    .card{background:#fff;border-radius:28px;box-shadow:var(--sh-card);}
+    .tab{display:inline-block;font-family:'Jua';color:#fff;padding:8px 20px;border-radius:12px;box-shadow:var(--sh-pop);}
+    .tag{display:inline-flex;align-items:center;font-family:'Jua';color:#fff;padding:9px 20px;border-radius:999px;box-shadow:var(--sh-pop);}
+
+    .r{opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s cubic-bezier(.2,1.25,.4,1);}
+    .reveal section.go .r{opacity:1;transform:none;}
+    .go .r{transition-delay:calc(var(--i,0)*70ms);}
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- TITLE -->
+  <section data-transition="fade">
+    <div class="deco">
+      <div class="shape circle bob" style="--rot:0deg;width:240px;height:240px;background:var(--red);top:-80px;left:-60px;"></div>
+      <div class="shape tri" style="width:190px;height:170px;background:var(--yellow);top:60px;right:120px;"></div>
+      <div class="shape blob bob" style="--rot:0deg;width:280px;height:250px;background:var(--green);bottom:-90px;left:70px;"></div>
+      <div class="shape circle" style="width:230px;height:230px;background:var(--blue);bottom:-90px;right:-60px;"></div>
+      <svg class="shape" style="top:120px;left:300px;width:64px;height:64px" viewBox="0 0 24 24" fill="#9B6DFF"><path d="M12 1.6l3 6.3 6.9.7-5.2 4.7 1.5 6.8L12 17.9 5.8 20.8l1.5-6.8L2.1 8.6l6.9-.7z"/></svg>
+      <div class="shape circle" style="width:64px;height:64px;background:var(--orange);top:90px;right:80px;"></div>
+    </div>
+
+    <div class="stage" style="align-items:center;text-align:center;">
+      <div class="r" style="--i:0"><span class="tab" style="background:var(--grape);transform:rotate(-2deg)">ADDINEDU · VLA 최종 프로젝트</span></div>
+      <h1 class="r" style="--i:1;font-size:138px;margin-top:24px;">
+        <span style="color:var(--red)">ping</span><span style="color:var(--grape)">der</span><span style="color:var(--green)">garten</span>
+      </h1>
+      <p class="jua r" style="--i:2;font-size:32px;color:var(--ink);margin-top:10px;">교실에 활기를, 선생님께 여유를</p>
+      <div class="r" style="--i:3;display:flex;gap:14px;margin-top:42px;">
+        <span class="tag" style="background:var(--red)">사랑의 에듀핑</span>
+        <span class="tag" style="background:var(--blue)">팀원 6명</span>
+        <span class="tag" style="background:var(--orange)">2026.04.23 — 06.04</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section data-transition="fade">
+    <div class="deco">
+      <div class="shape circle" style="width:150px;height:150px;background:var(--yellow);top:-50px;right:90px;"></div>
+      <div class="shape blob" style="width:170px;height:150px;background:var(--blue);bottom:-50px;left:-40px;opacity:.9"></div>
+    </div>
+    <div class="stage" style="justify-content:flex-start;">
+      <div class="r" style="--i:0"><span class="tab" style="background:var(--red);transform:rotate(-1.5deg)">PROLOGUE</span></div>
+      <h2 class="r" style="--i:0;font-size:60px;margin:16px 0 30px;">유치원의 현실</h2>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:26px;">
+        <div class="r" style="--i:1"><div class="card" style="transform:rotate(-1.5deg);padding:26px 24px;text-align:center;">
+          <div class="circle" style="width:150px;height:150px;background:var(--red);box-shadow:var(--sh-pop);margin:0 auto;display:flex;align-items:center;justify-content:center;">
+            <span class="jua" style="color:#fff;font-size:74px;">15</span>
+          </div>
+          <p class="jua" style="font-size:22px;color:var(--ink);margin-top:16px;">교사 1명당 아동</p>
+          <p style="color:var(--muted);font-size:15px;margin-top:4px;">만 3세반 법정 기준 · 2005년 이후 동결</p>
+        </div></div>
+
+        <div class="r" style="--i:2"><div class="card" style="transform:rotate(1deg);padding:26px 24px;text-align:center;">
+          <div style="height:150px;display:flex;align-items:center;justify-content:center;">
+            <span style="background:var(--blue);box-shadow:var(--sh-pop);border-radius:24px;padding:18px 26px;">
+              <span class="jua" style="color:#fff;font-size:56px;">8:52</span>
+            </span>
+          </div>
+          <p class="jua" style="font-size:22px;color:var(--ink);margin-top:16px;">하루 평균 근로</p>
+          <p style="color:var(--muted);font-size:15px;margin-top:4px;">2018 8:22 → 2021 8:52 · +30분</p>
+        </div></div>
+
+        <div class="r" style="--i:3"><div class="card" style="transform:rotate(-0.5deg);padding:26px 24px;text-align:center;">
+          <div class="circle" style="width:150px;height:150px;background:var(--green);box-shadow:var(--sh-pop);margin:0 auto;display:flex;align-items:center;justify-content:center;">
+            <span class="jua" style="color:#fff;font-size:48px;">12.1%</span>
+          </div>
+          <p class="jua" style="font-size:22px;color:var(--ink);margin-top:16px;">전직 의향</p>
+          <p style="color:var(--muted);font-size:15px;margin-top:4px;">"다른 직종으로 옮기고 싶다"</p>
+        </div></div>
+      </div>
+
+      <p class="jua r" style="--i:4;font-size:28px;margin-top:30px;text-align:center;">한 명이 <span style="color:var(--red)">15명</span>을, 하루 <span style="color:var(--blue)">9시간</span> 가까이 — 떠나는 선생님도 적지 않아요.</p>
+      <p class="r" style="--i:5;color:var(--faint);font-size:12px;margin-top:12px;text-align:center;">출처 · 영유아보육법 시행규칙 [별표2] · 보건복지부 2021 전국보육실태조사 · 육아정책연구소(KICCE) 2023</p>
+    </div>
+  </section>
+
+  <!-- EDUPING -->
+  <section data-transition="fade">
+    <div class="deco">
+      <div class="shape tri" style="width:150px;height:135px;background:var(--yellow);top:-30px;left:46%;"></div>
+      <div class="shape circle bob" style="--rot:0deg;width:120px;height:120px;background:var(--grape);bottom:30px;left:30px;"></div>
+    </div>
+    <div class="stage" style="flex-direction:row;align-items:center;gap:60px;">
+      <div class="r" style="--i:1;flex:0 0 auto;">
+        <div class="card" style="transform:rotate(-3deg);padding:16px 16px 14px;position:relative;">
+          <span class="tag" style="background:var(--orange);position:absolute;top:-16px;left:50%;transform:translateX(-50%) rotate(2deg);font-size:15px;padding:6px 16px;">실제 제작!</span>
+          <img src="../slides/assets/eduping-real.jpg" alt="EduPing 실물" style="height:430px;border-radius:16px;object-fit:cover;display:block;"/>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="r" style="--i:0"><span class="tab" style="background:var(--red);transform:rotate(-1.5deg)">ROBOT 1 / 3</span></div>
+        <h1 class="r" style="--i:1;font-size:108px;margin:16px 0 6px;"><span style="color:var(--red)">에듀</span>핑</h1>
+        <p class="jua r" style="--i:2;font-size:19px;letter-spacing:.12em;color:var(--muted);">EDUPING · OPENARM</p>
+        <p class="r" style="--i:3;font-size:22px;line-height:1.75;margin-top:22px;max-width:520px;color:var(--ink);">
+          정문에 상주하며 <b style="color:var(--red)">등원·하원 인사</b>와 <b style="color:var(--green)">율동·무궁화꽃이 피었습니다</b>를 함께해요.
+        </p>
+        <div class="r" style="--i:4;display:flex;gap:12px;flex-wrap:wrap;margin-top:26px;">
+          <span class="tag" style="background:var(--red)">등원·하원</span>
+          <span class="tag" style="background:var(--green)">율동</span>
+          <span class="tag" style="background:var(--blue)">무궁화꽃</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({width:1280,height:720,margin:0,center:false,hash:false,controls:true,progress:true,transition:'fade'});
+  function play(){document.querySelectorAll('.reveal section').forEach(s=>s.classList.remove('go'));var c=Reveal.getCurrentSlide();if(c){void c.offsetWidth;c.classList.add('go');}}
+  Reveal.on('ready',play); Reveal.on('slidechanged',play);
+</script>
+</body>
+</html>

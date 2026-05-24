@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>비비드 그라디언트 테크 — pingdergarten</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root{ --white:#FFFFFF; --soft:rgba(255,255,255,.78); --faint:rgba(255,255,255,.55); }
+    html,body{background:#2A1958;}
+    .reveal-viewport,html.reveal-viewport{background:#2A1958!important;}
+    .reveal{font-family:'Pretendard Variable',system-ui,sans-serif;color:var(--white);letter-spacing:-.01em;}
+    .reveal h1,.reveal h2{font-weight:800;line-height:1;letter-spacing:-.03em;margin:0;}
+    .reveal .slides{text-align:left;}
+    .reveal section{background:transparent;}
+    .material-icons-round{font-family:'Material Icons Round';line-height:1;vertical-align:middle;}
+
+    .bg{position:absolute;inset:0;z-index:0;overflow:hidden;
+        background:
+          radial-gradient(40% 60% at 15% 20%, #FF5FA2 0%, transparent 60%),
+          radial-gradient(45% 55% at 85% 25%, #5B8CFF 0%, transparent 60%),
+          radial-gradient(50% 60% at 70% 95%, #2DD4BF 0%, transparent 55%),
+          linear-gradient(140deg, #3A1C71 0%, #4A1F87 45%, #1E2A78 100%);}
+    .grain{position:absolute;inset:0;opacity:.5;background-image:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1px);background-size:26px 26px;}
+    .stage{position:relative;z-index:1;height:720px;box-sizing:border-box;padding:60px 80px;display:flex;flex-direction:column;justify-content:center;}
+
+    .glass{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);border-radius:24px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:26px;box-shadow:0 24px 60px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.18);}
+    .kick{display:inline-flex;align-items:center;gap:9px;font-size:15px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--white);background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);padding:8px 16px;border-radius:999px;}
+    .pill{display:inline-flex;font-size:16px;font-weight:600;padding:9px 18px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);}
+    .grad-text{background:linear-gradient(90deg,#FF8FB1,#9D7BFF,#5BE0C6);-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+    .r{opacity:0;transform:translateY(18px) scale(.99);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.3,1);}
+    .reveal section.go .r{opacity:1;transform:none;}
+    .go .r{transition-delay:calc(var(--i,0)*75ms);}
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- TITLE -->
+  <section data-transition="fade">
+    <div class="bg"><div class="grain"></div></div>
+    <div class="stage" style="align-items:center;text-align:center;">
+      <span class="kick r" style="--i:0">ADDINEDU · VLA 최종 프로젝트</span>
+      <h1 class="r" style="--i:1;font-size:148px;margin-top:26px;"><span class="grad-text">pingdergarten</span></h1>
+      <p class="r" style="--i:2;font-family:'Jua';font-size:30px;color:var(--white);margin-top:14px;">교실에 활기를, 선생님께 여유를</p>
+      <div class="r" style="--i:3;display:flex;gap:14px;margin-top:40px;">
+        <span class="pill">사랑의 에듀핑</span><span class="pill">팀원 6명</span><span class="pill">2026.04.23 — 06.04</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section data-transition="fade">
+    <div class="bg"><div class="grain"></div></div>
+    <div class="stage">
+      <span class="kick r" style="--i:0">PROLOGUE</span>
+      <h2 class="r" style="--i:0;font-size:62px;margin:18px 0 28px;">유치원의 현실</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:22px;">
+        <div class="glass r" style="--i:1;text-align:center;">
+          <p style="font-size:16px;color:var(--soft)">교사 1명당 아동</p>
+          <div style="font-weight:800;font-size:96px;line-height:1.05;" class="grad-text">15</div>
+          <p style="font-size:14px;color:var(--faint)">만 3세반 법정 기준 · 2005년 이후 동결</p>
+        </div>
+        <div class="glass r" style="--i:2;text-align:center;">
+          <p style="font-size:16px;color:var(--soft)">하루 평균 근로</p>
+          <div style="font-weight:800;font-size:76px;line-height:1.15;" class="grad-text">8:52</div>
+          <p style="font-size:14px;color:var(--faint)">2018 → 2021, 3년 새 +30분</p>
+        </div>
+        <div class="glass r" style="--i:3;text-align:center;">
+          <p style="font-size:16px;color:var(--soft)">전직 의향</p>
+          <div style="font-weight:800;font-size:88px;line-height:1.05;" class="grad-text">12.1%</div>
+          <p style="font-size:14px;color:var(--faint)">"다른 직종으로 옮기고 싶다"</p>
+        </div>
+      </div>
+      <p class="r" style="--i:4;margin-top:28px;font-size:22px;color:var(--white);text-align:center;">한 명이 15명을, 하루 9시간 가까이 — 떠나는 교사도 적지 않습니다.</p>
+      <p class="r" style="--i:5;margin-top:12px;font-size:12px;color:var(--faint);text-align:center;">출처 · 영유아보육법 시행규칙 [별표2] · 2021 전국보육실태조사 · 육아정책연구소(KICCE) 2023</p>
+    </div>
+  </section>
+
+  <!-- EDUPING -->
+  <section data-transition="fade">
+    <div class="bg"><div class="grain"></div></div>
+    <div class="stage" style="flex-direction:row;align-items:center;gap:56px;">
+      <div class="glass r" style="--i:1;flex:0 0 auto;padding:16px;">
+        <img src="../slides/assets/eduping-real.jpg" alt="EduPing 실물" style="height:452px;border-radius:14px;object-fit:cover;display:block;"/>
+        <p style="text-align:center;color:var(--soft);font-size:14px;margin-top:12px;">실제 제작한 EduPing</p>
+      </div>
+      <div style="flex:1;">
+        <span class="kick r" style="--i:0">ROBOT 01 / 03</span>
+        <h1 class="r" style="--i:1;font-size:96px;margin:16px 0 6px;"><span class="grad-text">에듀핑</span></h1>
+        <p class="r" style="--i:2;font-size:17px;letter-spacing:.16em;color:var(--soft);">EDUPING · OPENARM</p>
+        <p class="r" style="--i:3;font-size:22px;line-height:1.75;margin-top:22px;max-width:520px;color:var(--white);">정문에 상주하며 <b>등원·하원 인사</b>와 <b>율동·무궁화꽃이 피었습니다</b>를 함께합니다.</p>
+        <div class="r" style="--i:4;display:flex;gap:12px;flex-wrap:wrap;margin-top:26px;">
+          <span class="pill">등원 · 하원</span><span class="pill">율동</span><span class="pill">무궁화꽃이 피었습니다</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({width:1280,height:720,margin:0,center:false,hash:false,controls:true,progress:true,transition:'fade'});
+  function play(){document.querySelectorAll('.reveal section').forEach(s=>s.classList.remove('go'));var c=Reveal.getCurrentSlide();if(c){void c.offsetWidth;c.classList.add('go');}}
+  Reveal.on('ready',play); Reveal.on('slidechanged',play);
+</script>
+</body>
+</html>

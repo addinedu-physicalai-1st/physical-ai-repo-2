@@ -3,67 +3,67 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip chip-lavender" style="font-size:0.55em">NORIARM</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 1 · HERO</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 1 · HERO</span>
       <span class="chip chip-butter" style="font-size:0.5em">★ 모방학습 메인</span>
     </div>
-    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
-      <span class="material-icons-round" style="font-size:0.85em;color:#9678B6;vertical-align:-0.1em">view_in_ar</span>
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 14px">
+      <span class="material-icons-round" style="font-size:0.85em;color:var(--lavInk);vertical-align:-0.1em">view_in_ar</span>
       블럭쌓기 — ACT 모방학습
     </h2>
 
-    <p style="color:#8D6E63;font-size:0.78em;margin-bottom:14px">
-      사람과 번갈아 블럭을 쌓는 협동 놀이. 로봇 행동은 <b style="color:#5D4037">ACT (Action Chunking Transformer)</b> 모방학습 정책이 생성합니다.
+    <p style="color:var(--inkSoft);font-size:0.78em;margin-bottom:14px">
+      사람과 번갈아 블럭을 쌓는 협동 놀이. 로봇 행동은 <b style="color:var(--ink)">ACT (Action Chunking Transformer)</b> 모방학습 정책이 생성합니다.
     </p>
 
     <div style="flex:1;display:grid;grid-template-columns:1.05fr 0.95fr;gap:16px">
 
-      <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;display:flex;flex-direction:column;padding:18px">
-        <h3 class="font-display" style="font-size:1em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#9678B6;vertical-align:-0.15em">play_for_work</span>
+      <div class="pastel-card" style="border-color:var(--lavenderSoft);background:var(--surface);display:flex;flex-direction:column;padding:18px">
+        <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--lavInk);vertical-align:-0.15em">play_for_work</span>
           게임 루프
         </h3>
-        <ol style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.7em;line-height:1.9;flex:1">
-          <li><b style="color:#9678B6">1.</b> 가위바위보 (로봇=보 / 사람=가위 고정) → 사람 선공</li>
-          <li><b style="color:#F8B4C4">2.</b> 가위바위보 동안 백그라운드로 ACT 정책 GPU 로드</li>
-          <li><b style="color:#5DBFA3">3.</b> 4개 ROI 에 사람색 2 + 로봇색 2 블럭 배치</li>
-          <li><b style="color:#E0AC2B">4.</b> 사람 ROI 1개 비워짐 → 로봇 차례 트리거</li>
-          <li><b style="color:#5A9FD8">5.</b> ACT 정책으로 자기 색 블럭 픽업·스택·HOME 복귀</li>
-          <li><b style="color:#9678B6">6.</b> HOME 복귀 2회 = 블럭 2개 완료 → 종료</li>
+        <ol style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.7em;line-height:1.9;flex:1">
+          <li><b style="color:var(--lavInk)">1.</b> 가위바위보 (로봇=보 / 사람=가위 고정) → 사람 선공</li>
+          <li><b style="color:var(--babypink)">2.</b> 가위바위보 동안 백그라운드로 ACT 정책 GPU 로드</li>
+          <li><b style="color:var(--mintInk)">3.</b> 4개 ROI 에 사람색 2 + 로봇색 2 블럭 배치</li>
+          <li><b style="color:var(--butterInk)">4.</b> 사람 ROI 1개 비워짐 → 로봇 차례 트리거</li>
+          <li><b style="color:var(--skyInk)">5.</b> ACT 정책으로 자기 색 블럭 픽업·스택·HOME 복귀</li>
+          <li><b style="color:var(--lavInk)">6.</b> HOME 복귀 2회 = 블럭 2개 완료 → 종료</li>
         </ol>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px">
 
-        <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">model_training</span>
+        <div class="pastel-card" style="border-color:var(--babypinkSoft);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">model_training</span>
             ACT 체크포인트
           </h3>
-          <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
             HuggingFace
-            <code style="background:#FFF0CC;padding:0 4px;border-radius:4px;font-size:0.9em">jisoo3/act_game_block_stacking_0520</code>
+            <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.9em">jisoo3/act_game_block_stacking_0520</code>
             — 부트스트랩 시 자동 다운로드, 진행률 UI 배너 표시.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">hub</span>
+        <div class="pastel-card" style="border-color:var(--mintSoft);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">hub</span>
             세션 격리
           </h3>
-          <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
             lerobot ACTPolicy 를 서브프로세스로 실행 →
             Control Server 세션 매니저가 라이프사이클 관리, 2회 SIGTERM 으로 안전 종료.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#E0AC2B;vertical-align:-0.15em">flag</span>
+        <div class="pastel-card" style="border-color:var(--butterSoft);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--butterInk);vertical-align:-0.15em">flag</span>
             홈 복귀 = 종료 신호
           </h3>
-          <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
-            <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">/joint_states</code> 가 HOME_POSE 임계 진입 frame 을
+          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
+            <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">/joint_states</code> 가 HOME_POSE 임계 진입 frame 을
             "1턴 완료" 로 카운트, 2회 도달 시 게임 종료. ROI 모니터링은 보조 안전망.
           </p>
         </div>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>다크 키즈 — pingdergarten</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root{
+      --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --muted:#A79FB4; --faint:#6F6885; --border:rgba(255,255,255,.10);
+      --coral:#FF6F86; --mint:#3FD9A6; --yellow:#FFD25E; --sky:#5BB6FF; --purple:#B98CFF;
+      --coralT:rgba(255,111,134,.16); --mintT:rgba(63,217,166,.16); --yellowT:rgba(255,210,94,.16); --skyT:rgba(91,182,255,.16);
+    }
+    html,body{background:var(--bg);}
+    .reveal-viewport,html.reveal-viewport{background:var(--bg)!important;}
+    .reveal{font-family:'Pretendard Variable',system-ui,sans-serif;color:var(--ink);}
+    .reveal h1,.reveal h2,.reveal h3{font-family:'Jua',sans-serif;font-weight:400;line-height:1.08;margin:0;}
+    .reveal .slides{text-align:left;}
+    .reveal section{background:transparent;}
+    .jua{font-family:'Jua',sans-serif;}
+    .material-icons-round{font-family:'Material Icons Round';line-height:1;vertical-align:middle;}
+
+    .deco{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;}
+    .glow{position:absolute;border-radius:50%;filter:blur(80px);opacity:.28;}
+    .confetti span{position:absolute;border-radius:50%;}
+
+    .stage{position:relative;z-index:1;height:720px;box-sizing:border-box;padding:62px 84px;display:flex;flex-direction:column;justify-content:center;}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
+    .eyebrow::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--coral);box-shadow:0 0 12px var(--coral);}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:24px;box-shadow:0 18px 44px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.05);}
+    .pill{display:inline-flex;align-items:center;font-family:'Jua';font-size:16px;padding:9px 18px;border-radius:999px;}
+    .badge{width:118px;height:118px;border-radius:26px;display:flex;align-items:center;justify-content:center;font-family:'Jua';}
+
+    .r{opacity:0;transform:translateY(15px);transition:opacity .55s ease,transform .55s cubic-bezier(.22,.7,.3,1);}
+    .reveal section.go .r{opacity:1;transform:none;}
+    .go .r{transition-delay:calc(var(--i,0)*65ms);}
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- TITLE -->
+  <section data-transition="fade">
+    <div class="deco">
+      <div class="glow" style="width:480px;height:480px;background:#FF6F86;top:-140px;left:-100px;"></div>
+      <div class="glow" style="width:420px;height:420px;background:#3FD9A6;bottom:-150px;right:-90px;"></div>
+      <div class="glow" style="width:300px;height:300px;background:#B98CFF;top:120px;right:200px;opacity:.2"></div>
+      <div class="confetti">
+        <span style="width:12px;height:12px;background:#FFD25E;top:130px;left:240px"></span>
+        <span style="width:9px;height:9px;background:#5BB6FF;top:520px;left:300px"></span>
+        <span style="width:11px;height:11px;background:#FF6F86;top:180px;right:280px"></span>
+        <span style="width:8px;height:8px;background:#3FD9A6;bottom:160px;right:360px"></span>
+      </div>
+    </div>
+    <div class="stage" style="align-items:center;text-align:center;">
+      <p class="eyebrow r" style="--i:0">ADDINEDU · VLA 최종 프로젝트</p>
+      <h1 class="r" style="--i:1;font-size:134px;margin-top:22px;">
+        <span style="color:var(--coral);text-shadow:0 0 30px rgba(255,111,134,.45)">ping</span><span style="color:var(--purple);text-shadow:0 0 30px rgba(185,140,255,.45)">der</span><span style="color:var(--mint);text-shadow:0 0 30px rgba(63,217,166,.4)">garten</span>
+      </h1>
+      <p class="jua r" style="--i:2;font-size:30px;color:var(--ink);margin-top:12px;">교실에 활기를, 선생님께 여유를</p>
+      <div class="r" style="--i:3;display:flex;gap:12px;margin-top:42px;">
+        <span class="pill" style="background:var(--coralT);color:var(--coral)">사랑의 에듀핑</span>
+        <span class="pill" style="background:var(--mintT);color:var(--mint)">팀원 6명</span>
+        <span class="pill" style="background:var(--yellowT);color:var(--yellow)">2026.04.23 — 06.04</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section data-transition="fade">
+    <div class="deco">
+      <div class="glow" style="width:360px;height:360px;background:#FF6F86;top:-150px;right:-60px;opacity:.18"></div>
+    </div>
+    <div class="stage" style="justify-content:flex-start;">
+      <p class="eyebrow r" style="--i:0">PROLOGUE</p>
+      <h2 class="r" style="--i:0;font-size:54px;margin:14px 0 32px;">유치원의 현실</h2>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;">
+        <div class="card r" style="--i:1;padding:28px;display:flex;align-items:center;gap:22px;">
+          <div class="badge" style="background:var(--coralT);flex:0 0 auto;"><span style="color:var(--coral);font-size:56px;">15</span></div>
+          <div>
+            <p class="jua" style="font-size:20px;">교사 1명당 아동</p>
+            <p style="color:var(--muted);font-size:14px;margin-top:6px;line-height:1.5;">만 3세반 법정 기준<br>2005년 이후 동결</p>
+          </div>
+        </div>
+        <div class="card r" style="--i:2;padding:28px;display:flex;align-items:center;gap:22px;">
+          <div class="badge" style="background:var(--skyT);flex:0 0 auto;"><span style="color:var(--sky);font-size:34px;">8:52</span></div>
+          <div>
+            <p class="jua" style="font-size:20px;">하루 평균 근로</p>
+            <p style="color:var(--muted);font-size:14px;margin-top:6px;line-height:1.5;">2018 8:22 → 2021 8:52<br>3년 새 +30분</p>
+          </div>
+        </div>
+        <div class="card r" style="--i:3;padding:28px;display:flex;align-items:center;gap:22px;">
+          <div class="badge" style="background:var(--mintT);flex:0 0 auto;"><span style="color:var(--mint);font-size:34px;">12.1%</span></div>
+          <div>
+            <p class="jua" style="font-size:20px;">전직 의향</p>
+            <p style="color:var(--muted);font-size:14px;margin-top:6px;line-height:1.5;">"다른 직종으로<br>옮기고 싶다"</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="jua r" style="--i:4;font-size:26px;margin-top:34px;">한 명이 <span style="color:var(--coral)">15명</span>을, 하루 <span style="color:var(--sky)">9시간</span> 가까이 — 떠나는 교사도 적지 않습니다.</p>
+      <p class="r" style="--i:5;color:var(--faint);font-size:12px;margin-top:14px;">출처 · 영유아보육법 시행규칙 [별표2] · 보건복지부 2021 전국보육실태조사 · 육아정책연구소(KICCE) 2023</p>
+    </div>
+  </section>
+
+  <!-- EDUPING -->
+  <section data-transition="fade">
+    <div class="deco">
+      <div class="glow" style="width:420px;height:420px;background:#B98CFF;bottom:-150px;left:-80px;opacity:.2"></div>
+      <div class="glow" style="width:300px;height:300px;background:#3FD9A6;top:-90px;right:160px;opacity:.18"></div>
+    </div>
+    <div class="stage" style="flex-direction:row;align-items:center;gap:64px;">
+      <div class="r" style="--i:1;flex:0 0 auto;">
+        <div class="card" style="padding:14px;">
+          <img src="../slides/assets/eduping-real.jpg" alt="EduPing 실물" style="height:452px;border-radius:16px;object-fit:cover;display:block;"/>
+        </div>
+        <p style="color:var(--faint);font-size:14px;margin-top:12px;text-align:center;">실제 제작한 EduPing</p>
+      </div>
+      <div style="flex:1;">
+        <p class="eyebrow r" style="--i:0">ROBOT 01 / 03</p>
+        <h1 class="r" style="--i:1;font-size:96px;margin:14px 0 6px;"><span style="color:var(--coral)">에듀</span>핑</h1>
+        <p class="jua r" style="--i:2;font-size:18px;letter-spacing:.14em;color:var(--muted);">EDUPING · OPENARM</p>
+        <p class="r" style="--i:3;font-size:21px;line-height:1.8;margin-top:22px;max-width:520px;color:var(--ink);">
+          정문에 상주하며 <b style="color:var(--coral)">등원·하원 인사</b>와 <b style="color:var(--mint)">율동·무궁화꽃이 피었습니다</b>를 함께합니다.
+        </p>
+        <div class="r" style="--i:4;display:flex;gap:12px;flex-wrap:wrap;margin-top:28px;">
+          <span class="pill" style="background:var(--coralT);color:var(--coral)">등원 · 하원</span>
+          <span class="pill" style="background:var(--mintT);color:var(--mint)">율동</span>
+          <span class="pill" style="background:var(--yellowT);color:var(--yellow)">무궁화꽃이 피었습니다</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({width:1280,height:720,margin:0,center:false,hash:false,controls:true,progress:true,transition:'fade'});
+  function play(){document.querySelectorAll('.reveal section').forEach(s=>s.classList.remove('go'));var c=Reveal.getCurrentSlide();if(c){void c.offsetWidth;c.classList.add('go');}}
+  Reveal.on('ready',play); Reveal.on('slidechanged',play);
+</script>
+</body>
+</html>

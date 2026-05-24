@@ -172,6 +172,15 @@ async function initPresentation() {
     });
   }
 
+  // Re-trigger entrance motion (.r elements) each time a slide becomes current
+  function replayMotion() {
+    document.querySelectorAll('.reveal .slides section').forEach(function (s) {
+      s.classList.remove('go');
+    });
+    var cur = Reveal.getCurrentSlide();
+    if (cur) { void cur.offsetWidth; cur.classList.add('go'); } // reflow → restart transition
+  }
+
   Reveal.on('ready', function () {
     var loadingScreen = document.getElementById('loading-screen');
     if (loadingScreen) {
@@ -182,6 +191,7 @@ async function initPresentation() {
     initDraw();
     initImageZoom();
     forceCenterAlign();
+    replayMotion();
 
     var slideNum = document.querySelector('.reveal .slide-number');
     if (slideNum) {
@@ -195,6 +205,7 @@ async function initPresentation() {
   Reveal.on('slidechanged', function (event) {
     clearDraw();
     forceCenterAlign();
+    replayMotion();
     var panel = document.getElementById('slide-panel');
     if (panel && !panel.classList.contains('hidden')) {
       updateSlidePanelActive();
@@ -313,7 +324,7 @@ function updateFullscreenHint() {
   if (!hint) return;
   var key = document.fullscreenElement ? 'ESC' : 'F';
   var msg = document.fullscreenElement ? 'to minimize' : 'for fullscreen';
-  hint.innerHTML = 'Press <kbd style="background:#FFFFFF;border:1px solid #FFE0E6;border-radius:4px;padding:1px 5px;font-size:0.9em;color:#5D4037">' + key + '</kbd> ' + msg;
+  hint.innerHTML = 'Press <kbd style="background:#241F33;border:1px solid rgba(255,255,255,0.14);border-radius:4px;padding:1px 5px;font-size:0.9em;color:#F4EFE8">' + key + '</kbd> ' + msg;
 }
 document.addEventListener('fullscreenchange', updateFullscreenHint);
 

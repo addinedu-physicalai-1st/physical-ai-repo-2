@@ -1,40 +1,74 @@
 <section>
-  <div style="padding:40px 80px;height:680px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+  <div class="bg-deco">
+    <div class="dots"></div>
+    <div class="blob" style="width:300px;height:300px;background:var(--babypinkSoft);top:-110px;right:-60px;opacity:.4"></div>
+  </div>
 
-    <p style="color:#F8B4C4;font-family:'Jua';letter-spacing:0.3em;font-size:0.7em">PROLOGUE</p>
-    <h2 class="font-display" style="font-size:2.4em;color:#5D4037;margin:8px 0 36px">
+  <div class="layer" style="padding:40px 80px;height:680px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
+
+    <p class="eyebrow eyebrow-pink r" style="--i:0">PROLOGUE</p>
+    <h2 class="s-title r" style="--i:0;font-size:2.4em;margin:8px 0 36px">
       유치원의 <span class="wavy">현실</span>
     </h2>
 
     <div class="grid grid-cols-3 gap-6">
 
-      <div class="pastel-card text-center" style="border-color:#FFD3DD">
-        <p style="font-family:'Jua';color:#F8B4C4;font-size:0.7em;letter-spacing:0.15em">교사 1인당</p>
-        <div class="font-display" style="font-size:4.5em;color:#F8B4C4;line-height:1">12<span style="font-size:0.45em;color:#8D6E63">명</span></div>
-        <p style="color:#8D6E63;font-size:0.65em;margin-top:6px">법정 정원<br>(만 3세 기준)</p>
+      <!-- ① 교사 대 아동 비율 (1:15 도트) -->
+      <div class="pastel-card text-center r" style="--i:1;border-color:var(--babypinkSoft)">
+        <p style="font-family:'Jua';color:var(--pinkInk);font-size:0.7em;letter-spacing:0.15em">교사 1명당 아동</p>
+        <div class="font-display" style="font-size:3.4em;color:var(--pinkInk);line-height:1.1">15<span style="font-size:0.45em;color:var(--inkSoft)">명</span></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;min-height:48px">
+          <span class="material-icons-round" style="font-size:30px;color:var(--babypink)">escalator_warning</span>
+          <div style="display:flex;flex-wrap:wrap;gap:3px;max-width:96px;justify-content:center">
+            <span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span><span style="width:9px;height:9px;border-radius:50%;background:var(--babypink)"></span>
+          </div>
+        </div>
+        <p style="color:var(--inkSoft);font-size:0.6em;margin-top:8px">만 3세반 법정 기준<br>(2005년 이후 동결)</p>
       </div>
 
-      <div class="pastel-card text-center" style="border-color:#E2D4F0">
-        <p style="font-family:'Jua';color:#9678B6;font-size:0.7em;letter-spacing:0.15em">주당 평균</p>
-        <div class="font-display" style="font-size:4.5em;color:#9678B6;line-height:1">54<span style="font-size:0.45em;color:#8D6E63">시간</span></div>
-        <p style="color:#8D6E63;font-size:0.65em;margin-top:6px">교사 근로시간<br>(전국 보육교사 실태조사)</p>
+      <!-- ② 근로시간 상승 추이 -->
+      <div class="pastel-card text-center r" style="--i:2;border-color:var(--lavenderSoft)">
+        <p style="font-family:'Jua';color:var(--lavInk);font-size:0.7em;letter-spacing:0.15em">하루 평균 근로</p>
+        <div class="font-display" style="font-size:3.4em;color:var(--lavInk);line-height:1.1">8<span style="font-size:0.4em;color:var(--inkSoft)">시간</span>52<span style="font-size:0.4em;color:var(--inkSoft)">분</span></div>
+        <svg viewBox="0 0 150 56" style="width:100%;max-width:150px;margin:8px auto 0;display:block;min-height:48px">
+          <line x1="30" y1="40" x2="120" y2="20" stroke="var(--lavender)" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="30" cy="40" r="4.5" fill="var(--lavInk)"/>
+          <circle cx="120" cy="20" r="4.5" fill="var(--lavInk)"/>
+          <text x="30" y="52" font-size="9" fill="var(--inkSoft)" text-anchor="middle" font-family="Jua">8:22</text>
+          <text x="120" y="52" font-size="9" fill="var(--inkSoft)" text-anchor="middle" font-family="Jua">8:52</text>
+          <text x="135" y="16" font-size="9" fill="var(--lavInk)" text-anchor="middle" font-family="Jua">+30</text>
+        </svg>
+        <p style="color:var(--inkSoft);font-size:0.6em;margin-top:2px">2018 → 2021, 3년 새 30분↑</p>
       </div>
 
-      <div class="pastel-card text-center" style="border-color:#D6F2E8">
-        <p style="font-family:'Jua';color:#5DBFA3;font-size:0.7em;letter-spacing:0.15em">이직 의향</p>
-        <div class="font-display" style="font-size:4.5em;color:#5DBFA3;line-height:1">43<span style="font-size:0.45em;color:#8D6E63">%</span></div>
-        <p style="color:#8D6E63;font-size:0.65em;margin-top:6px">5년차 미만<br>보육교사</p>
+      <!-- ③ 전직 의향 12.1% 도넛 -->
+      <div class="pastel-card text-center r" style="--i:3;border-color:var(--mintSoft)">
+        <p style="font-family:'Jua';color:var(--mintInk);font-size:0.7em;letter-spacing:0.15em">전직 의향</p>
+        <div style="position:relative;width:96px;height:96px;margin:8px auto 0">
+          <svg viewBox="0 0 80 80" style="width:96px;height:96px">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--mintSoft)" stroke-width="10"/>
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--mintInk)" stroke-width="10" stroke-linecap="round"
+                    stroke-dasharray="24.3 176.8" transform="rotate(-90 40 40)"/>
+          </svg>
+          <div class="font-display" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.4em;color:var(--mintInk)">12.1%</div>
+        </div>
+        <p style="color:var(--inkSoft);font-size:0.6em;margin-top:8px">"다른 직종으로<br>옮기고 싶다"</p>
       </div>
 
     </div>
 
-    <p class="mt-10 text-center" style="color:#8D6E63;font-size:0.85em;line-height:1.6">
-      <span class="font-display" style="color:#5D4037;font-size:1.1em">한 명이 12명을, 매주 54시간씩</span><br>
-      그리고 절반 가까이가 그만두고 싶어 합니다.
+    <p class="r mt-8 text-center" style="--i:4;color:var(--inkSoft);font-size:0.85em;line-height:1.6">
+      <span class="font-display" style="color:var(--ink);font-size:1.1em">한 명이 15명을, 하루 9시간 가까이</span><br>
+      여건 불만에 직종을 떠나려는 교사도 적지 않습니다.
+    </p>
+
+    <p class="r mt-6 text-center" style="--i:5;color:var(--inkFaint);font-size:0.5em;line-height:1.7">
+      출처 · 교사 대 아동 비율: 영유아보육법 시행규칙 제10조 [별표2]<br>
+      근로시간: 보건복지부 「2021년 전국보육실태조사」 (2022) · 전직 의향: 육아정책연구소(KICCE) 보육교직원 조사 (2023)
     </p>
 
   </div>
   <aside class="notes">
-    유치원 현실에 대한 통계로 청중의 공감을 끌어내는 슬라이드.
+    실데이터 기반 — 교사 1명당 만3세 15명(영유아보육법, 2005년 이후 미개정), 1일 평균 근로 8시간 52분(2021 전국보육실태조사, 2018년 8시간 22분 대비 30분↑), 전직 의향 12.1%(육아정책연구소 2023). 이직 의향은 7.3%, 퇴직 의향 4.9%.
   </aside>
 </section>

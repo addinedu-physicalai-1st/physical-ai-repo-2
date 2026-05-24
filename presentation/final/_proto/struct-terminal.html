@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>터미널 / 로봇 콘솔 — pingdergarten</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root{
+      --bg:#0A0E16; --win:#0E141F; --bar:#162032; --line:#1F2A3C;
+      --txt:#C7D2E0; --dim:#5C6B7E; --green:#3DDC84; --cyan:#56D4DD; --mag:#FF6AC1; --yellow:#F5D76E; --orange:#FF9E64;
+    }
+    html,body{background:var(--bg);}
+    .reveal-viewport,html.reveal-viewport{background:var(--bg)!important;}
+    .reveal{font-family:'Nanum Gothic Coding',monospace;color:var(--txt);}
+    .reveal h1,.reveal h2{margin:0;font-weight:700;line-height:1;}
+    .reveal .slides{text-align:left;}
+    .reveal section{background:transparent;}
+    .stage{height:720px;box-sizing:border-box;padding:34px 44px;display:flex;}
+
+    .win{flex:1;display:flex;flex-direction:column;border-radius:13px;background:var(--win);border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.55);overflow:hidden;}
+    .bar{height:42px;flex:0 0 auto;background:var(--bar);display:flex;align-items:center;padding:0 16px;gap:8px;border-bottom:1px solid var(--line);}
+    .dot{width:13px;height:13px;border-radius:50%;}
+    .bartitle{flex:1;text-align:center;color:var(--dim);font-size:14px;}
+    .body{flex:1;padding:26px 30px;font-size:23px;line-height:1.65;overflow:hidden;}
+    .pr{color:var(--green);} .pth{color:var(--cyan);} .cmt{color:var(--dim);} .str{color:var(--yellow);}
+    .key{color:var(--mag);} .num{color:var(--cyan);} .ok{color:var(--green);}
+    .cur{display:inline-block;width:12px;height:1.05em;background:var(--green);vertical-align:-3px;animation:blink 1s steps(1) infinite;}
+    @keyframes blink{50%{opacity:0;}}
+
+    .r{opacity:0;transform:translateY(8px);transition:opacity .4s ease,transform .4s ease;}
+    .reveal section.go .r{opacity:1;transform:none;}
+    .go .r{transition-delay:calc(var(--i,0)*120ms);}
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- TITLE -->
+  <section data-transition="fade">
+    <div class="stage">
+      <div class="win">
+        <div class="bar"><span class="dot" style="background:#FF5F57"></span><span class="dot" style="background:#FEBC2E"></span><span class="dot" style="background:#28C840"></span><span class="bartitle">pingdergarten — zsh — 120×32</span></div>
+        <div class="body" style="display:flex;flex-direction:column;justify-content:center;">
+          <p class="r" style="--i:0"><span class="pr">➜</span> <span class="pth">~/pingdergarten</span> whoami</p>
+          <p class="r" style="--i:1">사랑의 에듀핑 <span class="cmt"># 팀원 6명 · ADDINEDU VLA 최종 프로젝트</span></p>
+          <p class="r" style="--i:2;margin-top:10px;"><span class="pr">➜</span> <span class="pth">~/pingdergarten</span> ./launch --all</p>
+          <h1 class="r" style="--i:3;font-size:78px;margin:14px 0;font-family:'Nanum Gothic Coding';">
+            <span style="color:var(--mag)">ping</span><span style="color:var(--cyan)">der</span><span style="color:var(--green)">garten</span>
+          </h1>
+          <p class="r" style="--i:4"><span class="ok">✔</span> mission loaded: <span class="str">"교실에 활기를, 선생님께 여유를"</span></p>
+          <p class="r" style="--i:5"><span class="ok">✔</span> robots online: <span class="num">EduPing</span> · <span class="num">GogoPing</span> · <span class="num">NoriArm×3</span></p>
+          <p class="r" style="--i:6;margin-top:8px;"><span class="pr">➜</span> <span class="pth">~/pingdergarten</span> <span class="cur"></span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section data-transition="fade">
+    <div class="stage">
+      <div class="win">
+        <div class="bar"><span class="dot" style="background:#FF5F57"></span><span class="dot" style="background:#FEBC2E"></span><span class="dot" style="background:#28C840"></span><span class="bartitle">analyze — kindergarten-reality.log</span></div>
+        <div class="body" style="display:flex;flex-direction:column;justify-content:center;">
+          <p class="r" style="--i:0"><span class="pr">➜</span> ./analyze <span class="str">--prologue</span></p>
+          <p class="r" style="--i:1;margin-top:14px;"><span class="key">교사_1명당_아동</span> ········· <span class="num" style="font-size:1.25em;font-weight:700">15명</span>  <span class="cmt"># 만 3세반 법정 기준, 2005년 이후 동결</span></p>
+          <p class="r" style="--i:2"><span class="key">하루_평균_근로</span> ········· <span class="num" style="font-size:1.25em;font-weight:700">8:52</span>  <span class="cmt"># 2018 8:22 → 2021 8:52 (+30분)</span></p>
+          <p class="r" style="--i:3"><span class="key">전직_의향</span> ··············· <span class="num" style="font-size:1.25em;font-weight:700">12.1%</span> <span class="cmt"># "다른 직종으로 옮기고 싶다"</span></p>
+          <p class="r" style="--i:4;margin-top:16px;color:var(--orange);">⚠ 한 명이 15명을, 하루 9시간 가까이 — 떠나는 교사도 적지 않습니다.</p>
+          <p class="r" style="--i:5;margin-top:18px;font-size:14px;"><span class="cmt">// 출처: 영유아보육법 시행규칙 [별표2] · 2021 전국보육실태조사 · 육아정책연구소(KICCE) 2023</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDUPING -->
+  <section data-transition="fade">
+    <div class="stage" style="gap:24px;">
+      <div class="win" style="flex:1.15;">
+        <div class="bar"><span class="dot" style="background:#FF5F57"></span><span class="dot" style="background:#FEBC2E"></span><span class="dot" style="background:#28C840"></span><span class="bartitle">robot --id eduping --info</span></div>
+        <div class="body" style="display:flex;flex-direction:column;justify-content:center;font-size:21px;">
+          <p class="r" style="--i:0"><span class="pr">➜</span> ./robot <span class="str">--id eduping</span> --info</p>
+          <p class="r" style="--i:1;margin-top:10px;">{</p>
+          <p class="r" style="--i:2;padding-left:28px;"><span class="key">"name"</span>: <span class="str">"에듀핑"</span>,</p>
+          <p class="r" style="--i:3;padding-left:28px;"><span class="key">"base"</span>: <span class="str">"OpenArm"</span>, <span class="key">"station"</span>: <span class="str">"정문"</span>,</p>
+          <p class="r" style="--i:4;padding-left:28px;"><span class="key">"skills"</span>: [<span class="str">"등원·하원 인사"</span>, <span class="str">"율동"</span>,</p>
+          <p class="r" style="--i:5;padding-left:96px;"><span class="str">"무궁화꽃이 피었습니다"</span>]</p>
+          <p class="r" style="--i:6;">}</p>
+          <p class="r" style="--i:7;margin-top:8px;"><span class="ok">✔</span> ROBOT 01 / 03 ready <span class="cur"></span></p>
+        </div>
+      </div>
+      <div class="win" style="flex:1;">
+        <div class="bar"><span class="dot" style="background:#FF5F57"></span><span class="dot" style="background:#FEBC2E"></span><span class="dot" style="background:#28C840"></span><span class="bartitle">eduping.preview</span></div>
+        <div style="flex:1;padding:14px;">
+          <img class="r" src="../slides/assets/eduping-real.jpg" alt="EduPing 실물" style="--i:3;width:100%;height:100%;object-fit:cover;border-radius:8px;"/>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({width:1280,height:720,margin:0,center:false,hash:false,controls:true,progress:true,transition:'fade'});
+  function play(){document.querySelectorAll('.reveal section').forEach(s=>s.classList.remove('go'));var c=Reveal.getCurrentSlide();if(c){void c.offsetWidth;c.classList.add('go');}}
+  Reveal.on('ready',play); Reveal.on('slidechanged',play);
+</script>
+</body>
+</html>

@@ -1,12 +1,12 @@
 <section>
   <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
 
-    <p style="color:#5A9FD8;font-family:'Jua';letter-spacing:0.2em;font-size:0.7em">DATA PIPELINE</p>
-    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
+    <p style="color:var(--skyInk);font-family:'Jua';letter-spacing:0.2em;font-size:0.7em">DATA PIPELINE</p>
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 14px">
       사진과 보고서는 자동으로
     </h2>
 
-    <p style="color:#8D6E63;font-size:0.75em;margin-bottom:18px">
+    <p style="color:var(--inkSoft);font-size:0.75em;margin-bottom:18px">
       놀이 중 감정 임계 초과 프레임 → 사진 저장 → 분류 → 학부모 사진첩 + 일일 보고서 자동 생성.
     </p>
 
@@ -15,50 +15,50 @@
       <!-- Flow -->
       <div style="display:flex;align-items:stretch;gap:8px">
 
-        <div class="pastel-card text-center" style="border-color:#FFD3DD;padding:14px 12px;flex:1">
-          <span style="font-family:'Jua';color:#F8B4C4;font-size:0.55em;letter-spacing:0.1em">CAPTURE</span>
-          <div class="font-display" style="font-size:0.82em;color:#5D4037;margin-top:4px">자연 촬영</div>
-          <p style="color:#8D6E63;font-size:0.58em;margin-top:6px;line-height:1.5">
+        <div class="pastel-card text-center" style="border-color:var(--babypinkSoft);padding:14px 12px;flex:1">
+          <span style="font-family:'Jua';color:var(--babypink);font-size:0.55em;letter-spacing:0.1em">CAPTURE</span>
+          <div class="font-display" style="font-size:0.82em;color:var(--ink);margin-top:4px">자연 촬영</div>
+          <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">
             ROS2 노드 (놀이 모드)<br>감정 인식 임계 초과<br>5단 throttling
           </p>
         </div>
 
-        <span class="self-center material-icons-round" style="color:#FFE5A8;font-size:20px">chevron_right</span>
+        <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px">chevron_right</span>
 
-        <div class="pastel-card text-center" style="border-color:#D6F2E8;padding:14px 12px;flex:1">
-          <span style="font-family:'Jua';color:#5DBFA3;font-size:0.55em;letter-spacing:0.1em">STORE</span>
-          <div class="font-display" style="font-size:0.82em;color:#5D4037;margin-top:4px">Control Server</div>
-          <p style="color:#8D6E63;font-size:0.58em;margin-top:6px;line-height:1.5">
+        <div class="pastel-card text-center" style="border-color:var(--mintSoft);padding:14px 12px;flex:1">
+          <span style="font-family:'Jua';color:var(--mintInk);font-size:0.55em;letter-spacing:0.1em">STORE</span>
+          <div class="font-display" style="font-size:0.82em;color:var(--ink);margin-top:4px">Control Server</div>
+          <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">
             REST 업로드<br>디스크 + photo 행<br>메타 첨부
           </p>
         </div>
 
-        <span class="self-center material-icons-round" style="color:#FFE5A8;font-size:20px">chevron_right</span>
+        <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px">chevron_right</span>
 
-        <div class="pastel-card text-center" style="border-color:#E2D4F0;padding:14px 12px;flex:1">
-          <span style="font-family:'Jua';color:#9678B6;font-size:0.55em;letter-spacing:0.1em">ENQUEUE</span>
-          <div class="font-display" style="font-size:0.82em;color:#5D4037;margin-top:4px">ai_job 큐</div>
-          <p style="color:#8D6E63;font-size:0.58em;margin-top:6px;line-height:1.5">
+        <div class="pastel-card text-center" style="border-color:var(--lavenderSoft);padding:14px 12px;flex:1">
+          <span style="font-family:'Jua';color:var(--lavInk);font-size:0.55em;letter-spacing:0.1em">ENQUEUE</span>
+          <div class="font-display" style="font-size:0.82em;color:var(--ink);margin-top:4px">ai_job 큐</div>
+          <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">
             PostgreSQL<br>FOR UPDATE SKIP LOCKED<br>멱등키 중복 방지
           </p>
         </div>
 
-        <span class="self-center material-icons-round" style="color:#FFE5A8;font-size:20px">chevron_right</span>
+        <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px">chevron_right</span>
 
-        <div class="pastel-card text-center" style="border-color:#FFF0CC;padding:14px 12px;flex:1">
-          <span style="font-family:'Jua';color:#E0AC2B;font-size:0.55em;letter-spacing:0.1em">WORKER</span>
-          <div class="font-display" style="font-size:0.82em;color:#5D4037;margin-top:4px">AI Server</div>
-          <p style="color:#8D6E63;font-size:0.58em;margin-top:6px;line-height:1.5">
+        <div class="pastel-card text-center" style="border-color:var(--butterSoft);padding:14px 12px;flex:1">
+          <span style="font-family:'Jua';color:var(--butterInk);font-size:0.55em;letter-spacing:0.1em">WORKER</span>
+          <div class="font-display" style="font-size:0.82em;color:var(--ink);margin-top:4px">AI Server</div>
+          <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">
             얼굴 인식 (전 등장 아이)<br>photo_subject N:N<br>Ollama qwen2.5 요약
           </p>
         </div>
 
-        <span class="self-center material-icons-round" style="color:#FFE5A8;font-size:20px">chevron_right</span>
+        <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px">chevron_right</span>
 
-        <div class="pastel-card text-center" style="border-color:#D6ECFF;padding:14px 12px;flex:1">
-          <span style="font-family:'Jua';color:#5A9FD8;font-size:0.55em;letter-spacing:0.1em">DELIVER</span>
-          <div class="font-display" style="font-size:0.82em;color:#5D4037;margin-top:4px">Portal Web</div>
-          <p style="color:#8D6E63;font-size:0.58em;margin-top:6px;line-height:1.5">
+        <div class="pastel-card text-center" style="border-color:var(--skySoft);padding:14px 12px;flex:1">
+          <span style="font-family:'Jua';color:var(--skyInk);font-size:0.55em;letter-spacing:0.1em">DELIVER</span>
+          <div class="font-display" style="font-size:0.82em;color:var(--ink);margin-top:4px">Portal Web</div>
+          <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">
             자녀별 사진첩<br>일일 보고서<br>학부모 자동 조회
           </p>
         </div>
@@ -66,22 +66,22 @@
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
 
-        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">filter_alt</span>
+        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">filter_alt</span>
             5단 throttling
           </h3>
-          <p style="color:#8D6E63;font-size:0.62em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.62em;margin-top:6px;line-height:1.7">
             ① 감정 임계 ② 아이 쿨다운 ③ 모드 한도 ④ 일일 한도 ⑤ 시각 중복 — 통과한 프레임만 업로드.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">smart_toy</span>
+        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">smart_toy</span>
             보고서 생성 트리거
           </h3>
-          <p style="color:#8D6E63;font-size:0.62em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.62em;margin-top:6px;line-height:1.7">
             하원 시각 기록과 같은 트랜잭션에서 ai_job(kind=report) INSERT — 사진/모드/낮잠/메뉴를 자연어 요약.
           </p>
         </div>

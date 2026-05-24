@@ -7,7 +7,7 @@
 
 - [Reveal.js 5.1.0](https://revealjs.com/) (CDN)
 - [Tailwind CSS](https://tailwindcss.com/) (CDN, 인라인 config 로 파스텔 팔레트)
-- Google Fonts — Jua, Gaegu, Material Icons Round
+- Google Fonts — Jua, Material Icons Round · Pretendard Variable (jsDelivr CDN, 본문)
 - 빌드 단계 없음. 정적 HTML/CSS/JS.
 
 ## 실행

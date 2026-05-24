@@ -3,43 +3,43 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip" style="font-size:0.55em">EDUPING</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 2</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 2</span>
     </div>
-    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 18px">
-      <span class="material-icons-round" style="font-size:0.85em;color:#5DBFA3;vertical-align:-0.1em">music_note</span>
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 18px">
+      <span class="material-icons-round" style="font-size:0.85em;color:var(--mintInk);vertical-align:-0.1em">music_note</span>
       율동
     </h2>
 
     <div style="flex:1;display:flex;gap:18px">
 
       <div style="flex:1;display:flex;flex-direction:column;gap:12px">
-        <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;padding:18px">
-          <h3 class="font-display" style="font-size:1em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">timeline</span>
+        <div class="pastel-card" style="border-color:var(--mintSoft);background:var(--surface);padding:18px">
+          <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">timeline</span>
             음악 · 모션 동기 스트리밍
           </h3>
-          <p style="color:#8D6E63;font-size:0.7em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.7">
             Control Server 가 50Hz 모션 frame 과 16kHz PCM 청크를 같은
-            <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">t_ms</code> 위에 묶어
+            <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">t_ms</code> 위에 묶어
             WebSocket binary frame 으로 push. 곡·3D 시각화·실물 팔이 한 시점에.
           </p>
         </div>
-        <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;padding:18px">
-          <h3 class="font-display" style="font-size:1em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">speaker</span>
+        <div class="pastel-card" style="border-color:var(--babypinkSoft);background:var(--surface);padding:18px">
+          <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">speaker</span>
             Web Audio API · sample-accurate
           </h3>
-          <p style="color:#8D6E63;font-size:0.7em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.7">
             로봇 UI 가 Web Audio 로 청크를 sample-accurate 하게 스케줄해
             끊김 없이 재생. 모션 frame 은 같은 clock 으로 three.js 와 실물 팔에 동시 적용.
           </p>
         </div>
-        <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;padding:18px">
-          <h3 class="font-display" style="font-size:1em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#E0AC2B;vertical-align:-0.15em">home</span>
+        <div class="pastel-card" style="border-color:var(--butterSoft);background:var(--surface);padding:18px">
+          <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--butterInk);vertical-align:-0.15em">home</span>
             정지 시 양팔 home 복귀
           </h3>
-          <p style="color:#8D6E63;font-size:0.7em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.7">
             정지·종료·팝업 닫기 시 1.5s smoothstep ramp + JTC spline 으로
             HOME_POSE 까지 부드럽게 복귀.
           </p>
@@ -47,23 +47,23 @@
       </div>
 
       <div style="flex:1;display:flex;flex-direction:column;gap:12px;justify-content:center">
-        <div class="pastel-card text-center" style="border-color:#E2D4F0;background:#FFFFFF;padding:22px">
-          <p style="font-family:'Jua';color:#9678B6;font-size:0.7em;letter-spacing:0.15em">DANCE LIBRARY</p>
+        <div class="pastel-card text-center" style="border-color:var(--lavenderSoft);background:var(--surface);padding:22px">
+          <p style="font-family:'Jua';color:var(--lavInk);font-size:0.7em;letter-spacing:0.15em">DANCE LIBRARY</p>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid #FFE0E6;border-radius:12px">
-              <span style="color:#5D4037;font-size:0.8em">🎵 곰 세 마리</span>
-              <span style="color:#8D6E63;font-size:0.6em">1:23</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid var(--border);border-radius:12px">
+              <span style="color:var(--ink);font-size:0.8em">🎵 곰 세 마리</span>
+              <span style="color:var(--inkSoft);font-size:0.6em">1:23</span>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid #FFE0E6;border-radius:12px">
-              <span style="color:#5D4037;font-size:0.8em">🎵 작은 별</span>
-              <span style="color:#8D6E63;font-size:0.6em">1:05</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid var(--border);border-radius:12px">
+              <span style="color:var(--ink);font-size:0.8em">🎵 작은 별</span>
+              <span style="color:var(--inkSoft);font-size:0.6em">1:05</span>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid #FFE0E6;border-radius:12px">
-              <span style="color:#5D4037;font-size:0.8em">🎵 머리·어깨·무릎·발</span>
-              <span style="color:#8D6E63;font-size:0.6em">0:55</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid var(--border);border-radius:12px">
+              <span style="color:var(--ink);font-size:0.8em">🎵 머리·어깨·무릎·발</span>
+              <span style="color:var(--inkSoft);font-size:0.6em">0:55</span>
             </div>
           </div>
-          <p style="color:#8D6E63;font-size:0.6em;margin-top:14px;line-height:1.6">
+          <p style="color:var(--inkSoft);font-size:0.6em;margin-top:14px;line-height:1.6">
             곡 선택 → Control Server 가 trajectory + 오디오 스트림 동시 송출<br>
             로봇 UI 가 sample-accurate 스케줄로 동기 재생
           </p>

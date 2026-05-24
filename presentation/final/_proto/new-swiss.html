@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>스위스 에디토리얼 — pingdergarten</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Icons+Round&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root{ --ink:#111111; --gray:#6E6E6E; --line:#111111; --faint:#9A9A9A; --accent:#F23A4D; }
+    html,body{background:#fff;}
+    .reveal-viewport,html.reveal-viewport{background:#fff!important;}
+    .reveal{font-family:'Pretendard Variable',system-ui,sans-serif;color:var(--ink);letter-spacing:-.01em;}
+    .reveal h1,.reveal h2{font-weight:800;line-height:.95;letter-spacing:-.03em;margin:0;}
+    .reveal .slides{text-align:left;}
+    .reveal section{background:transparent;}
+    .material-icons-round{font-family:'Material Icons Round';line-height:1;vertical-align:middle;}
+    .stage{height:720px;box-sizing:border-box;padding:64px 80px;display:flex;flex-direction:column;}
+
+    .meta{display:flex;align-items:center;justify-content:space-between;border-top:2px solid var(--line);padding-top:12px;font-size:15px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+    .meta .num{color:var(--accent);}
+    .kick{font-size:15px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);}
+    .lede{color:var(--gray);font-size:21px;line-height:1.6;font-weight:500;}
+
+    .r{opacity:0;transform:translateY(16px);transition:opacity .5s cubic-bezier(.2,.7,.3,1),transform .5s cubic-bezier(.2,.7,.3,1);}
+    .reveal section.go .r{opacity:1;transform:none;}
+    .go .r{transition-delay:calc(var(--i,0)*70ms);}
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- TITLE -->
+  <section data-transition="slide">
+    <div class="stage">
+      <div class="meta r" style="--i:0"><span><span class="num">01</span> &nbsp;/&nbsp; TITLE</span><span>ADDINEDU · VLA</span></div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <p class="kick r" style="--i:1">교육보조로봇 서비스</p>
+        <h1 class="r" style="--i:2;font-size:160px;margin:18px 0;">ping<span style="color:var(--accent)">der</span>garten</h1>
+        <p class="lede r" style="--i:3;max-width:680px;">교실에 활기를, 선생님께 여유를. 유치원에서 아이와 놀아주고 교사를 보조하는 세 로봇.</p>
+      </div>
+      <div class="meta r" style="--i:4"><span>사랑의 에듀핑</span><span>팀원 6명</span><span>2026.04.23 — 06.04</span></div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section data-transition="slide">
+    <div class="stage">
+      <div class="meta r" style="--i:0"><span><span class="num">02</span> &nbsp;/&nbsp; PROLOGUE</span><span>유치원의 현실</span></div>
+      <h2 class="r" style="--i:1;font-size:74px;margin:30px 0 8px;">숫자가 말하는<br>교실의 부담.</h2>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;gap:0;">
+        <div class="r" style="--i:2;padding-right:36px;border-right:1px solid #DADADA;">
+          <p class="kick" style="color:var(--ink);">교사 1명당 아동</p>
+          <div style="font-weight:800;font-size:120px;line-height:1;letter-spacing:-.04em;color:var(--accent);">15</div>
+          <p style="color:var(--gray);font-size:16px;">만 3세반 법정 기준 · 2005년 이후 동결</p>
+        </div>
+        <div class="r" style="--i:3;padding:0 36px;border-right:1px solid #DADADA;">
+          <p class="kick" style="color:var(--ink);">하루 평균 근로</p>
+          <div style="font-weight:800;font-size:96px;line-height:1;letter-spacing:-.04em;">8:52</div>
+          <p style="color:var(--gray);font-size:16px;">2018 8:22 → 2021 8:52, 3년 새 +30분</p>
+        </div>
+        <div class="r" style="--i:4;padding-left:36px;">
+          <p class="kick" style="color:var(--ink);">전직 의향</p>
+          <div style="font-weight:800;font-size:120px;line-height:1;letter-spacing:-.04em;">12.1<span style="font-size:.45em">%</span></div>
+          <p style="color:var(--gray);font-size:16px;">"다른 직종으로 옮기고 싶다"</p>
+        </div>
+      </div>
+      <p class="r" style="--i:5;color:var(--faint);font-size:13px;border-top:1px solid #DADADA;padding-top:12px;">출처 · 영유아보육법 시행규칙 [별표2] · 보건복지부 2021 전국보육실태조사 · 육아정책연구소(KICCE) 2023</p>
+    </div>
+  </section>
+
+  <!-- EDUPING -->
+  <section data-transition="slide">
+    <div class="stage">
+      <div class="meta r" style="--i:0"><span><span class="num">03</span> &nbsp;/&nbsp; ROBOT 01 / 03</span><span>EDUPING · OPENARM</span></div>
+      <div style="flex:1;display:flex;align-items:center;gap:64px;">
+        <div style="flex:1;">
+          <h1 class="r" style="--i:1;font-size:128px;margin:0 0 10px;">에듀핑<span style="color:var(--accent)">.</span></h1>
+          <p class="lede r" style="--i:2;max-width:520px;">정문에 상주하며 <b style="color:var(--ink)">등원·하원 인사</b>와 <b style="color:var(--ink)">율동·무궁화꽃이 피었습니다</b>를 함께합니다.</p>
+          <div class="r" style="--i:3;display:flex;gap:0;margin-top:30px;font-size:16px;font-weight:700;">
+            <span style="padding-right:18px;border-right:1px solid #CFCFCF;">등원·하원</span>
+            <span style="padding:0 18px;border-right:1px solid #CFCFCF;">율동</span>
+            <span style="padding-left:18px;">무궁화꽃이 피었습니다</span>
+          </div>
+        </div>
+        <div class="r" style="--i:2;flex:0 0 auto;">
+          <img src="../slides/assets/eduping-real.jpg" alt="EduPing 실물" style="height:500px;object-fit:cover;display:block;border:1px solid #DADADA;"/>
+          <p style="color:var(--faint);font-size:13px;margin-top:8px;letter-spacing:.04em;">FIG. 01 — 실제 제작한 EduPing</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({width:1280,height:720,margin:0,center:false,hash:false,controls:true,progress:true,transition:'slide',transitionSpeed:'fast'});
+  function play(){document.querySelectorAll('.reveal section').forEach(s=>s.classList.remove('go'));var c=Reveal.getCurrentSlide();if(c){void c.offsetWidth;c.classList.add('go');}}
+  Reveal.on('ready',play); Reveal.on('slidechanged',play);
+</script>
+</body>
+</html>

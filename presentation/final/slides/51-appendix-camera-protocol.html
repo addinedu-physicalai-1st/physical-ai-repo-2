@@ -3,65 +3,65 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip chip-sky" style="font-size:0.55em">APPENDIX · A4</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">DEEP DIVE</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">DEEP DIVE</span>
     </div>
-    <h2 class="font-display" style="font-size:2em;color:#5D4037;margin:4px 0 12px">
-      <span class="material-icons-round" style="font-size:0.85em;color:#5A9FD8;vertical-align:-0.1em">videocam</span>
+    <h2 class="font-display" style="font-size:2em;color:var(--ink);margin:4px 0 12px">
+      <span class="material-icons-round" style="font-size:0.85em;color:var(--skyInk);vertical-align:-0.1em">videocam</span>
       카메라 영상 스트리밍 프로토콜
     </h2>
 
-    <p style="color:#8D6E63;font-size:0.72em;margin-bottom:14px">
+    <p style="color:var(--inkSoft);font-size:0.72em;margin-bottom:14px">
       로봇 Pi → UDP → Control Server → WebSocket → Admin UI · subscriber 0 명이면 즉시 drop.
     </p>
 
     <div style="flex:1;display:flex;flex-direction:column;gap:10px">
 
-      <div class="pastel-card" style="border-color:#D6ECFF;background:#FFFFFF;padding:14px 20px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">28B 헤더 + JPEG payload (단일 패킷 = 단일 frame)</h3>
-        <pre style="background:#FFF8F2;padding:10px 14px;border-radius:10px;color:#5D4037;font-size:0.6em;margin-top:8px;overflow-x:auto">magic "PING" | version | robot_id | stream_id | frame_seq | ts_ms | jpeg_size | CRC32</pre>
-        <p style="color:#8D6E63;font-size:0.62em;margin-top:8px;line-height:1.7">
+      <div class="pastel-card" style="border-color:var(--skySoft);background:var(--surface);padding:14px 20px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">28B 헤더 + JPEG payload (단일 패킷 = 단일 frame)</h3>
+        <pre style="background:var(--surface);padding:10px 14px;border-radius:10px;color:var(--ink);font-size:0.6em;margin-top:8px;overflow-x:auto">magic "PING" | version | robot_id | stream_id | frame_seq | ts_ms | jpeg_size | CRC32</pre>
+        <p style="color:var(--inkSoft);font-size:0.62em;margin-top:8px;line-height:1.7">
           MJPEG 640×480 q60 @ 25fps · 영상 9013/UDP · 제어 9012/UDP (intent_seq 단조 증가, 1초 간격 3회 재전송)
         </p>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
 
-        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">verified</span>
+        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">verified</span>
             4단 검증
           </h3>
-          <p style="color:#8D6E63;font-size:0.62em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.62em;margin-top:6px;line-height:1.7">
             magic / 길이 / CRC32 / frame_seq — 통과한 frame 만 hub 에.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">group_work</span>
+        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">group_work</span>
             multi-subscribe
           </h3>
-          <p style="color:#8D6E63;font-size:0.62em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.62em;margin-top:6px;line-height:1.7">
             한 client 가 여러 로봇 동시 구독. subscribe/unsubscribe 가 Pi 송출엔 영향 없음.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#9678B6;vertical-align:-0.15em">delete_sweep</span>
+        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--lavInk);vertical-align:-0.15em">delete_sweep</span>
             drop-oldest
           </h3>
-          <p style="color:#8D6E63;font-size:0.62em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.62em;margin-top:6px;line-height:1.7">
             client 큐 maxsize=1 — 늦은 client 가 stream 막지 않음.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#E0AC2B;vertical-align:-0.15em">cookie</span>
+        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--butterInk);vertical-align:-0.15em">cookie</span>
             세션 쿠키 핸드셰이크
           </h3>
-          <p style="color:#8D6E63;font-size:0.62em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.62em;margin-top:6px;line-height:1.7">
             fastapi-users 세션 쿠키로 WS 인증, 30초 heartbeat.
           </p>
         </div>

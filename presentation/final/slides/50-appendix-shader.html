@@ -3,36 +3,36 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip chip-butter" style="font-size:0.55em">APPENDIX · A3</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">DEEP DIVE</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">DEEP DIVE</span>
     </div>
-    <h2 class="font-display" style="font-size:2em;color:#5D4037;margin:4px 0 12px">
-      <span class="material-icons-round" style="font-size:0.85em;color:#E0AC2B;vertical-align:-0.1em">sentiment_satisfied_alt</span>
+    <h2 class="font-display" style="font-size:2em;color:var(--ink);margin:4px 0 12px">
+      <span class="material-icons-round" style="font-size:0.85em;color:var(--butterInk);vertical-align:-0.1em">sentiment_satisfied_alt</span>
       셰이더 표정 — 외부 이미지 없이 표정 합성
     </h2>
 
-    <p style="color:#8D6E63;font-size:0.72em;margin-bottom:14px">
+    <p style="color:var(--inkSoft);font-size:0.72em;margin-bottom:14px">
       9가지 표정 (basic·hello·happy·fun·interest·bored·sad·angry·sleep) 을 three.js 셰이더로 합성. 외부 이미지 자원 0.
     </p>
 
     <div style="flex:1;display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px">
 
-      <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;padding:18px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">파라미터</h3>
-        <ul style="list-style:none;padding:0;margin:10px 0 0;color:#5D4037;font-size:0.68em;line-height:1.9">
+      <div class="pastel-card" style="border-color:var(--butterSoft);background:var(--surface);padding:18px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">파라미터</h3>
+        <ul style="list-style:none;padding:0;margin:10px 0 0;color:var(--ink);font-size:0.68em;line-height:1.9">
           <li>· <b>closure</b> — 눈 감김 정도 (0~1)</li>
           <li>· <b>smileBow</b> — 입꼬리 곡률</li>
           <li>· <b>smileThickness</b> — 입 두께</li>
           <li>· <b>eyebrowAngle</b> — 눈썹 각도 (분노/슬픔)</li>
           <li>· <b>pupilOffset</b> — 동공 위치 (관심/지루함)</li>
         </ul>
-        <p style="color:#8D6E63;font-size:0.62em;margin-top:10px;line-height:1.7">
+        <p style="color:var(--inkSoft);font-size:0.62em;margin-top:10px;line-height:1.7">
           파라미터 interpolation 으로 표정 간 부드러운 전환.
         </p>
       </div>
 
-      <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px">
-        <p style="color:#8D6E63;font-size:0.65em;text-align:center;line-height:1.6">
-          9가지 표정 미리보기는<br>로봇 UI <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">EmotionDisplay.vue</code> 참조
+      <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px">
+        <p style="color:var(--inkSoft);font-size:0.65em;text-align:center;line-height:1.6">
+          9가지 표정 미리보기는<br>로봇 UI <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">EmotionDisplay.vue</code> 참조
         </p>
         <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">
           <span class="chip" style="font-size:0.5em">basic</span>

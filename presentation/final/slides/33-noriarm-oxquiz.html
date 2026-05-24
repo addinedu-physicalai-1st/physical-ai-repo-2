@@ -3,25 +3,25 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip chip-lavender" style="font-size:0.55em">NORIARM</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 2</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 2</span>
     </div>
-    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
-      <span class="material-icons-round" style="font-size:0.85em;color:#F8B4C4;vertical-align:-0.1em">quiz</span>
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 14px">
+      <span class="material-icons-round" style="font-size:0.85em;color:var(--babypink);vertical-align:-0.1em">quiz</span>
       OX 퀴즈
     </h2>
 
-    <p style="color:#8D6E63;font-size:0.78em;margin-bottom:16px">
+    <p style="color:var(--inkSoft);font-size:0.78em;margin-bottom:16px">
       3문제 무작위 추출 → 5초 카운트다운 → 손 위치로 정답 판정 → OMX 팔이 정답을 가리킵니다.
     </p>
 
     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
-      <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;display:flex;flex-direction:column;padding:18px">
-        <h3 class="font-display" style="font-size:1em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">pan_tool_alt</span>
+      <div class="pastel-card" style="border-color:var(--babypinkSoft);background:var(--surface);display:flex;flex-direction:column;padding:18px">
+        <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">pan_tool_alt</span>
           손 위치로 답하기
         </h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.7em;line-height:1.9;flex:1">
+        <ul style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.7em;line-height:1.9;flex:1">
           <li>· 책상 위 종이로 O / X 영역 표시</li>
           <li>· overhead 카메라 + MediaPipe Hands 검출</li>
           <li>· 5초 안에 손을 올리는 영역으로 정답 판정</li>
@@ -29,23 +29,23 @@
         </ul>
       </div>
 
-      <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;display:flex;flex-direction:column;padding:18px">
-        <h3 class="font-display" style="font-size:1em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#9678B6;vertical-align:-0.15em">smart_toy</span>
+      <div class="pastel-card" style="border-color:var(--lavenderSoft);background:var(--surface);display:flex;flex-direction:column;padding:18px">
+        <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--lavInk);vertical-align:-0.15em">smart_toy</span>
           OMX 팔이 답을 가리킨다
         </h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.7em;line-height:1.9;flex:1">
+        <ul style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.7em;line-height:1.9;flex:1">
           <li>· 정답 trajectory 를 룰베이스 정책으로 재생</li>
           <li>· three.js URDF 뷰어에 관절값 SSE 스트림</li>
           <li>· sim/real 동일 vision 파이프라인 — OMX 팔 레이어만 분기</li>
-          <li>· 매니페스트 <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">policy.kind</code> 변경 시 SmolVLA 로 교체 가능</li>
+          <li>· 매니페스트 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">policy.kind</code> 변경 시 SmolVLA 로 교체 가능</li>
         </ul>
       </div>
 
-      <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;grid-column:1 / span 2;padding:14px 22px;display:flex;align-items:center;gap:14px">
-        <span class="material-icons-round" style="font-size:30px;color:#5DBFA3;flex:0 0 auto">science</span>
-        <p style="color:#8D6E63;font-size:0.72em;line-height:1.7">
-          <b style="color:#5D4037">실험적 정책 교체</b> — 같은 게임 루프 위에서 rule_based ↔ SmolVLA 모방학습으로 비교 가능.
+      <div class="pastel-card" style="border-color:var(--border);background:var(--surface);grid-column:1 / span 2;padding:14px 22px;display:flex;align-items:center;gap:14px">
+        <span class="material-icons-round" style="font-size:30px;color:var(--mintInk);flex:0 0 auto">science</span>
+        <p style="color:var(--inkSoft);font-size:0.72em;line-height:1.7">
+          <b style="color:var(--ink)">실험적 정책 교체</b> — 같은 게임 루프 위에서 rule_based ↔ SmolVLA 모방학습으로 비교 가능.
           매니페스트만 바꾸면 UI·통신·검출 파이프라인은 동일하게 유지.
         </p>
       </div>

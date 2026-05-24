@@ -3,45 +3,45 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip chip-mint" style="font-size:0.55em">APPENDIX · A2</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MENTOR Q2</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MENTOR Q2</span>
     </div>
-    <h2 class="font-display" style="font-size:2em;color:#5D4037;margin:4px 0 8px">
+    <h2 class="font-display" style="font-size:2em;color:var(--ink);margin:4px 0 8px">
       SmolVLA pick 정확도가 왜 낮은가
     </h2>
-    <p style="color:#8D6E63;font-size:0.72em;margin-bottom:14px">
+    <p style="color:var(--inkSoft);font-size:0.72em;margin-bottom:14px">
       한글 프롬프트 ("딸기 줘") · 태스크당 50개 (총 250) 학습 후 객체 pick 정확도 저조. 가설 3가지.
     </p>
 
     <div style="flex:1;display:flex;flex-direction:column;gap:10px">
 
-      <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;padding:14px 20px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-          <span style="background:#F8B4C4;color:#FFFFFF;font-family:'Jua';font-size:0.7em;width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;vertical-align:-0.2em">1</span>
+      <div class="pastel-card" style="border-color:var(--babypinkSoft);background:var(--surface);padding:14px 20px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+          <span style="background:var(--babypink);color:#FFFFFF;font-family:'Jua';font-size:0.7em;width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;vertical-align:-0.2em">1</span>
           백본 LLM 한글 미지원
         </h3>
-        <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+        <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
           SmolVLA 백본은 영어 위주 — 한글 토큰화 품질이 떨어져 action embedding 까지 영향.
           영어 프롬프트 또는 한글 → 영어 사전 변환 layer 실험 필요.
         </p>
       </div>
 
-      <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;padding:14px 20px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-          <span style="background:#5DBFA3;color:#FFFFFF;font-family:'Jua';font-size:0.7em;width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;vertical-align:-0.2em">2</span>
+      <div class="pastel-card" style="border-color:var(--mintSoft);background:var(--surface);padding:14px 20px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+          <span style="background:var(--mintInk);color:#FFFFFF;font-family:'Jua';font-size:0.7em;width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;vertical-align:-0.2em">2</span>
           데이터 규모 부족 — 오버핏
         </h3>
-        <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+        <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
           태스크당 50개로는 vision backbone 까지 학습돼 train set 에 오버핏. ACT 데이터셋 (블럭쌓기) 규모 참조 →
           최소 태스크당 100~150개 + augmentation (조명·배경·각도) 필요.
         </p>
       </div>
 
-      <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;padding:14px 20px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-          <span style="background:#9678B6;color:#FFFFFF;font-family:'Jua';font-size:0.7em;width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;vertical-align:-0.2em">3</span>
+      <div class="pastel-card" style="border-color:var(--lavenderSoft);background:var(--surface);padding:14px 20px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+          <span style="background:var(--lavInk);color:#FFFFFF;font-family:'Jua';font-size:0.7em;width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;vertical-align:-0.2em">3</span>
           태스크 분해 적합성
         </h3>
-        <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+        <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
           왼손 4단계 (접시 집기 → 대기 → 내밀기 → 원위치) / 오른손 4단계 (객체 집기 → 접시 위 → 종 → 원위치) 의
           long-horizon 이 SmolVLA 의 action chunk 보다 길 가능성 — 단일 객체 pick 만 별도 학습으로 분해 검증.
         </p>

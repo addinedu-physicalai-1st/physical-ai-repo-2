@@ -1,23 +1,40 @@
 <section>
-  <div style="padding:80px;height:680px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+  <div class="bg-deco">
+    <div class="dots"></div>
+    <div class="blob" style="width:280px;height:280px;background:var(--babypinkSoft);top:-90px;right:120px;opacity:.4"></div>
+  </div>
 
-    <span class="material-icons-round" style="font-size:64px;color:#F8B4C4;opacity:0.5">format_quote</span>
+  <div class="layer" style="height:680px;box-sizing:border-box;display:flex;align-items:center;gap:56px;padding:0 70px">
 
-    <p class="font-display" style="font-size:2.4em;color:#5D4037;line-height:1.5;margin:24px 0 32px;max-width:900px">
-      선생님은<br>
-      <span style="color:#F8B4C4">슈퍼맨이 아니에요</span>.
-    </p>
+    <!-- 사진 -->
+    <div class="r" style="--i:0;flex:0 0 46%;display:flex;flex-direction:column;align-items:center">
+      <div style="position:relative;display:inline-block">
+        <span style="position:absolute;inset:-12px;border-radius:28px;background:var(--babypinkSoft);transform:rotate(-3deg);z-index:0"></span>
+        <img class="zoomable photo" src="slides/assets/teacher-reading.jpg" alt="아이들에게 책을 읽어주는 교사"
+             style="position:relative;z-index:1;width:100%;height:420px" />
+      </div>
+    </div>
 
-    <div style="width:60px;height:4px;border-radius:999px;background:#FFE0E6"></div>
+    <!-- 인용 + 수치 -->
+    <div style="flex:1">
+      <span class="r material-icons-round" style="--i:1;font-size:56px;color:var(--babypink);opacity:0.55">format_quote</span>
 
-    <p style="font-family:'Jua';color:#8D6E63;font-size:0.95em;margin-top:24px;line-height:1.8;max-width:700px">
-      "혼자서 12명을 다 챙기는 게 사실 불가능해요.<br>
-      놓치는 게 있을 수밖에 없고, 그게 늘 마음에 남죠."
-    </p>
+      <p class="r font-display" style="--i:2;font-size:2.4em;color:var(--ink);line-height:1.4;margin:10px 0 24px">
+        선생님은<br>
+        <span style="color:var(--pinkInk)">슈퍼맨이 아니에요</span>.
+      </p>
 
-    <p style="color:#8D6E63;font-size:0.75em;margin-top:14px">
-      — 8년차 어린이집 교사
-    </p>
+      <div class="r" style="--i:3;width:60px;height:4px;border-radius:999px;background:var(--babypink)"></div>
+
+      <p class="r" style="--i:4;color:var(--inkSoft);font-size:0.95em;margin-top:24px;line-height:1.8">
+        보육교직원의 <span class="font-display" style="color:var(--lavInk);font-size:1.25em">80.6%</span> 가
+        "<b style="color:var(--ink)">임금·근무 여건</b> 이 계속 일할지를 좌우한다" 고 답했습니다.
+      </p>
+
+      <p class="r" style="--i:5;color:var(--inkFaint);font-size:0.6em;margin-top:18px">
+        출처 · 육아정책연구소(KICCE) 보육교직원 조사 (2023)
+      </p>
+    </div>
 
   </div>
 </section>

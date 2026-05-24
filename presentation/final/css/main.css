@@ -1,46 +1,65 @@
 /* ==========================================
-   pingdergarten — 파스텔 유치원 테마
+   pingdergarten — 다크 키즈 테마 (Dark Kids)
+   딥 차콜 배경 + 캔디톤 악센트 + 둥근 Jua
+   토큰 이름은 라이트 시절과 동일하게 유지(슬라이드 호환)
    ========================================== */
 
 :root {
-  --cream:    #FFF8F2;
-  --surface:  #FFFFFF;
-  --babypink: #F8B4C4;
-  --babypinkSoft: #FFD3DD;
-  --mint:     #B5E6D8;
-  --mintSoft: #D6F2E8;
-  --butter:   #FFE5A8;
-  --butterSoft: #FFF0CC;
-  --lavender: #C9B6E4;
-  --lavenderSoft: #E2D4F0;
-  --sky:      #B5DEFF;
-  --skySoft:  #D6ECFF;
-  --ink:      #5D4037;
-  --inkSoft:  #8D6E63;
-  --border:   #FFE0E6;
+  /* surfaces */
+  --canvas:   #16131F;   /* slide background — warm deep charcoal */
+  --surface:  #241F33;   /* card surface */
+  --surface2: #2C2740;   /* raised surface */
+  --cream:    #16131F;   /* legacy name → maps to canvas */
+
+  /* candy accents (bright = legible on dark) */
+  --babypink: #FF6F86;  --babypinkSoft: rgba(255,111,134,.16);
+  --mint:     #3FD9A6;  --mintSoft:     rgba(63,217,166,.16);
+  --butter:   #FFD25E;  --butterSoft:   rgba(255,210,94,.16);
+  --lavender: #B98CFF;  --lavenderSoft: rgba(185,140,255,.16);
+  --sky:      #5BB6FF;  --skySoft:      rgba(91,182,255,.16);
+
+  /* accent text (same bright tone reads as the accent on dark) */
+  --pinkInk:   #FF6F86;
+  --mintInk:   #3FD9A6;
+  --butterInk: #FFD25E;
+  --lavInk:    #B98CFF;
+  --skyInk:    #5BB6FF;
+
+  /* text */
+  --ink:      #F4EFE8;   /* primary — warm white */
+  --inkSoft:  #A79FB4;   /* secondary */
+  --inkFaint: #6F6885;   /* captions / sources */
+  --border:   rgba(255,255,255,.10);
+
+  /* structure */
+  --r-lg: 24px;
+  --r-md: 18px;
+  --sh-1: 0 6px 14px rgba(0,0,0,.30);
+  --sh-2: 0 18px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05);
+  --sh-3: 0 24px 54px rgba(0,0,0,.50);
+  --ease: cubic-bezier(.22,.7,.3,1);
 }
 
 html, body {
-  background: var(--cream);
+  background: var(--canvas);
   color: var(--ink);
-  font-family: 'Gaegu', system-ui, sans-serif;
+  font-family: 'Pretendard Variable', system-ui, sans-serif;
 }
 
 /* Reveal overrides */
+.reveal-viewport, html.reveal-viewport { background: var(--canvas) !important; }
 .reveal {
-  font-family: 'Gaegu', system-ui, sans-serif;
+  font-family: 'Pretendard Variable', system-ui, sans-serif;
   color: var(--ink);
 }
-.reveal .slides {
-  text-align: left;
-}
+.reveal .slides { text-align: left; }
 .reveal .slides section {
-  background: var(--cream);
+  background: var(--canvas);
   color: var(--ink);
   font-size: 28px;
 }
 .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
-  font-family: 'Jua', 'Gaegu', system-ui, sans-serif;
+  font-family: 'Jua', 'Pretendard Variable', system-ui, sans-serif;
   color: var(--ink);
   text-transform: none;
   letter-spacing: 0;
@@ -58,18 +77,16 @@ html, body {
   font-family: 'Jua', system-ui, sans-serif;
   font-size: 12px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(248, 180, 196, 0.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
 }
 .reveal .slide-number:hover {
   background: var(--babypinkSoft);
-  color: var(--ink);
-}
-
-.reveal .controls {
   color: var(--babypink);
 }
+
+.reveal .controls { color: var(--babypink); }
 .reveal .progress {
-  background: var(--border);
+  background: rgba(255,255,255,.08);
   color: var(--babypink);
   height: 4px;
 }
@@ -93,19 +110,20 @@ html, body {
 
 /* Slide thumbnail panel */
 #slide-panel.flex { display: flex; }
+#slide-panel { background: var(--surface) !important; }
 .slide-thumb-item {
-  background: var(--surface);
+  background: var(--surface2);
   border: 2px solid var(--border);
   border-radius: 14px;
   padding: 10px 12px;
   cursor: pointer;
   transition: all 0.18s ease;
-  box-shadow: 0 2px 6px rgba(248, 180, 196, 0.08);
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
 }
 .slide-thumb-item:hover {
   border-color: var(--babypink);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(248, 180, 196, 0.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,.45);
 }
 .slide-thumb-item.active {
   border-color: var(--babypink);
@@ -125,7 +143,7 @@ html, body {
   height: 26px;
   border-radius: 50%;
   background: var(--babypink);
-  color: white;
+  color: #16131F;
   font-size: 12px;
   flex-shrink: 0;
 }
@@ -136,6 +154,7 @@ html, body {
 }
 .slide-thumb-item.active .slide-thumb-num {
   background: var(--ink);
+  color: #16131F;
 }
 
 /* Material icons sizing helper */
@@ -149,7 +168,7 @@ html, body {
   font-feature-settings: 'liga';
 }
 
-/* Pastel chip / pill */
+/* Candy chip / pill — tinted bg + bright text on dark */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -159,25 +178,120 @@ html, body {
   font-family: 'Jua', system-ui, sans-serif;
   font-size: 0.6em;
   background: var(--babypinkSoft);
-  color: var(--ink);
+  color: var(--babypink);
 }
-.chip-mint     { background: var(--mintSoft); }
-.chip-butter   { background: var(--butterSoft); }
-.chip-lavender { background: var(--lavenderSoft); }
-.chip-sky      { background: var(--skySoft); }
+.chip-mint     { background: var(--mintSoft);     color: var(--mint); }
+.chip-butter   { background: var(--butterSoft);   color: var(--butter); }
+.chip-lavender { background: var(--lavenderSoft);  color: var(--lavender); }
+.chip-sky      { background: var(--skySoft);       color: var(--sky); }
 
-/* Pastel card */
+/* Card — raised dark surface */
 .pastel-card {
   background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
   padding: 20px;
-  box-shadow: 0 8px 24px rgba(248, 180, 196, 0.12);
+  box-shadow: var(--sh-2);
 }
 
 /* Decorative wavy underline */
 .wavy {
   text-decoration: underline wavy var(--babypink);
-  text-underline-offset: 6px;
-  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
+  text-decoration-thickness: 2.5px;
+}
+
+/* ==========================================
+   Dark Kids — components & utilities
+   ========================================== */
+
+/* content layer sits above decorative background */
+.layer { position: relative; z-index: 1; }
+
+/* eyebrow / section label */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: 'Jua', system-ui, sans-serif;
+  font-size: 0.62em;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--inkSoft);
+}
+.eyebrow::before {
+  content: "";
+  width: 0.46em; height: 0.46em;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+.eyebrow-pink   { color: var(--pinkInk); }
+.eyebrow-mint   { color: var(--mintInk); }
+.eyebrow-lav    { color: var(--lavInk); }
+.eyebrow-butter { color: var(--butterInk); }
+.eyebrow-sky    { color: var(--skyInk); }
+
+/* slide title */
+.s-title {
+  font-family: 'Jua', system-ui, sans-serif;
+  font-weight: 400;
+  color: var(--ink);
+  font-size: 2.2em;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  margin: 0.18em 0 0.55em;
+}
+
+/* number / icon badge — tinted rounded square */
+.badge {
+  border-radius: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Jua', system-ui, sans-serif;
+}
+
+/* photo treatment — subtle frame + deep shadow */
+.photo {
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-3);
+  object-fit: cover;
+}
+
+/* decorative background — soft candy glows + faint dots */
+.bg-deco {
+  position: absolute; inset: 0;
+  overflow: hidden; z-index: 0;
+  pointer-events: none;
+}
+.bg-deco .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.9;
+}
+.bg-deco .dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.05) 1.3px, transparent 1.3px);
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 45%, #000 55%, transparent 100%);
+          mask-image: radial-gradient(ellipse 82% 72% at 50% 45%, #000 55%, transparent 100%);
+}
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.bg-deco .float { animation: floaty 7s ease-in-out infinite; }
+
+/* entrance motion — replayed on slide enter via .go (added in main.js) */
+.r {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity .55s var(--ease), transform .55s var(--ease);
+}
+.reveal section.go .r { opacity: 1; transform: none; }
+.go .r { transition-delay: calc(var(--i, 0) * 70ms); }
+
+/* never hide content for print / PDF export */
+@media print {
+  .r { opacity: 1 !important; transform: none !important; }
 }

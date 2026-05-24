@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>디자인 시안 — pingdergarten</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Pretendard Variable',system-ui,sans-serif;background:#FBF6EF;color:#3A2D28;padding:56px 32px 72px;}
+    .wrap{max-width:1080px;margin:0 auto;}
+    h1{font-family:'Jua';font-size:46px;margin-bottom:8px;}
+    .sub{color:#8A766C;font-size:17px;margin-bottom:6px;}
+    .hint{color:#B6A89F;font-size:14px;margin-bottom:40px;}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+    .card{border-radius:22px;overflow:hidden;border:1.5px solid rgba(0,0,0,.08);box-shadow:0 14px 36px rgba(0,0,0,.10);background:#fff;display:flex;flex-direction:column;transition:transform .18s ease,box-shadow .18s ease;}
+    .card:hover{transform:translateY(-4px);box-shadow:0 22px 50px rgba(0,0,0,.16);}
+    .swatch{height:150px;display:flex;align-items:center;justify-content:center;font-family:'Jua';font-size:40px;position:relative;}
+    .swatch .dots{position:absolute;bottom:14px;left:0;right:0;display:flex;gap:8px;justify-content:center;}
+    .swatch .dots span{width:18px;height:18px;border-radius:50%;}
+    .body{padding:22px;flex:1;display:flex;flex-direction:column;}
+    .tag{font-family:'Jua';font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#B6A89F;}
+    .ttl{font-family:'Jua';font-size:24px;margin:4px 0 10px;}
+    .desc{font-size:14.5px;line-height:1.65;color:#6B5B52;flex:1;}
+    .open{margin-top:18px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Jua';font-size:16px;text-decoration:none;color:#fff;padding:12px;border-radius:14px;}
+    .note{margin-top:40px;padding:18px 22px;border-radius:16px;background:#FCEFD0;border:1.5px solid #E8A21C;color:#7a5a12;font-size:14.5px;line-height:1.6;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>pingdergarten · 디자인 시안 3종</h1>
+    <p class="sub">같은 대표 슬라이드 3장(타이틀 · 통계 · 에듀핑)을 세 방향으로 만들었습니다. 하나 골라 주시면 전체 51장에 적용합니다.</p>
+    <p class="hint">각 시안을 열고 ← → 키로 3장을 넘겨 보세요. 슬라이드 진입 시 등장 모션이 재생됩니다.</p>
+
+    <div class="grid">
+      <!-- A -->
+      <div class="card">
+        <div class="swatch" style="background:#FFF8F2;color:#DD6E8A;">
+          <span style="color:#DD6E8A">ping</span><span style="color:#8567B5">der</span><span style="color:#3AA98C">garten</span>
+          <div class="dots"><span style="background:#F8B4C4"></span><span style="background:#B5E6D8"></span><span style="background:#FFE5A8"></span><span style="background:#C9B6E4"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Direction A</span>
+          <div class="ttl">Elevated Pastel</div>
+          <p class="desc">현재 파스텔 정체성을 그대로 두고 완성도만 끌어올린 버전. 부드러운 깊이감(레이어드 그림자)·일관된 타이포 스케일·코너 데코 블롭·등장 모션. <b>가장 안전 — 기존 작업 보존.</b></p>
+          <a class="open" style="background:#DD6E8A" href="direction-a.html">A 열기 →</a>
+        </div>
+      </div>
+
+      <!-- B -->
+      <div class="card">
+        <div class="swatch" style="background:#FBF6EF;color:#3A2D28;">
+          <span>ping</span><span style="color:#8364C0">der</span><span style="color:#1FA68A">garten</span>
+          <div class="dots"><span style="background:#EE6E8C"></span><span style="background:#8364C0"></span><span style="background:#1FA68A"></span><span style="background:#E8A21C"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Direction B</span>
+          <div class="ttl">Bold Editorial</div>
+          <p class="desc">같은 파스텔 색을 과감하게 — 컬러 블록·초대형 숫자/타이틀·세로 인덱스 레일·스티커 태그·비대칭 그리드. 편집디자인 같은 자신감. <b>인상은 강하지만 변화 폭이 큼.</b></p>
+          <a class="open" style="background:#EE6E8C" href="direction-b.html">B 열기 →</a>
+        </div>
+      </div>
+
+      <!-- C -->
+      <div class="card">
+        <div class="swatch" style="background:#16120F;">
+          <span style="color:#FF9FB6">ping</span><span style="color:#C6ADF2">der</span><span style="color:#84E6CD">garten</span>
+          <div class="dots"><span style="background:#FF9FB6"></span><span style="background:#84E6CD"></span><span style="background:#C6ADF2"></span><span style="background:#FFD98A"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Direction C</span>
+          <div class="ttl">Dark Keynote</div>
+          <p class="desc">완전히 새로운 톤 — 딥 차콜 배경에 파스텔을 네온처럼 발광시키고, 글래스(반투명) 카드·그리드 배경. "진지한 피지컬 AI 제품" 인상. <b>유아 따뜻함은 다소 줄어드는 트레이드오프.</b></p>
+          <a class="open" style="background:#16120F" href="direction-c.html">C 열기 →</a>
+        </div>
+      </div>
+    </div>
+
+    <h1 style="font-size:34px;margin:48px 0 6px;">+ 완전히 다른 디자인 4종</h1>
+    <p class="sub" style="margin-bottom:28px;">현재 파스텔 계열을 벗어난 새 디자인 언어. 모두 고대비·가독성 우선.</p>
+
+    <div class="grid" style="grid-template-columns:repeat(4,1fr);">
+      <!-- Brutalist -->
+      <div class="card">
+        <div class="swatch" style="background:#FFFDF6;font-size:30px;">
+          <span style="color:#FF5D73">ping</span><span style="color:#7C5CFF">der</span><span style="color:#13C2A3">garten</span>
+          <div class="dots"><span style="background:#FF5D73"></span><span style="background:#13C2A3"></span><span style="background:#FFC53D"></span><span style="background:#7C5CFF"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">New 1</span><div class="ttl">네오브루탈리즘</div>
+          <p class="desc">굵은 검정 외곽선 + 하드 오프셋 그림자 + 쨍한 플랫 컬러. 가장 또렷하고 재미있는, 현재와 가장 다른 안.</p>
+          <a class="open" style="background:#17120E" href="new-brutalist.html">열기 →</a>
+        </div>
+      </div>
+      <!-- Swiss -->
+      <div class="card">
+        <div class="swatch" style="background:#fff;font-size:30px;color:#111;font-family:'Pretendard Variable';font-weight:800;">
+          ping<span style="color:#F23A4D">der</span>garten
+          <div class="dots"><span style="background:#111"></span><span style="background:#F23A4D"></span><span style="background:#9A9A9A"></span><span style="background:#DADADA"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">New 2</span><div class="ttl">스위스 에디토리얼</div>
+          <p class="desc">흰 바탕 + 초대형 타이포 + 단일 강조색(레드) + 엄격한 그리드/여백. 깔끔·전문적·고가독.</p>
+          <a class="open" style="background:#F23A4D" href="new-swiss.html">열기 →</a>
+        </div>
+      </div>
+      <!-- Crayon -->
+      <div class="card">
+        <div class="swatch" style="background:#FBF3E4;font-size:30px;">
+          <span style="color:#EF6F6C">ping</span><span style="color:#9B7EDE">der</span><span style="color:#56B98C">garten</span>
+          <div class="dots"><span style="background:#EF6F6C"></span><span style="background:#56B98C"></span><span style="background:#EFB93E"></span><span style="background:#5E9FD8"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">New 3</span><div class="ttl">크레용 동화책</div>
+          <p class="desc">종이 질감 + 손그림 낙서·물결 + 손글씨(Gaegu) + 스티키노트 카드. 유아 감성 극대화, 따뜻.</p>
+          <a class="open" style="background:#EF6F6C" href="new-crayon.html">열기 →</a>
+        </div>
+      </div>
+      <!-- Gradient -->
+      <div class="card">
+        <div class="swatch" style="background:linear-gradient(140deg,#3A1C71,#4A1F87 45%,#1E2A78);font-size:26px;color:#fff;">
+          pingdergarten
+          <div class="dots"><span style="background:#FF5FA2"></span><span style="background:#9D7BFF"></span><span style="background:#2DD4BF"></span><span style="background:#5B8CFF"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">New 4</span><div class="ttl">비비드 그라디언트</div>
+          <p class="desc">선명한 그라디언트 면 + 글래스(반투명) 카드 + 굵은 타이포. 임팩트·모던·AI 제품 느낌.</p>
+          <a class="open" style="background:#4A1F87" href="new-gradient.html">열기 →</a>
+        </div>
+      </div>
+    </div>
+
+    <h1 style="font-size:34px;margin:48px 0 6px;">+ 구조가 다른 디자인 4종</h1>
+    <p class="sub" style="margin-bottom:28px;">색/폰트가 아니라 레이아웃 패러다임 자체가 다른 안.</p>
+
+    <div class="grid" style="grid-template-columns:repeat(4,1fr);">
+      <!-- Bento -->
+      <div class="card">
+        <div class="swatch" style="background:#EBEDF1;font-size:24px;">
+          <span style="color:#FF6B8A">ping</span><span style="color:#7C5CFF">der</span><span style="color:#13BFA0">garten</span>
+          <div class="dots"><span style="background:#FF6B8A"></span><span style="background:#13BFA0"></span><span style="background:#7C5CFF"></span><span style="background:#F5A623"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Struct 1</span><div class="ttl">벤토 그리드</div>
+          <p class="desc">크기 제각각인 모듈 박스 그리드. 제목+본문 구조를 버린 모던 구성. 정보 밀도 높음.</p>
+          <a class="open" style="background:#1E2430" href="struct-bento.html">열기 →</a>
+        </div>
+      </div>
+      <!-- Comic -->
+      <div class="card">
+        <div class="swatch" style="background:#FFFDF4;font-size:24px;">
+          <span style="color:#E63A46">ping</span><span style="color:#2D7DD2">der</span><span style="color:#16BFa0">garten</span>
+          <div class="dots"><span style="background:#E63A46"></span><span style="background:#FFD23F"></span><span style="background:#2D7DD2"></span><span style="background:#16BFA0"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Struct 2</span><div class="ttl">만화 / 스토리보드</div>
+          <p class="desc">만화 칸 + 말풍선 + 내레이션 박스. 로봇이 주인공인 이야기 구조. 가장 놀이감 있음.</p>
+          <a class="open" style="background:#E63A46" href="struct-comic.html">열기 →</a>
+        </div>
+      </div>
+      <!-- Terminal -->
+      <div class="card">
+        <div class="swatch" style="background:#0A0E16;font-size:22px;font-family:monospace;">
+          <span style="color:#FF6AC1">ping</span><span style="color:#56D4DD">der</span><span style="color:#3DDC84">garten</span>
+          <div class="dots"><span style="background:#3DDC84"></span><span style="background:#56D4DD"></span><span style="background:#FF6AC1"></span><span style="background:#F5D76E"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Struct 3</span><div class="ttl">터미널 / 로봇 콘솔</div>
+          <p class="desc">모노스페이스 + 명령창/코드블록. 다크. AI·로보틱스 기술 신뢰감, 개발자·심사 임팩트.</p>
+          <a class="open" style="background:#0A0E16" href="struct-terminal.html">열기 →</a>
+        </div>
+      </div>
+      <!-- Blueprint -->
+      <div class="card">
+        <div class="swatch" style="background:#0E2A47;font-size:24px;color:#EAF4FA;">
+          ping<span style="color:#6FD3F2">der</span>garten
+          <div class="dots"><span style="background:#6FD3F2"></span><span style="background:#EAF4FA"></span><span style="background:#FFCB6B"></span><span style="background:#86A6C0"></span></div>
+        </div>
+        <div class="body">
+          <span class="tag">Struct 4</span><div class="ttl">블루프린트 / 기술도면</div>
+          <p class="desc">네이비 + 시안 그리드 위 라인 도면 + 치수·주석·콜아웃·타이틀블록. 엔지니어링 도면 느낌.</p>
+          <a class="open" style="background:#0E2A47" href="struct-blueprint.html">열기 →</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      💡 <b>보는 법</b> — 로컬 파일을 더블클릭해도 열리지만, 폰트·reveal.js CDN 로딩과 모션을 정확히 보려면 <code>final/</code>에서 로컬 서버를 띄우는 걸 권합니다:
+      <code>cd final &amp;&amp; python3 -m http.server 8000</code> → 브라우저에서 <code>localhost:8000/_proto/</code>
+    </div>
+  </div>
+</body>
+</html>

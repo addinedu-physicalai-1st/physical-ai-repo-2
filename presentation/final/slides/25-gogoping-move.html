@@ -3,63 +3,63 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip chip-mint" style="font-size:0.55em">GOGOPING</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 2 · HERO</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 2 · HERO</span>
     </div>
-    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
-      <span class="material-icons-round" style="font-size:0.85em;color:#5DBFA3;vertical-align:-0.1em">explore</span>
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 14px">
+      <span class="material-icons-round" style="font-size:0.85em;color:var(--mintInk);vertical-align:-0.1em">explore</span>
       자율 이동 (운반)
     </h2>
 
-    <p style="color:#8D6E63;font-size:0.78em;margin-bottom:16px">
-      Admin UI 지도에서 클릭만 — <b style="color:#5D4037">SLAM 맵 + nav graph</b> 위로 GogoPing 이 자율 주행으로 갑니다.
+    <p style="color:var(--inkSoft);font-size:0.78em;margin-bottom:16px">
+      Admin UI 지도에서 클릭만 — <b style="color:var(--ink)">SLAM 맵 + nav graph</b> 위로 GogoPing 이 자율 주행으로 갑니다.
     </p>
 
     <div style="flex:1;display:grid;grid-template-columns:1.1fr 0.9fr;gap:18px">
 
-      <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;display:flex;flex-direction:column;padding:18px">
-        <h3 class="font-display" style="font-size:1em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">edit_location_alt</span>
+      <div class="pastel-card" style="border-color:var(--border);background:var(--surface);display:flex;flex-direction:column;padding:18px">
+        <h3 class="font-display" style="font-size:1em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">edit_location_alt</span>
           관제 화면에서 클릭 한 번
         </h3>
-        <ol style="list-style:none;padding:0;margin:10px 0 0;color:#5D4037;font-size:0.7em;line-height:2;flex:1">
-          <li><b style="color:#F8B4C4">1.</b> 교사가 Admin UI 지도에서 목적지 (named pose) 클릭</li>
-          <li><b style="color:#5DBFA3">2.</b> Control Server 가 ROS2 액션 <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">/carry/deliver</code> send_goal</li>
-          <li><b style="color:#9678B6">3.</b> GogoPing 이 nav graph 따라 자율 주행</li>
-          <li><b style="color:#E0AC2B">4.</b> 도착 시 음성 합성 + 토스트 알림</li>
-          <li><b style="color:#5A9FD8">5.</b> 그 자리에서 대기 — 다음 명령까지</li>
+        <ol style="list-style:none;padding:0;margin:10px 0 0;color:var(--ink);font-size:0.7em;line-height:2;flex:1">
+          <li><b style="color:var(--babypink)">1.</b> 교사가 Admin UI 지도에서 목적지 (named pose) 클릭</li>
+          <li><b style="color:var(--mintInk)">2.</b> Control Server 가 ROS2 액션 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">/carry/deliver</code> send_goal</li>
+          <li><b style="color:var(--lavInk)">3.</b> GogoPing 이 nav graph 따라 자율 주행</li>
+          <li><b style="color:var(--butterInk)">4.</b> 도착 시 음성 합성 + 토스트 알림</li>
+          <li><b style="color:var(--skyInk)">5.</b> 그 자리에서 대기 — 다음 명령까지</li>
         </ol>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px">
 
-        <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">hub</span>
+        <div class="pastel-card" style="border-color:var(--mintSoft);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">hub</span>
             nav graph 직접 편집
           </h3>
-          <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
             Admin UI 에서 노드·간선·이름을 시각적으로 편집.
             거리 임계 자동 간선 / 1-step undo / yaml atomic write 로 즉시 반영.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#E0AC2B;vertical-align:-0.15em">shield</span>
+        <div class="pastel-card" style="border-color:var(--butterSoft);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--butterInk);vertical-align:-0.15em">shield</span>
             동적 장애물 회피
           </h3>
-          <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
             LiDAR occupancy + 카메라 객체 인식 으로 사람·아이를 항상 감지.
             인접 시 속도 스케일 다운, 임계 이하 즉시 정지.
           </p>
         </div>
 
-        <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-            <span class="material-icons-round" style="font-size:18px;color:#9678B6;vertical-align:-0.15em">battery_charging_full</span>
+        <div class="pastel-card" style="border-color:var(--lavenderSoft);background:var(--surface);padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+            <span class="material-icons-round" style="font-size:18px;color:var(--lavInk);vertical-align:-0.15em">battery_charging_full</span>
             저배터리 자동 복귀
           </h3>
-          <p style="color:#8D6E63;font-size:0.65em;margin-top:6px;line-height:1.7">
+          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
             배터리 임계 도달 시 비긴급 작업 cancel → <code>charger</code> named pose 로 자동 복귀.
           </p>
         </div>

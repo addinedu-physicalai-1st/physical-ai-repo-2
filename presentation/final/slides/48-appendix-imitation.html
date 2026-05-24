@@ -3,20 +3,20 @@
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip" style="font-size:0.55em">APPENDIX · A1</span>
-      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MENTOR Q1</span>
+      <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MENTOR Q1</span>
     </div>
-    <h2 class="font-display" style="font-size:2em;color:#5D4037;margin:4px 0 12px">
+    <h2 class="font-display" style="font-size:2em;color:var(--ink);margin:4px 0 12px">
       모방학습 성과를 어떻게 정량 측정하나
     </h2>
 
     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px">
 
-      <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;padding:18px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">analytics</span>
+      <div class="pastel-card" style="border-color:var(--babypinkSoft);background:var(--surface);padding:18px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">analytics</span>
           행위 단위 지표
         </h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.68em;line-height:1.9">
+        <ul style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.68em;line-height:1.9">
           <li>· <b>Pickup 성공률</b> — ROI 비워짐 검출률</li>
           <li>· <b>Stack 성공률</b> — HOME_POSE 복귀 × 정상 적재</li>
           <li>· <b>Trajectory 충돌</b> — joint 임계 초과 횟수</li>
@@ -24,12 +24,12 @@
         </ul>
       </div>
 
-      <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;padding:18px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">scoreboard</span>
+      <div class="pastel-card" style="border-color:var(--mintSoft);background:var(--surface);padding:18px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">scoreboard</span>
           학습 품질 지표
         </h3>
-        <ul style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.68em;line-height:1.9">
+        <ul style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.68em;line-height:1.9">
           <li>· <b>Action MSE</b> — 정답 trajectory vs 추론</li>
           <li>· <b>Action L2</b> — 마지막 timestep 거리</li>
           <li>· <b>Validation success</b> — held-out 데모 reproducibility</li>
@@ -37,12 +37,12 @@
         </ul>
       </div>
 
-      <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;grid-column:1 / span 2;padding:14px 22px">
-        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
-          <span class="material-icons-round" style="font-size:18px;color:#9678B6;vertical-align:-0.15em">timeline</span>
+      <div class="pastel-card" style="border-color:var(--border);background:var(--surface);grid-column:1 / span 2;padding:14px 22px">
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink)">
+          <span class="material-icons-round" style="font-size:18px;color:var(--lavInk);vertical-align:-0.15em">timeline</span>
           시각화 — wandb 패널
         </h3>
-        <p style="color:#8D6E63;font-size:0.68em;margin-top:6px;line-height:1.7">
+        <p style="color:var(--inkSoft);font-size:0.68em;margin-top:6px;line-height:1.7">
           학습 시 loss curve + validation reward · 추론 시 per-episode 성공률 · 누적 충돌 횟수 시계열.
           체크포인트 다이프별 비교로 회귀 감지.
         </p>
