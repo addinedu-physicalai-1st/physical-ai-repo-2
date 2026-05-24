@@ -76,19 +76,18 @@
       "displayName": "NoriArm",
       "wakeWord": "노리암",
       "wakeWordAliases": ["놀이암", "노리아", "노라암", "노리야"],
-      "modes": ["대기", "놀이", "블럭쌓기", "OX 퀴즈"],
+      "modes": ["대기", "OX 퀴즈", "블럭쌓기", "가게놀이"],
       "modeTree": [
         "대기",
-        {
-          "id": "놀이", "selfSelectable": false,
-          "children": ["블럭쌓기", "OX 퀴즈"]
-        }
+        "OX 퀴즈",
+        "블럭쌓기",
+        "가게놀이"
       ],
       "defaultEmotionByMode": {
         "대기": "basic",
-        "놀이": "interest",
+        "OX 퀴즈": "fun",
         "블럭쌓기": "interest",
-        "OX 퀴즈": "fun"
+        "가게놀이": "interest"
       },
       "restrictedVoiceMode": null
     }
