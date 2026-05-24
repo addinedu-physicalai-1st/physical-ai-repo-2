@@ -24,6 +24,9 @@ export interface ModeIntentHandlers {
    *  미정의 시 framework default = mode.setMode('대기'). 컴포넌트가
    *  override 하면 default 가 일어나지 않음 (예: confirm popup 후 처리). */
   onModeExit?: () => void;
+  /** mode 안 sub-stage 시작 — sub_command('start'). 예: 무궁화 의 참가자
+   *  등록 단계에서 '시작' 발화 → 게임 진행. 미정의 시 ignored. */
+  onStart?: () => void;
 }
 
 interface ModeEntry {

@@ -79,7 +79,9 @@ class ModeChange(BaseModel):
 
 class SubCommand(BaseModel):
     kind: Literal["sub_command"] = "sub_command"
-    action: Literal["stop", "return"]
+    # 'start' — mode 안 sub-stage 시작 ('무궁화꽃이 피었습니다' 의 참가자 등록
+    # 단계에서 게임 진행으로 등). client 의 useModeIntents onStart handler 가 처리.
+    action: Literal["stop", "return", "start"]
 
 
 class GotoVertex(BaseModel):

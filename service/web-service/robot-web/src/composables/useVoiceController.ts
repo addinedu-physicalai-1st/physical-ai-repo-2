@@ -132,6 +132,7 @@ export function useVoiceController(robot: RobotConfig): {
     if (connected) {
       webrtcVoice.send({ type: 'mode_set', mode: mode.currentMode });
       webrtcVoice.send({ type: 'awaiting_confirm_set', awaiting: voice.confirm !== null });
+      webrtcVoice.send({ type: 'stt_hints_set', keywords: voice.sttHints });
     }
   });
 
@@ -142,6 +143,17 @@ export function useVoiceController(robot: RobotConfig): {
       if (!webrtcVoice.isConnected.value) return;
       webrtcVoice.send({ type: 'awaiting_confirm_set', awaiting: c !== null });
     },
+  );
+
+  // STT initial_prompt 에 mode/stage/library 의 expected 단어 동적 주입 —
+  // Whisper 가 짧은 한국어 발화의 후보를 좁힘.
+  watch(
+    () => voice.sttHints,
+    (kws) => {
+      if (!webrtcVoice.isConnected.value) return;
+      webrtcVoice.send({ type: 'stt_hints_set', keywords: kws });
+    },
+    { deep: true },
   );
 
   function clearListeningTimer(): void {
@@ -288,6 +300,12 @@ export function useVoiceController(robot: RobotConfig): {
     }
     if (intent.kind === 'sub_command') {
       if (intent.action === 'return') { void handleReturn(); enterCooldown(); return; }
+      if (intent.action === 'start') {
+        // 현재 mode 컴포넌트의 onStart handler 호출. 없으면 ignored.
+        handlers?.onStart?.();
+        enterCooldown();
+        return;
+      }
       if (intent.action === 'stop') {
         // 현재 mode 의 onModeExit handler 가 있으면 그것 우선. 없으면 framework
         // default (handleStop 으로 mode='대기' 전환 + 안내 TTS).
@@ -385,9 +403,9 @@ export function useVoiceController(robot: RobotConfig): {
       speak(confirmation);
       return;
     }
-    // eduping / noriarm — 단순 mode 전환만.
+    // eduping / noriarm — 단순 mode 전환만. useModeAnnouncer 가 대기 진입 시
+    // 자체 안내 TTS 처리하므로 별도 confirmation speak 불필요.
     mode.setMode('대기');
-    speak('네, 그만할게요');
   }
 
   async function handleReturn(): Promise<void> {

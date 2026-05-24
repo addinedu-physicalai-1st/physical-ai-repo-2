@@ -71,12 +71,50 @@ def _get_model():
 
 # 호출어/모드 단어를 미리 주입해 짧은 발화에서 모델이 비슷한 음으로 잘못 옮기는 빈도를 낮춘다.
 # Whisper 의 `initial_prompt` 은 디코딩 컨텍스트로만 쓰이고 출력엔 포함되지 않는다.
-_KO_INITIAL_PROMPT = (
+# robot 미지정 fallback — 모든 호출어 + 일반 단어.
+_KO_INITIAL_PROMPT_DEFAULT = (
     "에듀핑, 고고핑, 노리암. 등원, 하원, 율동, 인사, 사진, 출석, 자장가, 숨바꼭질, OX 퀴즈, 블럭쌓기, 가게놀이."
 )
+# robot 별 prompt 일 때 같이 보낼 일반 단어. 다른 robot 의 wake word 는 빼고
+# 그 robot 의 wake + alias + mode + 일반 어휘만 prompt 로.
+_KO_PROMPT_COMMON_TAIL = "인사, 사진, 출석, 자장가."
 
 
-def transcribe_pcm(pcm: "object", language: str = "ko") -> str:
+def _ko_prompt_for(
+    robot: "str | None",
+    extra_keywords: "list[str] | None" = None,
+) -> str:
+    """robot 별 wake 이름 + 그 robot 의 mode + 일반 단어 + (있으면) extra keyword.
+
+    extra_keywords 는 클라가 현재 mode/stage/library 컨텍스트에서 동적으로 보낸
+    expected 단어들 (예: 율동 모드의 등록 곡명, 무궁화 ready 의 '건너뛰기').
+    """
+    if robot is None and not extra_keywords:
+        return _KO_INITIAL_PROMPT_DEFAULT
+    parts: list[str] = []
+    if robot is not None:
+        from ai_service.robots import modes_for, wake_words_for
+
+        names = wake_words_for(robot)
+        if names:
+            parts.append(", ".join(names))
+        mode_words = [m for m in modes_for(robot) if m != "대기"]
+        if mode_words:
+            parts.append(", ".join(mode_words))
+    if extra_keywords:
+        cleaned = [k.strip() for k in extra_keywords if k and k.strip()]
+        if cleaned:
+            parts.append(", ".join(cleaned))
+    parts.append(_KO_PROMPT_COMMON_TAIL)
+    return ". ".join(parts) if parts else _KO_INITIAL_PROMPT_DEFAULT
+
+
+def transcribe_pcm(
+    pcm: "object",
+    language: str = "ko",
+    robot: "str | None" = None,
+    extra_keywords: "list[str] | None" = None,
+) -> str:
     """numpy Float32 PCM mono 16kHz → 텍스트.
 
     WebRTC 경로 — 이미 16kHz Float32 mono 로 디코딩·리샘플된 audio 를 받아
@@ -92,13 +130,14 @@ def transcribe_pcm(pcm: "object", language: str = "ko") -> str:
     # vad_filter=False: 호출자 (webrtc_voice) 가 이미 Silero VAD 로 utterance 를 잘라온다.
     # Whisper 내부 Silero VAD 는 짧은 한 단어 wake word ("에듀핑" ~600ms) 를 통째로 묵음
     # 처리해서 빈 문자열을 돌려주는 경우가 있어, 호출어 인식이 깨진다.
-    # beam_size=1 + best_of=1 + 이전 context off → 짧은 발화 latency 최소화.
-    prompt = _KO_INITIAL_PROMPT if language == "ko" else None
+    # beam_size=5: 짧은 한국어 발화 ("율동" 이 "율통" 으로 떨어지는 식) 의 오인식
+    # 줄이려고 다양한 후보 탐색. 짧은 발화 한정이라 latency 영향 미미.
+    prompt = _ko_prompt_for(robot, extra_keywords) if language == "ko" else None
     segments, _info = model.transcribe(
         pcm,
         language=language,
         vad_filter=False,
-        beam_size=1,
+        beam_size=5,
         best_of=1,
         condition_on_previous_text=False,
         initial_prompt=prompt,

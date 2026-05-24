@@ -20,6 +20,8 @@ interface ModeAudioConfig {
 export function useModeAnnouncer(
   voiceController: VoiceController,
   audioByMode: Record<string, ModeAudioConfig> = {},
+  /** 모드 이름 대신 발화할 텍스트. e.g. '율동' → '어떤 노래로 율동할까요?'. */
+  ttsOverrideByMode: Record<string, string> = {},
 ): void {
   const mode = useModeStore();
   const voice = useVoiceStore();
@@ -77,7 +79,7 @@ export function useModeAnnouncer(
       }
       // 진행 중 server TTS 가 있으면 비우고 새 모드 안내. WebRTC 가 즉시 buffer clear.
       voiceController.cancelSpeak();
-      voiceController.speak(next);
+      voiceController.speak(ttsOverrideByMode[next] ?? next);
 
       const config = audioByMode[next];
       if (!config) return;

@@ -43,6 +43,27 @@ def modes_for(robot: str) -> list[str]:
     return list(entry["modes"]) if entry else []
 
 
+def mode_matchers_for(robot: str) -> list[tuple[str, str]]:
+    """[(키워드, 대상 mode), ...] — modes 의 정식 이름 + modeAliases 의 별칭.
+
+    길이 내림차순 정렬. ModeChangeHandler 가 substring 매치 시
+    '율동 등록' (긴 mode) 이 '율동' (짧은 mode) 보다 먼저 시도되어
+    부분-키워드 충돌을 피한다.
+    """
+    entry = _ROBOTS_BY_ID.get(robot)
+    if not entry:
+        return []
+    aliases: dict[str, list[str]] = entry.get("modeAliases", {}) or {}  # type: ignore[assignment]
+    out: list[tuple[str, str]] = []
+    for mode in entry["modes"]:
+        out.append((mode, mode))
+        for alias in aliases.get(mode, []):
+            if alias:
+                out.append((alias, mode))
+    out.sort(key=lambda kv: -len(kv[0]))
+    return out
+
+
 def robot_display_name(robot: str) -> str:
     entry = _ROBOTS_BY_ID.get(robot)
     return str(entry["displayName"]) if entry else robot
@@ -55,6 +76,19 @@ def capabilities_for(robot: str) -> list[tuple[str, str]]:
         for m in modes_for(robot)
         if m != "대기"
     ]
+
+
+def wake_words_for(robot: str) -> list[str]:
+    """STT prompt biasing 용 — wakeWord + aliases. 다른 robot 이름은 제외해
+    Whisper 가 짧은 발화를 다른 robot 후보로 떨어트리는 것을 막는다."""
+    entry = _ROBOTS_BY_ID.get(robot)
+    if not entry:
+        return []
+    names = [entry["wakeWord"]] if entry.get("wakeWord") else []
+    for alias in entry.get("wakeWordAliases", []) or []:
+        if alias:
+            names.append(alias)
+    return names
 
 
 def name_aliases_for(robot: str) -> frozenset[str]:

@@ -197,9 +197,16 @@ watch(currentMode, async (newMode) => {
 });
 
 // 모드 전환 시 voiceController.speak 로 서버 TTS 안내, BGM mp3 도 같이 처리.
-useModeAnnouncer(voiceController, {
-  자장가: { src: '/audio/lullaby.mp3', loop: true, volume: 0.7 },
-});
+useModeAnnouncer(
+  voiceController,
+  {
+    자장가: { src: '/audio/lullaby.mp3', loop: true, volume: 0.7 },
+  },
+  {
+    // 율동 모드 진입 시 곡 선택을 음성으로 요구.
+    율동: '어떤 노래로 율동할까요?',
+  },
+);
 
 const started = ref(false);
 

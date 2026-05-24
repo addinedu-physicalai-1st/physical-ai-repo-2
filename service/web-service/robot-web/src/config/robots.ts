@@ -55,6 +55,11 @@ export const ROBOT_CONFIGS: Record<RobotId, RobotConfig> = Object.fromEntries(
 export const MODE_DESCRIPTIONS: Readonly<Record<string, string>> =
   robotsData.modeDescriptions;
 
+/** server 의 StopHandler 가 매치하는 정식 stop 표현 + 흔한 STT 오인식 변형.
+ *  율동 모드 컴포넌트가 STT 결과를 stop 으로 재해석할지 mode-aware 판단할 때
+ *  비교 기준으로 사용. */
+export const STOP_TOKENS: readonly string[] = robotsData.stopTokens;
+
 /**
  * STT 가 호출어를 비슷한 음으로 잘못 인식하는 경우 (예: '에듀핑' → '에듀핀') 도
  * 호출 성공으로 처리하기 위한 (변형 → 정식 wakeWord) 매핑 테이블.

@@ -12,6 +12,7 @@
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
+import { STOP_TOKENS } from '@/config/robots';
 import { useModeIntents } from '@/composables/useModeIntents';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
@@ -141,7 +142,22 @@ onMounted(() => {
 onUnmounted(() => {
   stream.close();
   stateWs.stop();
+  voice.setSttHints([]);  // 다른 mode 진입 시 영향 안 주게 hint 비움.
 });
+
+// STT prompt hint — 등록된 곡명 + 율동 모드 내 자주 발화하는 명령들.
+watch(
+  () => items.value.map((i) => i.display_name).join('|'),
+  () => {
+    const songs = items.value.map((i) => i.display_name);
+    voice.setSttHints([
+      ...songs,
+      '정지', '멈춰', '그만', '노래 멈춰', '음악 정지',
+      '대기', '쉬자',
+    ]);
+  },
+  { immediate: true },
+);
 
 // 음성 명령으로 들어온 곡 재생/정지. 라이브러리 (items) 에서 displayName 의 정규화
 // substring 매치 — '아기상어' 발화로 '아기상어 율동' 같은 등록명도 잡히게.
@@ -164,6 +180,34 @@ function _jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 const _BIGRAM_SIM_THRESHOLD = 0.4;
+
+/** STT 가 "정지" 를 "장기/공지/방지" 등으로 떨군 경우를 mode-aware 로 잡기.
+ *  발화 정규화 결과가 stopTokens 중 어느 하나와 글자 단위 거리 (1 이하) 또는
+ *  bigram 유사도 임계 이상이면 stop 의 변형으로 본다. 짧은 한글 stop 토큰
+ *  ('정지' 2글자) 의 1글자 차이는 음운 변형일 확률이 높음.
+ *
+ *  단순 char-level Levenshtein 의 짧은-string 변형: 두 문자열 길이가 같고 다른
+ *  글자 수가 1 이하면 distance ≤ 1.
+ */
+function _isStopVariant(displayName: string): boolean {
+  const q = _normalize(displayName);
+  if (!q) return false;
+  for (const token of STOP_TOKENS) {
+    const t = _normalize(token);
+    if (!t) continue;
+    if (q === t) return true;
+    // 같은 길이 + 1글자 차이 → 정지 ↔ 장기/공지/방지/잡지/정시 같은 패턴.
+    if (q.length === t.length && q.length >= 2) {
+      let diff = 0;
+      for (let i = 0; i < q.length; i++) {
+        if (q[i] !== t[i]) diff += 1;
+        if (diff > 1) break;
+      }
+      if (diff <= 1) return true;
+    }
+  }
+  return false;
+}
 
 function _findByDisplayName(displayName: string): DanceItem | null {
   const q = _normalize(displayName);
@@ -198,34 +242,51 @@ function _findByDisplayName(displayName: string): DanceItem | null {
 // + 서버 awaiting_confirm sync 일괄).
 useModeIntents('율동', {
   onRhythmPlay: ({ displayName }) => {
-    // 이미 재생 중인 동안에는 다른 곡 명령 무시 — 마이크가 재생 중인 곡 가사를
-    // STT 로 잡아 rhythm_play 로 떨어지는 경우가 흔함. 사용자가 의도적으로
-    // 곡을 바꾸려면 먼저 '정지' 발화 → 대기 복귀 후 재진입.
-    if (playingSlug.value !== '') return;
+    const playing = playingSlug.value !== '';
+    const stopLike = _isStopVariant(displayName);
+
+    // 1) 재생 중 + stop 변형 — STT 가 '정지' 를 '장기/공지/방지' 등으로
+    //    떨군 경우. 재생 중인 상태에선 stop 의도일 확률이 압도적이라 즉시
+    //    음악 정지 + 대기 복귀.
+    if (playing && stopLike) {
+      stop();
+      mode.setMode('대기');
+      return;
+    }
+
+    // 2) 재생 중 + 그 외 — 마이크가 곡 가사를 STT 로 잡아 들어오는 false
+    //    rhythm_play 가 흔함. 무시.
+    if (playing) return;
+
+    // 3) 재생 안 중 — 사용자가 곡 선택/재생 의도일 확률이 압도적. 라이브러리
+    //    fuzzy match 우선. stop 변형이라도 곡 찾기를 먼저 시도.
     if (items.value.length === 0) {
       voiceController?.speak('아직 등록된 율동이 없어요. 율동 등록 모드에서 먼저 곡을 추가해 주세요.');
       return;
     }
     const match = _findByDisplayName(displayName);
-    if (!match) {
-      voiceController?.speak(
-        `${displayName} 비슷한 곡을 찾지 못했어요. 등록된 곡 이름으로 다시 말해줄래요?`,
-      );
+    if (match) {
+      voiceController?.startConfirm({
+        context: 'rhythm_play',
+        prompt: `${match.display_name} 재생할게요. 로봇 팔이 움직일 수 있으니 가까이 가지 마세요. 재생할까요?`,
+        onConfirm: () => {
+          playingSlug.value = match.slug;
+          captureResetKey.value += 1;
+          error.value = '';
+          stream.play(match.slug);
+        },
+        onCancel: () => {
+          voiceController?.speak('알겠어요. 다른 곡을 말해주세요.');
+        },
+      });
       return;
     }
-    voiceController?.startConfirm({
-      context: 'rhythm_play',
-      prompt: `${match.display_name} 재생할게요. 로봇 팔이 움직일 수 있으니 가까이 가지 마세요. 재생할까요?`,
-      onConfirm: () => {
-        playingSlug.value = match.slug;
-        captureResetKey.value += 1;
-        error.value = '';
-        stream.play(match.slug);
-      },
-      onCancel: () => {
-        voiceController?.speak('알겠어요. 다른 곡을 말해주세요.');
-      },
-    });
+
+    // 4) 매치 실패 — 못 찾았다 안내. 사용자가 정말 빠져나가려면 정식 '정지'/'대기'
+    //    발화로 다시 시도 (server StopHandler / ModeChangeHandler 가 분류).
+    voiceController?.speak(
+      `${displayName} 비슷한 곡을 찾지 못했어요. 등록된 곡 이름으로 다시 말해줄래요?`,
+    );
   },
   onRhythmStop: () => {
     stop();

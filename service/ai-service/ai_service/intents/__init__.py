@@ -14,6 +14,7 @@ from ai_service.intents.common.menu import MenuHandler
 from ai_service.intents.common.mode_change import ModeChangeHandler
 from ai_service.intents.common.report import ReportHandler
 from ai_service.intents.common.schedule import ScheduleHandler
+from ai_service.intents.common.start import StartHandler
 from ai_service.intents.common.stop import StopHandler
 from ai_service.intents.common.whereabouts import WhereaboutsHandler
 from ai_service.intents.eduping.confirm import ConfirmHandler
@@ -27,6 +28,7 @@ _EDUPING_RHYTHM_PIPELINE: list[IntentHandler] = [
     ConfirmHandler(),
     RhythmStopHandler(),
     StopHandler(),
+    StartHandler(),
     ModeChangeHandler(),
     RhythmPlayHandler(),
 ]
@@ -36,6 +38,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         ConfirmHandler(),
         RhythmStopHandler(),
         StopHandler(),
+        StartHandler(),
         MenuHandler(),
         HelloHandler(),
         GenderHandler(),
@@ -50,6 +53,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     ],
     "gogoping": [
         StopHandler(),
+        StartHandler(),
         ReturnHandler(),
         GotoVertexHandler(),
         MenuHandler(),
@@ -65,6 +69,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     ],
     "noriarm": [
         StopHandler(),
+        StartHandler(),
         MenuHandler(),
         HelloHandler(),
         GenderHandler(),

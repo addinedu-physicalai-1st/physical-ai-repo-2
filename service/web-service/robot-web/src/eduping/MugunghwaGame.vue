@@ -88,12 +88,30 @@ function onCancelExitClick(): void {
 
 useModeIntents('무궁화꽃이 피었습니다', {
   onModeExit: () => {
+    // end (놀이 끝) 단계에선 이미 게임 종료 — 추가 confirm 없이 바로 대기.
+    if (stage.value === 'end') {
+      mode.setMode('대기');
+      return;
+    }
     voiceController?.startConfirm({
       context: 'game_exit',
       prompt: '게임을 그만할까요?',
       onConfirm: () => mode.setMode('대기'),
       onCancel: () => voiceController?.speak('알겠어요. 계속할게요.'),
     });
+  },
+  onStart: () => {
+    // entry: 참가자 등록 → ready (준비).
+    // ready: 준비 단계 건너뛰기 → song (곡 시작).
+    // end: 놀이 끝 popup → '다시하기' → 참가자 초기화 후 entry 로 복귀.
+    // 그 외 stage (song / observation / eliminationWait) 는 음성 진행점 정의 안 됨.
+    if (stage.value === 'entry') {
+      setStage('ready');
+    } else if (stage.value === 'ready') {
+      setStage('song');
+    } else if (stage.value === 'end') {
+      restartGame();
+    }
   },
 });
 const tts = {
@@ -1159,7 +1177,25 @@ onMounted(() => {
   if (stage.value === 'entry') startDetectorLoop();
 });
 
+// STT prompt hint — stage 별 expected 단어들.
+const _STAGE_HINTS: Record<Stage, string[]> = {
+  entry:           ['시작', '시작해', '출발', '준비됐어', '준비완료', '그만', '대기'],
+  ready:           ['바로 시작', '바로시작', '준비됐어', '시작', '한번더', '그만'],
+  song:            ['그만', '정지', '멈춰', '대기'],
+  observation:     ['그만', '정지', '멈춰', '대기'],
+  eliminationWait: ['그만', '정지', '멈춰', '대기'],
+  end:             ['다시하기', '다시해', '재시작', '한번더', '끝내기', '대기'],
+};
+watch(
+  stage,
+  (next) => {
+    voice.setSttHints(_STAGE_HINTS[next] ?? []);
+  },
+  { immediate: true },
+);
+
 onUnmounted(() => {
+  voice.setSttHints([]);
   stopSongStage();
   if (songAudio) {
     try { songAudio.pause(); } catch { /* noop */ }
@@ -1311,7 +1347,7 @@ onUnmounted(() => {
                     <strong class="ready-num">{{ readyCountdownSec }}</strong> 초 후 자동 시작
                   </div>
                 </div>
-                <button type="button" class="btn-start" @click="setStage('song')">건너뛰기</button>
+                <button type="button" class="btn-start" @click="setStage('song')">바로 시작</button>
               </footer>
 
               <div v-if="stage === 'song'" class="arm-overlay">

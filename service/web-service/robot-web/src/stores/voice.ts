@@ -37,6 +37,10 @@ export const useVoiceStore = defineStore('voice', () => {
    *  가 setConfirm 으로 set. server 의 confirm_yes/no intent 도착 시 callback
    *  실행 후 clearConfirm. UI 컴포넌트는 이 ref 를 watch 해서 popup 표시. */
   const confirm = ref<ConfirmRequest | null>(null);
+  /** STT initial_prompt 에 주입할 동적 keyword list. mode 컴포넌트가 현재
+   *  stage / library 컨텍스트의 expected 단어를 push (예: 율동 곡명, 무궁화
+   *  ready 의 '건너뛰기'). useVoiceController 가 watch 해서 server 동기화. */
+  const sttHints = ref<string[]>([]);
 
   function setState(next: VoiceState): void { state.value = next; }
   function setSttText(text: string): void {
@@ -56,6 +60,9 @@ export const useVoiceStore = defineStore('voice', () => {
   function bumpWake(): void { lastWakeAt.value = Date.now(); }
   function setConfirm(req: ConfirmRequest | null): void { confirm.value = req; }
   function clearConfirm(): void { confirm.value = null; }
+  function setSttHints(keywords: readonly string[]): void {
+    sttHints.value = [...keywords];
+  }
 
   return {
     state,
@@ -70,6 +77,7 @@ export const useVoiceStore = defineStore('voice', () => {
     speechEnvelope,
     lastWakeAt,
     confirm,
+    sttHints,
     bumpWake,
     setState,
     setSttText,
@@ -83,5 +91,6 @@ export const useVoiceStore = defineStore('voice', () => {
     setVoiceMode,
     setConfirm,
     clearConfirm,
+    setSttHints,
   };
 });

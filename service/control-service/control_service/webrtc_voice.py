@@ -298,6 +298,10 @@ class _Session:
         # 클라가 startConfirm 호출 후 'awaiting_confirm_set' DC msg 로 동기화.
         # ConfirmHandler 활성 조건.
         self.awaiting_confirm: bool = False
+        # 클라가 'stt_hints_set' DC msg 로 동기화 — 현재 mode/stage/library 의
+        # expected 단어들. transcribe_pcm 의 initial_prompt 에 주입해 Whisper 가
+        # 짧은 한국어 발화를 그 단어 후보로 우선 떨어트리게 한다.
+        self.stt_keywords: list[str] = []
         self._gate_close_task: Optional[asyncio.Task] = None
         self.outbound_tts: Optional[OutboundTTSTrack] = None
 
@@ -453,6 +457,18 @@ def _handle_client_msg(session: _Session, msg: dict, log_id: str = "") -> None:
     elif msg_type == "awaiting_confirm_set":
         session.awaiting_confirm = bool(msg.get("awaiting"))
         logger.info(f"[webrtc:{log_id}] awaiting_confirm → {session.awaiting_confirm}")
+    elif msg_type == "stt_hints_set":
+        kws = msg.get("keywords")
+        if isinstance(kws, list):
+            session.stt_keywords = [
+                str(k).strip() for k in kws if isinstance(k, str) and k.strip()
+            ][:64]
+        else:
+            session.stt_keywords = []
+        logger.info(
+            f"[webrtc:{log_id}] stt_keywords ({len(session.stt_keywords)}) → "
+            f"{session.stt_keywords[:8]}{'...' if len(session.stt_keywords) > 8 else ''}"
+        )
     else:
         logger.info(f"[webrtc:{log_id}] dc msg: {msg!r}")
 
@@ -558,7 +574,13 @@ async def _consume_audio(track, session: _Session, log_id: str = "") -> None:
 async def _transcribe_and_send(pcm: np.ndarray, session: _Session) -> None:
     """whisper transcribe → DC `stt_final` → /voice/intent → DC `intent` → TTS push."""
     try:
-        text = await asyncio.to_thread(stt_engine.transcribe_pcm, pcm, "ko")
+        text = await asyncio.to_thread(
+            stt_engine.transcribe_pcm,
+            pcm,
+            "ko",
+            session.robot,
+            session.stt_keywords or None,
+        )
     except Exception:
         logger.exception(f"[webrtc:{session.log_id}] transcribe failed")
         return
