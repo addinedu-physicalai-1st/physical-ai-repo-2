@@ -23,7 +23,8 @@ from ai_service.robots import mode_matchers_for
 
 
 def _strip_spaces(s: str) -> str:
-    return re.sub(r"\s+", "", s)
+    # lower() — STT 가 'OX 퀴즈' 를 'ox 퀴즈'/'Ox 퀴즈' 로 떨어뜨려도 매치되게.
+    return re.sub(r"\s+", "", s).lower()
 
 
 def _bigrams(s: str) -> set[str]:
@@ -57,7 +58,8 @@ class ModeChangeHandler(IntentHandler):
             # 이미 그 모드 안에 있는데 같은 mode 키워드가 발화에 섞이면 (예:
             # 율동 모드 안에서 '민쩐 율동') 모드 재진입이 아니라 곡명/대화일 가능성
             # 더 큼 → mode_change 무시하고 다음 핸들러 (rhythm_play 등) 에 위임.
-            if req.mode == mode:
+            # 단 '대기' 는 sub-content 가 없어 재진입 허용 (idle 에서 "대기 모드" 발화도 통과).
+            if req.mode == mode and mode != "대기":
                 continue
             return ModeChange(mode=mode)
         # 2) char-bigram Jaccard fuzzy fallback — 긴 키워드만.
@@ -67,7 +69,7 @@ class ModeChangeHandler(IntentHandler):
             key_n = _strip_spaces(keyword)
             if len(key_n) < _FUZZY_MIN_KEYWORD_LEN:
                 continue
-            if req.mode == mode:
+            if req.mode == mode and mode != "대기":
                 continue
             sim = _jaccard(_bigrams(key_n), text_bigrams)
             if sim < _FUZZY_THRESHOLD:
