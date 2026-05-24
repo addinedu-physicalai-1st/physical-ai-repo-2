@@ -13,6 +13,7 @@ from typing import Any
 
 from PyQt5.QtCore import Qt, QTimer, QPointF, QRectF, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QBrush, QPixmap
+from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import (
     QAction, QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMenu, QMessageBox, QPushButton, QStackedWidget,
@@ -21,11 +22,16 @@ from PyQt5.QtWidgets import (
 
 DEFAULT_MAP_PGM = (pathlib.Path(__file__).resolve().parents[3]
                    / "controller/gogoping-controller/src/gogoping/gogoping_navigation"
-                   / "maps/new_map.pgm")
+                   / "maps/admin_map_color.png")
+DEFAULT_MAP_SVG = DEFAULT_MAP_PGM.with_name("admin_overlay.svg")
 
 
 def _map_pgm_path() -> pathlib.Path:
     return pathlib.Path(os.environ.get("PINGDER_ADMIN_MAP_PGM", str(DEFAULT_MAP_PGM)))
+
+
+def _map_svg_path() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("PINGDER_ADMIN_MAP_SVG", str(DEFAULT_MAP_SVG)))
 
 
 class MapView(QWidget):
@@ -58,6 +64,8 @@ class MapView(QWidget):
         self.setCursor(Qt.CrossCursor)                  # 맵 위 커서 십자
         self.setMouseTracking(True)                     # hover 좌표 표시용
         self._map_pixmap = QPixmap(str(_map_pgm_path()))
+        svg_path = _map_svg_path()
+        self._map_svg = QSvgRenderer(str(svg_path)) if svg_path.exists() else None
         # 표시 모드: 'map' = 배경 + 로봇/경로만, 'graph' = + waypoint 마커
         self._display_mode: str = 'graph'
         # zoom/pan — Ctrl + 휠로 줌인/아웃, 마우스 위치 중심
