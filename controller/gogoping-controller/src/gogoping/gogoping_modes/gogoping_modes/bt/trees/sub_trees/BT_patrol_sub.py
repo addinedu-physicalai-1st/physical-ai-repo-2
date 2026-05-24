@@ -4,10 +4,13 @@
 동적으로 생성:
 
     visit_<name>:
+        ├─ SetPatrolIndex(i)     → BB.patrol_current_index = i (admin UI 시각화용)
         ├─ SelectVertex          → BB.target_vertex_name = <name>
         ├─ NavigateToVertex      → graph_router 호출
         ├─ BrakeAndWait          → cmd_vel=0 publish + 0.5s 대기 (잔여 관성 정리)
         └─ PanCameraSweep        → 90 → 30 → 150 → 90
+
+마지막 자식으로 ``SetPatrolIndex(len(waypoints))`` 추가 — 모든 vertex 완료 표시.
 
 각 visit Sequence 는 ``FailureIsSuccess`` decorator 로 감싸 한 vertex 실패가 전체 중단을
 일으키지 않게 함 (skip-on-failure 정책).
@@ -26,6 +29,7 @@ from py_trees.decorators import FailureIsSuccess
 
 from ....context import Context
 from ...behaviors.common.select_vertex import SelectVertex
+from ...behaviors.common.set_patrol_index import SetPatrolIndex
 from ...behaviors.follow.pan_camera_sweep import PanCameraSweep
 from ...behaviors.navigation.brake_and_wait import BrakeAndWait
 from ...behaviors.navigation.navigate_to_vertex import NavigateToVertex
@@ -63,11 +67,12 @@ def build_patrol_sub(
             raise ValueError("build_patrol_sub: waypoints contains empty name")
 
     children: list[py_trees.behaviour.Behaviour] = []
-    for name in names:
+    for i, name in enumerate(names):
         visit = py_trees.composites.Sequence(
             name=f"visit_{name}",
             memory=True,
             children=[
+                SetPatrolIndex(name=f"set_index_{i}", index=i),
                 SelectVertex(name=f"select_{name}", vertex_name=name),
                 NavigateToVertex(name=f"nav_{name}"),
                 BrakeAndWait(name=f"brake_{name}", context=ctx),
@@ -76,6 +81,9 @@ def build_patrol_sub(
         )
         # 한 vertex 실패 시 다음 vertex 계속 — root Sequence 가 멈추지 않도록.
         children.append(FailureIsSuccess(name=f"safe_visit_{name}", child=visit))
+
+    # 모든 vertex 완료 표시 — index = N (admin UI 가 X 모두 그리도록)
+    children.append(SetPatrolIndex(name="set_index_done", index=len(names)))
 
     return py_trees.composites.Sequence(
         name="BT_patrol_sub",

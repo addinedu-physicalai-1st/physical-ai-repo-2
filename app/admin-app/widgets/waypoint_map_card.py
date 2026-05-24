@@ -80,6 +80,10 @@ class MapView(QWidget):
         self._filter: set[str] | None = None   # 검색 필터 (None = 전체)
         self._lanes: list[dict] = []           # [{from, to, bidirectional}, ...]
         self._route: list[str] | None = None   # vertex name sequence — 강조선
+        # patrol 시각화 — vertex 동그라미 안에 번호 / 도착 완료 vertex 는 X.
+        # 빈 리스트 / current_index == -1 면 미진행 (overlay 안 그림).
+        self._patrol_vertices: list[str] = []
+        self._patrol_current_index: int = -1
         self._robot: dict | None = None
         self._plan: list[tuple[float, float]] = []
         self._current_name: str | None = None
@@ -137,6 +141,18 @@ class MapView(QWidget):
 
     def set_current(self, name: str | None) -> None:
         self._current_name = name; self.update()
+
+    def set_patrol(self, vertices: list[str] | None, current_index: int = -1) -> None:
+        """patrol 진행 시각화. vertices: 정렬된 vertex 이름 리스트. current_index: -1=미진행, N=완료.
+
+        vertex 별 표시:
+          - 인덱스 < current_index : ✕ (방문 완료)
+          - 인덱스 == current_index : 강조색 동그라미 + 번호 (현재 진행)
+          - 인덱스 > current_index : 번호만 (대기)
+        """
+        self._patrol_vertices = list(vertices or [])
+        self._patrol_current_index = int(current_index)
+        self.update()
 
     def _map_to_widget(self, mx: float, my: float) -> QPointF:
         W = self.width(); H = self.height()
@@ -595,11 +611,21 @@ class MapView(QWidget):
                     pa = self._map_to_widget(a["x"], a["y"])
                     pb = self._map_to_widget(b["x"], b["y"])
                     qp.drawLine(pa, pb)
+            # patrol overlay 준비 — vertex name → 1-based 순번. 없으면 0.
+            patrol_index_of: dict[str, int] = {
+                n: i for i, n in enumerate(self._patrol_vertices)
+            }
+            patrol_cur = self._patrol_current_index
+
             for w in self._waypoints:
                 if self._filter is not None and w["name"] not in self._filter:
                     continue
                 p = self._map_to_widget(w["x"], w["y"])
                 is_current = (w["name"] == self._current_name)
+                # patrol 상태 — 0..N-1=대기/진행/방문, N=완료, -1=미진행
+                p_idx = patrol_index_of.get(w["name"], None)
+                p_is_visited = p_idx is not None and patrol_cur > p_idx
+                p_is_now = p_idx is not None and patrol_cur == p_idx
                 # 편집 모드 — hover / 선택 노드 (link_pending 1차) 강조
                 is_hover_node = (self._edit_mode and self._hover_target
                                  and self._hover_target.get("kind") == "node"
@@ -616,6 +642,18 @@ class MapView(QWidget):
                     border_color = "#0D4F66"   # 진한 파랑
                     border_width = 3 * z
                     fill_color = "#A8D8E8"
+                elif p_is_now:
+                    # 현재 진행 중 — 주황 강조
+                    r = 7 * z
+                    border_color = "#B85C00"
+                    border_width = 3 * z
+                    fill_color = "#FFA94D"
+                elif p_idx is not None and not p_is_visited:
+                    # 대기 — 보라 (patrol 대상 식별)
+                    r = 5 * z
+                    border_color = "#5A2F8A"
+                    border_width = 2 * z
+                    fill_color = "#C8A8E8"
                 elif is_current:
                     r = 5 * z
                     border_color = "#1A6B8A"
@@ -629,6 +667,18 @@ class MapView(QWidget):
                 qp.setPen(QPen(QColor(border_color), border_width))
                 qp.setBrush(QBrush(QColor(fill_color)))
                 qp.drawEllipse(p, r, r)
+                # patrol overlay: 동그라미 안에 번호 (1-based) 또는 X
+                if p_idx is not None:
+                    overlay_fsize = max(7, int(round(8 * z)))
+                    qp.setFont(QFont("", overlay_fsize, QFont.Bold))
+                    overlay_rect = QRectF(p.x() - r, p.y() - r, 2 * r, 2 * r)
+                    if p_is_visited:
+                        qp.setPen(QColor("#1A1A1A"))
+                        qp.drawText(overlay_rect, Qt.AlignCenter, "✕")
+                    else:
+                        # 진행 중 vertex 는 검은 굵은 숫자, 대기는 진한 보라
+                        qp.setPen(QColor("#1A1A1A") if p_is_now else QColor("#3A1A6B"))
+                        qp.drawText(overlay_rect, Qt.AlignCenter, str(p_idx + 1))
                 # 라벨: z 가 이미 sqrt(zoom) 이므로 그대로 사용 (인접 충돌 완화)
                 fsize = max(7, int(round(7 * z)))
                 qp.setFont(QFont("", fsize, QFont.Bold))
@@ -1117,6 +1167,22 @@ class WaypointMapCard(QFrame):
             self._status.setText("")
             self._map.set_current(None)
             self._highlight(None)
+
+    def update_patrol(self, patrol: dict | None) -> None:
+        """``/gogoping/state`` 의 ``patrol`` 필드를 받아 시각화 갱신.
+
+        patrol = {"vertices": [...], "current_index": int} 또는 None (미진행).
+        """
+        if not patrol or not isinstance(patrol, dict):
+            self._map.set_patrol(None, -1)
+            return
+        verts = patrol.get("vertices") or []
+        idx = patrol.get("current_index", -1)
+        try:
+            idx = int(idx)
+        except (TypeError, ValueError):
+            idx = -1
+        self._map.set_patrol(list(verts), idx)
 
     def _refresh_list(self) -> None:
         import httpx

@@ -49,6 +49,7 @@ class Keys:
     DESTINATION_KEY = "destination_key"           # str — DB named_pose
     HIDE_POSITION_KEY = "hide_position_key"
     SEARCH_WAYPOINTS = "search_waypoints"         # list[str]
+    PATROL_CURRENT_INDEX = "patrol_current_index"  # int — search_waypoints 의 현재 진행 인덱스 (-1=idle, N=완료)
     HOME_POSITION_KEY = "home_position_key"
     CHARGING_DOCK_APPROACH_KEY = "charging_dock_approach_key"
     CHARGING_DOCK_TARGET_YAW = "charging_dock_target_yaw"  # float (rad) — AlignToDock 의 target yaw, SubTree 빌더가 graph 에서 vertex.yaw 로 채움
@@ -87,6 +88,7 @@ _DEFAULTS: dict[str, object] = {
     Keys.DESTINATION_KEY: "",
     Keys.HIDE_POSITION_KEY: "",
     Keys.SEARCH_WAYPOINTS: [],
+    Keys.PATROL_CURRENT_INDEX: -1,
     Keys.HOME_POSITION_KEY: "",
     Keys.CHARGING_DOCK_APPROACH_KEY: "",
     Keys.CHARGING_DOCK_TARGET_YAW: 0.0,
