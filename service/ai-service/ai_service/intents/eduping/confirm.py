@@ -7,7 +7,11 @@
      TTS prompt + forceWake.
   2. 다음 사용자 발화의 STT 결과가 본 핸들러를 통과 (pipeline 상단).
   3. 키워드 fast path → 매치 실패 시 LLM 3-way classifier → 'confirm'/'cancel'/'other'.
-  4. 'other' 분류면 다음 핸들러 (ChatFallback) 에 위임.
+  4. 'other' 분류면 None 반환 → 파이프라인의 다음 핸들러로 위임.
+     - 기본 eduping pipeline 에선 ChatFallback (LLM chat) 로 떨어짐.
+     - _EDUPING_RHYTHM_PIPELINE 에선 ChatFallback 가 없어 결국 RhythmPlayHandler
+       가 흡수하거나 ignored 응답. 율동 모드의 confirm 사이클 중 사용자 답이
+       confirm/cancel 둘 다 아니면 곡 명령으로 재해석될 수 있음을 의식해야 함.
 """
 from __future__ import annotations
 
@@ -28,7 +32,8 @@ _CONFIRM_KEYWORDS: tuple[str, ...] = (
     "좋아", "좋다", "재생", "시작", "하자", "그렇",
 )
 _CANCEL_KEYWORDS: tuple[str, ...] = (
-    "아니", "취소", "다른", "싫", "별로", "안할", "안해", "말고", "다음",
+    "아니", "아냐", "아니야", "않", "취소", "다른", "싫", "별로",
+    "안할", "안해", "말고", "다음",
 )
 
 _SYSTEM_PROMPT = (

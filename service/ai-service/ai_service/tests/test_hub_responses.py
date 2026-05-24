@@ -240,3 +240,46 @@ def test_voice_intent_no_awaiting_confirm_skips_handler() -> None:
     assert r.status_code == 200
     # rhythm_play 로 잡히거나 ChatFallback 으로 떨어지지 confirm_yes 는 아니어야.
     assert r.json().get("kind") != "confirm_yes"
+
+
+def test_voice_intent_confirm_llm_fallback_confirm() -> None:
+    """키워드 매치 실패 시 LLM 이 'confirm' 분류하면 ConfirmYes 반환."""
+    with patch(
+        "ai_service.intents.eduping.confirm._ollama_chat",
+        new_callable=AsyncMock,
+    ) as mock_chat:
+        mock_chat.return_value = '{"intent": "confirm"}'
+        r = client.post(
+            "/voice/intent",
+            json={
+                "text": "그러게 한번 들어보자",
+                "robot": "eduping",
+                "mode": "율동",
+                "awaiting_confirm": True,
+            },
+        )
+    assert r.status_code == 200
+    assert r.json() == {"kind": "confirm_yes"}
+
+
+def test_voice_intent_confirm_llm_failure_falls_through() -> None:
+    """LLM 호출 실패 (LLMError) 시 ConfirmHandler 는 None 반환 → 다음 핸들러로."""
+    from ai_service.llm import LLMError
+
+    with patch(
+        "ai_service.intents.eduping.confirm._ollama_chat",
+        new_callable=AsyncMock,
+        side_effect=LLMError("simulated network failure"),
+    ):
+        r = client.post(
+            "/voice/intent",
+            json={
+                "text": "음... 그러게",  # 키워드 매치 실패 → LLM → 실패 → other → 다음 핸들러
+                "robot": "eduping",
+                "mode": "율동",
+                "awaiting_confirm": True,
+            },
+        )
+    assert r.status_code == 200
+    # confirm_yes/no 가 아니어야 — 율동 restricted pipeline 에선 RhythmPlay 또는 ignored.
+    assert r.json().get("kind") not in ("confirm_yes", "confirm_no")
