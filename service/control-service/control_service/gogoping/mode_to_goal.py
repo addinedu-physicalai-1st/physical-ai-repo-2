@@ -34,6 +34,7 @@ class Goal:
     task: str = ""
     destination_key: str = ""
     target_id: str = ""
+    search_waypoints: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -41,6 +42,7 @@ class Goal:
             "task": self.task,
             "destination_key": self.destination_key,
             "target_id": self.target_id,
+            "search_waypoints": list(self.search_waypoints),
         }
 
 

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from .mode_to_goal import Goal, UnsupportedMode, mode_to_goal
 from .ros_bridge import GogopingRosBridge
+from ..waypoints import yaml_store
 from ..waypoints.ros_bridge import WaypointsRosBridge
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,27 @@ class IdleTimeoutResponse(BaseModel):
     accepted: bool
     reason: str = ""
     seconds: float = 0.0
+
+
+class PatrolRequest(BaseModel):
+    """admin UI [순찰] 버튼이 POST 하는 payload.
+
+    현재는 별도 옵션 없음 — group 필드가 채워진 모든 vertex 를 robot 의 현재
+    위치에서 nearest-neighbor 순서로 순회한다.
+    """
+    pass
+
+
+class PatrolResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    # nearest-neighbor 정렬된 vertex 이름 리스트 (echo)
+    vertices: list[str] = []
+    # 사용된 시작 좌표 — robot pose 못 받으면 첫 vertex 의 좌표
+    start_x: float = 0.0
+    start_y: float = 0.0
+    # robot pose 가 실제로 사용됐는지 (False 면 fallback)
+    used_robot_pose: bool = False
 
 
 def install(
@@ -253,6 +275,60 @@ def install(
             accepted=accepted, reason=reason,
             gazebo_accepted=gz_ok, gazebo_reason=gz_reason,
             amcl_published=amcl_published,
+        )
+
+    @router.post("/debug/patrol", response_model=PatrolResponse)
+    async def trigger_patrol(req: PatrolRequest) -> PatrolResponse:
+        """[디버그] group 필드 있는 모든 vertex 를 nearest-neighbor 순서로 순찰.
+
+        - waypoints.yaml 의 ``group`` 채워진 vertex 만 후보 (복도/충전소 등 제외)
+        - robot 의 현재 위치 (``/gogoping/state`` 의 ``robot_pose``) 에서 가장 가까운
+          후보부터 시작 → 거기서 가장 가까운 미방문 → 반복 (그리디 NN traversal)
+        - robot pose 못 받으면 첫 후보의 좌표를 시작점으로 fallback
+        """
+        wps, _ = await asyncio.to_thread(yaml_store.load)
+        candidates = [(w.name, float(w.x), float(w.y)) for w in wps if w.group]
+        if not candidates:
+            return PatrolResponse(accepted=False, reason="no_grouped_vertices")
+
+        latest = bridge.get_latest_state() or {}
+        pose = latest.get("robot_pose") if isinstance(latest, dict) else None
+        if (isinstance(pose, dict)
+                and isinstance(pose.get("x"), (int, float))
+                and isinstance(pose.get("y"), (int, float))):
+            cur_x, cur_y = float(pose["x"]), float(pose["y"])
+            used_robot_pose = True
+        else:
+            cur_x, cur_y = candidates[0][1], candidates[0][2]
+            used_robot_pose = False
+        start_x, start_y = cur_x, cur_y
+
+        remaining = list(candidates)
+        ordered: list[str] = []
+        while remaining:
+            best = min(
+                remaining,
+                key=lambda w: (w[1] - cur_x) ** 2 + (w[2] - cur_y) ** 2,
+            )
+            ordered.append(best[0])
+            cur_x, cur_y = best[1], best[2]
+            remaining.remove(best)
+
+        goal = Goal(
+            mode="PLAY", task="hideseek",
+            target_id="patrol_debug",
+            search_waypoints=ordered,
+        )
+        accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
+        if not accepted:
+            logger.warning(
+                f"Patrol SetGoal 거부: vertices={ordered!r} reason={reason!r}"
+            )
+        return PatrolResponse(
+            accepted=accepted, reason=reason,
+            vertices=ordered,
+            start_x=start_x, start_y=start_y,
+            used_robot_pose=used_robot_pose,
         )
 
     @router.post("/emergency_stop", response_model=EmergencyStopResponse)

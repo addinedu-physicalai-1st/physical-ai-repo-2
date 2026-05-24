@@ -220,6 +220,43 @@ class StateClient:
 
         threading.Thread(target=_run, name="emergency_stop", daemon=True).start()
 
+    def post_patrol(
+        self,
+        on_result: Callable[[bool, str, list[str]], None] | None = None,
+    ) -> None:
+        """[디버그] group 있는 모든 vertex 를 nearest-neighbor 순서로 순찰 — ``POST /api/gogoping/debug/patrol``.
+
+        별도 thread 에서 HTTP 호출. 응답 시 ``on_result(ok, reason, vertices)`` 콜백.
+        DebugStatePanel 의 [순찰] 빠른 버튼이 호출.
+        """
+        url = f"{self._base}/api/gogoping/debug/patrol"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            vertices: list[str] = []
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(url, json={})
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                        vertices = list(data.get("vertices", []) or [])
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(ok, reason, vertices)
+                except Exception as e:
+                    logger.warning(f"patrol on_result 콜백 오류: {e}")
+
+        threading.Thread(target=_run, name="patrol", daemon=True).start()
+
     def post_idle_timeout(
         self,
         seconds: float,

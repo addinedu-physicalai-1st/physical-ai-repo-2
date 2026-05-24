@@ -217,6 +217,7 @@ class GogopingRosBridge:
         req.goal.task = goal.task
         req.goal.destination_key = goal.destination_key
         req.goal.target_id = goal.target_id
+        req.goal.search_waypoints = list(goal.search_waypoints)
 
         future = self._cli.call_async(req)
         deadline = time.time() + self.SEND_GOAL_TIMEOUT_S

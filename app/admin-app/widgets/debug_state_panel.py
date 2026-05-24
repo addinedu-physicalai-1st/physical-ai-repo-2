@@ -54,6 +54,8 @@ class DebugStatePanel(QFrame):
     force_state_requested = pyqtSignal(str, str)
     # 긴급정지 버튼 클릭 시 emit. 인자 없음.
     emergency_stop_requested = pyqtSignal()
+    # [순찰] 빠른 버튼 클릭 시 emit. 인자 없음 — control-server 가 랜덤 그룹 선택.
+    patrol_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -156,6 +158,16 @@ class DebugStatePanel(QFrame):
         )
         self._quick_drive_btn.clicked.connect(lambda: self._quick_apply("IDLE"))
         quick_row.addWidget(self._quick_drive_btn, 1)
+        # [순찰] — control-server 가 random 그룹 선택 → SetGoal(PLAY/hideseek) 발사
+        self._quick_patrol_btn = QPushButton("순찰")
+        self._quick_patrol_btn.setCursor(Qt.PointingHandCursor)
+        self._quick_patrol_btn.setStyleSheet(
+            f"background: {COLORS['warning']}; color: white; border: none;"
+            f" border-radius: 6px; padding: 4px 10px; font-size: 9pt; font-weight: 800;"
+            f" min-height: 24px;"
+        )
+        self._quick_patrol_btn.clicked.connect(self._on_patrol_clicked)
+        quick_row.addWidget(self._quick_patrol_btn, 1)
         outer.addLayout(quick_row)
 
         # state row
@@ -238,6 +250,14 @@ class DebugStatePanel(QFrame):
         )
         self.emergency_stop_requested.emit()
 
+    def _on_patrol_clicked(self) -> None:
+        """[순찰] — 즉시 랜덤 그룹 발사. control-server 가 group 선택."""
+        self._last_result.setText("sending → 순찰 (랜덤 그룹) ...")
+        self._last_result.setStyleSheet(
+            f"font-size: 8pt; font-weight: 600; color: {COLORS['text_soft']};"
+        )
+        self.patrol_requested.emit()
+
     # --------------------------------------------------------------- public
 
     def set_last_result(self, state: str, ok: bool, reason: str = "") -> None:
@@ -249,6 +269,23 @@ class DebugStatePanel(QFrame):
             )
         else:
             self._last_result.setText(f"✗ {state}: {reason}")
+            self._last_result.setStyleSheet(
+                f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
+            )
+
+    def set_patrol_result(
+        self, ok: bool, reason: str = "",
+        vertices: list[str] | None = None,
+    ) -> None:
+        """state_client 가 /debug/patrol 응답 받은 후 호출."""
+        if ok:
+            n = len(vertices) if vertices else 0
+            self._last_result.setText(f"✓ 순찰 시작 ({n} vertex)")
+            self._last_result.setStyleSheet(
+                f"font-size: 8pt; font-weight: 700; color: {COLORS['success']};"
+            )
+        else:
+            self._last_result.setText(f"✗ 순찰: {reason}")
             self._last_result.setStyleSheet(
                 f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
             )

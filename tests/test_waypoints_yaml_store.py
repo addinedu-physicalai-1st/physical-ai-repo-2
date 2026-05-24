@@ -171,3 +171,40 @@ def test_undo_returns_none_when_empty(tmp_yaml):
     _, ys = tmp_yaml
     ys.clear_undo_stack()
     assert ys.undo() is None
+
+
+# ---- group 필드 ----
+def test_save_roundtrip_with_group(tmp_yaml):
+    """group 필드 (선택) 저장/로드 라운드트립."""
+    _, ys = tmp_yaml
+    wps = [
+        ys.Waypoint(name="놀이방", x=0.0, y=0.0, yaw=0.0, group="놀이방"),
+        ys.Waypoint(name="복도1", x=0.5, y=2.0, yaw=0.0, group=None),  # 그룹 없음
+    ]
+    ys.save(wps, {})
+    wps2, _ = ys.load()
+    assert wps2[0].group == "놀이방"
+    assert wps2[1].group is None
+
+
+def test_validate_rejects_empty_group_string(tmp_yaml):
+    """group="" 같은 빈 문자열은 거부 (null 만 허용)."""
+    _, ys = tmp_yaml
+    with pytest.raises(ys.WaypointStoreError):
+        ys.validate({
+            "waypoints": [
+                {"name": "x", "x": 0.0, "y": 0.0, "yaw": 0.0, "group": ""},
+            ],
+            "patrols": {},
+        })
+
+
+def test_load_yaml_without_group_field_ok(tmp_yaml):
+    """기존 yaml (group 필드 없는) 로드 회귀 — group=None 으로 통과."""
+    p, ys = tmp_yaml
+    p.write_text(
+        "waypoints:\n- name: a\n  x: 0.0\n  y: 0.0\n  yaw: 0.0\npatrols: {}\n",
+        encoding="utf-8",
+    )
+    wps, _ = ys.load()
+    assert wps[0].group is None
