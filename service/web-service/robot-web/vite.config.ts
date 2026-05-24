@@ -29,6 +29,12 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 5173,
+      // onnxruntime-web 의 WASM multi-thread (SharedArrayBuffer) 활성. wake word
+      // embedding 추론이 main thread 의 80% 이상 — single-thread 로는 step 250-600ms.
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+      },
       // shared/ 디렉터리(repo root) 를 dev server 가 import 할 수 있도록 허용
       fs: {
         allow: [path.resolve(__dirname, '../../../')],

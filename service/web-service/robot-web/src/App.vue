@@ -249,6 +249,13 @@ function handleStart(): void {
       </button>
     </Transition>
     <StartOverlay v-if="!started" @start="handleStart" />
+    <div v-if="voiceController.debug" class="wake-debug">
+      <template v-for="(score, id) in voiceController.wakeScores.value" :key="id">
+        <span class="wake-debug-row" :class="{ fire: score >= voiceController.wakeThreshold }">
+          {{ id }} {{ (score * 100).toFixed(1) }}%
+        </span>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -355,6 +362,29 @@ function handleStart(): void {
     padding: 4px 10px;
     max-width: calc(100vw - 80px); /* 우측 hamburger 만큼 빼고 */
   }
+}
+
+.wake-debug {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #eee;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.wake-debug-row.fire {
+  color: #6ee7b7;
+  font-weight: 700;
 }
 </style>
 
