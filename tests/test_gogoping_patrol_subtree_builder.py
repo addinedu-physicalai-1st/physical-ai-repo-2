@@ -21,6 +21,7 @@ sys.path.insert(0, str(_REPO / "controller" / "gogoping-controller" / "src" / "g
 
 from gogoping_modes.bt.behaviors.common.select_vertex import SelectVertex  # noqa: E402
 from gogoping_modes.bt.behaviors.follow.pan_camera_sweep import PanCameraSweep  # noqa: E402
+from gogoping_modes.bt.behaviors.navigation.brake_and_wait import BrakeAndWait  # noqa: E402
 from gogoping_modes.bt.behaviors.navigation.navigate_to_vertex import NavigateToVertex  # noqa: E402
 from gogoping_modes.bt.trees.sub_trees.BT_patrol_sub import build_patrol_sub  # noqa: E402
 
@@ -49,17 +50,18 @@ def test_builder_creates_one_child_per_waypoint():
         assert isinstance(child, FailureIsSuccess)
 
 
-def test_each_visit_has_select_nav_sweep_in_order():
+def test_each_visit_has_select_nav_brake_sweep_in_order():
     root = build_patrol_sub(_ctx(), ["A", "B"])
     for safe_visit in root.children:
         visit = safe_visit.children[0]   # FailureIsSuccess wraps a single child Sequence
         assert isinstance(visit, py_trees.composites.Sequence)
         assert visit.name.startswith("visit_")
-        # 자식 3개
-        assert len(visit.children) == 3
+        # 자식 4개 — select / nav / brake / sweep
+        assert len(visit.children) == 4
         assert isinstance(visit.children[0], SelectVertex)
         assert isinstance(visit.children[1], NavigateToVertex)
-        assert isinstance(visit.children[2], PanCameraSweep)
+        assert isinstance(visit.children[2], BrakeAndWait)
+        assert isinstance(visit.children[3], PanCameraSweep)
 
 
 def test_select_vertex_names_match_input_order():
@@ -97,7 +99,8 @@ def test_visit_names_include_vertex():
     assert visit.name == "visit_foo"
     assert visit.children[0].name == "select_foo"
     assert visit.children[1].name == "nav_foo"
-    assert visit.children[2].name == "sweep_foo"
+    assert visit.children[2].name == "brake_foo"
+    assert visit.children[3].name == "sweep_foo"
 
 
 def test_memory_true_on_sequences():

@@ -33,6 +33,7 @@ class Waypoint:
     y: float
     yaw: float
     id: int | None = None
+    group: str | None = None
 
 
 class WaypointStoreError(Exception):
@@ -58,6 +59,9 @@ def validate(data: dict) -> None:
             v = w[k]
             if not isinstance(v, (int, float)) or math.isnan(v) or math.isinf(v):
                 raise WaypointStoreError(f"waypoints[{i}].{k} 가 NaN/Inf")
+        if "group" in w and w["group"] is not None:
+            if not isinstance(w["group"], str) or not w["group"].strip():
+                raise WaypointStoreError(f"waypoints[{i}].group must be non-empty str or null")
     patrols = data.get("patrols", {}) or {}
     for pname, members in patrols.items():
         if not isinstance(members, list):

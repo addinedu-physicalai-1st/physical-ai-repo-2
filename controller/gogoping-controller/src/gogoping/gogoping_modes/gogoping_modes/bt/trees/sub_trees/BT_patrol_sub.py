@@ -6,6 +6,7 @@
     visit_<name>:
         ├─ SelectVertex          → BB.target_vertex_name = <name>
         ├─ NavigateToVertex      → graph_router 호출
+        ├─ BrakeAndWait          → cmd_vel=0 publish + 0.5s 대기 (잔여 관성 정리)
         └─ PanCameraSweep        → 90 → 30 → 150 → 90
 
 각 visit Sequence 는 ``FailureIsSuccess`` decorator 로 감싸 한 vertex 실패가 전체 중단을
@@ -26,6 +27,7 @@ from py_trees.decorators import FailureIsSuccess
 from ....context import Context
 from ...behaviors.common.select_vertex import SelectVertex
 from ...behaviors.follow.pan_camera_sweep import PanCameraSweep
+from ...behaviors.navigation.brake_and_wait import BrakeAndWait
 from ...behaviors.navigation.navigate_to_vertex import NavigateToVertex
 
 
@@ -68,6 +70,7 @@ def build_patrol_sub(
             children=[
                 SelectVertex(name=f"select_{name}", vertex_name=name),
                 NavigateToVertex(name=f"nav_{name}"),
+                BrakeAndWait(name=f"brake_{name}", context=ctx),
                 PanCameraSweep(name=f"sweep_{name}", context=ctx),
             ],
         )

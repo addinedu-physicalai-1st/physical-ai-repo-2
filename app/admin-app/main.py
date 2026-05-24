@@ -436,6 +436,13 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # [순찰] 빠른 버튼 → state_client.post_patrol (control-server 가 랜덤 그룹 선택)
+        self.dashboard.debug_panel.patrol_requested.connect(
+            lambda: self.state_client.post_patrol(
+                on_result=self.dashboard.debug_panel.set_patrol_result,
+            )
+        )
+
         # 배터리 디버그 슬라이더 → state_client.post_battery_level
         self.dashboard.battery_debug.battery_level_requested.connect(
             lambda level: self.state_client.post_battery_level(
