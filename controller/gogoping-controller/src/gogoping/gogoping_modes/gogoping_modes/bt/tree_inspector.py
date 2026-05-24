@@ -67,6 +67,8 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader.register_key(key=Keys.PLAY_TASK, access=Access.READ)
         _bb_reader.register_key(key=Keys.IDLE_ENTERED_AT, access=Access.READ)
         _bb_reader.register_key(key=Keys.IDLE_TIMEOUT_SECONDS, access=Access.READ)
+        _bb_reader.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.READ)
+        _bb_reader.register_key(key=Keys.PATROL_CURRENT_INDEX, access=Access.READ)
     return _bb_reader
 
 
@@ -129,6 +131,30 @@ def _read_robot_pose() -> dict | None:
         return None
 
 
+def _read_patrol() -> dict | None:
+    """blackboard 의 patrol 진행 상태 → {vertices, current_index} 또는 None.
+
+    - vertices: BB.SEARCH_WAYPOINTS (list[str])
+    - current_index: BB.PATROL_CURRENT_INDEX (-1 = idle, N = 완료)
+
+    vertices 비어있고 current_index <= -1 이면 patrol 자체 미진행 — None 반환.
+    """
+    bb = _ensure_bb_reader()
+    try:
+        vertices_raw = bb.get(Keys.SEARCH_WAYPOINTS)
+        idx_raw = bb.get(Keys.PATROL_CURRENT_INDEX)
+    except (KeyError, TypeError):
+        return None
+    vertices = list(vertices_raw) if isinstance(vertices_raw, (list, tuple)) else []
+    try:
+        current_index = int(idx_raw) if idx_raw is not None else -1
+    except (TypeError, ValueError):
+        current_index = -1
+    if not vertices and current_index <= -1:
+        return None
+    return {"vertices": vertices, "current_index": current_index}
+
+
 def snapshot(
     fsm_state: str,
     root_tree: Any,
@@ -189,6 +215,9 @@ def snapshot(
         # remaining: IDLE 일 때만 float, 아니면 None. total: 항상 float (totals 표시용).
         "idle_seconds_remaining": idle_remaining,
         "idle_timeout_seconds": idle_total,
+        # patrol 진행 상태 — admin UI waypoint_map_card 가 시각화 (번호 / X / 강조).
+        # None = patrol 미진행 (SEARCH_WAYPOINTS 빈 + current_index = -1).
+        "patrol": _read_patrol(),
         "ts": time.time(),
     }
 

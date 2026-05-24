@@ -45,14 +45,15 @@ def test_returns_patrol_sub_when_waypoints_present():
     root = build_hide_and_seek_sub(_ctx())
     assert isinstance(root, py_trees.composites.Sequence)
     assert root.name == "BT_patrol_sub"
-    assert len(root.children) == 3
+    # 3 visits + 1 done marker
+    assert len(root.children) == 4
 
 
 def test_waypoint_order_preserved():
     _set_search_waypoints(["foo", "bar"])
     root = build_hide_and_seek_sub(_ctx())
-    # FailureIsSuccess 로 감싸진 visit Sequence — 이름이 visit_<name>
-    visit_names = [safe.children[0].name for safe in root.children]
+    # FailureIsSuccess 로 감싸진 visit Sequence — 이름이 visit_<name>. 마지막은 done marker 제외.
+    visit_names = [safe.children[0].name for safe in root.children[:-1]]
     assert visit_names == ["visit_foo", "visit_bar"]
 
 

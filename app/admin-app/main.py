@@ -640,6 +640,13 @@ class AdminWindow(QMainWindow):
             except Exception:
                 pass
 
+        # patrol 진행 시각화 — waypoint_map_card 의 vertex 번호/X
+        if "patrol" in snap:
+            try:
+                self.dashboard.map_card.update_patrol(snap.get("patrol"))
+            except Exception:
+                pass
+
     def closeEvent(self, ev) -> None:   # noqa: N802
         if self.stream_client is not None:
             try:

@@ -103,6 +103,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_hide_and_seek_subtree_builder.py \
   tests/test_gogoping_return_subtree_builder.py \
   tests/test_gogoping_select_vertex.py \
+  tests/test_gogoping_set_patrol_index.py \
   tests/test_gogoping_ui_publish.py \
   tests/test_gogoping_ui_publisher_event.py \
   -v "$@"; then
