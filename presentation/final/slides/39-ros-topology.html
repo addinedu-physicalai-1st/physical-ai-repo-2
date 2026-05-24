@@ -1,0 +1,64 @@
+<section>
+  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+
+    <p style="color:#5A9FD8;font-family:'Jua';letter-spacing:0.2em;font-size:0.7em">ROS2 TOPOLOGY</p>
+    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
+      디바이스 점유와 통신 책임
+    </h2>
+
+    <p style="color:#8D6E63;font-size:0.75em;margin-bottom:14px">
+      마이크/스피커는 <b style="color:#5D4037">브라우저</b>, 카메라/LiDAR/로봇팔은 <b style="color:#5D4037">ROS2 노드</b> — 충돌 방지를 위해 점유 주체를 명확히 분리.
+    </p>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+      <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:18px">
+        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
+          <span class="material-icons-round" style="font-size:18px;color:#F8B4C4;vertical-align:-0.15em">web</span>
+          브라우저 점유
+        </h3>
+        <ul style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.68em;line-height:1.9">
+          <li>· <b>마이크</b> — Web Speech API STT (항상 듣기)</li>
+          <li>· <b>스피커</b> — <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">speechSynthesis</code> + <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">&lt;audio&gt;</code></li>
+          <li>· <b>등록 카메라</b> — WebRTC (운영시간 외)</li>
+        </ul>
+        <p style="color:#8D6E63;font-size:0.62em;margin-top:8px;line-height:1.6">
+          호출어 wake word 모델 없이 STT 텍스트 매칭으로 처리.
+        </p>
+      </div>
+
+      <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:18px">
+        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
+          <span class="material-icons-round" style="font-size:18px;color:#5DBFA3;vertical-align:-0.15em">memory</span>
+          ROS2 노드 점유
+        </h3>
+        <ul style="list-style:none;padding:0;margin:8px 0 0;color:#5D4037;font-size:0.68em;line-height:1.9">
+          <li>· <b>웹캠 / Top / Gripper</b> — 얼굴·객체·자세·자연 촬영</li>
+          <li>· <b>LiDAR (RPLiDAR C1)</b> — 거리·장애물</li>
+          <li>· <b>로봇팔 / 구동기</b> — JTC / cmd_vel</li>
+        </ul>
+        <p style="color:#8D6E63;font-size:0.62em;margin-top:8px;line-height:1.6">
+          같은 호스트 노드들은 DDS shared memory 로 프레임 공유.
+        </p>
+      </div>
+
+      <div class="pastel-card" style="border-color:#D6ECFF;background:#FFFFFF;padding:14px 22px;grid-column:1 / span 2">
+        <h3 class="font-display" style="font-size:0.95em;color:#5D4037">
+          <span class="material-icons-round" style="font-size:18px;color:#5A9FD8;vertical-align:-0.15em">hub</span>
+          로봇별 namespace · 모드 독립
+        </h3>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <span class="chip" style="font-size:0.55em;padding:6px 14px"><b>/eduping/</b> mode · state · photo</span>
+          <span class="chip chip-mint" style="font-size:0.55em;padding:6px 14px"><b>/gogoping/</b> mode · scan · cmd_vel · carry</span>
+          <span class="chip chip-lavender" style="font-size:0.55em;padding:6px 14px"><b>/noriarm/</b> mode · joint_states · session</span>
+        </div>
+        <p style="color:#8D6E63;font-size:0.62em;margin-top:10px;line-height:1.6">
+          mode 토픽은 latched — 각 로봇 노드들은 자기 namespace 만 구독.
+          한 로봇 모드 전환이 다른 로봇에 영향 없음.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+</section>

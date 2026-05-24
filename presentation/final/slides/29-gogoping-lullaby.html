@@ -1,0 +1,56 @@
+<section>
+  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING</span>
+      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 4</span>
+    </div>
+    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
+      <span class="material-icons-round" style="font-size:0.85em;color:#9678B6;vertical-align:-0.1em">bedtime</span>
+      자장가 모드
+    </h2>
+
+    <p style="color:#8D6E63;font-size:0.78em;margin-bottom:18px">
+      낮잠 시간 — 자장가를 틀고, 시작·종료 시각이 자동으로 기록되어 일일 보고서에 포함됩니다.
+    </p>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+      <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;display:flex;flex-direction:column;gap:10px;padding:18px">
+        <h3 class="font-display" style="font-size:1em;color:#5D4037">
+          <span class="material-icons-round" style="font-size:18px;color:#9678B6;vertical-align:-0.15em">music_note</span>
+          호출어로 시작 · 호출어로 종료
+        </h3>
+        <p style="color:#8D6E63;font-size:0.7em;line-height:1.7">
+          "고고핑, 자장가 틀어줘" 한 마디로 mp3 재생 시작.
+          호출어 + 모드 전환 발화로 정지.
+        </p>
+        <p style="color:#8D6E63;font-size:0.7em;line-height:1.7">
+          표정은 <span class="chip chip-lavender" style="font-size:0.55em;padding:2px 8px">sleep</span> 으로 자동 전환,
+          디스플레이가 어둑해지며 분위기 잡기.
+        </p>
+      </div>
+
+      <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;display:flex;flex-direction:column;gap:10px;padding:18px">
+        <h3 class="font-display" style="font-size:1em;color:#5D4037">
+          <span class="material-icons-round" style="font-size:18px;color:#E0AC2B;vertical-align:-0.15em">edit_calendar</span>
+          낮잠 시각 자동 기록
+        </h3>
+        <p style="color:#8D6E63;font-size:0.7em;line-height:1.7">
+          자장가 모드 진입·종료 시각을 Control Server REST 로 전달 →
+          DB <code style="background:#FFF0CC;padding:0 4px;border-radius:4px">mode_history</code> 에 기록.
+        </p>
+        <p style="color:#8D6E63;font-size:0.7em;line-height:1.7">
+          하원 시 일과 보고서 생성 (Ollama) 작업이 이 기록을 조회해
+          학부모에게 보낼 보고서에 <b style="color:#5D4037">낮잠 시작·종료 시각</b> 자동 포함.
+        </p>
+      </div>
+
+    </div>
+
+    <p class="mt-4 text-center" style="color:#8D6E63;font-size:0.72em">
+      🎵 사용 자장가 — <span style="color:#5D4037">엄마가 섬그늘에 굴 따러 가면</span>
+    </p>
+
+  </div>
+</section>

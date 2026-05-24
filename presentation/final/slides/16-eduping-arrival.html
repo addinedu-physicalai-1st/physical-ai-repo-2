@@ -1,0 +1,74 @@
+<section>
+  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span class="chip" style="font-size:0.55em">EDUPING</span>
+      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 1</span>
+    </div>
+    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 18px">
+      <span class="material-icons-round" style="font-size:0.85em;color:#F8B4C4;vertical-align:-0.1em">wb_sunny</span>
+      등원 · 하원
+    </h2>
+
+    <div class="grid grid-cols-2 gap-5" style="flex:1">
+
+      <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:30px;border-radius:8px;background:#FFD3DD;display:inline-flex;align-items:center;justify-content:center">
+            <span class="material-icons-round" style="font-size:18px;color:#F8B4C4">camera_alt</span>
+          </span>
+          <h3 class="font-display" style="font-size:1em;color:#5D4037">얼굴 인식 출석</h3>
+        </div>
+        <p style="color:#8D6E63;font-size:0.72em;line-height:1.7">
+          정문 웹캠이 등록된 아이 얼굴을 한 프레임 캡처 → InsightFace 임베딩 매칭 →
+          child_id 확정 → DB 에 등·하원 시각 INSERT.
+        </p>
+        <p style="color:#8D6E63;font-size:0.7em;line-height:1.7">
+          당일 이미 출석 기록이 있는 아이는 무시 (중복 방지).
+        </p>
+      </div>
+
+      <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:30px;border-radius:8px;background:#D6F2E8;display:inline-flex;align-items:center;justify-content:center">
+            <span class="material-icons-round" style="font-size:18px;color:#5DBFA3">volume_up</span>
+          </span>
+          <h3 class="font-display" style="font-size:1em;color:#5D4037">이름 부르며 인사</h3>
+        </div>
+        <p style="color:#8D6E63;font-size:0.72em;line-height:1.7">
+          이름이 포함된 환영/작별 멘트를 합성해 스피커로 재생.
+          중복으로 아이가 등장하면 멘트는 큐에 적재되어 순차 처리.
+        </p>
+      </div>
+
+      <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:30px;border-radius:8px;background:#E2D4F0;display:inline-flex;align-items:center;justify-content:center">
+            <span class="material-icons-round" style="font-size:18px;color:#9678B6">waving_hand</span>
+          </span>
+          <h3 class="font-display" style="font-size:1em;color:#5D4037">양팔로 손 흔들기</h3>
+        </div>
+        <p style="color:#8D6E63;font-size:0.72em;line-height:1.7">
+          사전 녹화한 환영/작별 trajectory 를 OpenArm 양팔이 재생.
+          음성과 동기 시작, 완료 시 출결 기록 트리거.
+        </p>
+      </div>
+
+      <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:30px;border-radius:8px;background:#FFF0CC;display:inline-flex;align-items:center;justify-content:center">
+            <span class="material-icons-round" style="font-size:18px;color:#E0AC2B">groups</span>
+          </span>
+          <h3 class="font-display" style="font-size:1em;color:#5D4037">학부모에게 자동 전송</h3>
+        </div>
+        <p style="color:#8D6E63;font-size:0.72em;line-height:1.7">
+          출결 시각이 Portal Web 에 실시간 반영 — 학부모는 별도 알림 없이
+          앱에서 등·하원 확인.
+        </p>
+        <span class="chip" style="font-size:0.5em;align-self:flex-start;background:#FFE0E6">관련 SR · IN-001~006 / OUT-001~006</span>
+      </div>
+
+    </div>
+
+  </div>
+</section>

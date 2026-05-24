@@ -1,0 +1,63 @@
+<section>
+  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING</span>
+      <span style="color:#8D6E63;font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 1 · HERO</span>
+    </div>
+    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 14px">
+      <span class="material-icons-round" style="font-size:0.85em;color:#5DBFA3;vertical-align:-0.1em">directions_run</span>
+      교사 추종
+    </h2>
+
+    <p style="color:#8D6E63;font-size:0.78em;margin-bottom:16px">
+      카메라 ReID 로 <b style="color:#5D4037">방위를 잠그고</b>, LiDAR 로 <b style="color:#5D4037">거리를 잰다</b> — 두 센서가 역할을 나눕니다.
+    </p>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:18px">
+
+      <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="width:36px;height:36px;border-radius:10px;background:#FFD3DD;display:inline-flex;align-items:center;justify-content:center">
+            <span class="material-icons-round" style="font-size:22px;color:#F8B4C4">videocam</span>
+          </span>
+          <h3 class="font-display" style="font-size:1em;color:#5D4037">카메라 — 누구를 따라가나</h3>
+        </div>
+        <ul style="list-style:none;padding:0;margin:0;color:#5D4037;font-size:0.72em;line-height:1.9;flex:1">
+          <li>· UI "추종 시작" → 노트북 웹캠으로 교사 얼굴 캡처</li>
+          <li>· InsightFace 매칭 → 등록 교사 확정 (3회 한도)</li>
+          <li>· DeepSORT + OSNet ReID 로 잠금 유지</li>
+          <li>· 시야 로스트 시 회전·이동·음성 호출 ("선생님?")</li>
+        </ul>
+      </div>
+
+      <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="width:36px;height:36px;border-radius:10px;background:#D6F2E8;display:inline-flex;align-items:center;justify-content:center">
+            <span class="material-icons-round" style="font-size:22px;color:#5DBFA3">radar</span>
+          </span>
+          <h3 class="font-display" style="font-size:1em;color:#5D4037">LiDAR — 얼마나 떨어졌나</h3>
+        </div>
+        <ul style="list-style:none;padding:0;margin:0;color:#5D4037;font-size:0.72em;line-height:1.9;flex:1">
+          <li>· RPLiDAR C1 으로 잠근 방위의 거리 측정</li>
+          <li>· 거리 변동에 따라 속도 조절 (P 제어)</li>
+          <li>· 임계 거리 이하 진입 시 즉시 정지</li>
+          <li>· 인접 사람 감지 시 속도 스케일 다운</li>
+        </ul>
+      </div>
+
+      <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;grid-column:1 / span 2;display:flex;align-items:center;gap:16px;padding:16px 22px">
+        <span class="material-icons-round" style="font-size:32px;color:#E0AC2B;flex:0 0 auto">handshake</span>
+        <div>
+          <h3 class="font-display" style="font-size:0.95em;color:#5D4037">두 센서의 책임 분담</h3>
+          <p style="color:#8D6E63;font-size:0.68em;margin-top:4px;line-height:1.7">
+            카메라 = "<b>누가</b>" (식별과 잠금) / LiDAR = "<b>어디서</b>" (거리 측정과 정지).
+            ReID 만으론 거리 노이즈, LiDAR 만으론 사람 구분 불가 — 둘을 같이 써서 견고하게.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>

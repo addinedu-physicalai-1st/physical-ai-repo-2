@@ -1,0 +1,82 @@
+<section>
+  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+
+    <p style="color:#5A9FD8;font-family:'Jua';letter-spacing:0.2em;font-size:0.7em">SOFTWARE ARCHITECTURE</p>
+    <h2 class="font-display" style="font-size:2.2em;color:#5D4037;margin:4px 0 16px">
+      소프트웨어 아키텍처
+    </h2>
+
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+
+      <!-- Layer 1: 클라이언트 -->
+      <div style="display:flex;gap:10px">
+        <div class="pastel-card text-center" style="border-color:#FFD3DD;background:#FFFFFF;padding:14px;flex:1">
+          <p style="font-family:'Jua';color:#F8B4C4;font-size:0.55em;letter-spacing:0.1em">CLIENT</p>
+          <div class="font-display" style="font-size:0.95em;color:#5D4037;margin-top:4px">Robot UI</div>
+          <p style="color:#8D6E63;font-size:0.6em;margin-top:4px;line-height:1.5">
+            Vue 3 + Vite · STT/TTS<br>표정 셰이더 · 모드 화면
+          </p>
+        </div>
+        <div class="pastel-card text-center" style="border-color:#D6F2E8;background:#FFFFFF;padding:14px;flex:1">
+          <p style="font-family:'Jua';color:#5DBFA3;font-size:0.55em;letter-spacing:0.1em">CLIENT</p>
+          <div class="font-display" style="font-size:0.95em;color:#5D4037;margin-top:4px">Portal Web</div>
+          <p style="color:#8D6E63;font-size:0.6em;margin-top:4px;line-height:1.5">
+            학부모 · 교사 공용<br>출결 · 사진 · 보고서
+          </p>
+        </div>
+        <div class="pastel-card text-center" style="border-color:#E2D4F0;background:#FFFFFF;padding:14px;flex:1">
+          <p style="font-family:'Jua';color:#9678B6;font-size:0.55em;letter-spacing:0.1em">CLIENT</p>
+          <div class="font-display" style="font-size:0.95em;color:#5D4037;margin-top:4px">Admin UI</div>
+          <p style="color:#8D6E63;font-size:0.6em;margin-top:4px;line-height:1.5">
+            PyQt5 데스크톱 관제<br>지도 · 카메라 · LiDAR
+          </p>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#FFE5A8;font-size:1.4em">↓ REST / WebSocket / SSE</div>
+
+      <!-- Layer 2: 서버 -->
+      <div style="display:flex;gap:10px">
+        <div class="pastel-card" style="border-color:#FFE0E6;background:#FFFFFF;padding:14px;flex:2;display:flex;flex-direction:column;gap:6px">
+          <p style="font-family:'Jua';color:#5A9FD8;font-size:0.55em;letter-spacing:0.1em">SERVER</p>
+          <div class="font-display" style="font-size:1em;color:#5D4037">Control Server (FastAPI)</div>
+          <p style="color:#8D6E63;font-size:0.62em;line-height:1.6">
+            HTTP REST / WebSocket / SSE 단일 진입점.
+            fastapi-users 세션, 출결/사진/모드/스트리밍 게이트웨이, ROS2 브리지.
+          </p>
+        </div>
+        <div class="pastel-card" style="border-color:#FFF0CC;background:#FFFFFF;padding:14px;flex:1;display:flex;flex-direction:column;gap:6px">
+          <p style="font-family:'Jua';color:#E0AC2B;font-size:0.55em;letter-spacing:0.1em">SERVER</p>
+          <div class="font-display" style="font-size:1em;color:#5D4037">AI Server</div>
+          <p style="color:#8D6E63;font-size:0.62em;line-height:1.6">
+            Ollama LLM · ai_job 큐 워커<br>의도 분류 · 사진 분류 · 보고서 생성
+          </p>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:#FFE5A8;font-size:1.4em">↓ ROS2 Topic / Service / Action · DB</div>
+
+      <!-- Layer 3: ROS + DB -->
+      <div style="display:flex;gap:10px">
+        <div class="pastel-card" style="border-color:#FFD3DD;background:#FFFFFF;padding:12px;flex:1;text-align:center">
+          <div class="font-display" style="font-size:0.85em;color:#5D4037">EduPing</div>
+          <p style="color:#8D6E63;font-size:0.55em;margin-top:2px">/eduping/* topics</p>
+        </div>
+        <div class="pastel-card" style="border-color:#D6F2E8;background:#FFFFFF;padding:12px;flex:1;text-align:center">
+          <div class="font-display" style="font-size:0.85em;color:#5D4037">GogoPing</div>
+          <p style="color:#8D6E63;font-size:0.55em;margin-top:2px">/gogoping/* topics</p>
+        </div>
+        <div class="pastel-card" style="border-color:#E2D4F0;background:#FFFFFF;padding:12px;flex:1;text-align:center">
+          <div class="font-display" style="font-size:0.85em;color:#5D4037">NoriArm × 3</div>
+          <p style="color:#8D6E63;font-size:0.55em;margin-top:2px">/noriarm/* topics</p>
+        </div>
+        <div class="pastel-card" style="border-color:#D6ECFF;background:#FFFFFF;padding:12px;flex:1;text-align:center">
+          <div class="font-display" style="font-size:0.85em;color:#5D4037">PostgreSQL</div>
+          <p style="color:#8D6E63;font-size:0.55em;margin-top:2px">child · attendance · photo · report · ai_job</p>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
