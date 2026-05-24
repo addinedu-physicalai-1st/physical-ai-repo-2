@@ -12,14 +12,13 @@
         "등원",
         "하원",
         "율동",
-        "뎁스카메라 뷰",
         {
           "id": "놀이", "selfSelectable": false,
           "children": ["무궁화꽃이 피었습니다"]
         },
         {
           "id": "관리", "selfSelectable": false,
-          "children": ["율동 등록", "등하원 인사 설정", "무궁화 율동 등록"]
+          "children": ["율동 등록", "등하원 인사 설정", "무궁화 율동 등록", "뎁스카메라 뷰"]
         }
       ],
       "defaultEmotionByMode": {
