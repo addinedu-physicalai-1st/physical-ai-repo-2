@@ -41,8 +41,8 @@ def generate_launch_description() -> LaunchDescription:
     spawn_yaw = LaunchConfiguration("spawn_yaw")
 
     pkg_nav_share = FindPackageShare("gogoping_navigation")
-    default_map = PathJoinSubstitution([pkg_nav_share, "maps", "map_v2.yaml"])
-    default_world = PathJoinSubstitution([pkg_nav_share, "worlds", "map_v2.sdf"])
+    default_map = PathJoinSubstitution([pkg_nav_share, "maps", "new_map.yaml"])
+    default_world = PathJoinSubstitution([pkg_nav_share, "worlds", "world.sdf"])
 
     return LaunchDescription([
         DeclareLaunchArgument(

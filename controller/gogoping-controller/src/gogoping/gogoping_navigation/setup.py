@@ -28,7 +28,8 @@ setup(
         _data_glob('maps', '*'),
         _data_glob('rviz', '*.rviz'),
         _data_glob('urdf', '*.xacro'),
-        _data_glob('worlds', '*.world'),
+        ('share/' + package_name + '/worlds',
+            glob('worlds/*.world') + glob('worlds/*.sdf')),
         # models (Gazebo) — 디렉토리 트리 보존
         (os.path.join('share', package_name, 'models', 'pingdergarten'),
             glob(os.path.join('models', 'pingdergarten', '*.sdf')) +

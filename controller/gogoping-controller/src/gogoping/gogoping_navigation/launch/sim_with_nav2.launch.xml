@@ -24,10 +24,10 @@
 -->
 <launch>
     <arg name="namespace" default="gogoping"/>
-    <arg name="world_name" default="map_v2.sdf"/>
+    <arg name="world_name" default="world.sdf"/>
     <!-- world: 절대경로 직접 전달용 (.world / .sdf 후보 swap). 미지정 시 world_name 으로 share 내부 해석. -->
     <arg name="world" default="$(find-pkg-share gogoping_navigation)/worlds/$(var world_name)"/>
-    <arg name="map" default="$(find-pkg-share gogoping_navigation)/maps/map_v2.yaml"/>
+    <arg name="map" default="$(find-pkg-share gogoping_navigation)/maps/new_map.yaml"/>
     <!-- Pinky spawn pose (world frame). launch_sim_with_pinky.launch.xml 의 default 와 동일. -->
     <arg name="spawn_x" default="0.0"/>
     <arg name="spawn_y" default="0.0"/>
