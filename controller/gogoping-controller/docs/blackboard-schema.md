@@ -47,12 +47,12 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | `destination_key` | `str` | `command_listener` | `navigate_to_vertex` (BT_goto_sub 에서 `target_key=Keys.DESTINATION_KEY` 로 명시) | goto 목적지 (waypoints.yaml vertex 이름) |
 | `target_vertex_name` | `str` | `select_vertex` | `navigate_to_vertex` (default `target_key`) | NavigateToVertex 의 기본 R 키. BT_patrol_sub 의 각 visit 마다 SelectVertex 가 W. **string literal — Keys 에 등재되지 않음** (현재 정책) |
 | `hide_position_key` | `str` | `command_listener` / config | `navigate_to_pose` | 숨바꼭질 숨을 위치 |
-| `search_waypoints` | `list[str]` | config / `command_listener` | `navigate_to_pose` (loop) | 숨바꼭질 탐색 waypoint |
+| `search_waypoints` | `list[str]` | `command_listener` (Goal.msg.search_waypoints 를 goal_reconciler 가 BB W, hideseek 시) | `BT_hide_and_seek_sub` 빌더 (빌드 시점 1회 R → `build_patrol_sub` 자식들이 vertex 별 SelectVertex 로 변환) | 숨바꼭질 탐색 vertex 리스트. 빈 리스트는 reconciler 가 `missing_search_waypoints` 로 거부 |
 | `home_position_key` | `str` | config | `navigate_to_pose` | 숨바꼭질 원위치 |
 | `charging_dock_approach_key` | `str` | config | `navigate_to_pose` | 도킹 접근 위치 |
 | `charging_dock_target_yaw` | `float` (rad) | SubTree 빌더 (graph 의 vertex.yaw) | `align_to_dock` | AlignToDock 의 target yaw — robot 이 도크 등진 자세로 정렬 |
 
-> 주: `search_waypoints` 는 BT 의 `command_listener` 가 control-server 의 `GET /waypoints/patrol/hide_and_seek_search` 에서 가져와 세팅한다. control-server 도달 실패 시 `${PINGDER_BT_CACHE_DIR:-/tmp/pingder}/hide_and_seek_search.json` 캐시 fallback. helper: `gogoping_modes.utils.waypoints_client.fetch_patrol`.
+> 주: `search_waypoints` 는 UI 가 `SetGoal.srv` 의 `Goal.msg.search_waypoints` 필드로 직접 전달한다 (UI 의 vertex 선택 UI 가 책임). `command_listener._on_set_goal_request` 가 dict 로 변환 → `goal_reconciler._set_task_blackboard` 가 hideseek 시 BB W. (이전 안: control-server 의 `/waypoints/patrol/hide_and_seek_search` fetch — 현재 미사용)
 
 ### 에러 (fault 발화한 monitor 가 W)
 

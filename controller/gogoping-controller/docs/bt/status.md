@@ -13,11 +13,11 @@
 
 | 영역 | 진행 | 비고 |
 |---|---|---|
-| **Trees** | **11 / 13** + 1 빌딩블록 | MainTree 8/8 ✅ · SubTree 3/5 (BT_return_sub ✅ · BT_lullaby_sub ✅ · BT_goto_sub ✅) · **빌딩 블록 BT_patrol_sub ✅** (재사용 가능, mode/task 단위 SubTree 아님) |
-| **Stubs (_stubs/)** | **1 / 3** | base ✅ · 2 stub 🟡 (follow/hideseek). stub_lullaby·stub_carry 삭제됨 |
+| **Trees** | **12 / 13** + 1 빌딩블록 | MainTree 8/8 ✅ · SubTree 4/5 (BT_return_sub ✅ · BT_lullaby_sub ✅ · BT_goto_sub ✅ · **BT_hide_and_seek_sub ✅ patrol-only**) · **빌딩 블록 BT_patrol_sub ✅** |
+| **Stubs (_stubs/)** | **1 / 3** | base ✅ · stub_follow 🟡 · stub_hideseek 사용 안 함 (BT_play_main 이 build_hide_and_seek_sub 호출) |
 | **Behaviors** | **17 / 31** | common 10/11 · navigation 4/8 · perception 0/4 · follow 1/4 · manual 1/1 · recovery 1/3 |
 | **Infrastructure** | **40 / 42** | 🟡 2 (nav2 실물 localization-only / battery_publisher_node static placeholder). camera_pan_client 실 구현 포함 |
-| **합계** | **69 / 89** | patrol 빌딩 블록 (BT_patrol_sub + SelectVertex + PanCameraSweep + CameraPanClient 실 구현) 추가 |
+| **합계** | **70 / 89** | BT_hide_and_seek_sub (patrol-only) 결선 완료 |
 
 ---
 
@@ -30,22 +30,22 @@
 | BT_charging_main | ✅ | Parallel(BatteryFullMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener). 부팅 시 첫 tick 에 battery_full → IDLE 자동 전이 |
 | BT_idle_main | ✅ | Parallel(BatteryLowMonitor + IdleTimeoutMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener). docs — [trees/BT_idle_main.md](trees/BT_idle_main.md) |
 | BT_assist_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — goto ✅ + follow stub + lullaby ✅). docs — [trees/BT_assist_main.md](trees/BT_assist_main.md) |
-| BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — hideseek 분기, stub) |
+| BT_play_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + TaskSelector — hideseek 분기 → build_hide_and_seek_sub(ctx)). docs — [trees/BT_play_main.md](trees/BT_play_main.md) |
 | BT_manual_main | ✅ | Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON 라이프사이클 ✅. battery·HW·collision monitor 미배치 — 위치 안전(MapBoundary)만 예외적 배치. docs — [trees/BT_manual_main.md](trees/BT_manual_main.md) |
 | BT_returning_main | ✅ | Parallel(BatteryLowMonitor + MapBoundaryMonitor + HardwareHealthMonitor + CommandListener + **ReturnSubTree**). escalation — RETURNING 중 배터리 떨어지면 LOW_BATTERY_RETURN. ReturnSubTree = OneShot(NavTo "충전소입구" → AlignToDock → ReverseIntoDock) |
 | BT_low_battery_return_main | ✅ | Parallel(MapBoundaryMonitor + HardwareHealthMonitor + **ReturnSubTree**) — lockdown (CommandListener 없음, 사용자 명령 차단). ReturnSubTree 동일 (RETURNING 과 공유). docs — [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) |
 | BT_error_main | ✅ | Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 사람이 재시작. docs — [trees/BT_error_main.md](trees/BT_error_main.md) |
 
-> **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree 미완성분 (follow/hideseek/return) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
+> **walking skeleton 단계**: 8 트리의 골격 + CommandListener / 일부 monitor 만 동작. 진짜 SubTree 미완성분 (follow) 는 `_stubs/` 임시 placeholder. main.py 의 BT swap 루프가 FSM state 변화에 맞춰 트리를 교체 — 8 state 모두 진입/이탈 검증 (force_state 디버그 포함).
 
-### SubTree — 3 / 5 (+ 1 빌딩 블록)
+### SubTree — 4 / 5 (+ 1 빌딩 블록)
 
 | 트리 | 상태 | 비고 |
 |---|---|---|
 | BT_goto_sub | ✅ | Sequence(NavigateToVertex + UIPublish) — 단일 vertex 이동. 운반은 user 가 follow + goto chain | [trees/BT_goto_sub.md](trees/BT_goto_sub.md) |
 | BT_follow_sub | ☐ | StubFollow 로 대체 중. 정상 ↔ Loss Recovery |
 | BT_lullaby_sub | ✅ | [BT_lullaby_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_lullaby_sub.py) — 단일 LullabyAudio leaf. initialise=lullaby_play event publish, update=RUNNING, terminate=lullaby_stop publish (idempotent). 빌더 2 + LullabyAudio 7 테스트 통과 |
-| BT_hide_and_seek_sub | ☐ | StubHideseek 로 대체 중. 1회 실행 후 종료 |
+| BT_hide_and_seek_sub | ✅ | [BT_hide_and_seek_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_hide_and_seek_sub.py) — `build_hide_and_seek_sub(ctx)` 빌더. BB.search_waypoints 읽어 `build_patrol_sub(ctx, wps)` 반환. **patrol-only 첫 구현** — 진짜 hideseek (인식/FOUND) 확장 ☐. 5 빌더 테스트 통과 |
 | BT_patrol_sub | ✅ | **빌딩 블록 (mode/task 단위 SubTree 아님)** — [BT_patrol_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_patrol_sub.py). `build_patrol_sub(ctx, waypoints)` 로 vertex 마다 `FailureIsSuccess(Sequence(SelectVertex + NavigateToVertex + PanCameraSweep))` 동적 생성. 9 빌더 테스트 통과. 현재 어디에도 결선되지 않음 — 호출자가 사용 |
 | BT_return_sub | ✅ | [BT_return_sub.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py) — OneShot(Sequence([NavigateToVertex("충전소입구"), AlignToDock, ReverseIntoDock, **VerifyDockingContact**])). 빌더가 waypoints.yaml 의 충전소입구 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 로 자동 주입. ReverseIntoDock 완료 후 VerifyDockingContact 가 `docked` trigger 자동 발사 → CHARGING 전이. 6 빌더 테스트 통과 (tests/test_gogoping_return_subtree_builder.py). ⚠ **알려진 이슈** — RETURNING 중 cancel 시 robot 즉시 안 멈춤 + 경로 잔상 ([trees/BT_return_sub.md 의 "알려진 이슈" 섹션](trees/BT_return_sub.md#알려진-이슈--cancel-cleanup-2026-05-18) 참조) |
 
@@ -57,7 +57,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 |---|---|---|
 | `_stubs/_base.py` | ✅ | `StubRunningThenSuccess` (N tick → SUCCESS) + `StubInfiniteRunning` (항상 RUNNING) |
 | `_stubs/stub_follow.py` | 🟡 | `StubInfiniteRunning`. 진짜 follow 의 "사람 보이는 한 RUNNING" 의미와 동등 |
-| `_stubs/stub_hideseek.py` | 🟡 | `StubRunningThenSuccess(30 tick = 3초)`. 진짜 hideseek 의 "1회 사이클 후 SUCCESS" 의미와 동등 |
+| `_stubs/stub_hideseek.py` | 🗑 | **사용 안 함** — BT_play_main 이 `build_hide_and_seek_sub(ctx)` 호출하도록 교체됨. 파일은 잔존 (다른 stub 정리 시 함께 삭제 예정) |
 
 ---
 
@@ -74,7 +74,7 @@ walking skeleton 단계의 임시 placeholder. 진짜 SubTree 작성 시 폴더�
 | hardware_health_monitor | ✅ | [hardware_health_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/hardware_health_monitor.py) — LIDAR `/gogoping/scan` + odom `/gogoping/odom` 두 토픽 직접 subscribe. 마지막 수신 시각 ROS param `hw_health_staleness_seconds` (기본 3.0s) 초과 시 `fault(reason="lidar_timeout" / "odom_timeout")` 발화. **6 트리 배치** (CHARGING/IDLE/ASSIST/PLAY/RETURNING/LOW_BATTERY_RETURN — MANUAL/ERROR 제외). `initialise()` 가 _last_* 를 *현재 시각* 으로 초기화해 부팅 직후 grace period 보장 + edge-triggered (`_fired` 플래그). blackboard ERROR_REASON / ERROR_SOURCE W |
 | collision_event_handler | ☐ | |
 | map_boundary_monitor | ✅ | [map_boundary_monitor.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/map_boundary_monitor.py) — blackboard.ROBOT_POSE 읽고 `map_cache.is_outside(x, y)` → 박스 밖 또는 unknown 셀이면 `fault(reason="out_of_map")` 발화. **7 트리 배치** (CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN, ERROR 만 제외). MANUAL 은 다른 monitor 와 달리 위치 안전 예외로 포함. 발화 시 blackboard.ERROR_REASON / ERROR_SOURCE 도 세팅. 7 시나리오 통과 |
-| command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — `SetGoal.srv` + `ForceState.srv` 2개 서버 호스팅. SetGoal → `goal_reconciler` 호출. ForceState → `fsm.force_state()` + sub_task blackboard 세팅 (ASSIST→assist_task, PLAY→play_task). unit test 7 + reconciler 13 |
+| command_listener | ✅ | [command_listener.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/command_listener.py) — `SetGoal.srv` + `ForceState.srv` 2개 서버 호스팅. SetGoal → `goal_reconciler` 호출. ForceState → `fsm.force_state()` + sub_task blackboard 세팅 (ASSIST→assist_task, PLAY→play_task). Goal.msg.`search_waypoints` 도 dict 로 전달 → reconciler 가 hideseek 시 BB W. unit test 7 + reconciler 8 |
 | docking_contact_check | ☐ | |
 | check_task | ✅ | [check_task.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/check_task.py) — TaskSelector 분기 Condition. 5 시나리오 통과 |
 | ui_publish | ✅ | [ui_publish.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/ui_publish.py) — `message: dict` 1회 publish 후 즉시 SUCCESS. 5 단위 테스트 통과 |
