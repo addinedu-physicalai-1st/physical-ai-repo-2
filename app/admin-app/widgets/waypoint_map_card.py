@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
 
 DEFAULT_MAP_PGM = (pathlib.Path(__file__).resolve().parents[3]
                    / "controller/gogoping-controller/src/gogoping/gogoping_navigation"
-                   / "maps/map_v2.pgm")
+                   / "maps/new_map.pgm")
 
 
 def _map_pgm_path() -> pathlib.Path:
@@ -31,9 +31,9 @@ def _map_pgm_path() -> pathlib.Path:
 class MapView(QWidget):
     """SLAM PGM 배경 + 마커/로봇/경로 오버레이 + Nav2 Goal 클릭-드래그."""
 
-    MAP_ORIGIN = (-9.485, -8.342)
+    MAP_ORIGIN = (-10.004, -6.958)
     MAP_RES = 0.050
-    MAP_SIZE = (575, 467)
+    MAP_SIZE = (580, 440)
     DRAG_MIN_PX = 12          # 이보다 짧은 드래그는 클릭 실수로 간주, goal 무시
     NODE_HIT_PX = 16          # 편집 모드 노드 hit 반경 (widget px)
     LANE_HIT_PX = 8           # 편집 모드 lane hit perpendicular 거리 (widget px)
