@@ -58,7 +58,16 @@ GotoSubTree (Sequence, memory=True)
  #   자세한 명세: docs/bt/trees/BT_lullaby_sub.md
 
    -------------------------------------------------------------------------------
- HideAndSeekSubTree
+ HideAndSeekSubTree — **현재 구현: patrol-only**
+  build_hide_and_seek_sub(ctx):
+    BB.search_waypoints → wps
+    if not wps: return Failure("BT_hide_and_seek_sub_no_waypoints")
+    return build_patrol_sub(ctx, wps)   # ※ vertex 순회 + 카메라 sweep만
+ # 정상 경로엔 reconciler 가 missing_search_waypoints 로 빈 리스트 차단.
+ # 자세한 명세: docs/bt/trees/BT_hide_and_seek_sub.md
+
+ # ─── 진짜 hideseek (인식/FOUND/홈복귀) 확장 예정 (현재 ☐) ──────────────────────
+ HideAndSeekSubTree (future)
   Parallel (SuccessOnSelected=[HideSeekCore])
     └─ HideSeekCore (Sequence, memory=True)
           ├─ NavigateToPose(hide_position_key)
@@ -109,8 +118,8 @@ PatrolSubTree (building block — mode/task 단위 SubTree 아님)
 자장가 재생 → "그만" 명령까지 대기
 
 4. HideAndSeekSubTree (숨바꼭질)
-숨는 위치로 이동 → 30초 카운트다운 → 등록된 waypoint 들 순회하며 탐색 (이동 + 카메라 sweep)
-→ 찾으면 "찾았다!", 다 돌았는데 못 찾으면 "못 찾았어요" → 원위치 복귀
+**현재 구현 (patrol-only)**: BB.search_waypoints 의 vertex 들을 순회하며 각 vertex 에서 카메라 좌우 sweep. 빈 리스트는 reconciler 가 차단.
+**진짜 구현 (☐)**: 숨는 위치로 이동 → 30초 카운트다운 → 등록된 waypoint 들 순회하며 탐색 (이동 + 카메라 sweep) → 찾으면 "찾았다!", 다 돌았는데 못 찾으면 "못 찾았어요" → 원위치 복귀.
 **한 번 실행 후 종료** (라운드/반복 개념 없음). 다시 하려면 사용자가 UI 에서 재요청.
 
 5. ReturnSubTree (도킹 복귀) — 4단계
@@ -122,6 +131,6 @@ graph_router 로 "충전소입구" vertex 까지 lane 따라 이동 → 도크 �
 ### 빌딩 블록 (mode/task 단위 SubTree 아님)
 
 **PatrolSubTree** — vertex list 를 순서대로 돌며 각 vertex 에서 카메라 좌우 sweep.
-한 vertex 실패는 skip 후 다음 진행 (`FailureIsSuccess` decorator). 본 SubTree 자체는
-어느 mode/task 에도 결선돼 있지 않다 — 호출자가 빌더 `build_patrol_sub(ctx, waypoints)` 로
-사용. 추후 `HideAndSeekSubTree` 의 search 단계 등에서 재사용 예정.
+한 vertex 실패는 skip 후 다음 진행 (`FailureIsSuccess` decorator). 호출자가 빌더
+`build_patrol_sub(ctx, waypoints)` 로 사용. 현재 호출처: **BT_hide_and_seek_sub**
+(patrol-only 첫 구현이 본 빌딩 블록을 그대로 사용).

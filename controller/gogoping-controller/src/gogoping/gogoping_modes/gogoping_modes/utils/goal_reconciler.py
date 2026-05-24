@@ -79,6 +79,7 @@ _K_ASSIST_TASK = "assist_task"
 _K_PLAY_TASK = "play_task"
 _K_DESTINATION_KEY = "destination_key"
 _K_TARGET_PERSON_ID = "target_person_id"
+_K_SEARCH_WAYPOINTS = "search_waypoints"
 
 
 # ---------------------------------------------------------------- Validation
@@ -113,6 +114,9 @@ def _validate(goal: dict) -> str | None:
 
         if mode == "PLAY" and task == "hideseek" and not goal.get("target_id"):
             return "missing_target_id"
+
+        if mode == "PLAY" and task == "hideseek" and not goal.get("search_waypoints"):
+            return "missing_search_waypoints"
 
     return None
 
@@ -227,6 +231,7 @@ def _set_task_blackboard(goal: dict, blackboard: _BlackboardProto) -> None:
         blackboard.set(_K_PLAY_TASK, task)
         if task == "hideseek":
             blackboard.set(_K_TARGET_PERSON_ID, goal.get("target_id", ""))
+            blackboard.set(_K_SEARCH_WAYPOINTS, list(goal.get("search_waypoints", [])))
 
 
 __all__ = ["ReconcileResult", "reconcile"]

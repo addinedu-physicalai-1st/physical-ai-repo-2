@@ -14,11 +14,11 @@ Parallel(SuccessOnSelected=[TaskSelector])
 └─ TaskSelector (Selector, memory=False)
       └─ Sequence(hideseek_branch, memory=True)
             ├─ CheckTask(play_task=="hideseek")    (✅)
-            └─ StubHideseek                         (🟡 placeholder — 30 tick → SUCCESS)
+            └─ build_hide_and_seek_sub(ctx)         (✅ patrol-only — BT_hide_and_seek_sub.md)
 ```
 
 추후 추가 예정: `CollisionEventHandler` (현재 ☐).
-SubTree 교체: `StubHideseek` → `build_hide_and_seek(ctx)` (현재 ☐).
+진짜 hideseek (인식/FOUND) 확장: ☐ — `BT_hide_and_seek_sub` 안에서.
 
 ### TaskSelector 정책
 
@@ -67,10 +67,10 @@ TaskSelector 가 SUCCESS 면 BT_play_main root 도 SUCCESS → `main.py._on_tree
 - [hardware_health_monitor](../behaviors/common.md#hardware_health_monitor)
 - [command_listener](../behaviors/common.md#command_listener)
 - [check_task](../behaviors/common.md#check_task) — Selector 분기용
-- (sub_tree 호출) → [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) — 현재 stub
+- (sub_tree 호출) → [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) (patrol-only)
 
 ## 상태
 
 - 코드: ✅ ([BT_play_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_play_main.py))
 - 의존 behavior: BatteryLow / MapBoundary / HardwareHealth / CommandListener / CheckTask 모두 ✅
-- SubTree: BT_hide_and_seek_sub 는 현재 `StubHideseek` (🟡 의미상 동등 — N tick → SUCCESS)
+- SubTree: [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) ✅ (patrol-only — 진짜 hideseek 확장은 ☐)

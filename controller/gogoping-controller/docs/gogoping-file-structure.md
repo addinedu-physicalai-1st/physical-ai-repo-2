@@ -151,7 +151,7 @@ controller/gogoping-controller/src/gogoping/
         │   │       ├── __init__.py
         │   │       ├── _base.py                     # StubRunningThenSuccess (30 tick → SUCCESS) + StubInfiniteRunning (항상 RUNNING)
         │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미)
-        │   │       └── stub_hideseek.py             # BT_hide_and_seek_sub 자리 — 30 tick stub (1회 사이클 SUCCESS 의미)
+        │   │       └── stub_hideseek.py             # ★ 사용 안 함 — BT_play_main 이 build_hide_and_seek_sub(ctx) 호출하도록 교체됨. 파일은 잔존 (다른 stub 정리 시 함께 삭제)
         │   │
         │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
         │       ├── __init__.py
@@ -161,7 +161,7 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_charging_main.py               # CHARGING — BatteryFullMonitor + CommandListener
         │       │   ├── BT_idle_main.py                   # IDLE — CommandListener
         │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(goto ✅ + follow stub + lullaby ✅)
-        │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek stub)
+        │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek → build_hide_and_seek_sub(ctx)) (✅ patrol-only)
         │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON ✅
         │       │   ├── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
         │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
@@ -172,7 +172,7 @@ controller/gogoping-controller/src/gogoping/
         │           ├── BT_goto_sub.py            # 이동 — Sequence(NavigateToVertex + UIPublish)
         │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
         │           ├── BT_lullaby_sub.py         # 자장가 — LullabyAudio 단일 leaf (UI 가 mp3 재생, BT 는 publish only) (✅)
-        │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 (1회 실행) — 숨기 → 카운트 → 탐색 → 복귀
+        │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 — build_hide_and_seek_sub(ctx) (✅ patrol-only 첫 구현. BB.search_waypoints 읽어 build_patrol_sub 호출. 빈 리스트 Failure leaf). 진짜 hideseek (인식/FOUND) 확장 ☐ → docs/bt/trees/BT_hide_and_seek_sub.md
         │           ├── BT_patrol_sub.py          # ★ 빌딩 블록 (mode/task 단위 아님) — build_patrol_sub(ctx, waypoints) 로 vertex 마다 Sequence(SelectVertex + NavigateToVertex + PanCameraSweep) 동적 생성 + FailureIsSuccess 로 감싸 skip-on-failure (✅) → docs/bt/trees/BT_patrol_sub.md
         │           └── BT_return_sub.py          # 도킹 복귀 — OneShot(Sequence(NavTo "충전소입구" → AlignToDock → ReverseIntoDock → VerifyDockingContact)). 마지막 단계가 docked trigger 자동 발사 → CHARGING. 빌더가 yaml 의 vertex.yaw 를 blackboard.CHARGING_DOCK_TARGET_YAW 주입 → docs/bt/trees/BT_return_sub.md
         │

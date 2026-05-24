@@ -121,6 +121,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
             "task": g.task,
             "destination_key": g.destination_key,
             "target_id": g.target_id,
+            "search_waypoints": list(g.search_waypoints),
         }
 
         # debug event (admin UI 추적용)
@@ -276,6 +277,7 @@ class _BlackboardWriter:
     _WRITE_KEYS = (
         "assist_task", "play_task",
         "destination_key", "target_person_id",
+        "search_waypoints",
         # _on_emergency_stop_request 가 fault reason 기록용으로 W
         "error_reason", "error_source",
     )
