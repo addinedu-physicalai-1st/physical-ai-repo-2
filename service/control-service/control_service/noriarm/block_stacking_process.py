@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 
 
 class RunnerProcess:
+    """runner_entry.py 서브프로세스 lifecycle.
+
+    block_stacking 의 단일 task 패턴 + store_play 의 long-lived 패턴 둘 다 지원.
+    - 단일 task: start → wait_ready → send_start → terminate (block_stacking 기존 흐름)
+    - long-lived: start → wait_ready → send_start → send_prompt × N → send_quit
+      각 send_prompt 후 wait_task_done 으로 task 완료 신호 (TASK_DONE 줄) 대기.
+    """
+
     def __init__(self, argv: Sequence[str], *, env_extra: dict[str, str] | None = None) -> None:
         self._argv = list(argv)
         self._env_extra = env_extra or {}
@@ -22,6 +30,8 @@ class RunnerProcess:
         self._ready_event = asyncio.Event()
         self._exit_code: int | None = None
         self._stdout_task: asyncio.Task | None = None
+        # long-lived (store_play) 용 — TASK_DONE 줄을 큐로 받아 매 task 마다 wait 가능.
+        self._task_done_queue: asyncio.Queue[bool] = asyncio.Queue(maxsize=8)
 
     async def start(self) -> None:
         env = os.environ.copy()
@@ -45,6 +55,11 @@ class RunnerProcess:
             logger.info("[runner] %s", text)
             if text == "READY":
                 self._ready_event.set()
+            elif text == "TASK_DONE":
+                try:
+                    self._task_done_queue.put_nowait(True)
+                except asyncio.QueueFull:
+                    pass  # 미소비 신호 누적 시 drop — 호출자가 timely consume 가정.
 
     async def wait_ready(self, *, timeout_s: float) -> bool:
         try:
@@ -57,6 +72,47 @@ class RunnerProcess:
         assert self._proc is not None and self._proc.stdin is not None
         self._proc.stdin.write(b"START\n")
         await self._proc.stdin.drain()
+
+    # ────────────────── long-lived (store_play) 전용 ──────────────────
+
+    async def send_prompt(self, prompt: str) -> None:
+        """'PROMPT <task>\\n' 보내서 runner 가 task 1회 실행하게 함."""
+        assert self._proc is not None and self._proc.stdin is not None
+        safe = prompt.replace("\n", " ").replace("\r", " ").strip()
+        line = f"PROMPT {safe}\n".encode()
+        self._proc.stdin.write(line)
+        await self._proc.stdin.drain()
+
+    async def wait_task_done(self, *, timeout_s: float) -> bool:
+        """runner 의 TASK_DONE stdout 줄 대기. True=받음, False=timeout."""
+        try:
+            await asyncio.wait_for(self._task_done_queue.get(), timeout=timeout_s)
+            return True
+        except asyncio.TimeoutError:
+            return False
+
+    async def send_abort(self) -> None:
+        """SIGUSR1 — 진행 중 task 만 중단 (runner 는 계속 살아있어 다음 PROMPT 대기)."""
+        if self._proc is None or self._proc.returncode is not None:
+            return
+        try:
+            self._proc.send_signal(signal.SIGUSR1)
+        except (ProcessLookupError, ValueError):
+            pass  # ValueError: windows 에서 SIGUSR1 미지원.
+
+    async def send_quit(self) -> None:
+        """'QUIT\\n' 보내서 runner 가 cleanly disconnect 후 종료하게 함."""
+        if self._proc is None or self._proc.returncode is not None:
+            return
+        if self._proc.stdin is None or self._proc.stdin.is_closing():
+            return
+        try:
+            self._proc.stdin.write(b"QUIT\n")
+            await self._proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    # ────────────────────────────────────────────────────────────────
 
     async def terminate(self) -> None:
         if self._proc is None or self._proc.returncode is not None:

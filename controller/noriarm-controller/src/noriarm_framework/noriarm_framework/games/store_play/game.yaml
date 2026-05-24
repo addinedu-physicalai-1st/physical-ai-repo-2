@@ -1,0 +1,141 @@
+name: store_play
+display: "가게놀이"
+
+# ACT phase5_roi preset — in-process LeRobot ACTPolicy + YOLO R11 ROI masking.
+# game.yaml (디폴트, SmolVLA HTTP) 과 별도 manifest. NORIARM_STOREPLAY_GAME_YAML
+# env 로 선택. 학습 코드 gen_roi_masked_videos_phase5.py 와 1:1 일치.
+
+hardware:
+  cameras:
+    - id: camera1
+      role: top_overhead
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 0
+      real:
+        source: usb
+        device: /dev/cam_top
+    - id: camera2
+      role: wrist_left
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 1
+      real:
+        source: usb
+        device: /dev/cam_wrist_left
+    - id: camera3
+      role: wrist_right
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 2
+      real:
+        source: usb
+        device: /dev/cam_wrist_right
+
+  arms:
+    - id: left
+      model: omx_f
+      ros_namespace: /noriarm/left
+      role: bimanual_left
+      controller_topic: /noriarm/left/arm_controller/joint_trajectory
+      controller_joint_names:
+        - left_shoulder_pan
+        - left_shoulder_lift
+        - left_elbow_flex
+        - left_wrist_flex
+        - left_wrist_roll
+        - left_gripper
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names:
+          - left_shoulder_pan
+          - left_shoulder_lift
+          - left_elbow_flex
+          - left_wrist_flex
+          - left_wrist_roll
+          - left_gripper
+      real:
+        backend: lerobot_bi_omx
+        port: /dev/omx_left_follower
+        baudrate: 1000000
+    - id: right
+      model: omx_f
+      ros_namespace: /noriarm/right
+      role: bimanual_right
+      controller_topic: /noriarm/right/arm_controller/joint_trajectory
+      controller_joint_names:
+        - right_shoulder_pan
+        - right_shoulder_lift
+        - right_elbow_flex
+        - right_wrist_flex
+        - right_wrist_roll
+        - right_gripper
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names:
+          - right_shoulder_pan
+          - right_shoulder_lift
+          - right_elbow_flex
+          - right_wrist_flex
+          - right_wrist_roll
+          - right_gripper
+      real:
+        backend: lerobot_bi_omx
+        port: /dev/omx_right_follower
+        baudrate: 1000000
+
+policy:
+  kind: act_local
+  module: noriarm_framework.games.store_play
+  # 로컬 체크포인트 (HF Hub 안 거치고 즉시 로드).
+  repo_id: /home/kyle/omx_store_play/models/store_play_act_phase5_roi/checkpoints/200000/pretrained_model
+  device: cuda:0
+  # hw udev symlink → 학습 모델 input feature key
+  image_key_map:
+    camera1: top
+    camera2: wrist_left
+    camera3: wrist_right
+  # phase5_roi 학습본은 inference 시에도 ROI mask 필수 (학습 분포 일치).
+  roi:
+    yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r11/weights/best.pt
+    conf: 0.25
+    iou: 0.5
+    pad: 20
+  paraphrases:
+    broccoli:
+      - "give me broccoli"
+      - "pass me the broccoli"
+      - "bring me broccoli"
+      - "I want broccoli"
+    grape:
+      - "give me grape"
+      - "pass me the grape"
+      - "bring me grape"
+      - "I want grape"
+    kiwi:
+      - "give me kiwi"
+      - "pass me the kiwi"
+      - "bring me kiwi"
+      - "I want kiwi"
+    strawberry:
+      - "give me strawberry"
+      - "pass me the strawberry"
+      - "bring me strawberry"
+      - "I want strawberry"
+    pineapple:
+      - "give me pineapple"
+      - "pass me the pineapple"
+      - "bring me pineapple"
+      - "I want pineapple"
+
+runtime:
+  rate_hz: 30
+  episode_timeout_s: 60

@@ -26,6 +26,7 @@ from urllib.parse import urlparse, urlunparse
 
 from control_service.config import settings
 from control_service.noriarm.block_stacking import router as block_stacking_router
+from control_service.noriarm.store_play import router as store_play_router
 from control_service.noriarm.ros_bridge import NoriarmRosBridge, ros_available
 
 # 실물 OMX-F follower 가 udev 룰로 만든 심볼릭 링크. 존재 여부로 연결 판정.
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/noriarm", tags=["noriarm"])
 router.include_router(block_stacking_router)
+router.include_router(store_play_router)
 
 
 class AnswerRequest(BaseModel):

@@ -11,6 +11,7 @@ setup(
         # 로 접근 가능.
         f"{package_name}.games.ox_quiz": ["*.yaml", "*.json"],
         f"{package_name}.games.block_stacking": ["*.yaml", "*.json"],
+        f"{package_name}.games.store_play": ["*.yaml", "*.json"],
     },
     include_package_data=True,
     data_files=[

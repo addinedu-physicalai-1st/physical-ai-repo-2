@@ -1,0 +1,179 @@
+name: store_play
+display: "가게놀이"
+
+# 가게놀이는 **BiOmxFollower 직결 path** 를 사용 — 즉 ROS 우회. runner_entry.py 가
+# LeRobot 표준 API (BiOmxFollower.get_observation / send_action) 로 양팔 + 카메라
+# 를 직접 제어한다. 5090 데스크탑의 inference_server.py 와 HTTP /chunk 로 obs/action
+# 교환. 학습 데이터 단위 (-100..100 motor .pos) 와 자동 일치.
+#
+# 이 manifest 는 따라서 다음 용도로만 사용:
+#   1. control_service 라우터 / UI 가 paraphrases / item 목록 조회 (policy.extra)
+#   2. inference_url override 진입점 (policy.extra.inference_url)
+#   3. manifest 스키마 통과용 (hardware.arms / cameras 필드는 framework 의 load_manifest
+#      가 요구함). 실제 디바이스 경로 / 모터 포트는 runner_entry 가 직접 들고 있다.
+
+hardware:
+  # 카메라 — 실제 디바이스 경로는 runner_entry.py 의 _CAMERA_DEVICES 가 가지고 있다.
+  # 이 섹션은 manifest 스키마 통과용 + 문서화 목적.
+  cameras:
+    - id: camera1
+      role: top_overhead
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 0
+      real:
+        source: usb
+        device: /dev/cam_top
+    - id: camera2
+      role: wrist_left
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 1
+      real:
+        source: usb
+        device: /dev/cam_wrist_left
+    - id: camera3
+      role: wrist_right
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 2
+      real:
+        source: usb
+        device: /dev/cam_wrist_right
+
+  # arms — 마찬가지로 manifest 스키마 통과용. ros_namespace / controller_topic /
+  # joint_state_topic 등 ROS 필드는 store_play 에서는 **dead config** (실제 publish/
+  # subscribe 없음). 학습 motor 순서는 left → right 고정 (inference_server.py 의
+  # MOTOR_ORDER 와 1:1).
+  arms:
+    - id: left
+      model: omx_f
+      ros_namespace: /noriarm/left
+      role: bimanual_left
+      controller_topic: /noriarm/left/arm_controller/joint_trajectory  # 미사용
+      controller_joint_names:
+        - left_shoulder_pan
+        - left_shoulder_lift
+        - left_elbow_flex
+        - left_wrist_flex
+        - left_wrist_roll
+        - left_gripper
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names:
+          - left_shoulder_pan
+          - left_shoulder_lift
+          - left_elbow_flex
+          - left_wrist_flex
+          - left_wrist_roll
+          - left_gripper
+      real:
+        backend: lerobot_bi_omx  # marker only — runner_entry 가 BiOmxFollower 직결.
+        port: /dev/omx_left_follower
+        baudrate: 1000000
+    - id: right
+      model: omx_f
+      ros_namespace: /noriarm/right
+      role: bimanual_right
+      controller_topic: /noriarm/right/arm_controller/joint_trajectory  # 미사용
+      controller_joint_names:
+        - right_shoulder_pan
+        - right_shoulder_lift
+        - right_elbow_flex
+        - right_wrist_flex
+        - right_wrist_roll
+        - right_gripper
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names:
+          - right_shoulder_pan
+          - right_shoulder_lift
+          - right_elbow_flex
+          - right_wrist_flex
+          - right_wrist_roll
+          - right_gripper
+      real:
+        backend: lerobot_bi_omx
+        port: /dev/omx_right_follower
+        baudrate: 1000000
+
+policy:
+  # 가게놀이는 framework 의 load_policy / build_policy 를 부르지 않는다.
+  # runner_entry.py 가 policy.kind 보고 두 종류의 chunk provider 중 하나 선택:
+  #
+  #   kind: smolvla_http  → 노트북 또는 5090 의 inference_server.py 에 /chunk POST.
+  #                          모델은 데몬에 상주 — 매 세션마다 재로딩 안 함 (UX 매끄러움).
+  #                          기본값. 노트북에서 띄울 거면 inference_url 을 localhost 로.
+  #
+  #   kind: act_local     → in-process ACTPolicy.from_pretrained.
+  #                          노트북 GPU 4070 8GB 에 직접 로드. 모델이 작아 (~50M) 가능.
+  #                          단점: 매 START 마다 ~5~10s 로드 (block_stacking 패턴).
+  #                          전환 시 정책 path 만 바꾸면 됨 — manifest 의 다른 필드는 동일.
+  #
+  # `module` 필드는 manifest 스키마 (_build_policy) 가 요구해서 채움 — runner_entry
+  # 가 직접 chunk_provider 만들고 framework load_policy 우회하므로 실제 import 안 됨.
+  kind: smolvla_http
+  module: noriarm_framework.games.store_play
+  # smolvla_http 전용 — runner_entry 가 NORIARM_STOREPLAY_INFERENCE_URL env 로 override 가능.
+  # 노트북 데몬: "http://localhost:8765" / 5090 데몬: "http://<5090-IP>:8765"
+  inference_url: "http://localhost:8765"
+  request_timeout_s: 30.0
+  jpeg_quality: 85
+  # ── act_local + phase5_roi 사용 시 (학습 코드 gen_roi_masked_videos_phase5.py 와 1:1) ──
+  # kind: act_local
+  # module: noriarm_framework.games.store_play
+  # repo_id: minssuung/store_play_act_v2_en_phase5_roi
+  #   # 또는 로컬: /home/kyle/omx_store_play/models/store_play_act_phase5_roi/checkpoints/200000/pretrained_model
+  # device: cuda:0
+  # image_key_map:
+  #   camera1: top           # hw udev symlink → 학습 모델 input key
+  #   camera2: wrist_left
+  #   camera3: wrist_right
+  # roi:                      # phase5_roi 학습본은 inference 시에도 ROI mask 필수
+  #   yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r8/weights/best.pt
+  #   conf: 0.25
+  #   iou: 0.5
+  #   pad: 20
+  # # n_action_steps / chunk_size 는 ACTPolicy.config 에서 자동 (= 100).
+  #
+  # ROI 안 쓰는 ACT 학습본 (예: phase4 raw) 이면 roi 섹션 빼면 됨 — provider 가 자동 우회.
+  # 학습된 phrase 4종 × 5 아이템 — UI / control_service 가 item 받아 1개 랜덤 선택해서
+  # --prompt 로 전달. 분포는 학습 시연과 동일.
+  paraphrases:
+    broccoli:
+      - "give me broccoli"
+      - "pass me the broccoli"
+      - "bring me broccoli"
+      - "I want broccoli"
+    grape:
+      - "give me grape"
+      - "pass me the grape"
+      - "bring me grape"
+      - "I want grape"
+    kiwi:
+      - "give me kiwi"
+      - "pass me the kiwi"
+      - "bring me kiwi"
+      - "I want kiwi"
+    strawberry:
+      - "give me strawberry"
+      - "pass me the strawberry"
+      - "bring me strawberry"
+      - "I want strawberry"
+    pineapple:
+      - "give me pineapple"
+      - "pass me the pineapple"
+      - "bring me pineapple"
+      - "I want pineapple"
+
+runtime:
+  rate_hz: 30
+  episode_timeout_s: 60  # 가게놀이 1회 픽업 ~10s. 60s 면 retry 여유.
