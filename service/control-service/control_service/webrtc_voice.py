@@ -291,6 +291,13 @@ class _Session:
         self.dc: Optional[object] = None
         self.gate_open: bool = False
         self.robot: Optional[str] = None
+        # 현재 모드 (클라이언트가 'mode_set' DC msg 로 동기화). intent 분류 시
+        # ai-service /voice/intent 의 mode hint 로 전달 — 율동 안 'noun 그만' 같은
+        # 컨텍스트 인지 핸들러용.
+        self.mode: Optional[str] = None
+        # 클라가 startConfirm 호출 후 'awaiting_confirm_set' DC msg 로 동기화.
+        # ConfirmHandler 활성 조건.
+        self.awaiting_confirm: bool = False
         self._gate_close_task: Optional[asyncio.Task] = None
         self.outbound_tts: Optional[OutboundTTSTrack] = None
 
@@ -439,6 +446,13 @@ def _handle_client_msg(session: _Session, msg: dict, log_id: str = "") -> None:
     elif msg_type == "tts_cancel":
         if session.outbound_tts is not None:
             asyncio.create_task(session.outbound_tts.clear())
+    elif msg_type == "mode_set":
+        mode = msg.get("mode")
+        session.mode = mode if isinstance(mode, str) and mode else None
+        logger.info(f"[webrtc:{log_id}] mode_set → {session.mode!r}")
+    elif msg_type == "awaiting_confirm_set":
+        session.awaiting_confirm = bool(msg.get("awaiting"))
+        logger.info(f"[webrtc:{log_id}] awaiting_confirm → {session.awaiting_confirm}")
     else:
         logger.info(f"[webrtc:{log_id}] dc msg: {msg!r}")
 
@@ -447,7 +461,12 @@ async def _dispatch_text_only(text: str, session: _Session) -> None:
     """STT 우회 — 주어진 텍스트로 곧장 intent + TTS 사이클. CommandBar 타이핑용."""
     session.send({"type": "stt_final", "text": text})  # UI echo
     try:
-        intent = await _dispatch_intent(text, session.robot or "eduping")
+        intent = await _dispatch_intent(
+            text,
+            session.robot or "eduping",
+            session.mode,
+            session.awaiting_confirm,
+        )
     except Exception:
         logger.exception(f"[webrtc:{session.log_id}] dispatch_text intent failed")
         return
@@ -562,7 +581,9 @@ async def _transcribe_and_send(pcm: np.ndarray, session: _Session) -> None:
         return
     robot = session.robot or "eduping"
     try:
-        intent = await _dispatch_intent(text, robot)
+        intent = await _dispatch_intent(
+            text, robot, session.mode, session.awaiting_confirm
+        )
     except Exception:
         logger.exception(f"[webrtc:{session.log_id}] intent dispatch failed")
         return
@@ -577,9 +598,22 @@ async def _transcribe_and_send(pcm: np.ndarray, session: _Session) -> None:
             await _speak_reply(reply, session)
 
 
-async def _dispatch_intent(text: str, robot: str) -> dict:
-    """ai-service /voice/intent 호출 — 기존 control-service /api/voice/intent 와 동일."""
-    payload = {"text": text, "robot": robot, "class_roster": []}
+async def _dispatch_intent(
+    text: str,
+    robot: str,
+    mode: Optional[str] = None,
+    awaiting_confirm: bool = False,
+) -> dict:
+    """ai-service /voice/intent 호출.
+
+    mode / awaiting_confirm 는 클라이언트가 DC msg 로 동기화해둔 컨텍스트 hint.
+    ai-service 의 컨텍스트 인지 핸들러 (RhythmStop, ConfirmHandler 등) 가 사용.
+    """
+    payload: dict = {"text": text, "robot": robot, "class_roster": []}
+    if mode:
+        payload["mode"] = mode
+    if awaiting_confirm:
+        payload["awaiting_confirm"] = True
     async with httpx.AsyncClient(timeout=settings.request_timeout_s) as client:
         response = await client.post(
             f"{settings.ai_hub_url}/voice/intent",
