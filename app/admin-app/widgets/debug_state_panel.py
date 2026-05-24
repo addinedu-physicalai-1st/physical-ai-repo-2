@@ -278,22 +278,16 @@ class DebugStatePanel(QFrame):
         group_order: list[str] | None = None,
         vertices: list[str] | None = None,
     ) -> None:
-        """state_client 가 /debug/patrol 응답 받은 후 호출.
-
-        panel 너비 좁아 그룹명 다 표시 못 함 — vertex/그룹 개수만. 전체 순서는 tooltip 에.
-        """
+        """state_client 가 /debug/patrol 응답 받은 후 호출."""
         if ok:
-            n_v = len(vertices) if vertices else 0
-            n_g = len(group_order) if group_order else 0
-            self._last_result.setText(f"✓ 순찰 시작 ({n_v} vertex / {n_g} 그룹)")
-            tip = " → ".join(group_order) if group_order else ""
-            self._last_result.setToolTip(tip)
+            n = len(vertices) if vertices else 0
+            grps = " → ".join(group_order) if group_order else "?"
+            self._last_result.setText(f"✓ 순찰 {grps} ({n} vertex)")
             self._last_result.setStyleSheet(
                 f"font-size: 8pt; font-weight: 700; color: {COLORS['success']};"
             )
         else:
             self._last_result.setText(f"✗ 순찰: {reason}")
-            self._last_result.setToolTip("")
             self._last_result.setStyleSheet(
                 f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
             )
