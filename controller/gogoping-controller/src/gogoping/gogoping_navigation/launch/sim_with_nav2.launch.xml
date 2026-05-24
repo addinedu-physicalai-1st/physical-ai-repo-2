@@ -41,8 +41,9 @@
     <arg name="autostart" default="true"/>
     <arg name="log_level" default="info"/>
     <!-- laser_filters 가 설치돼 있을 때만 true 로 (ros-jazzy-laser-filters).
-         false (default) 면 nav2 가 raw /gogoping/scan 직접 사용. -->
-    <arg name="use_laser_filter" default="false"/>
+         false 면 nav2 가 raw /gogoping/scan 직접 사용 (rear pillar 가
+         self-scan 으로 costmap 에 가짜 obstacle 로 잡힘). -->
+    <arg name="use_laser_filter" default="true"/>
 
     <!-- 1) gazebo + Vic Pinky spawn -->
     <include file="$(find-pkg-share gogoping_navigation)/launch/launch_sim_with_pinky.launch.xml">

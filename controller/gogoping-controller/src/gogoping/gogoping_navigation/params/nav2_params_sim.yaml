@@ -1,27 +1,24 @@
 # gogoping_navigation/params/nav2_params_sim.yaml
 #
-# vicpinky_navigation/params/nav2_params.yaml 의 verbatim copy + 다음 변경:
-#   * use_sim_time: True (gz Sim 사용)
-#   * 모든 frame 에 `gogoping/` prefix:
+# 시뮬레이션용 nav2 params. AMCL motion/sensor + controller (RPP) + costmap
+# inflation 튜닝은 nav2_params_real.yaml 과 동일하게 맞춤 (real 환경 행동 재현).
+#
+# nav2_params_real.yaml 과의 차이는 sim 환경 제약으로 강제되는 항목만 남김:
+#   * use_sim_time: True              (gz /clock 사용)
+#   * frame_id 에 `gogoping/` prefix  (sim URDF 가 namespace prefix 로 spawn 됨)
 #       base_footprint → gogoping/base_footprint
 #       base_link       → gogoping/base_link
 #       odom            → gogoping/odom
-#   * scan topic 절대경로화: /scan_filtered → /gogoping/scan
-#     (laser_filters 미설치 환경 호환을 위해 sim 에서는 raw scan 직접 사용.
-#      ros-jazzy-laser-filters 설치 후 sim_with_nav2.launch.xml 의 laser_filters
-#      노드를 활성화하면 /gogoping/scan_filtered 로 바꿔 footprint 폴리곤 제거 가능.)
-#   * odom topic 절대경로화: /odom → /gogoping/odom
-#   * AMCL initial pose = spawn pose (0.20, -7.00, yaw=1.5708)
+#   * voxel/obstacle scan raytrace_min_range / obstacle_min_range = 0.35
+#       (gazebo LIDAR 가 자기 몸체 스캔 → 반치수 0.30 + 여유 0.05 로 clip)
+#   * robot_state_publisher 블록 명시 (real 은 vicpinky_bringup 이 띄움)
 #
-# nav2 노드는 root namespace 에서 띄우고 토픽은 모두 /gogoping/* 절대경로로
-# 지정한다 (gazebo bridge 가 /tf, /clock 을 root 로 발행하기 때문).
+# 토픽은 모두 /gogoping/* 절대경로 (gazebo bridge 가 /tf, /clock 을 root 발행).
 
 amcl:
   ros__parameters:
     use_sim_time: True
-    # ── Motion model (sim 튜닝) ────────────────────────────────────
-    # gazebo odom 노이즈 거의 0 → alpha 낮춰 odom 신뢰 ↑.
-    # 기본 0.2 는 실물용. sim 에선 0.05 가 정확.
+    # Motion model — real 과 동일 (실 휠 encoder 노이즈 반영)
     alpha1: 0.05
     alpha2: 0.05
     alpha3: 0.05
@@ -38,40 +35,29 @@ amcl:
     laser_max_range: 100.0
     laser_min_range: -1.0
     laser_model_type: "likelihood_field"
-    # ── Beams (sim 2차 튜닝) ───────────────────────────────────────
-    # 60 → 180 으로 늘려 라이다 광선 더 많이 사용 → 대칭 환경 disambiguation ↑.
     max_beams: 180
-    # ── Particle count (sim 튜닝) ──────────────────────────────────
-    # 어려운 환경 (대칭/긴 복도) 대응 위해 늘림.
     max_particles: 5000
     min_particles: 1000
     odom_frame_id: "gogoping/odom"
     pf_err: 0.05
     pf_z: 0.99
-    # ── Recovery (sim 2차 튜닝) ────────────────────────────────────
-    # local minimum 에 갇혔을 때 자가 재분포 강화 (0.1 → 0.2).
     recovery_alpha_fast: 0.2
     recovery_alpha_slow: 0.001
     resample_interval: 1
     robot_model_type: "nav2_amcl::DifferentialMotionModel"
     save_pose_rate: 0.5
-    # ── Sensor model (sim 2차 튜닝) ────────────────────────────────
-    # sigma_hit 0.05 는 너무 엄격해서 작은 노이즈에도 매칭 실패 → local min 갇힘.
-    # 0.1 (10cm) 로 약간 완화하면서, z_hit/z_rand 비율 조정으로 정확 매칭 가중치 ↑.
+    # Sensor model — real 과 동일
     sigma_hit: 0.1
     tf_broadcast: true
     transform_tolerance: 1.0
-    # ── Update threshold (sim 튜닝) ────────────────────────────────
-    # 더 자주 업데이트 → drift 누적 방지.
+    # Update threshold — real 과 동일
     update_min_a: 0.1
     update_min_d: 0.1
-    # ── Sensor mixture (sim 2차 튜닝) ──────────────────────────────
-    # z_hit ↑ / z_rand ↓ → 정확 매칭에 가중, 우연 매칭 억제 → 갇힘 회피.
     z_hit: 0.7
     z_max: 0.05
     z_rand: 0.3
     z_short: 0.05
-    scan_topic: /gogoping/scan
+    scan_topic: /gogoping/scan_filtered
     set_initial_pose: true
     initial_pose:
       x: 0.0
@@ -114,38 +100,40 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      # ← 10cm (default 0.25)
-      xy_goal_tolerance: 0.10
-      # ← ~7° (default 0.25 ≈ 14°)
-      yaw_goal_tolerance: 0.12
-    # RPP — nav2 default 값 기준. Vic Pinky 용 변경만 주석에 ← 표시.
+      xy_goal_tolerance: 0.30
+      # yaw 무시 — controller 는 위치만 도착시킴. yaw 정렬은 BT 의 RotateToYaw 로 별도 처리.
+      yaw_goal_tolerance: 3.14
+    # RPP — Regulated Pure Pursuit. 좁은 통로 추종 안정성 > DWB sampling.
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.15            # ← 좁은 코너 신중 주행용 (Vic Pinky max 0.20, default 0.5)
-      lookahead_dist: 0.3                 # ← lane 타이트 추종 (default 0.6)
-      min_lookahead_dist: 0.15            # ← lane 타이트 추종 (default 0.3)
-      max_lookahead_dist: 0.5             # ← lane 타이트 추종 (default 0.9)
+      desired_linear_vel: 0.20
+      lookahead_dist: 1.2
+      min_lookahead_dist: 0.3
+      max_lookahead_dist: 0.9
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 0.9  # ← 10% 추가 감소 (이전 1.0, default 1.8)
+      rotate_to_heading_angular_vel: 0.5
       transform_tolerance: 0.1
-      use_velocity_scaled_lookahead_dist: false
+      use_velocity_scaled_lookahead_dist: true
       min_approach_linear_velocity: 0.05
       approach_velocity_scaling_dist: 0.6
-      use_collision_detection: true
-      max_allowed_time_to_collision_up_to_carrot: 1.0
+      # 충돌 예측 비활성화 — map 의 wall 노이즈로 자꾸 멈춤 방지
+      use_collision_detection: false
+      max_allowed_time_to_collision_up_to_carrot: 3.0
+      # 곡률 + 비용 기반 속도 조절 — 코너에서 자동 감속
       use_regulated_linear_velocity_scaling: true
       use_cost_regulated_linear_velocity_scaling: true
-      regulated_linear_scaling_min_radius: 0.9
-      regulated_linear_scaling_min_speed: 0.10   # ← desired_linear_vel(0.20) 보다 작아야 의미있음 (default 0.25)
-      # ≥45° 회전 또는 goal yaw 맞출 때 제자리 회전. real 에서 캐스터 깨끗 검증됨.
-      use_rotate_to_heading: true
-      rotate_to_heading_min_angle: 0.785
-      max_angular_accel: 2.5              # ← 이동 중 회전 부드럽게 (default 3.2)
+      regulated_linear_scaling_min_radius: 0.4
+      regulated_linear_scaling_min_speed: 0.05
+      # 항상 직진+회전 동시 (blended). 제자리 회전 모드 끔 → 찔끔거림 방지.
+      # yaw 정렬은 nav2 controller 가 안 하고 BT 의 RotateToYaw 가 별도 책임.
+      use_rotate_to_heading: false
+      rotate_to_heading_min_angle: 3.14
+      max_angular_accel: 1.5
       allow_reversing: false
       max_robot_pose_search_dist: 10.0
-      cost_scaling_dist: 0.10             # ← local inflation_radius(0.10) 와 일치 (default 0.6)
-      cost_scaling_gain: 1.0              # default
-      inflation_cost_scaling_factor: 3.0  # default
+      cost_scaling_dist: 0.3
+      cost_scaling_gain: 1.0
+      inflation_cost_scaling_factor: 2.5
 
 
 local_costmap:
@@ -157,8 +145,8 @@ local_costmap:
       robot_base_frame: gogoping/base_link
       use_sim_time: True
       rolling_window: true
-      width: 5
-      height: 5
+      width: 4
+      height: 4
       resolution: 0.05
       # Vic Pinky 실측 (docs/robots/vic-pinky.md):
       #   본체 길이 0.6 m, 본체 폭 0.4 m, 휠 간격 0.475 m + 휠 두께 0.05 m = 휠 외측 0.525 m
@@ -168,9 +156,9 @@ local_costmap:
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.0           # ← 부드럽게 (default 3.0)
-        # ← LOCAL: 통로에서 inflation 안 겹치도록 더 작게. 동적장애물은 비전이 맡음
-        inflation_radius: 0.10
+        cost_scaling_factor: 4.0
+        # LOCAL: 좁은 문 (0.885m) 통과 가능 위해 작게
+        inflation_radius: 0.18
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -182,7 +170,7 @@ local_costmap:
         mark_threshold: 0
         observation_sources: scan
         scan:
-          topic: /gogoping/scan
+          topic: /gogoping/scan_filtered
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -218,7 +206,7 @@ global_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /gogoping/scan
+          topic: /gogoping/scan_filtered
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -233,8 +221,8 @@ global_costmap:
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        # ← GLOBAL: planner 가 통로 중앙 path 그리게 (default 0.55, 더 작게)
+        cost_scaling_factor: 4.0
+        # GLOBAL: 크게 → planner 가 통로 중앙으로 path 그리도록
         inflation_radius: 0.35
       always_send_full_costmap: True
 
@@ -298,7 +286,7 @@ behavior_server:
     robot_base_frame: gogoping/base_link
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
-    max_rotational_vel: 1.5
+    max_rotational_vel: 1.0
     min_rotational_vel: 0.4
     rotational_acc_lim: 3.2
 
@@ -323,8 +311,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "CLOSED_LOOP"
-    max_velocity: [0.25, 0.0, 1.5]
-    min_velocity: [-0.25, 0.0, -1.5]
+    max_velocity: [0.25, 0.0, 1.0]
+    min_velocity: [-0.25, 0.0, -1.0]
     max_accel: [1.8, 0.0, 2.0]
     max_decel: [-1.8, 0.0, -2.0]
     odom_topic: "/gogoping/odom"

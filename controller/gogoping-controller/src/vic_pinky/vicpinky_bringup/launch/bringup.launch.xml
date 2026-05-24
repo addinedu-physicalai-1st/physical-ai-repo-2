@@ -22,7 +22,7 @@
         <param name='accel_limit' value='$(var accel_limit)'/>
         <param name='decel_limit' value='$(var decel_limit)'/>
         <param name='ang_accel_limit' value='$(var ang_accel_limit)'/>
-        <param name='ang_accel_limit' value='$(var ang_decel_limit)'/>
+        <param name='ang_decel_limit' value='$(var ang_decel_limit)'/>
     </node>
     
     <node pkg="laser_filters" exec="scan_to_scan_filter_chain">
