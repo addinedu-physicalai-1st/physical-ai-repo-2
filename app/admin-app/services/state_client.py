@@ -222,18 +222,19 @@ class StateClient:
 
     def post_patrol(
         self,
-        on_result: Callable[[bool, str, list[str]], None] | None = None,
+        on_result: Callable[[bool, str, list[str], list[str]], None] | None = None,
     ) -> None:
-        """[디버그] group 있는 모든 vertex 를 nearest-neighbor 순서로 순찰 — ``POST /api/gogoping/debug/patrol``.
+        """[디버그] 모든 group 카테고리를 랜덤 순서로 순찰 — ``POST /api/gogoping/debug/patrol``.
 
-        별도 thread 에서 HTTP 호출. 응답 시 ``on_result(ok, reason, vertices)`` 콜백.
-        DebugStatePanel 의 [순찰] 빠른 버튼이 호출.
+        별도 thread 에서 HTTP 호출. 응답 시
+        ``on_result(ok, reason, group_order, vertices)`` 콜백.
         """
         url = f"{self._base}/api/gogoping/debug/patrol"
 
         def _run() -> None:
             ok = False
             reason = ""
+            group_order: list[str] = []
             vertices: list[str] = []
             try:
                 with httpx.Client(timeout=2.0) as client:
@@ -242,6 +243,7 @@ class StateClient:
                         data = r.json()
                         ok = bool(data.get("accepted"))
                         reason = str(data.get("reason", ""))
+                        group_order = list(data.get("group_order", []) or [])
                         vertices = list(data.get("vertices", []) or [])
                     else:
                         reason = f"http_{r.status_code}"
@@ -251,7 +253,7 @@ class StateClient:
                 reason = f"unexpected: {e}"
             if on_result is not None:
                 try:
-                    on_result(ok, reason, vertices)
+                    on_result(ok, reason, group_order, vertices)
                 except Exception as e:
                     logger.warning(f"patrol on_result 콜백 오류: {e}")
 
