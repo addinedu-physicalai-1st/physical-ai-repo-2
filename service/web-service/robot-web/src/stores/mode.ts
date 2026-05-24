@@ -67,6 +67,12 @@ export const useModeStore = defineStore('mode', () => {
       case 'goto_vertex':
         // graph routing 은 useVoiceController 가 별도 fetch 로 처리. mode 변경 없음.
         break;
+      case 'rhythm_play':
+      case 'rhythm_stop':
+      case 'confirm_yes':
+      case 'confirm_no':
+        // useVoiceController 가 등록된 mode handler / confirm callback 으로 위임. mode 자체 변경 없음.
+        break;
       case 'chat':
       case 'ignored':
         break;

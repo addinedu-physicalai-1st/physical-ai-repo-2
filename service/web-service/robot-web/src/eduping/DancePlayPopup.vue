@@ -9,8 +9,11 @@
  *
  * 녹화 기능은 본 팝업에 없음 — 녹화는 '율동 등록' 모드의 DanceManager 가 담당.
  */
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
+import { useVoiceStore } from '@/stores/voice';
+import { useModeIntents } from '@/composables/useModeIntents';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
@@ -27,6 +30,8 @@ interface DanceItem {
 }
 
 const mode = useModeStore();
+const voice = useVoiceStore();
+const voiceController = inject(VOICE_CONTROLLER_KEY);
 const stream = useDanceStream();
 const stateWs = useEdupingStateWs();
 stateWs.start();
@@ -34,7 +39,9 @@ stateWs.start();
 // 패널 최소화 상태 — 헤더만 남기고 본문 접음.
 const cameraMinimized = ref(false);
 const musicMinimized = ref(false);
-const simMinimized = ref(false);
+// 시뮬 panel 은 기본 최소화 — URDF 로드가 무거워 율동 진입 직후엔 카메라/음악
+// panel 만 펼쳐두고, 시뮬이 필요한 교사가 헤더 클릭해서 열도록.
+const simMinimized = ref(true);
 // 시뮬 패널이 한 번이라도 열리기 전엔 URDF 로드 자체를 하지 않음.
 // realActive=true 면 패널이 unmount 되므로 어차피 로드 없음.
 const simEverOpened = ref(false);
@@ -46,7 +53,6 @@ const error = ref('');
 
 const playingSlug = ref<string>('');
 const playingItem = computed(() => items.value.find((i) => i.slug === playingSlug.value) ?? null);
-const pendingItem = ref<DanceItem | null>(null);  // 재생 확인 대기 중
 
 // 자연 촬영 — 율동 재생 중에만 캡처. 곡 시작마다 resetKey 증가시켜 직전 세션 락 해제.
 // OXQuiz 와 동일한 패턴: /api/photos/natural 로 happy/sad 프레임 업로드 → 같은 child_id+date
@@ -90,22 +96,32 @@ function requestPlay(item: DanceItem): void {
     stop();
     return;
   }
-  // 다른 곡 — 클릭 즉시 재생 X. 안전을 위해 확인 팝업 띄움.
-  pendingItem.value = item;
+  // 다른 곡 — 클릭 즉시 재생 X. 안전을 위해 confirm 팝업 띄움.
+  voiceController?.startConfirm({
+    context: 'rhythm_play',
+    prompt: `${item.display_name} 재생할게요. 로봇 팔이 움직일 수 있으니 가까이 가지 마세요. 재생할까요?`,
+    onConfirm: () => {
+      playingSlug.value = item.slug;
+      captureResetKey.value += 1;
+      error.value = '';
+      stream.play(item.slug);
+    },
+    onCancel: () => {
+      voiceController?.speak('알겠어요. 다른 곡을 말해주세요.');
+    },
+  });
 }
 
-function confirmPlay(): void {
-  const item = pendingItem.value;
-  pendingItem.value = null;
-  if (!item) return;
-  playingSlug.value = item.slug;
-  captureResetKey.value += 1;
-  error.value = '';
-  stream.play(item.slug);
+function onConfirmClick(): void {
+  const c = voice.confirm;
+  voice.clearConfirm();
+  if (c) void c.onConfirm();
 }
 
-function cancelPlay(): void {
-  pendingItem.value = null;
+function onCancelClick(): void {
+  const c = voice.confirm;
+  voice.clearConfirm();
+  if (c) void c.onCancel();
 }
 
 function stop(): void {
@@ -125,6 +141,98 @@ onMounted(() => {
 onUnmounted(() => {
   stream.close();
   stateWs.stop();
+});
+
+// 음성 명령으로 들어온 곡 재생/정지. 라이브러리 (items) 에서 displayName 의 정규화
+// substring 매치 — '아기상어' 발화로 '아기상어 율동' 같은 등록명도 잡히게.
+// STT 가 문장 끝에 '.' 등 punctuation 을 종종 붙이므로 같이 제거.
+function _normalize(s: string): string {
+  return s.replace(/[\s.,!?。｡]/g, '').toLowerCase();
+}
+
+function _bigrams(s: string): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i < s.length - 1; i++) out.add(s.slice(i, i + 2));
+  return out;
+}
+
+function _jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const x of a) if (b.has(x)) inter += 1;
+  return inter / (a.size + b.size - inter);
+}
+
+const _BIGRAM_SIM_THRESHOLD = 0.4;
+
+function _findByDisplayName(displayName: string): DanceItem | null {
+  const q = _normalize(displayName);
+  if (!q) return null;
+  // 1) 전체 substring (정확 match) — 가장 강한 확신.
+  for (const item of items.value) {
+    if (_normalize(item.display_name).includes(q)) return item;
+  }
+  // 2) 단어 단위 partial — STT 가 첫 음절 누락해도 다른 토큰이 등록명에 들어 있으면.
+  const tokens = displayName
+    .split(/\s+/)
+    .map(_normalize)
+    .filter((t) => t.length >= 2);
+  for (const item of items.value) {
+    const name = _normalize(item.display_name);
+    if (tokens.some((t) => name.includes(t))) return item;
+  }
+  // 3) char-bigram Jaccard 유사도 — '쨍이 토마토' vs '멋쟁이 토마토' 처럼 일부
+  //    음절만 다른 STT 오인식까지 흡수. threshold 0.4 = 약 절반 이상 음절쌍 공유.
+  const qBigrams = _bigrams(q);
+  let best: { item: DanceItem; score: number } | null = null;
+  for (const item of items.value) {
+    const score = _jaccard(qBigrams, _bigrams(_normalize(item.display_name)));
+    if (score > (best?.score ?? 0)) best = { item, score };
+  }
+  if (best && best.score >= _BIGRAM_SIM_THRESHOLD) return best.item;
+  return null;
+}
+
+// 음성 명령으로 들어온 곡 재생/정지/모드 종료 — useModeIntents 로 등록.
+// confirm 사이클은 voiceController.startConfirm 으로 일임 (TTS prompt + wake gate
+// + 서버 awaiting_confirm sync 일괄).
+useModeIntents('율동', {
+  onRhythmPlay: ({ displayName }) => {
+    // 이미 재생 중인 동안에는 다른 곡 명령 무시 — 마이크가 재생 중인 곡 가사를
+    // STT 로 잡아 rhythm_play 로 떨어지는 경우가 흔함. 사용자가 의도적으로
+    // 곡을 바꾸려면 먼저 '정지' 발화 → 대기 복귀 후 재진입.
+    if (playingSlug.value !== '') return;
+    if (items.value.length === 0) {
+      voiceController?.speak('아직 등록된 율동이 없어요. 율동 등록 모드에서 먼저 곡을 추가해 주세요.');
+      return;
+    }
+    const match = _findByDisplayName(displayName);
+    if (!match) {
+      voiceController?.speak(
+        `${displayName} 비슷한 곡을 찾지 못했어요. 등록된 곡 이름으로 다시 말해줄래요?`,
+      );
+      return;
+    }
+    voiceController?.startConfirm({
+      context: 'rhythm_play',
+      prompt: `${match.display_name} 재생할게요. 로봇 팔이 움직일 수 있으니 가까이 가지 마세요. 재생할까요?`,
+      onConfirm: () => {
+        playingSlug.value = match.slug;
+        captureResetKey.value += 1;
+        error.value = '';
+        stream.play(match.slug);
+      },
+      onCancel: () => {
+        voiceController?.speak('알겠어요. 다른 곡을 말해주세요.');
+      },
+    });
+  },
+  onRhythmStop: () => {
+    stop();
+  },
+  onModeExit: () => {
+    mode.setMode('대기');
+  },
 });
 </script>
 
@@ -271,19 +379,16 @@ onUnmounted(() => {
       </section>
 
       <Transition name="fade">
-        <div v-if="pendingItem" class="confirm-overlay" @click.self="cancelPlay">
+        <div v-if="voice.confirm" class="confirm-overlay" @click.self="onCancelClick">
           <div class="confirm-card" role="alertdialog" aria-modal="true">
             <div class="confirm-icon">
               <Icon name="alert" :size="32" />
             </div>
-            <h3>「{{ pendingItem.display_name }}」 재생할까요?</h3>
-            <p class="confirm-body">
-              로봇 팔이 움직입니다. 주변에 사람이나 물건이 없는지 확인하세요.
-            </p>
+            <h3>{{ voice.confirm.prompt }}</h3>
             <div class="confirm-actions">
-              <button type="button" class="btn-cancel" @click="cancelPlay">취소</button>
-              <button type="button" class="btn-confirm" @click="confirmPlay">
-                <Icon name="play" :size="14" /> 재생
+              <button type="button" class="btn-cancel" @click="onCancelClick">아니오</button>
+              <button type="button" class="btn-confirm" @click="onConfirmClick">
+                <Icon name="play" :size="14" /> 예
               </button>
             </div>
           </div>

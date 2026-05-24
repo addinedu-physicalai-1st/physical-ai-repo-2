@@ -15,6 +15,8 @@
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { EmotionId } from '@/config/robots';
 import { useModeStore } from '@/stores/mode';
+import { useVoiceStore } from '@/stores/voice';
+import { useModeIntents } from '@/composables/useModeIntents';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
@@ -65,7 +67,35 @@ interface Participant {
 const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
 
 const mode = useModeStore();
+const voice = useVoiceStore();
 const voiceController = inject(VOICE_CONTROLLER_KEY);
+
+// 게임 종료 확인 popup — useModeIntents.onModeExit 가 voiceController.startConfirm
+// 으로 confirm 사이클 시작. voice.confirm 이 set 되어 있으면 popup 표시.
+// confirm_yes/no intent 가 도착하면 useVoiceController 가 stored callback 실행.
+const showExitConfirm = computed(() => voice.confirm !== null);
+
+function onConfirmExitClick(): void {
+  const c = voice.confirm;
+  voice.clearConfirm();
+  if (c) void c.onConfirm();
+}
+function onCancelExitClick(): void {
+  const c = voice.confirm;
+  voice.clearConfirm();
+  if (c) void c.onCancel();
+}
+
+useModeIntents('무궁화꽃이 피었습니다', {
+  onModeExit: () => {
+    voiceController?.startConfirm({
+      context: 'game_exit',
+      prompt: '게임을 그만할까요?',
+      onConfirm: () => mode.setMode('대기'),
+      onCancel: () => voiceController?.speak('알겠어요. 계속할게요.'),
+    });
+  },
+});
 const tts = {
   speak: (text: string) => { voiceController?.speak(text); return Promise.resolve(); },
   cancel: () => { voiceController?.cancelSpeak(); },
@@ -1158,6 +1188,20 @@ onUnmounted(() => {
 <template>
   <Transition name="fade">
     <div class="popup-overlay">
+      <!-- 게임 종료 확인 — voice.confirm 이 set 되어 있을 때 표시. useModeIntents.onModeExit
+           가 voiceController.startConfirm 으로 confirm 사이클 시작. -->
+      <Transition name="pop">
+        <div v-if="showExitConfirm" class="exit-confirm" role="alertdialog" aria-label="게임 종료 확인">
+          <div class="exit-confirm-card">
+            <p class="exit-confirm-title">{{ voice.confirm?.prompt }}</p>
+            <p class="exit-confirm-hint">"응" 또는 "아니" 로 답해주세요</p>
+            <div class="exit-confirm-actions">
+              <button type="button" class="btn-confirm" @click="onConfirmExitClick">예</button>
+              <button type="button" class="btn-cancel" @click="onCancelExitClick">아니오</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
       <Transition name="pop" appear>
         <div class="popup-card" role="dialog" aria-modal="true" aria-label="무궁화꽃이 피었습니다">
           <!-- 상단 바: 햄버거 / 단계 인디케이터 / 카메라 / 닫기 -->
@@ -2742,6 +2786,58 @@ onUnmounted(() => {
 .drawer-slide-enter-active { transition: transform 0.24s cubic-bezier(.16,1,.3,1); }
 .drawer-slide-leave-active { transition: transform 0.20s ease; }
 .drawer-slide-enter-from, .drawer-slide-leave-to { transform: translateX(-100%); }
+
+/* ---- 게임 종료 확인 popup ---- */
+.exit-confirm {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.exit-confirm-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px;
+  min-width: 320px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+.exit-confirm-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: #111;
+}
+.exit-confirm-hint {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 20px;
+}
+.exit-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.btn-confirm, .btn-cancel {
+  flex: 1;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-confirm {
+  background: #ef4444;
+  color: white;
+}
+.btn-cancel {
+  background: #e5e7eb;
+  color: #111;
+}
 </style>
 
 <!--

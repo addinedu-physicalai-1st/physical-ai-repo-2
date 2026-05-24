@@ -19,15 +19,16 @@
  *   - echo guard / refresh / wakeAckInProgress 등 가드 flag 다수 (단일 PC + 서버 gate
  *     로 흐름이 깨끗해 불필요).
  */
-import { type Ref } from 'vue';
+import { watch, type Ref } from 'vue';
 import { type RobotConfig, type EmotionId } from '@/config/robots';
 import { isEmotionId } from '@/config/emotions';
 import { useTTS } from './useTTS';
 import { useWakeWord } from './useWakeWord';
 import { useWebRTCVoice } from './useWebRTCVoice';
-import { useVoiceStore } from '@/stores/voice';
+import { useVoiceStore, type ConfirmRequest } from '@/stores/voice';
 import { useModeStore } from '@/stores/mode';
 import type { IntentResponse } from './useIntentDispatch';
+import { getActiveModeHandlers } from './useModeIntents';
 
 // wake 분류기 default threshold. `?th=0.85` 로 override.
 const WAKE_DEFAULT_THRESHOLD = 0.9;
@@ -82,12 +83,19 @@ export function useVoiceController(robot: RobotConfig): {
   speak: (text: string) => void;
   /** 진행 중 server TTS outbound buffer 비움 + 클라 lip-sync detach. */
   cancelSpeak: () => void;
+  /** 호출어 없이 wake gate 강제 open — TTS 로 사용자에게 질문한 직후
+   *  답 받기 위해 사용. server 가 GATE_OPEN_TIMEOUT_S 후 자동 close. */
+  forceWake: () => void;
   /** SiriBlob 시각화용 mic level. */
   micLevel: Ref<number>;
   /** `?debug=1` 일 때 wake score overlay 용. robot id → 직전 inference score. */
   wakeScores: Ref<Record<string, number>>;
   /** wake threshold (정상 fire 기준). overlay 색칠용. */
   wakeThreshold: number;
+  /** 확인 사이클 시작 — TTS prompt 발화 + wake gate 자동 open + server
+   *  awaiting_confirm sync. server 가 confirm_yes/no intent 로 답변 분류해
+   *  돌려보내면 저장된 callback 실행. */
+  startConfirm: (opts: ConfirmRequest) => void;
   /** `?debug=1` 활성 여부. */
   debug: boolean;
 } {
@@ -106,6 +114,35 @@ export function useVoiceController(robot: RobotConfig): {
     onMessage: (msg) => handleDcMessage(msg as DcMsg),
     onError: (m) => voice.setError(m),
   });
+
+  // 현재 모드 → 서버 동기화. ai-service /voice/intent 의 컨텍스트 인지 핸들러
+  // (예: 율동 안 '노래 그만' → rhythm_stop) 가 mode hint 를 받음.
+  watch(
+    () => mode.currentMode,
+    (current, prev) => {
+      console.log(`[voice][mode] ${prev} → ${current} (connected=${webrtcVoice.isConnected.value})`);
+      if (!webrtcVoice.isConnected.value) return;
+      webrtcVoice.send({ type: 'mode_set', mode: current });
+    },
+    { immediate: true },
+  );
+  // DC open 직후에도 한번 — webrtc start 가 mount 후 비동기라 위 watch 가 fire
+  // 시점에 dc.readyState 가 connecting 일 수 있음.
+  watch(webrtcVoice.isConnected, (connected) => {
+    if (connected) {
+      webrtcVoice.send({ type: 'mode_set', mode: mode.currentMode });
+      webrtcVoice.send({ type: 'awaiting_confirm_set', awaiting: voice.confirm !== null });
+    }
+  });
+
+  // confirm 사이클 ↔ 서버 동기화. ConfirmHandler 가 이 hint 일 때만 활성.
+  watch(
+    () => voice.confirm,
+    (c) => {
+      if (!webrtcVoice.isConnected.value) return;
+      webrtcVoice.send({ type: 'awaiting_confirm_set', awaiting: c !== null });
+    },
+  );
 
   function clearListeningTimer(): void {
     if (listeningTimer !== null) {
@@ -137,8 +174,12 @@ export function useVoiceController(robot: RobotConfig): {
     voice.setState('cooldown');
     clearCooldownTimer();
     cooldownTimer = window.setTimeout(() => {
-      voice.setState('idle');
       cooldownTimer = null;
+      // cooldown 중 onTtsStart 가 state 를 'speaking' 으로 옮겼을 수 있다.
+      // 그 경우 idle 로 덮어쓰면 진행 중 TTS 가 잘리고 외부 watch (예:
+      // DancePlayPopup) 가 speaking→idle 전이로 오인해 wake gate 를 강제로 열어
+      // server outbound TTS 가 비워진다. cooldown 상태일 때만 idle 로 전이.
+      if (voice.state === 'cooldown') voice.setState('idle');
     }, COOLDOWN_MS);
   }
 
@@ -191,6 +232,9 @@ export function useVoiceController(robot: RobotConfig): {
   });
 
   function handleDcMessage(msg: DcMsg): void {
+    if (msg.type === 'stt_final' || msg.type === 'intent' || msg.type === 'tts_start' || msg.type === 'tts_end') {
+      console.log(`[voice][${msg.type}] state=${voice.state} mode=${mode.currentMode} awaiting=${voice.confirm !== null}`, msg);
+    }
     switch (msg.type) {
       case 'stt_final':
         onSttFinal(String(msg.text ?? ''));
@@ -231,23 +275,67 @@ export function useVoiceController(robot: RobotConfig): {
 
   function onIntent(intent: IntentResponse): void {
     mode.applyIntent(intent);
+    const handlers = getActiveModeHandlers(mode.currentMode);
+
     if (intent.kind === 'chat') {
       pendingEmotion = isEmotionId(intent.emotion) ? intent.emotion : 'basic';
       voice.setRobotReply(intent.reply);
-      // TTS audio + tts_start 가 곧 도착 → onTtsStart 가 speaking 전이.
-    } else if (intent.kind === 'goto_vertex') {
-      void handleGotoVertex(intent.name);
-    } else if (intent.kind === 'sub_command') {
-      if (intent.action === 'return') void handleReturn();
-      else if (intent.action === 'stop') void handleStop();
-      // mode.applyIntent 가 proximityHalt 도 함께 처리 (안전망).
-      enterCooldown();
-    } else if (intent.kind === 'mode_change') {
-      // mode.applyIntent 가 setMode 처리. useModeAnnouncer 가 모드 안내 발화 트리거.
-      enterCooldown();
-    } else {
-      enterCooldown();
+      return;  // tts_start 도착 시 onTtsStart 가 speaking 으로 전이
     }
+    if (intent.kind === 'goto_vertex') {
+      void handleGotoVertex(intent.name);
+      return;
+    }
+    if (intent.kind === 'sub_command') {
+      if (intent.action === 'return') { void handleReturn(); enterCooldown(); return; }
+      if (intent.action === 'stop') {
+        // 현재 mode 의 onModeExit handler 가 있으면 그것 우선. 없으면 framework
+        // default (handleStop 으로 mode='대기' 전환 + 안내 TTS).
+        if (handlers?.onModeExit) {
+          handlers.onModeExit();
+        } else {
+          void handleStop();
+        }
+      }
+      enterCooldown();
+      return;
+    }
+    if (intent.kind === 'mode_change') {
+      // sub_command(stop) 과 의미 같은 mode_change('대기') 는 onModeExit 로 위임.
+      if (intent.mode === '대기' && handlers?.onModeExit) {
+        handlers.onModeExit();
+        enterCooldown();
+        return;
+      }
+      // 일반 mode_change — useModeAnnouncer 가 setMode 후 자동 안내.
+      enterCooldown();
+      return;
+    }
+    if (intent.kind === 'rhythm_play') {
+      handlers?.onRhythmPlay?.({ displayName: intent.display_name });
+      enterCooldown();
+      return;
+    }
+    if (intent.kind === 'rhythm_stop') {
+      handlers?.onRhythmStop?.();
+      enterCooldown();
+      return;
+    }
+    if (intent.kind === 'confirm_yes') {
+      const c = voice.confirm;
+      voice.clearConfirm();
+      if (c) void c.onConfirm();
+      enterCooldown();
+      return;
+    }
+    if (intent.kind === 'confirm_no') {
+      const c = voice.confirm;
+      voice.clearConfirm();
+      if (c) void c.onCancel();
+      enterCooldown();
+      return;
+    }
+    enterCooldown();
   }
 
   async function handleGotoVertex(name: string): Promise<void> {
@@ -273,29 +361,33 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   async function handleStop(): Promise<void> {
-    // "그만"/"멈춰"/"정지"/"스톱" → 현재 mode 중단 + IDLE 전이. mode_to_goal("대기")
-    // 가 Goal(mode="IDLE") 로 변환 → command_listener 가 FSM cancel trigger 발사 →
-    // ASSIST/PLAY/MANUAL/RETURNING 어느 상태든 IDLE 복귀. 자장가/이동/추종/숨바꼭질
-    // 모두 동일 경로. gogoping 외 robot 은 stop 의미가 다르므로 skip (proximityHalt 만).
-    if (robot.id !== 'gogoping') return;
-    // 이미 대기 중이면 fetch 자체 skip — FSM cancel trigger 가 IDLE 에선 미정의라
-    // 항상 거부되는데, 그때마다 "멈출 수 없어요" 안내가 어색하므로 응답만 자연스럽게.
+    // "그만"/"멈춰"/"정지"/"스톱" → 현재 mode 중단 + 대기 복귀. 각 로봇 별 처리:
+    //   - gogoping: FSM cancel trigger (ASSIST/PLAY/MANUAL/RETURNING → IDLE). fetch
+    //     로 mode_to_goal("대기") 보내서 ROS command_listener 가 cancel 발사.
+    //   - eduping (및 그 외): mode store 만 '대기' 로 — 각 모드 컴포넌트
+    //     (DancePlayPopup 등) 가 onUnmounted 에서 stream.close() / camera teardown.
     if (mode.currentMode === '대기') {
       speak('이미 쉬고 있어요');
       return;
     }
-    let confirmation = '';
-    try {
-      const r = await fetch('/api/gogoping/mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ robot: 'gogoping', mode: '대기' }),
-      });
-      confirmation = r.ok ? '네, 멈출게요' : '지금은 멈출 수 없어요';
-    } catch {
-      confirmation = '지금은 멈출 수 없어요';
+    if (robot.id === 'gogoping') {
+      let confirmation = '';
+      try {
+        const r = await fetch('/api/gogoping/mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ robot: 'gogoping', mode: '대기' }),
+        });
+        confirmation = r.ok ? '네, 멈출게요' : '지금은 멈출 수 없어요';
+      } catch {
+        confirmation = '지금은 멈출 수 없어요';
+      }
+      speak(confirmation);
+      return;
     }
-    speak(confirmation);
+    // eduping / noriarm — 단순 mode 전환만.
+    mode.setMode('대기');
+    speak('네, 그만할게요');
   }
 
   async function handleReturn(): Promise<void> {
@@ -341,6 +433,7 @@ export function useVoiceController(robot: RobotConfig): {
   function speak(text: string): void {
     const trimmed = text.trim();
     if (!trimmed) return;
+    console.log(`[voice][speak] state=${voice.state} text=`, trimmed);
     webrtcVoice.send({ type: 'speak', text: trimmed });
   }
 
@@ -349,6 +442,36 @@ export function useVoiceController(robot: RobotConfig): {
     webrtcVoice.send({ type: 'tts_cancel' });
     lipsyncDetach?.();
     lipsyncDetach = null;
+  }
+
+  /** 확인 사이클 시작 — voice.confirm 저장 + 서버 awaiting_confirm sync +
+   *  TTS prompt + TTS 끝나면 wake gate 자동 open. 사용자 답이 server 의
+   *  ConfirmHandler 를 거쳐 confirm_yes/no intent 로 돌아오면 stored
+   *  callback 실행. */
+  let confirmAwaitingTtsEnd = false;
+  function startConfirm(opts: ConfirmRequest): void {
+    voice.setConfirm(opts);
+    confirmAwaitingTtsEnd = true;
+    speak(opts.prompt);
+  }
+  watch(
+    () => voice.state,
+    (next, prev) => {
+      if (prev === 'speaking' && next === 'cooldown' && confirmAwaitingTtsEnd) {
+        confirmAwaitingTtsEnd = false;
+        forceWake();
+      }
+    },
+  );
+
+  /** 호출어 없이 wake gate 강제 open — TTS prompt 직후 사용자 답 받을 때.
+   *  server 의 `wake` DC msg 와 동일 처리 (open_gate + outbound clear). 이미
+   *  TTS 가 끝난 시점에 호출하면 clear 가 noop. */
+  function forceWake(): void {
+    console.log(`[voice][forceWake] state=${voice.state}`);
+    webrtcVoice.send({ type: 'wake', robot: robot.id });
+    voice.setState('listening');
+    armListeningTimer();
   }
 
   /** CommandBar 타이핑 — wake 없이 서버 dispatch 사이클 시작. */
@@ -408,6 +531,8 @@ export function useVoiceController(robot: RobotConfig): {
     processCommand,
     speak,
     cancelSpeak,
+    forceWake,
+    startConfirm,
     micLevel: webrtcVoice.micLevel,
     wakeScores: wakeWord.lastScores,
     wakeThreshold,

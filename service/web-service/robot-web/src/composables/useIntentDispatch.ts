@@ -9,6 +9,10 @@ export type IntentResponse =
   | { kind: 'sub_command'; action: 'stop' | 'return' }
   | { kind: 'goto_vertex'; name: string }
   | { kind: 'chat'; reply: string; emotion: EmotionId }
+  | { kind: 'rhythm_play'; song: string; display_name: string }
+  | { kind: 'rhythm_stop' }
+  | { kind: 'confirm_yes' }
+  | { kind: 'confirm_no' }
   | { kind: 'ignored' };
 
 /**
