@@ -16,11 +16,25 @@ from ai_service.intents.common.report import ReportHandler
 from ai_service.intents.common.schedule import ScheduleHandler
 from ai_service.intents.common.stop import StopHandler
 from ai_service.intents.common.whereabouts import WhereaboutsHandler
+from ai_service.intents.eduping.confirm import ConfirmHandler
+from ai_service.intents.eduping.rhythm import RhythmPlayHandler, RhythmStopHandler
 from ai_service.intents.gogoping.goto_vertex import GotoVertexHandler
 from ai_service.intents.gogoping.return_ import ReturnHandler
 
+# 율동 모드 안에서는 곡 선택/재생/정지/모드전환만 허용 — 잡담·메뉴·인사 등
+# 일반 핸들러는 비활성. ChatFallback 도 없음 (매치 실패 시 ignored 반환).
+_EDUPING_RHYTHM_PIPELINE: list[IntentHandler] = [
+    ConfirmHandler(),
+    RhythmStopHandler(),
+    StopHandler(),
+    ModeChangeHandler(),
+    RhythmPlayHandler(),
+]
+
 PIPELINES: dict[str, list[IntentHandler]] = {
     "eduping": [
+        ConfirmHandler(),
+        RhythmStopHandler(),
         StopHandler(),
         MenuHandler(),
         HelloHandler(),
@@ -31,6 +45,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
         WhereaboutsHandler(),
         ReportHandler(),
         AttendanceHandler(),
+        RhythmPlayHandler(),
         ChatFallbackHandler(),
     ],
     "gogoping": [
@@ -63,4 +78,18 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     ],
 }
 
-__all__ = ["IntentContext", "IntentHandler", "IntentResponse", "PIPELINES", "now_kst"]
+
+def get_pipeline(robot: str, mode: str | None) -> list[IntentHandler]:
+    if robot == "eduping" and mode == "율동":
+        return _EDUPING_RHYTHM_PIPELINE
+    return PIPELINES.get(robot, [])
+
+
+__all__ = [
+    "IntentContext",
+    "IntentHandler",
+    "IntentResponse",
+    "PIPELINES",
+    "get_pipeline",
+    "now_kst",
+]

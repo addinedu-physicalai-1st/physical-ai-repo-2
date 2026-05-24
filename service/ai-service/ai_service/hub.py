@@ -49,6 +49,11 @@ app = FastAPI(
 class IntentRequest(BaseModel):
     text: str = Field(..., min_length=1)
     robot: Literal["eduping", "gogoping", "noriarm"]
+    # 현재 모드 hint — 모드 컨텍스트 인지 핸들러 (예: 율동 안에서 "그만" → 음악 정지)
+    # 가 사용. 클라이언트가 채워주지 않으면 None → 컨텍스트 핸들러 inactive.
+    mode: str | None = None
+    # 클라가 startConfirm 호출 후 동기화. ConfirmHandler 가 이 hint 일 때만 활성.
+    awaiting_confirm: bool = False
     # 로봇 UI가 반 명단을 알 때만 보냄 — LLM 에 사실로 주입 (없으면 이름 질문에 환각 방지용 안내만)
     class_roster: list[str] = Field(default_factory=list, max_length=40)
 
@@ -89,6 +94,32 @@ class Chat(BaseModel):
     emotion: str
 
 
+class RhythmPlay(BaseModel):
+    """율동 모드 안에서 사용자가 등록된 곡명을 발화 — 해당 곡 재생.
+
+    song 은 DanceManager 에 등록된 항목의 slug (서버가 매칭 후 결정).
+    display_name 은 UI/TTS 노출용 raw 곡 이름.
+    """
+    kind: Literal["rhythm_play"] = "rhythm_play"
+    song: str
+    display_name: str
+
+
+class RhythmStop(BaseModel):
+    """율동 모드 유지한 채 음악만 정지 — 다음 곡 재선택 대기."""
+    kind: Literal["rhythm_stop"] = "rhythm_stop"
+
+
+class ConfirmYes(BaseModel):
+    """confirm 사이클에서 사용자가 동의 — startConfirm 의 onConfirm 호출."""
+    kind: Literal["confirm_yes"] = "confirm_yes"
+
+
+class ConfirmNo(BaseModel):
+    """confirm 사이클에서 사용자가 거절 — startConfirm 의 onCancel 호출."""
+    kind: Literal["confirm_no"] = "confirm_no"
+
+
 class Ignored(BaseModel):
     kind: Literal["ignored"] = "ignored"
 
@@ -120,9 +151,10 @@ async def voice_intent(req: IntentRequest) -> dict:
 
     # Inline import: hub.py defines the Pydantic models (IntentRequest, Chat, ...)
     # that intents/* modules import. Module-level import here would cycle.
-    from ai_service.intents import PIPELINES, IntentContext, now_kst
+    from ai_service.intents import IntentContext, get_pipeline, now_kst
     ctx = IntentContext(now=now_kst(), req=req)
-    for handler in PIPELINES[req.robot]:
+    pipeline = get_pipeline(req.robot, req.mode)
+    for handler in pipeline:
         result = await handler.try_handle(req, ctx)
         if result is not None:
             logger.info(
@@ -130,7 +162,9 @@ async def voice_intent(req: IntentRequest) -> dict:
                 extra={"robot": req.robot, "handler": handler.name},
             )
             return result.model_dump()
-    raise RuntimeError("no handler matched — ChatFallback missing?")
+    # 매치된 핸들러 없음 — ChatFallback 가 없는 제한된 mode 파이프라인 (예:
+    # 율동) 에선 자연스러운 결과. ignored 반환하면 클라는 cooldown 으로 흘림.
+    return {"kind": "ignored"}
 
 
 class ReportPhotoEvent(BaseModel):

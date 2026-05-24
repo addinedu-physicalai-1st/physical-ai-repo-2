@@ -211,3 +211,32 @@ def test_voice_tts_edge_returns_mpeg(monkeypatch: pytest.MonkeyPatch) -> None:
     assert r.status_code == 200
     assert r.headers.get("content-type", "").startswith("audio/mpeg")
     assert len(r.content) == 320
+
+
+def test_voice_intent_awaiting_confirm_yes() -> None:
+    r = client.post(
+        "/voice/intent",
+        json={"text": "응", "robot": "eduping", "mode": "율동", "awaiting_confirm": True},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"kind": "confirm_yes"}
+
+
+def test_voice_intent_awaiting_confirm_no() -> None:
+    r = client.post(
+        "/voice/intent",
+        json={"text": "아니", "robot": "eduping", "mode": "율동", "awaiting_confirm": True},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"kind": "confirm_no"}
+
+
+def test_voice_intent_no_awaiting_confirm_skips_handler() -> None:
+    # awaiting_confirm 없으면 '응' 만으로 confirm 분류 안 함.
+    r = client.post(
+        "/voice/intent",
+        json={"text": "응", "robot": "eduping", "mode": "율동"},
+    )
+    assert r.status_code == 200
+    # rhythm_play 로 잡히거나 ChatFallback 으로 떨어지지 confirm_yes 는 아니어야.
+    assert r.json().get("kind") != "confirm_yes"

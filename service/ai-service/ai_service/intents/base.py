@@ -6,9 +6,28 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import ClassVar
 
-from ai_service.hub import Chat, GotoVertex, IntentRequest, ModeChange, SubCommand
+from ai_service.hub import (
+    Chat,
+    ConfirmNo,
+    ConfirmYes,
+    GotoVertex,
+    IntentRequest,
+    ModeChange,
+    RhythmPlay,
+    RhythmStop,
+    SubCommand,
+)
 
-IntentResponse = ModeChange | SubCommand | GotoVertex | Chat
+IntentResponse = (
+    ModeChange
+    | SubCommand
+    | GotoVertex
+    | Chat
+    | RhythmPlay
+    | RhythmStop
+    | ConfirmYes
+    | ConfirmNo
+)
 
 
 def now_kst() -> datetime:
