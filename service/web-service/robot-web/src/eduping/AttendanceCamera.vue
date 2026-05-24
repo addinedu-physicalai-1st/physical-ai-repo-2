@@ -263,9 +263,19 @@ async function performCheck(childId: number): Promise<void> {
   }
 }
 
+// MediaPipe face_detection.send() 가 main thread 를 ~117ms 동안 점유 (WASM 동기).
+// 매 rAF 마다 호출하면 main thread 가 거의 항상 잠겨 worklet → audio ring 의
+// chunk 처리가 batch 로 지연되어 호출어 인식이 버벅임. 등원 인식은 어린이가
+// 카메라 앞에 잠시 멈춰 있을 때 잡는 시나리오라 4fps 면 충분.
+const FACE_SEND_INTERVAL_MS = 220;
 async function loop(): Promise<void> {
   if (videoRef.value && videoRef.value.readyState >= 2) {
+    const t0 = performance.now();
     await detector.send(videoRef.value);
+    const elapsed = performance.now() - t0;
+    if (elapsed < FACE_SEND_INTERVAL_MS) {
+      await new Promise((r) => setTimeout(r, FACE_SEND_INTERVAL_MS - elapsed));
+    }
   }
   rafId = requestAnimationFrame(() => { void loop(); });
 }
