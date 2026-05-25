@@ -1,34 +1,31 @@
 """IDLE state MainTree — 명령 대기.
 
-Parallel 자식:
-- BatteryLowMonitor      (✅ ≤20% → battery_low → RETURNING)
-- IdleTimeoutMonitor     (✅ idle_timeout_seconds 경과 → idle_timeout → RETURNING)
-- MapBoundaryMonitor     (✅ 맵 밖 → fault → ERROR)
-- HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault → ERROR)
-- CommandListener        (✅)
+monitor 정책 (state-bt.md):
+- BatteryLowMonitor      ✅
+- IdleTimeoutMonitor     ✅ (IDLE 만)
+- MapBoundaryMonitor     ✅
+- HardwareHealthMonitor  ✅
+- CommandListener        ✅
+
+body 없음 — 명령 대기만. 시간 흘러 idle_timeout 발화하면 RETURNING.
 """
 from __future__ import annotations
 
 import py_trees
-from py_trees.common import ParallelPolicy
 
 from ....context import Context
-from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
-from ...behaviors.common.command_listener import CommandListener
-from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
-from ...behaviors.common.idle_timeout_monitor import IdleTimeoutMonitor
-from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
+from ._shell import build_active_main_tree
 
 
 def build(ctx: Context) -> py_trees.behaviour.Behaviour:
-    return py_trees.composites.Parallel(
-        name="BT_idle_main",
-        policy=ParallelPolicy.SuccessOnAll(synchronise=False),
-        children=[
-            BatteryLowMonitor("BatteryLowMonitor", ctx),
-            IdleTimeoutMonitor("IdleTimeoutMonitor", ctx),
-            MapBoundaryMonitor("MapBoundaryMonitor", ctx),
-            HardwareHealthMonitor("HardwareHealthMonitor", ctx),
-            CommandListener("CommandListener", ctx),
-        ],
+    return build_active_main_tree(
+        "MainTree[IDLE]", ctx,
+        body=py_trees.behaviours.Running(name="IdleHold"),   # 영구 RUNNING, root 가 SuccessOnAll
+        include_battery_low=True,
+        include_idle_timeout=True,
+        include_map_boundary=True,
+        include_hw_health=True,
+        include_collision=False,
+        include_command_listener=True,
+        task_body=False,
     )

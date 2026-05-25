@@ -7,18 +7,13 @@ snapshot 구조::
 
     {
       "robot_id": "gogoping",
-      "fsm_state": "ASSIST",
-      "assist_task": "lullaby",  # blackboard.ASSIST_TASK ("" / "goto" / "follow" / "lullaby")
-      "play_task": "",            # blackboard.PLAY_TASK ("" / "hideseek")
+      "fsm_state": "GOTO",
       "main_tree": {
-        "name": "BT_assist_main",
+        "name": "MainTree[GOTO]",
         "children": [
-          {"name": "CommandListener",                       "status": "RUNNING"},
-          {"name": "CheckTask(assist_task=='goto')",        "status": "SUCCESS"},
-          {"name": "BT_goto_sub",                           "status": "RUNNING"},
-          {"name": "CheckTask(assist_task=='follow')",      "status": "INVALID"},
-          {"name": "StubFollow",                            "status": "INVALID"},
-          ...
+          {"name": "BatteryLowMonitor",    "status": "RUNNING"},
+          {"name": "CommandListener",       "status": "RUNNING"},
+          {"name": "NavigateToVertex",      "status": "RUNNING"},
         ]
       },
       "sub_tree": null,    # + 에 BT_*_sub 이름 패턴 매칭 시 채워짐
@@ -63,8 +58,6 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader = py_trees.blackboard.Client(name="tree_inspector_reader")
         _bb_reader.register_key(key=Keys.BATTERY_LEVEL, access=Access.READ)
         _bb_reader.register_key(key=Keys.ROBOT_POSE, access=Access.READ)
-        _bb_reader.register_key(key=Keys.ASSIST_TASK, access=Access.READ)
-        _bb_reader.register_key(key=Keys.PLAY_TASK, access=Access.READ)
         _bb_reader.register_key(key=Keys.IDLE_ENTERED_AT, access=Access.READ)
         _bb_reader.register_key(key=Keys.IDLE_TIMEOUT_SECONDS, access=Access.READ)
         _bb_reader.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.READ)
@@ -166,7 +159,7 @@ def snapshot(
     Parameters
     ----------
     fsm_state : str
-        FSM 의 ``current_state`` ("IDLE" / "ASSIST" / "PLAY" / "MANUAL" / ...)
+        FSM 의 ``current_state`` ("IDLE" / "GOTO" / "FOLLOW" / "LULLABY" / "HIDEANDSEEK" / "MANUAL" / ...)
     root_tree : py_trees.behaviour.Behaviour
         ``MainTree`` 의 root composite.
     map_cache : MapCache or None
@@ -204,8 +197,6 @@ def snapshot(
     return {
         "robot_id": robot_id,
         "fsm_state": fsm_state,
-        "assist_task": _read_str_key(Keys.ASSIST_TASK),   # "" / "goto" / "follow" / "lullaby"
-        "play_task": _read_str_key(Keys.PLAY_TASK),       # "" / "hideseek"
         "main_tree": main_block,
         "sub_tree": sub_block,
         "battery_level": _read_battery_level(),

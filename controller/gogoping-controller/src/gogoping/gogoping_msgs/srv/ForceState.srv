@@ -1,19 +1,21 @@
 # [디버그 전용] FSM 강제 state 진입 — transition 규칙 우회.
 #
-# admin UI 의 debug_state_bar (TopBar 디버그 row) 가 호출. 정상 운영 / robot-web 의 mode
-# 클릭은 SetGoal.srv 사용.
+# admin UI 의 DebugStatePanel 이 호출. 정상 운영 / robot-web 의 mode 클릭은 SetGoal.srv 사용.
 #
-# 강제 진입 가능한 state — robot_fsm.py 의 STATES 8개:
-#   CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR
+# 강제 진입 가능한 state — robot_fsm.py 의 STATES 10개:
+#   IDLE / CHARGING / GOTO / FOLLOW / LULLABY / HIDEANDSEEK /
+#   MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR
 #
 # 동작:
-#   command_listener 가 server. request.target_state 를 받아 fsm.force_state(target) 호출.
+#   command_listener 가 server. request.target_state 받아 fsm.force_state(target) 호출.
 #   transition 규칙 우회 — CHARGING / LOW_BATTERY_RETURN / ERROR 도 일발 진입 가능.
 #   on_state_change 콜백 정상 발화 → main.py 의 BT swap 자동.
+#
+# 평탄화 후 sub_task 필드 제거 — state 자체가 task 이므로 불필요.
+# task body 의 추가 필드 (destination_key 등) 는 본 srv 로는 못 줌 — 디버그 시
+# blackboard 에 직접 세팅하거나 SetGoal.srv 사용.
 
-string target_state     # STATES 8개 중 하나
-string sub_task         # 옵션 — "carry"/"follow"/"lullaby" (ASSIST), "hideseek" (PLAY), "" (none).
-                        # 비어있지 않으면 force_state 전에 blackboard 의 assist_task / play_task 세팅.
+string target_state     # STATES 10개 중 하나
 ---
 bool accepted           # state 가 유효한 STATES 일 때 True. 같은 state 재요청도 True (no-op)
-string reason           # accepted=false 시: "invalid_state" / "invalid_sub_task"
+string reason           # accepted=false 시: "invalid_state"

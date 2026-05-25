@@ -1,37 +1,31 @@
 """CHARGING state MainTree — 도크에서 충전 중.
 
-Parallel 자식:
-- BatteryFullMonitor     (✅ ≥70% → battery_full → IDLE)
-- MapBoundaryMonitor     (✅ 맵 밖 → fault → ERROR)
-- HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault → ERROR)
-- CommandListener        (✅)
-- DockingContactCheck    (스켈레톤)
+monitor 정책 (state-bt.md):
+- BatteryFullMonitor     ✅ (≥70% → battery_full → IDLE)
+- MapBoundaryMonitor     ✅
+- HardwareHealthMonitor  ✅
+- CommandListener        ✅
+- (battery_low 없음 — 이미 충전 중)
 
-BatteryFullMonitor 가 핵심 — 부팅 직후 CHARGING → IDLE 전이를 자동화. 추후 에선
-BatterySubscriber stub 이라 BATTERY_LEVEL 이 init 값 (100.0) 이라 첫 tick 에 즉시 fire,
-사용자가 의도한 "부팅=CHARGING, 배터리 정상이면 IDLE" 시퀀스 자연 재현.
+부팅 직후 CHARGING → IDLE 전이 자동화 — BatterySubscriber 의 init 값이 100.0 이라 첫 tick 에 fire.
 """
 from __future__ import annotations
 
 import py_trees
-from py_trees.common import ParallelPolicy
 
 from ....context import Context
-from ...behaviors.common.battery_full_monitor import BatteryFullMonitor
-from ...behaviors.common.command_listener import CommandListener
-from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
-from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
+from ._shell import build_active_main_tree
 
 
 def build(ctx: Context) -> py_trees.behaviour.Behaviour:
-    return py_trees.composites.Parallel(
-        name="BT_charging_main",
-        policy=ParallelPolicy.SuccessOnAll(synchronise=False),
-        children=[
-            BatteryFullMonitor("BatteryFullMonitor", ctx),
-            MapBoundaryMonitor("MapBoundaryMonitor", ctx),
-            HardwareHealthMonitor("HardwareHealthMonitor", ctx),
-            CommandListener("CommandListener", ctx),
-            # TODO 추후: DockingContactCheck
-        ],
+    return build_active_main_tree(
+        "MainTree[CHARGING]", ctx,
+        body=py_trees.behaviours.Running(name="ChargingHold"),
+        include_battery_full=True,
+        include_battery_low=False,
+        include_map_boundary=True,
+        include_hw_health=True,
+        include_collision=False,
+        include_command_listener=True,
+        task_body=False,
     )

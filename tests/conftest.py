@@ -68,6 +68,8 @@ _ROS_STUBS = [
     "builtin_interfaces.msg",
     "rcl_interfaces",
     "rcl_interfaces.msg",
+    "std_srvs",
+    "std_srvs.srv",
 ]
 
 for _pkg in _ROS_STUBS:
