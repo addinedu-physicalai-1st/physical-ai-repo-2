@@ -182,10 +182,10 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[eduping] OpenArm L1 중력보상 컨트롤러 (MuJoCo headless — mujoco/모델 없으면 skip)"
+echo "[eduping] OpenArm 임피던스 컨트롤러 L1/L2 (MuJoCo headless — mujoco/모델 없으면 skip)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
-if ! conda run -n jazzy pytest tests/eduping/test_mujoco_l1_gravity_comp.py -v "$@"; then
+if ! conda run -n jazzy pytest tests/eduping/ -v "$@"; then
   EXIT=1
 fi
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
