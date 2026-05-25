@@ -50,3 +50,8 @@ log/rosbags/
 # OpenArm URDF mesh 자산 — xacro 에서 생성 (scripts/sync_openarm_assets.sh)
 # 72MB 라 repo 에 안 넣음. portal-web 띄우기 전 한 번 sync 필요.
 service/web-service/portal-web/public/openarm/meshes/
+
+# rosbag 녹화 — scripts/record-gogoping.sh 출력
+log/rosbags/
+*.mcap
+*.db3
