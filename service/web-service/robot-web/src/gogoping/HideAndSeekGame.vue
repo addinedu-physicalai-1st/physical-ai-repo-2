@@ -2,19 +2,22 @@
 /**
  * GogoPing 숨바꼭질 (SR-PLAY-007) UI — gogoping 모드가 "숨바꼭질" 일 때 마운트.
  *
- * 단계 머신:
- *   recruit → move_to_play → countdown → patrol → return → end
+ * 단계 머신 (BT 가 publish 하는 hideseek_phase 가 단일 진실원):
+ *   move_to_play → recruit → countdown → patrol → return → end
  *
- * 본 컴포넌트는 UI 만 구현 — fakeBackend.ts 의 타이머가 단계 전이를 트리거한다.
- * 실 도입 시 fakeBackend 만 BT/Control Server WS 로 교체.
+ * 본 컴포넌트는 BT snapshot 으로부터 phase 만 동기화하고, 화면 라우팅 + UI 부속
+ * 부수 효과 (countdown 1Hz tick, chant, 안내 음성) 만 책임진다. 단계 전이 자체는
+ * `useHideseekPhaseStore.phase` 를 watch 해서 `actions.syncFromBtPhase` 로 들어옴.
  */
-import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
+import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
+import { useHideseekPhaseStore } from '@/gogoping/stores/hideseekPhase';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { postModeClick } from '@/composables/useIntentDispatch';
 import { useHideAndSeekState } from './useHideAndSeekState';
-import { startFakeBackend, type FakeBackendHandle } from './fakeBackend';
-import { COUNTDOWN_SEC, type RosterEntry } from './fixtures';
+import { COUNTDOWN_SEC, HIDE_CHANT_INTERVAL_MS, type RosterEntry } from './fixtures';
+import { postRecruitComplete } from './api/hideseekApi';
 import RecruitPhase from './phases/RecruitPhase.vue';
 import MoveToPlayPhase from './phases/MoveToPlayPhase.vue';
 import CountdownPhase from './phases/CountdownPhase.vue';
@@ -26,13 +29,14 @@ const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change
 
 const mode = useModeStore();
 const voiceController = inject(VOICE_CONTROLLER_KEY);
+const hideseekStore = useHideseekPhaseStore();
+const { phase: btPhase } = storeToRefs(hideseekStore);
 
 function speak(text: string): void {
   voiceController?.speak(text);
 }
 
 const { state, actions } = useHideAndSeekState();
-let backend: FakeBackendHandle | null = null;
 
 const chantTick = ref(0);
 
@@ -44,6 +48,63 @@ const PHASE_META: Record<typeof state.phase, { label: string; helper: string; ac
   return:       { label: '복귀',       helper: '못 찾겠다 꾀꼬리!',                accent: '#7c3aed' },
   end:          { label: '발표',       helper: '오늘의 챔피언!',                  accent: '#dc2626' },
 };
+
+// -------- BT → UI phase 동기화 --------
+watch(
+  btPhase,
+  (p) => {
+    if (p) actions.syncFromBtPhase(p);
+  },
+  { immediate: true },
+);
+
+// -------- phase 진입/이탈 부수 효과 (음성 + 타이머) --------
+let countdownTimer: number | null = null;
+let chantTimer: number | null = null;
+
+function stopCountdownTimer(): void {
+  if (countdownTimer !== null) {
+    window.clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+}
+function stopChantTimer(): void {
+  if (chantTimer !== null) {
+    window.clearInterval(chantTimer);
+    chantTimer = null;
+  }
+}
+
+watch(
+  () => state.phase,
+  (p, prev) => {
+    // countdown 진입 — 안내 + 1Hz tick + 챈트 반복
+    if (p === 'countdown' && prev !== 'countdown') {
+      speak(`눈 감고 ${COUNTDOWN_SEC} 초 셀게!`);
+      stopCountdownTimer();
+      countdownTimer = window.setInterval(() => {
+        actions.tickCountdown();
+      }, 1000);
+      // 즉시 한 번 챈트 + 이후 HIDE_CHANT_INTERVAL_MS 마다 반복
+      stopChantTimer();
+      chantTick.value += 1;
+      speak('꼭꼭 숨어라, 머리카락 보일라!');
+      chantTimer = window.setInterval(() => {
+        chantTick.value += 1;
+        speak('꼭꼭 숨어라, 머리카락 보일라!');
+      }, HIDE_CHANT_INTERVAL_MS);
+    }
+    // countdown 이탈 — 두 timer 정지
+    if (p !== 'countdown') {
+      stopCountdownTimer();
+      stopChantTimer();
+    }
+    // return 진입 — "못 찾겠다 꾀꼬리!"
+    if (p === 'return' && prev !== 'return') {
+      speak('못 찾겠다 꾀꼬리!');
+    }
+  },
+);
 
 async function loadRoster(): Promise<void> {
   try {
@@ -60,22 +121,11 @@ async function loadRoster(): Promise<void> {
 
 onMounted(async () => {
   await loadRoster();
-  backend = startFakeBackend(state, actions);
-  backend.onHideChant(() => {
-    chantTick.value += 1;
-    speak('꼭꼭 숨어라, 머리카락 보일라!');
-  });
-  backend.onCountdownStart(() => {
-    speak(`눈 감고 ${COUNTDOWN_SEC} 초 셀게!`);
-  });
-  backend.onCannotFind(() => {
-    speak('못 찾겠다 꾀꼬리!');
-  });
 });
 
 onBeforeUnmount(() => {
-  backend?.stop();
-  backend = null;
+  stopCountdownTimer();
+  stopChantTimer();
 });
 
 function onRecruitToggle(id: number): void {
@@ -85,8 +135,17 @@ function onRecruitToggle(id: number): void {
   else actions.registerParticipant(id);
 }
 
-function onRecruitStart(): void {
-  actions.finishRecruit();
+// Task 12 — "출발" 버튼: control-service API 호출.
+// phase 전환은 BT 가 SetHideseekPhase("countdown") 발화 시 snapshot 으로 들어와 자동.
+async function onRecruitStart(): Promise<void> {
+  const registeredIds = state.participants
+    .filter((p) => p.registered)
+    .map((p) => p.id);
+  if (registeredIds.length === 0) return;
+  const ok = await postRecruitComplete(registeredIds);
+  if (!ok) {
+    console.warn('recruit-complete API 실패 — BT 미연결?');
+  }
 }
 
 async function close(): Promise<void> {
@@ -100,6 +159,8 @@ async function close(): Promise<void> {
 
 function restart(): void {
   actions.reset();
+  // 신규 게임 시작 — control-service 에 같은 모드 재진입 → reconciler 가 BT 재실행.
+  void postModeClick('숨바꼭질', 'gogoping');
 }
 </script>
 
