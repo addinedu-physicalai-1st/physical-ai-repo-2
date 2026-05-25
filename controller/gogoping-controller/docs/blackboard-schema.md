@@ -54,6 +54,15 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 > 주: `search_waypoints` 는 UI 가 `SetGoal.srv` 의 `Goal.msg.search_waypoints` 필드로 직접 전달한다 (UI 의 vertex 선택 UI 가 책임). `command_listener._on_set_goal_request` 가 dict 로 변환 → `goal_reconciler._set_task_blackboard` 가 hideseek 시 BB W. (이전 안: control-server 의 `/waypoints/patrol/hide_and_seek_search` fetch — 현재 미사용)
 
+### 숨바꼭질 (SR-PLAY-007) — UI / control-service / BT 협업
+
+| 키 | 타입 | W | R | 비고 |
+|---|---|---|---|---|
+| `hideseek_play_area_key` | `str` | `command_listener` / `goal_reconciler` | `BT_hide_and_seek_sub` | named pose (= 운동장2) |
+| `hideseek_registered_ids` | `list[int]` | control-service (recruit-complete API) | `HideSeekCaughtMonitor`, `AwaitRecruitComplete` | 모집 종료 시 |
+| `hideseek_caught_ids` | `list[int]` | control-service (caught API) | `HideSeekCaughtMonitor` | 발견 시마다 추가 |
+| `hideseek_phase` | `str` | `SetHideseekPhase` | `tree_inspector.snapshot`, robot-web hideseek phase store | UI 라우팅. `"move_to_play"`/`"recruit"`/`"countdown"`/`"patrol"`/`"return"`/`"end"`/`""` |
+
 ### 에러 (fault 발화한 monitor 가 W)
 
 | 키 | 타입 | W | R | 비고 |
@@ -103,6 +112,11 @@ class Keys:
     HOME_POSITION_KEY = "home_position_key"
     CHARGING_DOCK_APPROACH_KEY = "charging_dock_approach_key"
     CHARGING_DOCK_TARGET_YAW = "charging_dock_target_yaw"
+    # 숨바꼭질
+    HIDESEEK_PLAY_AREA_KEY = "hideseek_play_area_key"
+    HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids"
+    HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"
+    HIDESEEK_PHASE = "hideseek_phase"
     # 에러
     ERROR_REASON = "error_reason"
     ERROR_SOURCE = "error_source"
@@ -140,6 +154,8 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
 | `destination_key` / `hide_position_key` / `home_position_key` / `charging_dock_approach_key` | `""` |
 | `search_waypoints` | `[]` |
 | `charging_dock_target_yaw` | `0.0` |
+| `hideseek_play_area_key` / `hideseek_phase` | `""` |
+| `hideseek_registered_ids` / `hideseek_caught_ids` | `[]` |
 | `error_reason` / `error_source` | `""` |
 | `manual_torque_active` | `False` |
 | `idle_entered_at` | `-1.0` |
