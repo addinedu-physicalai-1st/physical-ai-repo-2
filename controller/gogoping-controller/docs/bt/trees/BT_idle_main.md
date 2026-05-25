@@ -29,18 +29,19 @@ Parallel(SuccessOnAll(synchronise=False))
 | Trigger | From | Source |
 |---|---|---|
 | `battery_full` | CHARGING | `battery_full_monitor` (CHARGING 안의) |
-| `assist_done` | ASSIST | `main.py._on_tree_success()` (BT_assist_main root SUCCESS) |
-| `play_done` | PLAY | `main.py._on_tree_success()` (BT_play_main root SUCCESS) |
-| `cancel` | ASSIST / PLAY / MANUAL / RETURNING | `command_listener` (SetGoal mode="IDLE") |
+| `task_done` | GOTO / FOLLOW / LULLABY / HIDEANDSEEK | `main.py._on_tree_success()` (해당 MainTree root SUCCESS) |
+| `cancel` | GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL / RETURNING | `command_listener` (SetGoal target_state="IDLE") |
 
 ### 종료
 | Trigger | To | Source |
 |---|---|---|
-| `assist_request` | ASSIST | `command_listener` (SetGoal mode="ASSIST", task=goto/follow/lullaby) |
-| `play_request` | PLAY | `command_listener` (SetGoal mode="PLAY", task=hideseek) |
-| `manual_request` | MANUAL | `command_listener` (SetGoal mode="MANUAL") |
-| `return_request` | RETURNING | `command_listener` (SetGoal mode="RETURNING") |
-| `battery_low` | LOW_BATTERY_RETURN | `battery_low_monitor` (≤20%, hysteresis 25% 진출) |
+| `goto_request` | GOTO | `command_listener` (SetGoal target_state="GOTO", destination_key=...) |
+| `follow_request` | FOLLOW | `command_listener` (SetGoal target_state="FOLLOW", target_id=...) |
+| `lullaby_request` | LULLABY | `command_listener` (SetGoal target_state="LULLABY") |
+| `hideseek_request` | HIDEANDSEEK | `command_listener` (SetGoal target_state="HIDEANDSEEK", search_waypoints=[...]) |
+| `manual_request` | MANUAL | `command_listener` (SetGoal target_state="MANUAL") |
+| `return_request` | RETURNING | `command_listener` (SetGoal target_state="RETURNING") |
+| `battery_low` | LOW_BATTERY_RETURNING | `battery_low_monitor` (≤20%, hysteresis 25% 진출) |
 | `idle_timeout` | RETURNING | `idle_timeout_monitor` (param `idle_timeout_seconds` 경과) |
 | `fault` | ERROR | `map_boundary_monitor` / `hardware_health_monitor` |
 

@@ -6,20 +6,20 @@
 
 ```
 Parallel(SuccessOnAll(synchronise=False))
-├─ BatteryLowMonitor        common/battery_low_monitor.md     (✅)  ← escalation: → LOW_BATTERY_RETURN
+├─ BatteryLowMonitor        common/battery_low_monitor.md     (✅)  ← escalation: → LOW_BATTERY_RETURNING
 ├─ MapBoundaryMonitor       common/map_boundary_monitor.md    (✅)
 ├─ HardwareHealthMonitor    common/hardware_health_monitor.md (✅)  ← LIDAR/odom staleness
 ├─ CommandListener          common/command_listener.md        (✅)
 └─ ReturnSubTree            sub_trees/BT_return_sub.md        (✅)  ← OneShot(NavTo → Align → Reverse)
 ```
 
-`BatteryLowMonitor` 가 RETURNING 중에도 배터리 더 떨어지면 `battery_low` trigger → LOW_BATTERY_RETURN 로 escalation. `ReturnSubTree` 는 OneShot 으로 감싸 SUCCESS 후 재실행 X — robot 은 도크에 들어간 상태로 cmd_vel=0 정지. 자동 `docked` trigger 는 발표 범위 외 (사람이 admin UI 디버그 버튼으로 발사 → CHARGING).
+`BatteryLowMonitor` 가 RETURNING 중에도 배터리 더 떨어지면 `battery_low` trigger → LOW_BATTERY_RETURNING 로 escalation. `ReturnSubTree` 는 OneShot 으로 감싸 SUCCESS 후 재실행 X — robot 은 도크에 들어간 상태로 cmd_vel=0 정지. 자동 `docked` trigger 는 발표 범위 외 (사람이 admin UI 디버그 버튼으로 발사 → CHARGING).
 
 추후 추가 예정: CollisionEventHandler.
 
-## LOW_BATTERY_RETURN 과의 차이
+## LOW_BATTERY_RETURNING 과의 차이
 
-| 항목 | RETURNING | LOW_BATTERY_RETURN |
+| 항목 | RETURNING | LOW_BATTERY_RETURNING |
 |---|---|---|
 | 진입 trigger | `return_request` / `idle_timeout` | `battery_low` |
 | BatteryLowMonitor | ✅ (escalation 용) | ✗ (이미 가장 낮은 상태) |
@@ -34,15 +34,15 @@ Parallel(SuccessOnAll(synchronise=False))
 ### 진입
 | Trigger | From | Source 발화 주체 |
 |---|---|---|
-| `return_request` | IDLE / ASSIST / PLAY / MANUAL | `command_listener` 또는 `main.py._on_tree_failure()` |
+| `return_request` | IDLE / GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL | `command_listener` 또는 `main.py._on_tree_failure()` |
 | `idle_timeout` | IDLE | `idle_timeout_monitor` |
 
 ### 종료
 | Trigger | To | Source 발화 주체 |
 |---|---|---|
 | `docked` | CHARGING | **사람** (admin UI 디버그 버튼) — 자동 도킹은 발표 범위 외 |
-| `battery_low` | LOW_BATTERY_RETURN | `battery_low_monitor` (escalation) |
-| `cancel` / `*_request` | IDLE / ASSIST / PLAY / MANUAL | `command_listener` (사용자 명령) |
+| `battery_low` | LOW_BATTERY_RETURNING | `battery_low_monitor` (escalation) |
+| `cancel` / `*_request` | IDLE / GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL | `command_listener` (사용자 명령) |
 | `fault` | ERROR | `map_boundary_monitor` 등 |
 
 ## 사용 behavior

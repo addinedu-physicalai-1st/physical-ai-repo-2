@@ -7,7 +7,7 @@ task state (GOTO/FOLLOW/LULLABY/HIDEANDSEEK) 는 body SUCCESS 시 root SUCCESS �
 되어야 main.py 의 _on_tree_success 가 task_done trigger 발화. 따라서 task_body=True 면
 SuccessOnSelected(children=[body]).
 
-기타 active state (IDLE/CHARGING/MANUAL/RETURNING/LOW_BATTERY_RETURN/ERROR) 는
+기타 active state (IDLE/CHARGING/MANUAL/RETURNING/LOW_BATTERY_RETURNING/ERROR) 는
 SuccessOnAll — root 가 SUCCESS 되어도 main.py 가 별도 trigger 발화 안 함 (해당 state 전이는
 monitor 가 trigger 함).
 """

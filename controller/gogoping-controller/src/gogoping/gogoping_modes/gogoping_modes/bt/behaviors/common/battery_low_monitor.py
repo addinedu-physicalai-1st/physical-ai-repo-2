@@ -2,7 +2,7 @@
 
 IDLE / ASSIST / PLAY / RETURNING MainTree 에 들어가는 monitor.
 - IDLE / ASSIST / PLAY → RETURNING (자동 도크 복귀)
-- RETURNING → LOW_BATTERY_RETURN (escalation — 도크로 가는 도중에 또 떨어지면 lockdown)
+- RETURNING → LOW_BATTERY_RETURNING (escalation — 도크로 가는 도중에 또 떨어지면 lockdown)
 - MANUAL 의도적 미배치 — 사용자가 들고 있는데 자동 빼앗김 방지 (``docs/state-bt.md`` 참조)
 
 monitor 컨벤션 (``docs/conventions.md`` §2):
@@ -12,7 +12,7 @@ monitor 컨벤션 (``docs/conventions.md`` §2):
 
 추후 ``BatterySubscriber`` 가 실제 ROS 토픽 구독으로 교체되면 자연스럽게 진짜 배터리
 값에 따라 동작. 현재는 ``sim_battery_node`` + ``/gogoping/sim/set_battery_level`` srv
-로 admin UI 슬라이더에서 임의 값 강제 → 자동 RETURNING / LOW_BATTERY_RETURN escalation
+로 admin UI 슬라이더에서 임의 값 강제 → 자동 RETURNING / LOW_BATTERY_RETURNING escalation
 검증 가능.
 """
 from __future__ import annotations

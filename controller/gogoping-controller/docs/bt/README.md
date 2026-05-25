@@ -28,12 +28,14 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | 파일 | 트리 |
 |---|---|
 | [trees/BT_idle_main.md](trees/BT_idle_main.md) | IDLE state — 명령 대기 + battery 감시 |
-| [trees/BT_assist_main.md](trees/BT_assist_main.md) | ASSIST — TaskSelector → goto/follow/lullaby + return_request listener |
-| [trees/BT_play_main.md](trees/BT_play_main.md) | PLAY — TaskSelector → hideseek + return_request listener |
+| [trees/BT_goto_main.md](trees/BT_goto_main.md) | GOTO — 지정 vertex 이동. body=BT_goto_sub |
+| [trees/BT_follow_main.md](trees/BT_follow_main.md) | FOLLOW — 사람 추종. body=StubFollow (BT_follow_sub 미구현) |
+| [trees/BT_lullaby_main.md](trees/BT_lullaby_main.md) | LULLABY — 자장가 재생. body=BT_lullaby_sub |
+| [trees/BT_hide_and_seek_main.md](trees/BT_hide_and_seek_main.md) | HIDEANDSEEK — 숨바꼭질 (현재 patrol-only). body=BT_hide_and_seek_sub |
 | [trees/BT_manual_main.md](trees/BT_manual_main.md) | MANUAL — torque off 모드, 사용자가 직접 밀어 이동. monitor + ManualTorqueHold + cancel/return listener |
 | [trees/BT_charging_main.md](trees/BT_charging_main.md) | CHARGING — battery_full 감지 + 도킹 접점 감시 |
 | [trees/BT_returning_main.md](trees/BT_returning_main.md) | RETURNING — BT_return_sub 호출 |
-| [trees/BT_low_battery_return_main.md](trees/BT_low_battery_return_main.md) | LOW_BATTERY_RETURN — 배터리 자동 복귀 lockdown (CommandListener 없음) |
+| [trees/BT_low_battery_returning_main.md](trees/BT_low_battery_returning_main.md) | LOW_BATTERY_RETURNING — 배터리 자동 복귀 lockdown (CommandListener 없음) |
 | [trees/BT_error_main.md](trees/BT_error_main.md) | ERROR — terminal (StopAll → Notify → Log) |
 | [trees/BT_goto_sub.md](trees/BT_goto_sub.md) | 이동 — Sequence(NavigateToVertex + UIPublish). 운반은 follow + goto chain |
 | [trees/BT_follow_sub.md](trees/BT_follow_sub.md) | 추종 — 정상 ↔ Loss Recovery |

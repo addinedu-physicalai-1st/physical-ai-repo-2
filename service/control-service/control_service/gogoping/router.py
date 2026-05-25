@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from .mode_to_goal import Goal, UnsupportedMode, mode_to_goal
+from .state_to_goal import Goal, UnsupportedMode, mode_to_goal
 from .ros_bridge import GogopingRosBridge
 from ..waypoints import yaml_store
 from ..waypoints.ros_bridge import WaypointsRosBridge
@@ -39,14 +39,13 @@ class GogopingModeResponse(BaseModel):
     accepted: bool
     reason: str = ""
     # 디버깅용 — 변환된 Goal 도 echo
-    goal_mode: str = ""
-    goal_task: str = ""
+    goal_target_state: str = ""
 
 
 class GogopingGotoVertexRequest(BaseModel):
-    """robot-web 음성 "X로 가" 처리. vertex 이름으로 ASSIST/goto 진입.
+    """robot-web 음성 "X로 가" 처리. vertex 이름으로 GOTO 진입.
 
-    `/waypoints/navigate` (graph_router action 직접) 와 달리 SetGoal.srv → FSM trigger 거침 — robot 이동 + state ASSIST 전이 둘 다 발생.
+    `/waypoints/navigate` (graph_router action 직접) 와 달리 SetGoal.srv → FSM trigger 거침 — robot 이동 + state GOTO 전이 둘 다 발생.
     """
 
     name: str  # waypoints.yaml 의 vertex 이름
@@ -62,15 +61,14 @@ class GogopingGotoVertexResponse(BaseModel):
 
 
 _VALID_FORCE_STATES = (
-    "CHARGING", "IDLE", "ASSIST", "PLAY", "MANUAL",
-    "RETURNING", "LOW_BATTERY_RETURN", "ERROR",
+    "IDLE", "CHARGING", "GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK",
+    "MANUAL", "RETURNING", "LOW_BATTERY_RETURNING", "ERROR",
 )
 
 
 class ForceStateRequest(BaseModel):
     """admin UI 의 디버그 패널이 POST 하는 payload."""
-    target_state: str        # 8개 STATES 중 하나
-    sub_task: str = ""       # 옵션 — "goto"/"follow"/"lullaby" (ASSIST) / "hideseek" (PLAY)
+    target_state: str        # 10개 STATES 중 하나 (평탄화 후 sub_task 제거)
 
 
 class ForceStateResponse(BaseModel):
@@ -182,12 +180,12 @@ def install(
             )
         return GogopingModeResponse(
             accepted=accepted, reason=reason,
-            goal_mode=goal.mode, goal_task=goal.task,
+            goal_target_state=goal.target_state,
         )
 
     @router.post("/goto_vertex", response_model=GogopingGotoVertexResponse)
     async def goto_vertex(req: GogopingGotoVertexRequest) -> GogopingGotoVertexResponse:
-        goal = Goal(mode="ASSIST", task="goto", destination_key=req.name)
+        goal = Goal(target_state="GOTO", destination_key=req.name)
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
             logger.warning(
@@ -199,11 +197,14 @@ def install(
 
     @router.post("/debug/force-state", response_model=ForceStateResponse)
     async def force_state(req: ForceStateRequest) -> ForceStateResponse:
-        """[디버그 전용] FSM 강제 state 전이 (+ 옵션 sub_task)."""
+        """[디버그 전용] FSM 강제 state 전이.
+
+        평탄화 (2026-05-25): sub_task 필드 제거. 10개 state 중 하나로 직접 진입.
+        """
         if req.target_state not in _VALID_FORCE_STATES:
             raise HTTPException(400, f"invalid target_state: {req.target_state!r}")
         accepted, reason = await asyncio.to_thread(
-            bridge.force_state_sync, req.target_state, req.sub_task,
+            bridge.force_state_sync, req.target_state,
         )
         latest = bridge.get_latest_state() or {}
         return ForceStateResponse(
@@ -327,7 +328,7 @@ def install(
                 remaining.remove(best)
 
         goal = Goal(
-            mode="PLAY", task="hideseek",
+            target_state="HIDEANDSEEK",
             target_id="patrol_debug",
             search_waypoints=ordered,
         )

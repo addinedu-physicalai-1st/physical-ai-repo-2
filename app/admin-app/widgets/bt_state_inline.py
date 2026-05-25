@@ -3,7 +3,7 @@
 [state] [BT main] [BT sub] 세 칸이 가로로 배치되어 TopBar 의 타이틀 우측에 들어간다.
 
 - 셀 1 (state): FSM state 알약. 색상은 state 별 (CHARGING=하늘, IDLE=회색,
-                ASSIST=민트, PLAY=라벤더, RETURNING=주황, ERROR=빨강).
+                task states (GOTO/FOLLOW/LULLABY)=각자 다른 파스텔, HIDEANDSEEK=라벤더, RETURNING=주황, ERROR=빨강).
 - 셀 2 (BT main): tree 이름 + 모든 children 을 status 별로 시각 차별:
                   ● (sky, bold)   = RUNNING — 현재 실행 중
                   ✓ (muted)       = SUCCESS — 완료, 취소선
@@ -17,7 +17,7 @@ EduPing/NoriArm 페이지에서는 hide() 로 숨김 — gogoping 페이지에�
 snapshot 포맷:
   {
     "robot_id": "gogoping",
-    "fsm_state": "ASSIST",
+    "fsm_state": "GOTO",
     "main_tree": {
       "name": "BT_assist_main",
       "children": [
@@ -63,13 +63,16 @@ from . import soften
 
 # FSM state → (강조 색, 텍스트 색) 매핑.
 _STATE_COLORS: dict[str, tuple[str, str]] = {
-    "CHARGING":            (COLORS["sky"],            COLORS["text"]),
     "IDLE":                (COLORS["text_muted"],     COLORS["text"]),
-    "ASSIST":              (COLORS["mint"],           COLORS["text"]),
-    "PLAY":                (COLORS["lavender"],       COLORS["text"]),
+    "CHARGING":            (COLORS["sky"],            COLORS["text"]),
+    # 평탄화 (2026-05-25): 4 task state 각자 고유 색.
+    "GOTO":                (COLORS["mint"],           COLORS["text"]),
+    "FOLLOW":              (COLORS["sky"],            COLORS["text"]),
+    "LULLABY":             (COLORS["sun"],            COLORS["text"]),
+    "HIDEANDSEEK":         (COLORS["lavender"],       COLORS["text"]),
     "MANUAL":              (COLORS["primary_dim"],    COLORS["text"]),     # 분홍 — 사용자 직접 제어
     "RETURNING":           (COLORS["accent"],         COLORS["text"]),     # 주황 — 자발 복귀
-    "LOW_BATTERY_RETURN":  (COLORS["warning"],        COLORS["text"]),     # 진한 주황 — lockdown
+    "LOW_BATTERY_RETURNING":  (COLORS["warning"],        COLORS["text"]),     # 진한 주황 — lockdown
     "ERROR":               (COLORS["danger"],         COLORS["danger"]),
     "—":                   (COLORS["border_strong"],  COLORS["text_muted"]),
 }
@@ -265,9 +268,9 @@ class BTStateInline(QWidget):
     snapshot 포맷:
       {
         "robot_id": "gogoping",
-        "fsm_state": "ASSIST",
-        "main_tree": {"name": "BT_assist_main", "running_children": [...]},
-        "sub_tree":  {"name": "BT_carry_sub",   "running_children": [...]} | None,
+        "fsm_state": "GOTO",
+        "main_tree": {"name": "BT_goto_main", "running_children": [...]},
+        "sub_tree":  None,
       }
     """
 

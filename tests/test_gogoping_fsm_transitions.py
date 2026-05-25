@@ -21,7 +21,7 @@ from gogoping_modes.fsm.robot_fsm import RobotFSM, STATES, TRANSITIONS  # noqa: 
 def test_states_are_ten():
     assert set(STATES) == {
         "IDLE", "CHARGING", "GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK",
-        "MANUAL", "RETURNING", "LOW_BATTERY_RETURN", "ERROR",
+        "MANUAL", "RETURNING", "LOW_BATTERY_RETURNING", "ERROR",
     }
 
 
@@ -100,17 +100,17 @@ _VALID_TRANSITIONS = [
     ("task_done", "LULLABY", "IDLE"),
     ("task_done", "HIDEANDSEEK", "IDLE"),
     # battery_low (MANUAL 제외)
-    ("battery_low", "IDLE", "LOW_BATTERY_RETURN"),
-    ("battery_low", "GOTO", "LOW_BATTERY_RETURN"),
-    ("battery_low", "FOLLOW", "LOW_BATTERY_RETURN"),
-    ("battery_low", "LULLABY", "LOW_BATTERY_RETURN"),
-    ("battery_low", "HIDEANDSEEK", "LOW_BATTERY_RETURN"),
-    ("battery_low", "RETURNING", "LOW_BATTERY_RETURN"),
+    ("battery_low", "IDLE", "LOW_BATTERY_RETURNING"),
+    ("battery_low", "GOTO", "LOW_BATTERY_RETURNING"),
+    ("battery_low", "FOLLOW", "LOW_BATTERY_RETURNING"),
+    ("battery_low", "LULLABY", "LOW_BATTERY_RETURNING"),
+    ("battery_low", "HIDEANDSEEK", "LOW_BATTERY_RETURNING"),
+    ("battery_low", "RETURNING", "LOW_BATTERY_RETURNING"),
     # idle_timeout
     ("idle_timeout", "IDLE", "RETURNING"),
     # docked
     ("docked", "RETURNING", "CHARGING"),
-    ("docked", "LOW_BATTERY_RETURN", "CHARGING"),
+    ("docked", "LOW_BATTERY_RETURNING", "CHARGING"),
     # fault (ERROR 외 모두)
     ("fault", "CHARGING", "ERROR"),
     ("fault", "IDLE", "ERROR"),
@@ -120,7 +120,7 @@ _VALID_TRANSITIONS = [
     ("fault", "HIDEANDSEEK", "ERROR"),
     ("fault", "MANUAL", "ERROR"),
     ("fault", "RETURNING", "ERROR"),
-    ("fault", "LOW_BATTERY_RETURN", "ERROR"),
+    ("fault", "LOW_BATTERY_RETURNING", "ERROR"),
 ]
 
 
@@ -145,12 +145,12 @@ def test_error_is_terminal():
 
 
 def test_low_battery_return_lockdown():
-    """LOW_BATTERY_RETURN 에서는 docked / fault 만 받음."""
-    fsm = RobotFSM(initial="LOW_BATTERY_RETURN")
+    """LOW_BATTERY_RETURNING 에서는 docked / fault 만 받음."""
+    fsm = RobotFSM(initial="LOW_BATTERY_RETURNING")
     for trigger_name in {t["trigger"] for t in TRANSITIONS} - {"docked", "fault"}:
         ok = fsm.trigger(trigger_name)
-        assert ok is False, f"LOW_BATTERY_RETURN should reject {trigger_name}"
-        assert fsm.current_state == "LOW_BATTERY_RETURN"
+        assert ok is False, f"LOW_BATTERY_RETURNING should reject {trigger_name}"
+        assert fsm.current_state == "LOW_BATTERY_RETURNING"
 
 
 def test_manual_ignores_battery_low_and_idle_timeout():

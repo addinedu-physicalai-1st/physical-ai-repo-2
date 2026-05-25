@@ -9,7 +9,7 @@
 자동 도킹 (접점 감지) 은 발표 범위 외 — 사람이 admin UI 디버그 버튼으로 `docked`
 trigger 발사 → CHARGING 전이.
 
-빌더 호출 시점 (RETURNING / LOW_BATTERY_RETURN 진입 시 BT swap) 에 blackboard 의
+빌더 호출 시점 (RETURNING / LOW_BATTERY_RETURNING 진입 시 BT swap) 에 blackboard 의
 ``CHARGING_DOCK_APPROACH_KEY = "충전소입구"`` + ``CHARGING_DOCK_TARGET_YAW`` =
 waypoints.yaml 의 충전소입구 vertex.yaw 를 채워둔다. yaml 이 admin UI 로 갱신
 되면 다음 RETURNING 진입 시 자동 반영.
@@ -83,7 +83,7 @@ def _seed_blackboard(approach_vertex_name: str) -> None:
 
 
 def build_return_subtree(ctx: "Context") -> py_trees.behaviour.Behaviour:
-    """RETURNING / LOW_BATTERY_RETURN MainTree 의 Parallel 자식으로 부착할 SubTree.
+    """RETURNING / LOW_BATTERY_RETURNING MainTree 의 Parallel 자식으로 부착할 SubTree.
 
     OneShot 으로 감싸 SUCCESS 후 재실행 차단.
     """

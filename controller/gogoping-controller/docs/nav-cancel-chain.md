@@ -1,4 +1,4 @@
-# Nav Cancel Chain — RETURNING / LOW_BATTERY_RETURN
+# Nav Cancel Chain — RETURNING / LOW_BATTERY_RETURNING
 
 도크 복귀 중 다른 state 로 전이될 때 nav2 goal 까지 cancel 이 forward 되는 전체
 시퀀스. 과거에 3가지 함정을 다 밟아봤음 (race / async event loop / orphan goal) —

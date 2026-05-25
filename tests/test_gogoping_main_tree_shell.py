@@ -67,7 +67,7 @@ def test_manual_policy_disables_battery_collision_hw():
 def test_low_battery_return_disables_command_listener():
     body = py_trees.behaviours.Success(name="ReturnBody")
     tree = build_active_main_tree(
-        "MainTree[LOW_BATTERY_RETURN]", _ctx(), body=body,
+        "MainTree[LOW_BATTERY_RETURNING]", _ctx(), body=body,
         include_battery_low=False,        # 이미 자기가 결과물
         include_command_listener=False,   # lockdown
     )

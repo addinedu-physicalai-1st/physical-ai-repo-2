@@ -423,8 +423,8 @@ class AdminWindow(QMainWindow):
 
         # 디버그 패널 (Dashboard 우측 DebugDrawer) → state_client.post_force_state
         self.dashboard.debug_panel.force_state_requested.connect(
-            lambda state, sub: self.state_client.post_force_state(
-                state, sub_task=sub,
+            lambda state: self.state_client.post_force_state(
+                state,
                 on_result=self.dashboard.debug_panel.set_last_result,
             )
         )

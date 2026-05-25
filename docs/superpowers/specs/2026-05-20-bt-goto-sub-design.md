@@ -277,7 +277,7 @@ fsm.trigger("assist_done") → ASSIST → IDLE
 | 사용자 "대기" (cancel) | `cancel` (ASSIST→IDLE) | ✅ INVALID → `_cancel_pending` flag → action cancel | ✅ | ❌ (Sequence 의 UIPublish 단계 도달 전 terminate) |
 | 사용자 다른 task (follow/lullaby) | reconciler 가 `assist_task` 갱신 — TaskSelector(memory=False) 매 tick 재평가 → goto_branch RUNNING 끊김 | ✅ INVALID → action cancel | ✅ | ❌ |
 | 사용자 "복귀" | `return_request` (ASSIST→RETURNING) | ✅ INVALID → action cancel | ✅ | ❌ |
-| 배터리 ≤20% | `battery_low` (ASSIST→LOW_BATTERY_RETURN) | ✅ INVALID → action cancel | ✅ | ❌ |
+| 배터리 ≤20% | `battery_low` (ASSIST→LOW_BATTERY_RETURNING) | ✅ INVALID → action cancel | ✅ | ❌ |
 | HW fault / 맵 이탈 | `fault` (ASSIST→ERROR) | ✅ INVALID → action cancel | ✅ | ❌ |
 | 경로 불가 / nav2 abort | NavigateToVertex 자체 FAILURE → SubTree FAILURE → `_on_tree_failure()` → `return_request` → RETURNING | (FAILURE 경로) | ✅ | ❌ |
 | `destination_key` 빈 값 / 잘못된 vertex | NavigateToVertex initialise 즉시 FAILURE (graph_router action reject) → 위와 동일 RETURNING 경로 | (FAILURE 경로) | (이동 시작 전) | ❌ |

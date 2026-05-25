@@ -1,7 +1,7 @@
 """RETURNING state MainTree — 도크 복귀.
 
 monitor 정책 (state-bt.md):
-- BatteryLowMonitor      ✅ (escalation → LOW_BATTERY_RETURN)
+- BatteryLowMonitor      ✅ (escalation → LOW_BATTERY_RETURNING)
 - MapBoundaryMonitor     ✅
 - HardwareHealthMonitor  ✅
 - CommandListener        ✅ (cancel / 새 task 받음)

@@ -8,7 +8,7 @@
 #   sim_battery_node 가 server. request.level (0.0 ~ 100.0) 을 받아 내부 상태 갱신,
 #   다음 publish tick 부터 새 값으로 /gogoping/battery 송출. BatterySubscriber 가 받아
 #   blackboard 의 Keys.BATTERY_LEVEL 갱신. 50% 이하면 battery_low_monitor 가 trigger
-#   발화 → 자동 RETURNING / LOW_BATTERY_RETURN escalation 검증 가능.
+#   발화 → 자동 RETURNING / LOW_BATTERY_RETURNING escalation 검증 가능.
 
 float32 level           # 0.0 ~ 100.0 (%). 범위 밖이면 clamp.
 ---

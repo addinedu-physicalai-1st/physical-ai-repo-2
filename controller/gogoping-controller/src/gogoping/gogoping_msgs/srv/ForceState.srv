@@ -4,11 +4,11 @@
 #
 # 강제 진입 가능한 state — robot_fsm.py 의 STATES 10개:
 #   IDLE / CHARGING / GOTO / FOLLOW / LULLABY / HIDEANDSEEK /
-#   MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR
+#   MANUAL / RETURNING / LOW_BATTERY_RETURNING / ERROR
 #
 # 동작:
 #   command_listener 가 server. request.target_state 받아 fsm.force_state(target) 호출.
-#   transition 규칙 우회 — CHARGING / LOW_BATTERY_RETURN / ERROR 도 일발 진입 가능.
+#   transition 규칙 우회 — CHARGING / LOW_BATTERY_RETURNING / ERROR 도 일발 진입 가능.
 #   on_state_change 콜백 정상 발화 → main.py 의 BT swap 자동.
 #
 # 평탄화 후 sub_task 필드 제거 — state 자체가 task 이므로 불필요.

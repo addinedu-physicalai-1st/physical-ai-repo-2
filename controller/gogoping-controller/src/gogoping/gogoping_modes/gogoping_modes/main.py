@@ -203,7 +203,7 @@ class GogopingModes:
         task_done 한 trigger 로 통합. body SUCCESS 시 shell 의 SuccessOnSelected 정책에
         의해 root SUCCESS → 본 콜백 → task_done → IDLE.
 
-        IDLE / CHARGING / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR 의 root SUCCESS 는
+        IDLE / CHARGING / MANUAL / RETURNING / LOW_BATTERY_RETURNING / ERROR 의 root SUCCESS 는
         task 완료 의미가 아니므로 무시 (state 전이는 그쪽 monitor 의 trigger 가 담당).
         """
         if self._current_state not in _TASK_STATES:

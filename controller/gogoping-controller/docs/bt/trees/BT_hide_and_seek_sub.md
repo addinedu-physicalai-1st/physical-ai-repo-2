@@ -1,8 +1,8 @@
 # BT_hide_and_seek_sub
 
-PLAY/hideseek 의 sub tree. **현재 구현: patrol 만** — vertex 목록을 받아 순회하며 각 vertex 에서 카메라 좌우 sweep. 진짜 hideseek (아이 인식 / FOUND 처리 / target_id 매칭) 은 추후 확장.
+HIDEANDSEEK state MainTree (BT_hide_and_seek_main) 의 body. **현재 구현: patrol 만** — vertex 목록을 받아 순회하며 각 vertex 에서 카메라 좌우 sweep. 진짜 hideseek (아이 인식 / FOUND 처리 / target_id 매칭) 은 추후 확장.
 
-`BT_play_main` 의 `hideseek_branch` 안에서 `CheckTask(play_task=="hideseek")` 다음에 호출된다.
+`BT_hide_and_seek_main` 이 body 로 직접 호출한다.
 
 ## Root composite
 
@@ -31,7 +31,7 @@ PLAY/hideseek 의 sub tree. **현재 구현: patrol 만** — vertex 목록을 �
 
 ## 진입 / 종료 trigger
 
-- 진입: 트리거 없음 — `BT_play_main` 의 selector 가 build 결과를 자식으로 직접 삽입.
+- 진입: 트리거 없음 — `BT_hide_and_seek_main` 의 `build_active_main_tree()` 가 body 로 직접 삽입.
 - 종료: 자식 (patrol_sub) 의 SUCCESS/FAILURE 가 그대로 부모로 전파.
 
 ## 추후 확장 (TODO)

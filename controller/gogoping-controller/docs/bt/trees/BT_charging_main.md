@@ -31,7 +31,7 @@ sim 환경에선 `sim_battery_node` 가 1Hz publish 시작하면서 실제 값�
 | Trigger | From | Source |
 |---|---|---|
 | (부팅 시 INITIAL_STATE) | — | `main.py` 의 `INITIAL_STATE="CHARGING"` |
-| `docked` | RETURNING / LOW_BATTERY_RETURN | `verify_docking_contact` (BT_return_sub Sequence 의 마지막 자식이 자동 발사) |
+| `docked` | RETURNING / LOW_BATTERY_RETURNING | `verify_docking_contact` (BT_return_sub Sequence 의 마지막 자식이 자동 발사) |
 
 ### 종료
 | Trigger | To | Source |

@@ -58,12 +58,12 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   ├── map_boundary_monitor.[py|/]   # 로봇 pose 가 맵 영역 밖 → "fault" (✅)
         │   │   │   │                                 #   MapCache.is_outside(x,y) — 격자 박스 + unknown 셀 체크.
         │   │   │   │                                 #   Used in: 7 트리 (CHARGING/IDLE/ASSIST/PLAY/MANUAL/
-        │   │   │   │                                 #            RETURNING/LOW_BATTERY_RETURN, ERROR 만 제외)
+        │   │   │   │                                 #            RETURNING/LOW_BATTERY_RETURNING, ERROR 만 제외)
         │   │   │   ├── hardware_health_monitor.py    # LIDAR/odom staleness → "fault" trigger (✅)
         │   │   │   │                                 #   /gogoping/scan + /gogoping/odom 직접 sub.
         │   │   │   │                                 #   ROS param hw_health_staleness_seconds (기본 3.0s).
         │   │   │   │                                 #   Used in: 6 트리 (CHARGING/IDLE/ASSIST/PLAY/RETURNING/
-        │   │   │   │                                 #            LOW_BATTERY_RETURN — MANUAL/ERROR 제외)
+        │   │   │   │                                 #            LOW_BATTERY_RETURNING — MANUAL/ERROR 제외)
         │   │   │   ├── collision_event_handler.[py|/] # Nav2 Collision Monitor 비정상 상태 → "fault" trigger
         │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main, BT_returning_main
         │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → blackboard 세팅 + fsm.trigger 호출 (✅)
@@ -165,7 +165,7 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON ✅
         │       │   ├── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
         │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
-        │       │   └── BT_low_battery_return_main.py    # LOW_BATTERY_RETURN — 빈 lockdown (CommandListener 없음)
+        │       │   └── BT_low_battery_returning_main.py    # LOW_BATTERY_RETURNING — 빈 lockdown (CommandListener 없음)
         │       │
         │       └── sub_trees/            # SubTree (mode/task 단위 5개 + 빌딩 블록)
         │           ├── __init__.py

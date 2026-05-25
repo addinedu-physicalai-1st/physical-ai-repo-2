@@ -334,7 +334,7 @@ vision_subscriber
 | 사용자 "대기" | cancel | BT swap → terminate(INVALID) 전파 | MaintainDistance/StopBase 의 terminate 가 cmd_vel=0 |
 | 사용자 다른 모드 (carry/lullaby) | assist_task 갱신 → TaskSelector 다른 branch | follow_branch RUNNING 끊김 → terminate(INVALID) | 동일 |
 | 사용자 "복귀" | return_request | BT swap (ASSIST → RETURNING) | 동일 |
-| 배터리 ≤20% | battery_low | BT swap (ASSIST → LOW_BATTERY_RETURN) | 동일 |
+| 배터리 ≤20% | battery_low | BT swap (ASSIST → LOW_BATTERY_RETURNING) | 동일 |
 | HW fault | fault | BT swap (ASSIST → ERROR) | 동일. ERROR 의 StopAllMotors 가 cmd_vel=0 + torque OFF 또 publish |
 | **Loss recovery 실패** | (BT 자체) FollowSubTree FAILURE → main.py._on_tree_failure → return_request | BT swap (ASSIST → RETURNING) | 동일 |
 

@@ -24,7 +24,7 @@ monitor 컨벤션 (``docs/conventions.md`` §2):
 - 발화 전 ``blackboard.ERROR_REASON / ERROR_SOURCE`` 세팅 (admin UI / DB 로그 활용).
 
 배치 (``docs/state-bt.md`` 정책):
-- CHARGING / IDLE / ASSIST / PLAY / RETURNING / LOW_BATTERY_RETURN (6 트리)
+- CHARGING / IDLE / ASSIST / PLAY / RETURNING / LOW_BATTERY_RETURNING (6 트리)
 - **MANUAL 제외** — battery/hw/collision 은 MANUAL 미배치 정책 (사용자 직접 제어 중
   자동 ERROR 차단). MapBoundaryMonitor 만 MANUAL 예외 배치.
 - ERROR 제외 — terminal.

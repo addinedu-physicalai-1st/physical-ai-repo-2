@@ -20,7 +20,7 @@ from py_trees.common import Access
 
 
 class Keys:
-    """Blackboard 변수 이름 상수 — 23개.
+    """Blackboard 변수 이름 상수 — 24개.
 
     **문자열 직접 사용 금지** — 항상 ``Keys.<NAME>`` 형태로만 참조.
     """

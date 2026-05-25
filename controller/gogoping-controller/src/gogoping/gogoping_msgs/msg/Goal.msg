@@ -10,7 +10,7 @@
 #   RETURNING    — 도크 복귀 강제 명령
 #
 # 외부에서 요청 불가 (validator 가 reject) — 내부 trigger 전용:
-#   CHARGING / LOW_BATTERY_RETURN / ERROR
+#   CHARGING / LOW_BATTERY_RETURNING / ERROR
 #
 # 같은 goal 재발행 = 무해 (idempotent). 다른 goal 발행 = preempt (active ↔ active 직접 전이).
 # command_listener 가 본 Goal 을 받아 reconciler 호출 → 적절한 FSM trigger 발화.

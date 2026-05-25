@@ -363,8 +363,8 @@ export function useVoiceController(robot: RobotConfig): {
     }
     let confirmation = '';
     try {
-      // ASSIST/goto 진입 — Control 의 /api/gogoping/goto_vertex 호출.
-      // SetGoal.srv → FSM trigger 경로라 robot 이동 + state ASSIST 전이 둘 다 발생.
+      // GOTO 진입 — Control 의 /api/gogoping/goto_vertex 호출.
+      // SetGoal.srv → FSM trigger 경로라 robot 이동 + state GOTO 전이 둘 다 발생.
       // (직접 graph_router action 호출인 /waypoints/navigate 는 FSM 우회 — admin 디버그 전용.)
       const r = await fetch('/api/gogoping/goto_vertex', {
         method: 'POST',
@@ -380,7 +380,7 @@ export function useVoiceController(robot: RobotConfig): {
 
   async function handleStop(): Promise<void> {
     // "그만"/"멈춰"/"정지"/"스톱" → 현재 mode 중단 + 대기 복귀. 각 로봇 별 처리:
-    //   - gogoping: FSM cancel trigger (ASSIST/PLAY/MANUAL/RETURNING → IDLE). fetch
+    //   - gogoping: FSM cancel trigger (active task / MANUAL / RETURNING → IDLE). fetch
     //     로 mode_to_goal("대기") 보내서 ROS command_listener 가 cancel 발사.
     //   - eduping (및 그 외): mode store 만 '대기' 로 — 각 모드 컴포넌트
     //     (DancePlayPopup 등) 가 onUnmounted 에서 stream.close() / camera teardown.

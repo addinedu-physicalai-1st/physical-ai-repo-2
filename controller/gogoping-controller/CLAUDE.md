@@ -9,14 +9,14 @@ FSM 및 Behavior Tree 관련 모든 설계는 [docs/](docs/) 디렉토리에 있
 | 문서 | 내용 |
 |---|---|
 | [docs/gogoping-file-structure.md](docs/gogoping-file-structure.md) | `src/gogoping/` 패키지별 폴더 구조 + behavior 별 책임 + "Used in:" 역참조 |
-| [docs/state-bt.md](docs/state-bt.md) | FSM 8 states (CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR) × MainTree 구조 + 트리 컨벤션 |
+| [docs/state-bt.md](docs/state-bt.md) | FSM 10 states (IDLE / CHARGING / GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL / RETURNING / LOW_BATTERY_RETURNING / ERROR) × MainTree 구조 + 트리 컨벤션 |
 | [docs/subtree-flow.md](docs/subtree-flow.md) | SubTree 5종 (Carry / Follow / Lullaby / HideAndSeek / Return) 의 자세한 노드 흐름 |
 | [docs/blackboard-schema.md](docs/blackboard-schema.md) | Blackboard 키 목록 + R/W 매트릭스 + 초기값 |
 | [docs/fsm-triggers.md](docs/fsm-triggers.md) | FSM trigger 이름 / kwargs / 전이 다이어그램 |
 | [docs/conventions.md](docs/conventions.md) | `context.py` / behavior DI / `main.py` BT swap 패턴 + 코딩 체크리스트 |
 | [docs/py-trees-spike.md](docs/py-trees-spike.md) | py_trees Parallel + Monitor RUNNING 동작 검증 (30분 spike, 본격 코딩 전 1회) |
 | [docs/graph-routing.md](docs/graph-routing.md) | vertex/lane 그래프 + 다익스트라 — 어디서 어떻게 호출하나 (BT / ROS / REST / Admin UI) |
-| [docs/nav-cancel-chain.md](docs/nav-cancel-chain.md) | RETURNING/LOW_BATTERY_RETURN 의 cancel 시퀀스 다이어그램 + 과거 함정 3개 (race / async event loop / orphan goal) — 새 nav behavior 추가 전 필독 |
+| [docs/nav-cancel-chain.md](docs/nav-cancel-chain.md) | RETURNING/LOW_BATTERY_RETURNING 의 cancel 시퀀스 다이어그램 + 과거 함정 3개 (race / async event loop / orphan goal) — 새 nav behavior 추가 전 필독 |
 | [docs/bt/](docs/bt/) | BT 트리/behavior 별 상세 — `bt/behaviors/<category>.md` (입출력 blackboard·액션) + `bt/trees/<tree>.md` (root composite·trigger 매트릭스). 새 behavior/트리 추가 시 갱신 컨벤션은 [docs/bt/README.md](docs/bt/README.md) 참조 |
 | [docs/bt/debug-tooling.md](docs/bt/debug-tooling.md) | `/gogoping/debug/nav_events` 토픽 + admin UI NavDebugLogCard 사용법 — cancel chain 실시간 추적 도구 |
 
@@ -27,8 +27,8 @@ ROS 서비스 / 메시지 계약은 `src/gogoping/gogoping_msgs/{srv,msg,action}
 다음 항목 중 하나라도 **다르게 정의하려고 하면 반드시 사용자에게 먼저 확인**한다. 무단 변경 금지:
 
 - **폴더 구조** — `src/gogoping/` 하위 패키지 추가/삭제/이름변경, `gogoping_modes/gogoping_modes/{fsm,bt,interfaces,utils}` 의 하위 구조 변경
-- **FSM state** — 8 states (CHARGING / IDLE / ASSIST / PLAY / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR) 추가/삭제/이름변경, transition 규칙 변경
-- **BT 구조** — MainTree 8개 / SubTree 5개 의 구성 변경, behavior 카테고리 (common / navigation / perception / follow / manual / recovery) 추가/삭제
+- **FSM state** — 10 states (IDLE / CHARGING / GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL / RETURNING / LOW_BATTERY_RETURNING / ERROR) 추가/삭제/이름변경, transition 규칙 변경
+- **BT 구조** — MainTree 10개 / SubTree 5개 의 구성 변경, behavior 카테고리 (common / navigation / perception / follow / manual / recovery) 추가/삭제
 
 위 세 가지는 6명 코드베이스의 뼈대다. 한 명이 조용히 바꾸면 다른 사람 코드가 다 깨진다. 작은 추가 (behavior 한 개 추가, blackboard 키 한 개 추가 등) 는 사용자 확인 없이 진행해도 OK 지만 문서 (docs/blackboard-schema.md 등) 는 같이 갱신할 것.
 

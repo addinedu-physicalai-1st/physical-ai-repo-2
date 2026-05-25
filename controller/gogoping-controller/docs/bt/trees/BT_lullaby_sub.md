@@ -1,6 +1,6 @@
 # BT_lullaby_sub
 
-자장가 SubTree — ASSIST 의 TaskSelector 안 `lullaby_branch` 자식. mp3 재생 시작/정지
+자장가 SubTree — LULLABY state MainTree (BT_lullaby_main) 의 body. mp3 재생 시작/정지
 신호를 `/gogoping/ui_event` 토픽에 publish (재생 자체는 robot-web frontend).
 
 [bt/trees/sub_trees/BT_lullaby_sub.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_lullaby_sub.py)
@@ -31,17 +31,17 @@ UI BT SUB 영역에 자동 표시.
 ### 진입
 | Trigger | 발화 주체 | 동작 |
 |---|---|---|
-| `assist_request(task="lullaby")` | `command_listener` (SetGoal mode=ASSIST, task=lullaby) | blackboard.assist_task = "lullaby" → BT_assist_main 의 TaskSelector → lullaby_branch → CheckTask SUCCESS → BT_lullaby_sub.initialise() → play publish |
+| `lullaby_request` | `command_listener` (SetGoal target_state=LULLABY) | FSM IDLE → LULLABY → BT swap → BT_lullaby_main body 로 직접 호출 → BT_lullaby_sub.initialise() → play publish |
 
 ### 종료
 | Trigger | 발화 주체 | terminate? | stop publish? |
 |---|---|---|---|
-| `cancel` (ASSIST → IDLE) | `command_listener` (SetGoal mode=IDLE) | ✅ | ✅ |
-| `assist_request(task="goto"/"follow")` | `command_listener` (TaskSelector 가 다른 branch 선택, lullaby_branch RUNNING 끊김) | ✅ | ✅ |
-| `return_request` (ASSIST → RETURNING) | `command_listener` (SetGoal mode=RETURNING) | ✅ | ✅ |
-| `manual_request` / `play_request` | `command_listener` | ✅ | ✅ |
-| `battery_low` (ASSIST → LOW_BATTERY_RETURN) | `battery_low_monitor` | ✅ | ✅ |
-| `fault` (ASSIST → ERROR) | `map_boundary_monitor` / `hardware_health_monitor` | ✅ | ✅ |
+| `cancel` (LULLABY → IDLE) | `command_listener` (SetGoal target_state=IDLE) | ✅ | ✅ |
+| `goto_request` / `follow_request` / `hideseek_request` | `command_listener` (LULLABY → 다른 task state 직접 전이) | ✅ | ✅ |
+| `return_request` (LULLABY → RETURNING) | `command_listener` (SetGoal target_state=RETURNING) | ✅ | ✅ |
+| `manual_request` | `command_listener` | ✅ | ✅ |
+| `battery_low` (LULLABY → LOW_BATTERY_RETURNING) | `battery_low_monitor` | ✅ | ✅ |
+| `fault` (LULLABY → ERROR) | `map_boundary_monitor` / `hardware_health_monitor` | ✅ | ✅ |
 
 모든 종료 경로에서 stop publish 보장 — `main.py._build_tree_for_state` 의
 `root.stop(INVALID) + tree.shutdown()` 이 RUNNING 자식의 `terminate()` 전파 보장
@@ -70,13 +70,10 @@ publish 되는 두 메시지 (frontend contract):
 control-service → SetGoal.srv → /gogoping/set_goal
   ↓
 command_listener → goal_reconciler
-  ├─ blackboard.assist_task = "lullaby"
-  └─ fsm.trigger("assist_request", task="lullaby")
-FSM IDLE → ASSIST → BT swap
+  └─ fsm.trigger("lullaby_request")
+FSM IDLE → LULLABY → BT swap
   ↓
-BT_assist_main → TaskSelector → lullaby_branch
-  → CheckTask("lullaby") = SUCCESS
-  → build_lullaby_subtree(ctx) → LullabyAudio
+BT_lullaby_main → build_lullaby_subtree(ctx) → LullabyAudio (body 직접 삽입)
        ↓ initialise()
      /gogoping/ui_event ← {"event": "lullaby_play", "src": "lullaby.mp3", "loop": true}
        ↓
@@ -84,7 +81,7 @@ BT_assist_main → TaskSelector → lullaby_branch
      ↓ update() = RUNNING (지속)
 
 [사용자 "대기" 클릭]
-  ↓ fsm.trigger("cancel") → ASSIST → IDLE → BT swap
+  ↓ fsm.trigger("cancel") → LULLABY → IDLE → BT swap
 main.py → root.stop(INVALID) + tree.shutdown()
   → LullabyAudio.terminate(INVALID)
        ↓

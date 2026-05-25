@@ -1,15 +1,15 @@
 SubTree
 
-# follow 의 두 경로 (★ 재사용 패턴)
+# follow 의 호출 경로
 
-**`FollowSubTree` 자체는 한 개, 호출 경로는 두 개.**
+**`FollowSubTree` 자체는 한 개, MainTree 가 wrap 해서 사용.**
 
-| 경로 | 명령 | 컨텍스트 | 추가 가드 |
+| 경로 | 명령 (Goal.target_state) | 컨텍스트 | 추가 가드 |
 |---|---|---|---|
-| (1) ASSIST 직속 | `assist_request, task=follow, target_id=...` | 단독 추종 | 없음 |
+| FOLLOW state | `follow_request` (= Goal{target_state=FOLLOW, target_id=...}) | 단독 추종 | 없음 |
 
 → 추종 로직 (1.5m 유지 / Loss Recovery 등) 은 `FollowSubTree` 한 곳에만 작성.
-운반 시나리오는 user 가 follow task + goto task 를 순차 chain (composition) 으로 구성.
+운반 시나리오는 user 가 GOTO + FOLLOW 를 순차 chain (composition) 으로 구성.
 
 # audio / announce 노드 표기 — 의사코드
 

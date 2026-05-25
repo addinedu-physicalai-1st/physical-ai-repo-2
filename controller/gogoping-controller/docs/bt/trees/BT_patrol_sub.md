@@ -2,7 +2,7 @@
 
 빌드 시 받은 vertex 이름 list 를 순서대로 돌며 각 vertex 도착 시 카메라 좌우 sweep — 일종의 "둘러보기" 빌딩 블록. 추후 술래잡기 (`BT_hide_and_seek_sub`) 의 탐색 단계 등에서 재사용 예정.
 
-본 SubTree 는 **building block** — FSM trigger / TaskSelector 결선은 별도 (호출자가 책임). 본 PR 단계에선 단독 결선 없음.
+본 SubTree 는 **building block** — FSM trigger 결선은 별도 (호출자가 책임). 본 PR 단계에선 단독 결선 없음.
 
 ## Root composite
 
@@ -64,7 +64,7 @@ root = build_patrol_sub(ctx, waypoints=["교실A", "운동장", "복도1"])
 
 본 빌더는 현재 단독 코드 — 어디서 호출할지는 추후 결정. 가능 패턴:
 
-- **PLAY/hideseek 안의 search 단계**: `BT_hide_and_seek_sub` 가 (nav → countdown → BT_patrol_sub → return) 형태로 조립.
+- **HIDEANDSEEK 의 search 단계**: `BT_hide_and_seek_sub` 가 (nav → countdown → BT_patrol_sub → return) 형태로 조립.
 - **단독 디버그 진입**: admin 측에서 SetGoal.srv 또는 별도 service 로 직접 트리거.
 
 ## 테스트

@@ -2,7 +2,7 @@
 
 ReturnSubTree 의 4단계 (마지막). 자동 도킹 접점 센서는 미구현이라 시간 기반 후진이
 끝났으면 도크 도달 간주하고 ``fsm.trigger("docked")`` 발사 → RETURNING /
-LOW_BATTERY_RETURN → CHARGING 자동 전이.
+LOW_BATTERY_RETURNING → CHARGING 자동 전이.
 
 Status:
   SUCCESS — trigger 발사 후 (매 tick 즉시 SUCCESS, 단 trigger 는 1회만)
