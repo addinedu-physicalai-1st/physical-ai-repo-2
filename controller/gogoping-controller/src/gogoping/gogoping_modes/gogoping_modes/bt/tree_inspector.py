@@ -62,6 +62,7 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader.register_key(key=Keys.IDLE_TIMEOUT_SECONDS, access=Access.READ)
         _bb_reader.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.READ)
         _bb_reader.register_key(key=Keys.PATROL_CURRENT_INDEX, access=Access.READ)
+        _bb_reader.register_key(key=Keys.HIDESEEK_PHASE, access=Access.READ)
     return _bb_reader
 
 
@@ -122,6 +123,22 @@ def _read_robot_pose() -> dict | None:
         }
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _read_hideseek_phase() -> str:
+    """blackboard.HIDESEEK_PHASE 안전 읽기. 미설정 / 예외 시 빈 문자열.
+
+    UI 라우팅 필드 — robot-web ``useGogopingStateWs`` 가 ``/ws/robot-state`` 로 받아
+    HideAndSeekGame 의 화면 (RecruitPhase / CountdownPhase / PatrolPhase / ReturnPhase /
+    EndPhase) 라우팅에 사용. blackboard 의 ``SetHideseekPhase`` setter 가 BT step 진입
+    시 W, snapshot 이 1Hz 로 publish.
+    """
+    bb = _ensure_bb_reader()
+    try:
+        v = bb.get(Keys.HIDESEEK_PHASE)
+        return str(v) if v else ""
+    except (KeyError, AttributeError, TypeError):
+        return ""
 
 
 def _read_patrol() -> dict | None:
@@ -209,6 +226,9 @@ def snapshot(
         # patrol 진행 상태 — admin UI waypoint_map_card 가 시각화 (번호 / X / 강조).
         # None = patrol 미진행 (SEARCH_WAYPOINTS 빈 + current_index = -1).
         "patrol": _read_patrol(),
+        # 숨바꼭질 단계 — robot-web HideAndSeekGame 의 phase 화면 라우팅에 사용.
+        # 값: "move_to_play"/"recruit"/"countdown"/"patrol"/"return"/"end"/"" (미진행).
+        "hideseek_phase": _read_hideseek_phase(),
         "ts": time.time(),
     }
 
