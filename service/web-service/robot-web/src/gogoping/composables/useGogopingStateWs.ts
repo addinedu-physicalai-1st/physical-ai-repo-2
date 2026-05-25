@@ -16,10 +16,16 @@ import { onBeforeUnmount } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useHideseekPhaseStore, type HideseekPhase } from '@/gogoping/stores/hideseekPhase';
 
+interface SnapshotPatrol {
+  vertices?: string[];
+  current_index?: number;
+}
+
 interface GogopingSnapshot {
   robot_id?: string;
   fsm_state?: string;
   hideseek_phase?: string;  // BT blackboard 의 hideseek_phase (Task 7 에서 추가)
+  patrol?: SnapshotPatrol | null;  // BT blackboard 의 search_waypoints + patrol_current_index
   // 평탄화 (2026-05-25): assist_task / play_task 필드 제거. fsm_state 자체가 task.
   // 그 외 필드는 본 composable 에서 사용 안 함 (main_tree / sub_tree / battery_level 등)
 }
@@ -75,6 +81,19 @@ export function useGogopingStateWs(): { stop: () => void } {
         // hideseek_phase → store (HideAndSeekGame 이 watch). 미지원 서버면 필드 없음 → no-op.
         if (typeof snap.hideseek_phase === 'string') {
           hideseekPhaseStore.setPhase(snap.hideseek_phase as HideseekPhase);
+        }
+
+        // patrol info → store (PatrolPhase / useHideAndSeekState 가 read).
+        // snap.patrol 은 null 이거나 {vertices, current_index} — 둘 다 없으면 empty 처리.
+        if (snap.patrol && Array.isArray(snap.patrol.vertices)) {
+          hideseekPhaseStore.setPatrol({
+            vertices: snap.patrol.vertices,
+            currentIndex: typeof snap.patrol.current_index === 'number'
+              ? snap.patrol.current_index
+              : -1,
+          });
+        } else if (snap.patrol === null) {
+          hideseekPhaseStore.setPatrol({ vertices: [], currentIndex: -1 });
         }
       } catch {
         // JSON 파싱 실패는 무시 (서버 측 포맷 변경 등 — 다음 메시지에서 회복)

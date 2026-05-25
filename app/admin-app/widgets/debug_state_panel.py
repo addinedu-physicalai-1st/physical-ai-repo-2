@@ -43,6 +43,8 @@ class DebugStatePanel(QFrame):
     emergency_stop_requested = pyqtSignal()
     # [순찰] 빠른 버튼 클릭 시 emit. 인자 없음 — control-server 가 랜덤 그룹 선택.
     patrol_requested = pyqtSignal()
+    # 숨바꼭질 [→ skip phase] 버튼 클릭 시 emit. 인자: (current_phase,)
+    hideseek_skip_phase_requested = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -157,6 +159,35 @@ class DebugStatePanel(QFrame):
         quick_row.addWidget(self._quick_patrol_btn, 1)
         outer.addLayout(quick_row)
 
+        # 숨바꼭질 debug skip — 현재 phase 표시 + skip 버튼.
+        # snapshot 의 hideseek_phase 가 recruit/countdown/patrol/return 일 때만 enable.
+        self._hideseek_phase: str = ""
+        hideseek_row = QHBoxLayout()
+        hideseek_row.setSpacing(4)
+        hideseek_row.setContentsMargins(0, 0, 0, 0)
+        hideseek_label = QLabel("hideseek")
+        hideseek_label.setStyleSheet(
+            f"font-size: 8pt; color: {COLORS['text_soft']}; min-width: 48px;"
+        )
+        hideseek_row.addWidget(hideseek_label)
+        self._hideseek_phase_label = QLabel("—")
+        self._hideseek_phase_label.setStyleSheet(
+            f"font-size: 9pt; font-weight: 700; color: {COLORS['text']};"
+            f" min-width: 80px;"
+        )
+        hideseek_row.addWidget(self._hideseek_phase_label, 1)
+        self._hideseek_skip_btn = QPushButton("→ 다음")
+        self._hideseek_skip_btn.setCursor(Qt.PointingHandCursor)
+        self._hideseek_skip_btn.setStyleSheet(
+            f"background: {COLORS['warning']}; color: white; border: none;"
+            f" border-radius: 6px; padding: 4px 10px; font-size: 9pt; font-weight: 800;"
+            f" min-height: 24px;"
+        )
+        self._hideseek_skip_btn.clicked.connect(self._on_hideseek_skip_clicked)
+        self._hideseek_skip_btn.setEnabled(False)
+        hideseek_row.addWidget(self._hideseek_skip_btn, 0)
+        outer.addLayout(hideseek_row)
+
         # state row
         state_row = QHBoxLayout()
         state_row.setSpacing(4)
@@ -217,6 +248,17 @@ class DebugStatePanel(QFrame):
         )
         self.patrol_requested.emit()
 
+    def _on_hideseek_skip_clicked(self) -> None:
+        """숨바꼭질 [→ 다음] — 현재 phase 를 BT 측에서 즉시 SUCCESS."""
+        phase = self._hideseek_phase
+        if not phase:
+            return
+        self._last_result.setText(f"sending → hideseek skip ({phase}) ...")
+        self._last_result.setStyleSheet(
+            f"font-size: 8pt; font-weight: 600; color: {COLORS['text_soft']};"
+        )
+        self.hideseek_skip_phase_requested.emit(phase)
+
     # --------------------------------------------------------------- public
 
     def set_last_result(self, state: str, ok: bool, reason: str = "") -> None:
@@ -228,6 +270,47 @@ class DebugStatePanel(QFrame):
             )
         else:
             self._last_result.setText(f"✗ {state}: {reason}")
+            self._last_result.setStyleSheet(
+                f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
+            )
+
+    _SKIPPABLE_PHASES = frozenset({
+        "recruit", "countdown", "patrol", "return",
+    })
+    _PHASE_LABELS = {
+        "": "—",
+        "move_to_play": "이동 중",
+        "recruit": "모집",
+        "countdown": "카운트다운",
+        "patrol": "순찰",
+        "return": "복귀",
+        "end": "발표",
+    }
+
+    def set_hideseek_phase(self, phase: str) -> None:
+        """snapshot 의 hideseek_phase 가 변경될 때 호출 — 라벨 + skip 버튼 enable 상태 갱신."""
+        self._hideseek_phase = phase or ""
+        label = self._PHASE_LABELS.get(self._hideseek_phase, self._hideseek_phase or "—")
+        self._hideseek_phase_label.setText(label)
+        self._hideseek_skip_btn.setEnabled(
+            self._hideseek_phase in self._SKIPPABLE_PHASES,
+        )
+
+    def set_hideseek_skip_result(
+        self, current_phase: str, ok: bool, reason: str = "",
+        advanced_to: str = "",
+    ) -> None:
+        """state_client 가 hideseek skip-phase 응답 받은 후 호출."""
+        if ok:
+            target = self._PHASE_LABELS.get(advanced_to, advanced_to or "?")
+            self._last_result.setText(
+                f"✓ hideseek skip {current_phase} → {target}"
+            )
+            self._last_result.setStyleSheet(
+                f"font-size: 8pt; font-weight: 700; color: {COLORS['success']};"
+            )
+        else:
+            self._last_result.setText(f"✗ hideseek skip ({current_phase}): {reason}")
             self._last_result.setStyleSheet(
                 f"font-size: 8pt; font-weight: 700; color: {COLORS['danger']};"
             )

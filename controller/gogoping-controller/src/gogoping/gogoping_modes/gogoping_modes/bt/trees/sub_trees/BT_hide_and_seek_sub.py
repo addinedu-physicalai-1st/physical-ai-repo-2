@@ -106,7 +106,11 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
         memory=True,
         children=[
             SetHideseekPhase(name="set_phase_countdown", phase="countdown"),
-            Countdown(name="countdown_30s", seconds=_COUNTDOWN_SECONDS),
+            Countdown(
+                name="countdown_30s",
+                seconds=_COUNTDOWN_SECONDS,
+                check_skip_key=Keys.HIDESEEK_SKIP_COUNTDOWN,
+            ),
         ],
     )
 

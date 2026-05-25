@@ -158,6 +158,25 @@ class HideseekCaughtResponse(BaseModel):
     child_id: int = 0
 
 
+class HideseekSkipPhaseRequest(BaseModel):
+    """robot-web 의 debug "다음 단계" 버튼이 POST.
+
+    current_phase: 현재 UI 가 표시 중인 phase 이름.
+        - "recruit"   → registered_ids=[1] (dummy) → AwaitRecruitComplete SUCCESS
+        - "countdown" → skip_countdown=True → BT Countdown 즉시 SUCCESS
+        - "patrol"    → caught_ids = sentinel large set → CaughtMonitor SUCCESS
+        - "return"    → 동일 (caught_ids sentinel)
+        - "move_to_play" / "end" → 지원 안 함 (BT goto/유휴 영구 RUNNING — UI 가 cancel 로 처리)
+    """
+    current_phase: str
+
+
+class HideseekSkipPhaseResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    advanced_to: str = ""   # next phase 이름 (UI 표시용)
+
+
 class PatrolRequest(BaseModel):
     """admin UI [순찰] 버튼이 POST 하는 payload — 현재 옵션 없음.
 
@@ -177,6 +196,96 @@ class PatrolResponse(BaseModel):
     start_x: float = 0.0
     start_y: float = 0.0
     used_robot_pose: bool = False
+
+
+def _build_group_patrol_order(
+    bridge: GogopingRosBridge,
+) -> tuple[list[str], list[str], tuple[float, float] | None]:
+    """waypoints.yaml 의 group 별 모든 vertex 를 셔플된 group 순서 + group 내 NN
+    으로 정렬해 단일 list 로 반환. ``/debug/patrol`` 과 동일 로직 — 숨바꼭질 모드
+    진입 시에도 같은 patrol 계획을 쓴다.
+
+    반환:
+        (ordered, group_order, start_pose)
+            ordered: 모든 group 의 vertex 가 셔플된 순서로 펼쳐진 list
+            group_order: 셔플된 group 이름 list (UI 의 "N 카테고리" 표시용)
+            start_pose: NN 시작 좌표 (robot pose 가 있으면 그 값, 없으면 None)
+
+    grouped vertex 가 하나도 없으면 (빈, 빈, None) 반환.
+    """
+    wps, _ = yaml_store.load()
+    groups: dict[str, list[tuple[str, float, float]]] = {}
+    for w in wps:
+        if w.group:
+            groups.setdefault(w.group, []).append(
+                (w.name, float(w.x), float(w.y))
+            )
+    if not groups:
+        return [], [], None
+
+    group_order = list(groups.keys())
+    random.shuffle(group_order)
+
+    latest = bridge.get_latest_state() or {}
+    pose = latest.get("robot_pose") if isinstance(latest, dict) else None
+    if (isinstance(pose, dict)
+            and isinstance(pose.get("x"), (int, float))
+            and isinstance(pose.get("y"), (int, float))):
+        cur_x, cur_y = float(pose["x"]), float(pose["y"])
+        start_pose: tuple[float, float] | None = (cur_x, cur_y)
+    else:
+        first_grp = groups[group_order[0]]
+        cur_x, cur_y = first_grp[0][1], first_grp[0][2]
+        start_pose = None
+
+    ordered: list[str] = []
+    for grp_name in group_order:
+        remaining = list(groups[grp_name])
+        while remaining:
+            best = min(
+                remaining,
+                key=lambda w: (w[1] - cur_x) ** 2 + (w[2] - cur_y) ** 2,
+            )
+            ordered.append(best[0])
+            cur_x, cur_y = best[1], best[2]
+            remaining.remove(best)
+
+    return ordered, group_order, start_pose
+
+
+def _build_hideseek_goal_dynamic(bridge: GogopingRosBridge, base: Goal) -> Goal:
+    """``숨바꼭질`` 진입 시 search_waypoints 를 group 셔플 + NN 정렬로 채운다.
+
+    `/debug/patrol` 과 동일 로직 (``_build_group_patrol_order``). 모든 grouped
+    vertex 를 한 번씩 순회 — group 수 = 사용자가 보는 카테고리 수.
+
+    play_area_key 는 base.play_area_key (state_to_goal 의 "운동장2") 그대로 유지 —
+    모집/카운트다운/복귀 도착점.
+
+    yaml 에 grouped vertex 가 없으면 base 의 hardcoded search_waypoints 그대로
+    반환 (degenerate fallback).
+    """
+    try:
+        ordered, group_order, _ = _build_group_patrol_order(bridge)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"_build_group_patrol_order 실패 — hideseek fallback: {e}")
+        return base
+
+    if not ordered:
+        logger.warning("waypoints.yaml 에 grouped vertex 없음 — hideseek fallback")
+        return base
+
+    logger.info(
+        f"hideseek dynamic patrol: {len(group_order)} categories "
+        f"({group_order}) → {len(ordered)} vertices in NN order"
+    )
+    return Goal(
+        target_state=base.target_state,
+        destination_key=base.destination_key,
+        target_id=base.target_id,
+        search_waypoints=ordered,
+        play_area_key=base.play_area_key,
+    )
 
 
 def install(
@@ -200,6 +309,15 @@ def install(
             goal = mode_to_goal(req.mode)
         except UnsupportedMode as e:
             raise HTTPException(400, str(e))
+
+        # HIDEANDSEEK 진입 시 search_waypoints 를 동적으로 — group 별 random 1 vertex
+        # + 모든 group 순회. 카테고리 수 = patrol 진행 step 수.
+        # play_area_key 는 운동장 group 의 한 vertex (UI/도착점). state_to_goal 의
+        # hardcoded "운동장2" fallback 은 모집 단계 도착점으로 그대로 사용.
+        if goal.target_state == "HIDEANDSEEK":
+            goal = await asyncio.to_thread(
+                _build_hideseek_goal_dynamic, bridge, goal,
+            )
 
         # bridge 의 동기 호출 — asyncio thread 에서 호출하므로 to_thread 로 offload
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
@@ -319,43 +437,20 @@ def install(
         - 다음 그룹들: 이전 그룹의 마지막 vertex 좌표에서 NN 시작
         - 결과: 모든 group vertex 가 하나의 search_waypoints 리스트에 들어감
         """
-        wps, _ = await asyncio.to_thread(yaml_store.load)
-        groups: dict[str, list[tuple[str, float, float]]] = {}
-        for w in wps:
-            if w.group:
-                groups.setdefault(w.group, []).append(
-                    (w.name, float(w.x), float(w.y))
-                )
-        if not groups:
+        ordered, group_order, start_pose = await asyncio.to_thread(
+            _build_group_patrol_order, bridge,
+        )
+        if not ordered:
             return PatrolResponse(accepted=False, reason="no_grouped_vertices")
 
-        group_order = list(groups.keys())
-        random.shuffle(group_order)
-
-        latest = bridge.get_latest_state() or {}
-        pose = latest.get("robot_pose") if isinstance(latest, dict) else None
-        if (isinstance(pose, dict)
-                and isinstance(pose.get("x"), (int, float))
-                and isinstance(pose.get("y"), (int, float))):
-            cur_x, cur_y = float(pose["x"]), float(pose["y"])
+        if start_pose is not None:
+            start_x, start_y = start_pose
             used_robot_pose = True
         else:
-            first_grp = groups[group_order[0]]
-            cur_x, cur_y = first_grp[0][1], first_grp[0][2]
+            # fallback: ordered 의 첫 vertex 좌표 (yaml lookup 필요한데 한 번 더 load
+            # 하긴 비효율 — 0,0 으로 둠. 디버그 응답 metadata 라 정확도 덜 중요)
+            start_x, start_y = 0.0, 0.0
             used_robot_pose = False
-        start_x, start_y = cur_x, cur_y
-
-        ordered: list[str] = []
-        for grp_name in group_order:
-            remaining = list(groups[grp_name])
-            while remaining:
-                best = min(
-                    remaining,
-                    key=lambda w: (w[1] - cur_x) ** 2 + (w[2] - cur_y) ** 2,
-                )
-                ordered.append(best[0])
-                cur_x, cur_y = best[1], best[2]
-                remaining.remove(best)
 
         goal = Goal(
             target_state="HIDEANDSEEK",
@@ -363,7 +458,7 @@ def install(
             search_waypoints=ordered,
             # reconciler 가 HIDEANDSEEK 진입 시 필수 필드 (missing_play_area_key 방지).
             # /debug/patrol 은 nav 검증용 — 운동장2 default 로 충분.
-            play_area_key="play_area",
+            play_area_key="운동장2",
         )
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
@@ -431,6 +526,48 @@ def install(
             )
         return HideseekCaughtResponse(
             accepted=accepted, reason=reason, child_id=req.child_id,
+        )
+
+    @router.post(
+        "/play/hideseek/debug/skip-phase",
+        response_model=HideseekSkipPhaseResponse,
+    )
+    async def hideseek_skip_phase(
+        req: HideseekSkipPhaseRequest,
+    ) -> HideseekSkipPhaseResponse:
+        """robot-web 의 debug "다음 단계" 버튼 — 현재 phase 를 SUCCESS 시켜 다음으로.
+
+        지원 phase: recruit / countdown / patrol / return.
+        move_to_play / end 는 BT goto / 영구 RUNNING 이라 skip 효과 없음 (UI 가
+        cancel 로 처리하거나 무시).
+        """
+        phase = req.current_phase
+        if phase == "recruit":
+            accepted, reason = await asyncio.to_thread(
+                bridge.write_hideseek_registered_ids, [1],
+            )
+            return HideseekSkipPhaseResponse(
+                accepted=accepted, reason=reason, advanced_to="countdown",
+            )
+        if phase == "countdown":
+            accepted, reason = await asyncio.to_thread(
+                bridge.write_hideseek_skip_countdown, True,
+            )
+            return HideseekSkipPhaseResponse(
+                accepted=accepted, reason=reason, advanced_to="patrol",
+            )
+        if phase in ("patrol", "return"):
+            accepted, reason = await asyncio.to_thread(
+                bridge.write_hideseek_caught_ids_complete,
+            )
+            return HideseekSkipPhaseResponse(
+                accepted=accepted, reason=reason,
+                advanced_to="return" if phase == "patrol" else "end",
+            )
+        return HideseekSkipPhaseResponse(
+            accepted=False,
+            reason=f"phase_not_skippable: {phase!r}",
+            advanced_to="",
         )
 
     @router.post("/emergency_stop", response_model=EmergencyStopResponse)
@@ -564,4 +701,5 @@ __all__ = [
     "EmergencyStopResponse",
     "HideseekRecruitCompleteRequest", "HideseekRecruitCompleteResponse",
     "HideseekCaughtRequest", "HideseekCaughtResponse",
+    "HideseekSkipPhaseRequest", "HideseekSkipPhaseResponse",
 ]
