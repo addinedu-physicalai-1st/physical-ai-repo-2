@@ -87,7 +87,7 @@ def install(app: FastAPI, bridge: WaypointsRosBridge) -> None:
         wps, patrols = ys.load()
         return {
             "waypoints": [
-                {"name": w.name, "x": w.x, "y": w.y, "yaw": w.yaw}
+                {"name": w.name, "x": w.x, "y": w.y, "yaw": w.yaw, "group": w.group}
                 for w in wps
             ],
             "patrols": patrols,

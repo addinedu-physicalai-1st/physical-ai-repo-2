@@ -83,3 +83,33 @@ def test_builder_rejects_missing_waypoints():
     _set(Keys.SEARCH_WAYPOINTS, [])
     root = build_hide_and_seek_sub(_ctx_stub())
     assert isinstance(root, py_trees.behaviours.Failure)
+
+
+def test_builder_patrol_only_returns_patrol_sub_only():
+    """HIDESEEK_PATROL_ONLY=True 면 SetHideseekPhase("patrol") + patrol_sub 만 (no 6-step).
+
+    admin UI [순찰] 모드 — 모집/카운트다운/이동/복귀 다 skip.
+    """
+    _set(Keys.HIDESEEK_PLAY_AREA_KEY, "play_area")
+    _set(Keys.SEARCH_WAYPOINTS, ["a", "b", "c"])
+    _set(Keys.HIDESEEK_PATROL_ONLY, True)
+    root = build_hide_and_seek_sub(_ctx_stub())
+    # patrol_only Sequence — 자식 2개 (SetHideseekPhase, BT_patrol_sub)
+    assert isinstance(root, py_trees.composites.Sequence)
+    assert root.name == "BT_hide_and_seek_sub_patrol_only"
+    names = [c.name for c in root.children]
+    assert names[0] == "set_phase_patrol_only"
+    assert names[1] == "BT_patrol_sub"
+    # 6-step 식별 마커 부재 확인
+    assert "set_phase_recruit" not in [n.name for n in root.iterate()]
+    assert "set_phase_countdown" not in [n.name for n in root.iterate()]
+
+
+def test_builder_patrol_only_does_not_need_play_area():
+    """patrol_only=True 면 play_area 없어도 OK — 모집/이동 step 자체 없으니까."""
+    # play_area 미설정 (clear 후 default 안 됨)
+    _set(Keys.SEARCH_WAYPOINTS, ["a"])
+    _set(Keys.HIDESEEK_PATROL_ONLY, True)
+    root = build_hide_and_seek_sub(_ctx_stub())
+    assert isinstance(root, py_trees.composites.Sequence)
+    assert root.name == "BT_hide_and_seek_sub_patrol_only"

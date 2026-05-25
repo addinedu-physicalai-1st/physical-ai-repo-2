@@ -44,6 +44,7 @@ TOPIC_TRACKING_STATE = "/gogoping/tracking_state"
 BB_KEY_HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids"
 BB_KEY_HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"
 BB_KEY_HIDESEEK_SKIP_COUNTDOWN = "hideseek_skip_countdown"
+BB_KEY_HIDESEEK_PATROL_ONLY = "hideseek_patrol_only"
 
 # admin UI NavDebugLogCard 가 WS 연결 시 backfill 받는 최근 이벤트 수.
 # 시나리오 재현 직후 늦게 연결해도 직전 cancel chain 한 cycle 정도는 보임.
@@ -496,6 +497,19 @@ class GogopingRosBridge:
             self._hideseek_caught_ids_cache = set()
         return self._call_set_blackboard_sync(
             BB_KEY_HIDESEEK_REGISTERED_IDS, list(child_ids),
+        )
+
+    def write_hideseek_patrol_only(self, value: bool) -> tuple[bool, str]:
+        """``hideseek_patrol_only`` blackboard flag set.
+
+        True → BT_hide_and_seek_sub 빌더가 patrol_sub 단독 (모집/카운트다운/이동/복귀 없이) 반환.
+        False → 6-step Sequence 전체 (술래잡기 게임).
+
+        admin UI [순찰] = True, robot UI [숨바꼭질] mode click = False (cleanup).
+        BT 가 빌드되기 직전 (SetGoal 보다 먼저) 셋팅해야 builder 가 정확히 읽는다.
+        """
+        return self._call_set_blackboard_sync(
+            BB_KEY_HIDESEEK_PATROL_ONLY, bool(value),
         )
 
     def write_hideseek_skip_countdown(self, value: bool = True) -> tuple[bool, str]:

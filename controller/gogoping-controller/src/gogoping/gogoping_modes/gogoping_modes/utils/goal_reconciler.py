@@ -63,6 +63,7 @@ _K_HIDESEEK_PLAY_AREA = "hideseek_play_area_key"
 _K_HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids"
 _K_HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"
 _K_HIDESEEK_PHASE = "hideseek_phase"
+_K_HIDESEEK_PATROL_ONLY = "hideseek_patrol_only"
 
 
 def _validate(goal: dict) -> str | None:
@@ -121,6 +122,8 @@ def reconcile(
             # 그렇지 않으면 다음 HIDEANDSEEK 진입 직후 UI 가 stale phase 값
             # (예: "end") 을 잠깐 받아 깜빡일 위험.
             blackboard.set(_K_HIDESEEK_PHASE, "")
+            # admin [순찰] 단독 모드 flag 도 reset — 다음 진입이 모드 새로 결정.
+            blackboard.set(_K_HIDESEEK_PATROL_ONLY, False)
         return ReconcileResult(
             accepted=ok, trigger_fired="cancel" if ok else None,
         )

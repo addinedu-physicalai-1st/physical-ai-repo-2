@@ -253,6 +253,15 @@ def test_idle_cancel_resets_hideseek_phase():
     assert setters["hideseek_phase"] == ""
 
 
+def test_idle_cancel_resets_patrol_only():
+    """HIDEANDSEEK → IDLE cancel 시 patrol_only flag 도 reset — 다음 진입이 모드 새로 결정."""
+    bb, fsm = _bb_and_fsm(current="HIDEANDSEEK")
+    result = reconcile({"target_state": "IDLE"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is True
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["hideseek_patrol_only"] is False
+
+
 # ---------------------------------------------------------------- idempotent / lockdown
 
 def test_same_state_is_idempotent():

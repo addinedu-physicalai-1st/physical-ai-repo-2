@@ -53,11 +53,10 @@ _LABEL_TO_GOAL = {
     "숨바꼭질": lambda: Goal(
         target_state="HIDEANDSEEK",
         target_id=DEMO_DEFAULT_CHILD_ID,
-        # waypoints.yaml 에 실제 등록된 vertex 이름 — 데모 운영자 환경 기반.
-        # play_area_key 와 search_waypoints 는 robot-web fixtures.ts WAYPOINTS 와
-        # 일치해야 UI 표시 ↔ BT 실제 nav 가 같은 위치를 가리킨다.
-        # 향후 /api/nav/named_poses 동적 조회로 교체 예정.
-        search_waypoints=["운동장3", "운동장입구", "놀이방2"],
+        # search_waypoints 는 router 의 /mode 핸들러가 _build_hideseek_goal_dynamic
+        # → _build_group_patrol_order 로 yaml 의 group 셔플된 vertex 리스트로 동적 교체.
+        # 빈 list 로 두면 yaml 로드 실패 시 reconciler 의 missing_search_waypoints 로 거부 —
+        # hardcoded fallback 없음 (운영자가 yaml 정합성 확인하라는 의도).
         play_area_key="운동장2",
     ),
 }

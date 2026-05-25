@@ -64,20 +64,43 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     bb = py_trees.blackboard.Client(name="BT_hide_and_seek_sub/builder")
     bb.register_key(key=Keys.HIDESEEK_PLAY_AREA_KEY, access=Access.READ)
     bb.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.READ)
+    bb.register_key(key=Keys.HIDESEEK_PATROL_ONLY, access=Access.READ)
 
+    # 각 키 별도 try — 한 키 미설정이 다른 키 fallback 으로 reset 되는 버그 방지.
     try:
         play_area = bb.get(Keys.HIDESEEK_PLAY_AREA_KEY)
+    except KeyError:
+        play_area = ""
+    try:
         wps_raw = bb.get(Keys.SEARCH_WAYPOINTS)
     except KeyError:
-        # init_blackboard 미호출 / Blackboard.clear 우회 — 디버그 환경에서만 발생.
-        play_area = ""
         wps_raw = None
+    try:
+        patrol_only = bool(bb.get(Keys.HIDESEEK_PATROL_ONLY))
+    except KeyError:
+        patrol_only = False
     wps = list(wps_raw or [])
 
-    if not play_area:
-        return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_play_area")
     if not wps:
         return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_waypoints")
+
+    # ─── patrol_only 분기 ─────────────────────────────────────────────────
+    # admin UI [순찰] 버튼이 set — 모집/카운트다운/이동/복귀 없이 patrol_sub 만
+    # 단독 실행. SetHideseekPhase("patrol") 만 추가해 robot-web 이 PatrolPhase UI
+    # 곧바로 마운트하도록.
+    if patrol_only:
+        return py_trees.composites.Sequence(
+            name="BT_hide_and_seek_sub_patrol_only",
+            memory=True,
+            children=[
+                SetHideseekPhase(name="set_phase_patrol_only", phase="patrol"),
+                build_patrol_sub(ctx, wps),
+            ],
+        )
+
+    # ─── 술래잡기 6-step Sequence ─────────────────────────────────────────
+    if not play_area:
+        return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_play_area")
 
     # Step 1: move_to_play — destination 셋 → phase 마커 → 실제 goto subtree.
     step_move = py_trees.composites.Sequence(

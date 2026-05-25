@@ -24,7 +24,9 @@ const vertexToGroup = ref<Record<string, string>>({});
 
 async function loadGroupMap(): Promise<void> {
   try {
-    const res = await fetch('/api/waypoints', {
+    // Control Server 의 waypoints router prefix 는 `/waypoints` (api/ prefix 없음).
+    // vite.config.ts proxy 도 `/waypoints` 단독 rule 로 forward.
+    const res = await fetch('/waypoints', {
       headers: { 'X-Device-Token': DEVICE_TOKEN },
     });
     if (!res.ok) return;
@@ -53,29 +55,60 @@ const emit = defineEmits<{
   caught: [childId: number, childName: string, waypointLabel: string | undefined];
 }>();
 
-// "N 카테고리" 진행 — vertex 가 어느 group 에 속하는지 lookup 후 distinct count.
-// group 매핑 없는 vertex (yaml group=null) 는 vertex name 자체를 group 으로 fallback.
+// vertex 가 어느 group 에 속하는지 lookup. fetch 실패 시 vertex name 자체 fallback.
 function groupOf(vertexKey: string): string {
   return vertexToGroup.value[vertexKey] ?? vertexKey;
 }
 
-const totalCategories = computed(() => {
-  const groups = new Set<string>();
-  for (const w of props.waypoints) groups.add(groupOf(w.key));
-  return groups.size;
+// search_waypoints 는 backend _build_group_patrol_order 에서 group 별로 연속 block 으로
+// 정렬됨 (group_order 순서로 group 전체 vertex 가 펼쳐짐). 따라서 인접 vertex 의 group
+// 이 같으면 한 segment 로 묶고, 바뀌면 새 segment. 결과 = group 수 = segment 수.
+interface GroupSegment {
+  group: string;        // group 이름
+  vertices: Waypoint[]; // 이 group 의 vertex 들
+  startIdx: number;     // search_waypoints 전체에서 이 group 첫 vertex 의 인덱스
+}
+
+const groupSegments = computed<GroupSegment[]>(() => {
+  const out: GroupSegment[] = [];
+  let lastGroup = '';
+  for (let i = 0; i < props.waypoints.length; i++) {
+    const wp = props.waypoints[i];
+    const g = groupOf(wp.key);
+    if (out.length === 0 || g !== lastGroup) {
+      out.push({ group: g, vertices: [wp], startIdx: i });
+      lastGroup = g;
+    } else {
+      out[out.length - 1].vertices.push(wp);
+    }
+  }
+  return out;
 });
 
-const visitedCategories = computed(() => {
-  const groups = new Set<string>();
-  for (let i = 0; i < props.waypoints.length && i < props.currentIdx; i++) {
-    groups.add(groupOf(props.waypoints[i].key));
-  }
-  return groups.size;
-});
+function segmentStatus(seg: GroupSegment): 'visited' | 'current' | 'pending' {
+  const lastIdx = seg.startIdx + seg.vertices.length - 1;
+  if (props.currentIdx > lastIdx) return 'visited';
+  if (props.currentIdx >= seg.startIdx) return 'current';
+  return 'pending';
+}
+
+// group 내 vertex 진행률 (예: "2/4") — current 인 group 만 유의미.
+function segmentProgress(seg: GroupSegment): string {
+  const done = Math.max(
+    0, Math.min(props.currentIdx - seg.startIdx, seg.vertices.length),
+  );
+  return `${done} / ${seg.vertices.length}`;
+}
+
+const totalCategories = computed(() => groupSegments.value.length);
+
+const visitedCategories = computed(
+  () => groupSegments.value.filter((s) => segmentStatus(s) === 'visited').length,
+);
 
 const currentCategory = computed<string | null>(() => {
-  if (props.currentIdx < 0 || props.currentIdx >= props.waypoints.length) return null;
-  return groupOf(props.waypoints[props.currentIdx].key);
+  const cur = groupSegments.value.find((s) => segmentStatus(s) === 'current');
+  return cur?.group ?? null;
 });
 
 const remainingCategories = computed(() =>
@@ -156,25 +189,27 @@ onBeforeUnmount(() => recognition.stop());
         </div>
       </div>
 
-      <!-- 웨이포인트 진행 (세로 스택) -->
+      <!-- 카테고리(group) 진행 — vertex 개별이 아닌 group 단위 -->
       <ol class="waypoints">
         <li
-          v-for="(wp, idx) in waypoints"
-          :key="wp.key"
+          v-for="(seg, i) in groupSegments"
+          :key="seg.group + '@' + seg.startIdx"
           class="wp"
-          :class="waypointStatus(idx)"
+          :class="segmentStatus(seg)"
         >
           <div class="wp-marker">
-            <span v-if="waypointStatus(idx) === 'visited'">✓</span>
-            <span v-else-if="waypointStatus(idx) === 'rotating'" class="cam">📷</span>
-            <span v-else>{{ idx + 1 }}</span>
+            <span v-if="segmentStatus(seg) === 'visited'">✓</span>
+            <span v-else-if="segmentStatus(seg) === 'current'" class="cam">📷</span>
+            <span v-else>{{ i + 1 }}</span>
           </div>
           <div class="wp-text">
-            <div class="wp-label">{{ wp.label }}</div>
+            <div class="wp-label">{{ seg.group }}</div>
             <div class="wp-status">
-              <template v-if="waypointStatus(idx) === 'visited'">확인 완료</template>
-              <template v-else-if="waypointStatus(idx) === 'rotating'">카메라 회전 중</template>
-              <template v-else>대기 중</template>
+              <template v-if="segmentStatus(seg) === 'visited'">확인 완료</template>
+              <template v-else-if="segmentStatus(seg) === 'current'">
+                {{ segmentProgress(seg) }} vertex · 회전 중
+              </template>
+              <template v-else>{{ seg.vertices.length }} vertex 대기</template>
             </div>
           </div>
         </li>
