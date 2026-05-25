@@ -1,6 +1,6 @@
 # BT_hide_and_seek_main
 
-`HIDEANDSEEK` state 의 MainTree — 숨바꼭질 (현재 patrol-only).
+`HIDEANDSEEK` state 의 MainTree — 숨바꼭질. body 는 [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) 의 6-step Sequence (move → recruit → countdown → patrol → return → end).
 
 ## Root composite
 
@@ -13,8 +13,8 @@ Parallel(SuccessOnSelected=[body])
 ├─ HardwareHealthMonitor    common/hardware_health_monitor.md    (✅ LIDAR/odom staleness → fault)
 ├─ CommandListener          common/command_listener.md           (✅ cancel / 다른 state 전이)
 └─ body: build_hide_and_seek_sub(ctx)
-      └─ BT_patrol_sub (Sequence)   — search_waypoints 순찰 (✅ patrol-only)
-            └─ (waypoints 빈 리스트 시) Failure leaf  — 방어 분기
+      └─ BT_hide_and_seek_sub (Sequence, 6-step)   — move → recruit → countdown → patrol → return → end (✅)
+            └─ (play_area / waypoints 결손 시) Failure leaf  — 방어 분기
 ```
 
 추후 추가 예정: `CollisionEventHandler` (현재 ☐).
@@ -23,7 +23,7 @@ Parallel(SuccessOnSelected=[body])
 
 `SuccessOnSelected([body])` — body (BT_hide_and_seek_sub) 가 SUCCESS 하면 root 도 SUCCESS →
 `main.py._on_tree_success()` 가 `task_done` 발화 → HIDEANDSEEK → IDLE.
-현재 patrol 완료 시 SUCCESS 발생. 진짜 hideseek (인식/FOUND) 확장 후에도 동일 경로 유지.
+다만 6-step body 의 마지막 step (`step_end`) 이 `py_trees.behaviours.Running()` 을 자식으로 — root SUCCESS 가 정상 경로에선 발생하지 않는다. 사용자 명시 cancel 이 종료시킨다. 자세한 의도: [BT_hide_and_seek_sub.md](BT_hide_and_seek_sub.md#step_end--영구-running-idle).
 
 ## 진입 trigger
 
@@ -62,12 +62,13 @@ Parallel(SuccessOnSelected=[body])
 - [map_boundary_monitor](../behaviors/common.md#map_boundary_monitor)
 - [hardware_health_monitor](../behaviors/common.md#hardware_health_monitor)
 - [command_listener](../behaviors/common.md#command_listener)
-- [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) — patrol-only body
-- [BT_patrol_sub](BT_patrol_sub.md) — 순찰 빌딩 블록
+- [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) — 6-step Sequence body (move/recruit/countdown/patrol/return/end)
+- [BT_goto_sub](BT_goto_sub.md) — move / return step 의 이동 빌딩 블록
+- [BT_patrol_sub](BT_patrol_sub.md) — patrol step 의 순찰 빌딩 블록
 
 ## 상태
 
 - 코드: ✅ ([BT_hide_and_seek_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_hide_and_seek_main.py))
 - shell helper: [`_shell.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/_shell.py)
 - 의존 behavior: 모두 ✅
-- body SubTree: [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) ✅ (patrol-only — 진짜 hideseek 확장 ☐)
+- body SubTree: [BT_hide_and_seek_sub](BT_hide_and_seek_sub.md) ✅ (6-step Sequence)
