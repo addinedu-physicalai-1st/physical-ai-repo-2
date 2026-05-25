@@ -116,6 +116,11 @@ def reconcile(
     # IDLE 요청 — active state 면 cancel.
     if target == "IDLE":
         ok = fsm.trigger("cancel")
+        if ok:
+            # 진행 중이던 숨바꼭질 round 가 cancel 되면 phase 마커도 reset —
+            # 그렇지 않으면 다음 HIDEANDSEEK 진입 직후 UI 가 stale phase 값
+            # (예: "end") 을 잠깐 받아 깜빡일 위험.
+            blackboard.set(_K_HIDESEEK_PHASE, "")
         return ReconcileResult(
             accepted=ok, trigger_fired="cancel" if ok else None,
         )

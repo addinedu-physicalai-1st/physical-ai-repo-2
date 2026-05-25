@@ -243,6 +243,16 @@ def test_idle_from_active_uses_cancel():
     assert result.trigger_fired == "cancel"
 
 
+def test_idle_cancel_resets_hideseek_phase():
+    """HIDEANDSEEK → IDLE cancel 시 hideseek_phase 도 reset — 다음 진입 시 UI flicker 방지."""
+    bb, fsm = _bb_and_fsm(current="HIDEANDSEEK")
+    result = reconcile({"target_state": "IDLE"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is True
+    assert result.trigger_fired == "cancel"
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["hideseek_phase"] == ""
+
+
 # ---------------------------------------------------------------- idempotent / lockdown
 
 def test_same_state_is_idempotent():

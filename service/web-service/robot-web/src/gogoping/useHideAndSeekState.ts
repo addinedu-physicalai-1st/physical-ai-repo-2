@@ -88,6 +88,13 @@ export interface HideAndSeekActions {
   advanceWaypoint: () => void;
   /** patrol: 현재 노드에서 사람 발견 (mock). 없으면 무시. */
   catchAtCurrent: (participantId: number) => void;
+  /**
+   * 인식 파이프라인 발견 → 등록자를 caught 처리 + 배너 띄움.
+   * PatrolPhase 는 현재 웨이포인트 label, ReturnPhase 는 "복귀 중" 같은 정적 라벨 전달.
+   * 동일 child 두 번 호출 시 (이미 caught) early return — 음성/네트워크는
+   * 호출 측에서 제어.
+   */
+  markCaught: (childId: number, waypointLabel: string) => void;
   /** patrol 전 노드 소진 → 복귀 단계로. */
   finishPatrol: () => void;
   /** 운동장2 복귀 도착 → 발표 단계로. */
@@ -202,6 +209,23 @@ export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideA
     }, 3000);
   }
 
+  function markCaught(childId: number, waypointLabel: string): void {
+    const p = participants.value.find((x) => x.id === childId);
+    if (!p || !p.registered || p.caught) return;
+    p.caught = true;
+    p.caughtAt = waypointLabel || null;
+    const banner: CaptureBanner = {
+      id: ++bannerSeq,
+      participantId: p.id,
+      participantName: p.name,
+      waypointLabel: waypointLabel || '',
+    };
+    captureBanners.value.push(banner);
+    window.setTimeout(() => {
+      captureBanners.value = captureBanners.value.filter((b) => b.id !== banner.id);
+    }, 3000);
+  }
+
   function finishPatrol(): void {
     if (phase.value !== 'patrol') return;
     phase.value = 'return';
@@ -278,6 +302,7 @@ export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideA
     startPatrol,
     advanceWaypoint,
     catchAtCurrent,
+    markCaught,
     finishPatrol,
     finishReturn,
     tickCountdown,
