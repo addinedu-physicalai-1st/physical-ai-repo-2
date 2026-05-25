@@ -20,7 +20,7 @@ from py_trees.common import Access
 
 
 class Keys:
-    """Blackboard 변수 이름 상수 — 25개.
+    """Blackboard 변수 이름 상수 — 23개.
 
     **문자열 직접 사용 금지** — 항상 ``Keys.<NAME>`` 형태로만 참조.
     """
@@ -34,8 +34,6 @@ class Keys:
     POSE_OVERRIDE_ACTIVE = "pose_override_active" # bool — True 면 PoseSubscriber 가 W skip (디버그 좌표 강제 시)
 
     # 명령 / 모드 (command_listener 가 W)
-    ASSIST_TASK = "assist_task"                   # "goto" / "follow" / "lullaby" / ""
-    PLAY_TASK = "play_task"                       # "hideseek" / ""
     TARGET_PERSON_ID = "target_person_id"         # str (ReID / face_id)
 
     # Perception (vision 토픽 어댑터가 W)
@@ -77,8 +75,6 @@ _DEFAULTS: dict[str, object] = {
     Keys.ROBOT_POSE: {"x": 0.0, "y": 0.0, "yaw": 0.0},
     Keys.POSE_OVERRIDE_ACTIVE: False,
     # 명령
-    Keys.ASSIST_TASK: "",
-    Keys.PLAY_TASK: "",
     Keys.TARGET_PERSON_ID: "",
     # Perception
     Keys.TARGET_VISIBLE: False,

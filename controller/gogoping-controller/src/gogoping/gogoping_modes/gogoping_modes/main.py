@@ -7,7 +7,7 @@
 4. FSM 의 ``on_state_change`` 콜백에 ``_on_state_change`` 등록 → BT 트리 swap
 5. ``TICK_HZ`` 주기로 ``_tick``:
      - 트리 tick
-     - root SUCCESS / FAILURE → 적절한 trigger (assist_done / play_done / return_request)
+     - root SUCCESS / FAILURE → 적절한 trigger (task_done / return_request)
      - 1Hz 로 ``tree_inspector.snapshot`` 생성 후 ``UIPublisher.publish_state``
 6. ``rclpy.spin``
 
@@ -28,6 +28,9 @@ from .bt.tree_inspector import snapshot
 from .bt.trees.main_trees import build_main_tree
 from .context import Context
 from .fsm.robot_fsm import RobotFSM
+
+# 평탄화 (2026-05-25): 4 task state — root SUCCESS 시 task_done 발화 대상.
+_TASK_STATES = frozenset({"GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK"})
 from .interfaces import (
     BaseDriverClient,
     BatterySubscriber,
@@ -194,17 +197,19 @@ class GogopingModes:
             self._last_publish = now
 
     def _on_tree_success(self) -> None:
-        """MainTree root SUCCESS = ASSIST/PLAY task 완료 → IDLE 복귀.
+        """MainTree root SUCCESS = task state 완료 → IDLE 복귀.
 
-        CHARGING / IDLE / MANUAL / RETURNING / ERROR 의 root SUCCESS 는 task 완료
-        의미가 아니므로 무시 (state 전이는 그쪽 monitor 의 trigger 가 담당).
+        평탄화 (2026-05-25): GOTO/FOLLOW/LULLABY/HIDEANDSEEK 4 task state 모두
+        task_done 한 trigger 로 통합. body SUCCESS 시 shell 의 SuccessOnSelected 정책에
+        의해 root SUCCESS → 본 콜백 → task_done → IDLE.
+
+        IDLE / CHARGING / MANUAL / RETURNING / LOW_BATTERY_RETURN / ERROR 의 root SUCCESS 는
+        task 완료 의미가 아니므로 무시 (state 전이는 그쪽 monitor 의 trigger 가 담당).
         """
-        mapping = {"ASSIST": "assist_done", "PLAY": "play_done"}
-        trigger = mapping.get(self._current_state)
-        if trigger is None:
+        if self._current_state not in _TASK_STATES:
             return
-        self._logger.info(f"[tree SUCCESS] {self._current_state} → {trigger}")
-        self.ctx.fsm.trigger(trigger)
+        self._logger.info(f"[tree SUCCESS] {self._current_state} → task_done")
+        self.ctx.fsm.trigger("task_done")
 
     def _on_tree_failure(self) -> None:
         """MainTree root FAILURE = SubTree 가 끝까지 실패 → RETURNING 으로 도피.

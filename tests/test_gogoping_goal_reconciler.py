@@ -1,6 +1,6 @@
-"""goal_reconciler.reconcile() goto-only validation 단위 테스트.
+"""goal_reconciler.reconcile() 평탄화 모델 테스트.
 
-carry-related 시나리오는 모두 삭제됨 (carry task 자체 폐기).
+target_state 직접 매핑 — mode/task 두 축이 없음.
 """
 from __future__ import annotations
 
@@ -16,147 +16,185 @@ sys.path.insert(0, str(_REPO / "controller" / "gogoping-controller" / "src" / "g
 from gogoping_modes.utils.goal_reconciler import reconcile  # noqa: E402
 
 
-def _bb_and_fsm():
-    """Mock blackboard + fsm. blackboard.set 호출 record, fsm.trigger 호출 record."""
+def _bb_and_fsm(current="IDLE"):
     bb = MagicMock()
     fsm = MagicMock()
+    fsm.current_state = current
+    fsm.trigger.return_value = True
     return bb, fsm
 
 
-def test_goto_with_destination_accepted():
-    """task=goto + destination_key 있으면 accepted, fsm.trigger 호출, blackboard 세팅."""
+# ---------------------------------------------------------------- validation
+
+def test_unknown_target_state_rejected():
     bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
-    fsm.trigger.return_value = True
+    result = reconcile({"target_state": "BANANA"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is False
+    assert result.reason == "invalid_target_state"
+
+
+def test_internal_only_states_rejected():
+    """CHARGING / LOW_BATTERY_RETURN / ERROR 는 외부에서 직접 요청 불가."""
+    for s in ("CHARGING", "LOW_BATTERY_RETURN", "ERROR"):
+        bb, fsm = _bb_and_fsm()
+        result = reconcile({"target_state": s}, fsm=fsm, blackboard=bb)
+        assert result.accepted is False
+        assert result.reason == "internal_only_state"
+
+
+# ---------------------------------------------------------------- GOTO
+
+def test_goto_with_destination_accepted():
+    bb, fsm = _bb_and_fsm()
     result = reconcile(
-        goal={"mode": "ASSIST", "task": "goto", "destination_key": "교실A"},
-        blackboard=bb,
-        fsm=fsm,
+        {"target_state": "GOTO", "destination_key": "교실A"},
+        fsm=fsm, blackboard=bb,
     )
     assert result.accepted is True
-    assert result.reason == "" or result.reason == "same_mode"
+    assert result.trigger_fired == "goto_request"
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["destination_key"] == "교실A"
 
 
 def test_goto_missing_destination_rejected():
-    """task=goto 인데 destination_key 빈 값이면 'missing_destination'."""
     bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
-    result = reconcile(
-        goal={"mode": "ASSIST", "task": "goto", "destination_key": ""},
-        blackboard=bb,
-        fsm=fsm,
-    )
+    result = reconcile({"target_state": "GOTO", "destination_key": ""}, fsm=fsm, blackboard=bb)
     assert result.accepted is False
     assert result.reason == "missing_destination"
+    fsm.trigger.assert_not_called()
 
 
-def test_carry_task_no_longer_valid():
-    """task=carry 는 더 이상 유효한 task 가 아님 → invalid_task 또는 유사."""
+# ---------------------------------------------------------------- FOLLOW
+
+def test_follow_with_target_accepted():
     bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
     result = reconcile(
-        goal={"mode": "ASSIST", "task": "carry", "destination_key": "X"},
-        blackboard=bb,
-        fsm=fsm,
-    )
-    assert result.accepted is False
-    # invalid task 거부 — 정확한 reason 문자열은 reconciler 코드를 따라가지만 carry 가 _ASSIST_TASKS 에 없어야 함
-    assert "task" in result.reason or "invalid" in result.reason or "unknown" in result.reason
-
-
-def test_lullaby_still_works():
-    """task=lullaby 는 그대로 작동 (regression check)."""
-    bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
-    fsm.trigger.return_value = True
-    result = reconcile(
-        goal={"mode": "ASSIST", "task": "lullaby"},
-        blackboard=bb,
-        fsm=fsm,
+        {"target_state": "FOLLOW", "target_id": "teacher_A"},
+        fsm=fsm, blackboard=bb,
     )
     assert result.accepted is True
+    assert result.trigger_fired == "follow_request"
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["target_person_id"] == "teacher_A"
 
 
-# ---------------------------------------------------------------- hideseek (PLAY)
+def test_follow_missing_target_rejected():
+    bb, fsm = _bb_and_fsm()
+    result = reconcile({"target_state": "FOLLOW", "target_id": ""}, fsm=fsm, blackboard=bb)
+    assert result.accepted is False
+    assert result.reason == "missing_target_id"
 
+
+# ---------------------------------------------------------------- LULLABY
+
+def test_lullaby_accepted_no_extra_fields():
+    bb, fsm = _bb_and_fsm()
+    result = reconcile({"target_state": "LULLABY"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is True
+    assert result.trigger_fired == "lullaby_request"
+
+
+# ---------------------------------------------------------------- HIDEANDSEEK
 
 def test_hideseek_with_target_and_waypoints_accepted():
-    """PLAY/hideseek + target_id + search_waypoints → accepted, BB 에 두 키 write."""
     bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
-    fsm.trigger.return_value = True
     result = reconcile(
-        goal={
-            "mode": "PLAY", "task": "hideseek",
+        {
+            "target_state": "HIDEANDSEEK",
             "target_id": "child_42",
             "search_waypoints": ["A", "B", "C"],
         },
-        blackboard=bb,
-        fsm=fsm,
+        fsm=fsm, blackboard=bb,
     )
     assert result.accepted is True
-    assert result.trigger_fired == "play_request"
-    # BB write 검증 — play_task / target_person_id / search_waypoints
-    setters = {call.args[0]: call.args[1] for call in bb.set.call_args_list}
-    assert setters["play_task"] == "hideseek"
+    assert result.trigger_fired == "hideseek_request"
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
     assert setters["target_person_id"] == "child_42"
     assert setters["search_waypoints"] == ["A", "B", "C"]
 
 
 def test_hideseek_missing_search_waypoints_rejected():
-    """PLAY/hideseek + target_id 있음 + search_waypoints 비면 'missing_search_waypoints'."""
     bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
     result = reconcile(
-        goal={
-            "mode": "PLAY", "task": "hideseek",
-            "target_id": "child_42",
-            "search_waypoints": [],
-        },
-        blackboard=bb,
-        fsm=fsm,
+        {"target_state": "HIDEANDSEEK", "target_id": "x", "search_waypoints": []},
+        fsm=fsm, blackboard=bb,
     )
     assert result.accepted is False
     assert result.reason == "missing_search_waypoints"
-    fsm.trigger.assert_not_called()
-
-
-def test_hideseek_missing_target_id_rejected():
-    """PLAY/hideseek + waypoints 있음 + target_id 비면 'missing_target_id'."""
-    bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
-    result = reconcile(
-        goal={
-            "mode": "PLAY", "task": "hideseek",
-            "target_id": "",
-            "search_waypoints": ["A", "B"],
-        },
-        blackboard=bb,
-        fsm=fsm,
-    )
-    assert result.accepted is False
-    assert result.reason == "missing_target_id"
-    fsm.trigger.assert_not_called()
 
 
 def test_hideseek_search_waypoints_copied_not_aliased():
-    """BB.set 에 들어가는 list 가 입력 list 의 별도 복사본인지 (외부 mutate 안전)."""
     bb, fsm = _bb_and_fsm()
-    fsm.current_state = "IDLE"
-    fsm.trigger.return_value = True
     wps_in = ["X", "Y"]
     reconcile(
-        goal={
-            "mode": "PLAY", "task": "hideseek",
-            "target_id": "child_42",
-            "search_waypoints": wps_in,
-        },
-        blackboard=bb,
-        fsm=fsm,
+        {"target_state": "HIDEANDSEEK", "target_id": "c", "search_waypoints": wps_in},
+        fsm=fsm, blackboard=bb,
     )
-    setters = {call.args[0]: call.args[1] for call in bb.set.call_args_list}
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
     stored = setters["search_waypoints"]
     assert stored == ["X", "Y"]
-    # 외부 mutate 가 BB 에 반영되지 않아야 함
     wps_in.append("Z")
     assert stored == ["X", "Y"]
+
+
+# ---------------------------------------------------------------- MANUAL / RETURNING / IDLE
+
+def test_manual_accepted():
+    bb, fsm = _bb_and_fsm()
+    result = reconcile({"target_state": "MANUAL"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is True
+    assert result.trigger_fired == "manual_request"
+
+
+def test_returning_accepted():
+    bb, fsm = _bb_and_fsm()
+    result = reconcile({"target_state": "RETURNING"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is True
+    assert result.trigger_fired == "return_request"
+
+
+def test_idle_from_active_uses_cancel():
+    """active state 에서 IDLE 요청은 cancel trigger 로."""
+    bb, fsm = _bb_and_fsm(current="GOTO")
+    result = reconcile({"target_state": "IDLE"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is True
+    assert result.trigger_fired == "cancel"
+
+
+# ---------------------------------------------------------------- idempotent / lockdown
+
+def test_same_state_is_idempotent():
+    """이미 GOTO 인 상태에서 GOTO 재요청 — trigger 미발화, accepted=True."""
+    bb, fsm = _bb_and_fsm(current="GOTO")
+    result = reconcile(
+        {"target_state": "GOTO", "destination_key": "X"},
+        fsm=fsm, blackboard=bb,
+    )
+    assert result.accepted is True
+    assert result.reason == "same_state"
+    fsm.trigger.assert_not_called()
+    # 그래도 destination_key 는 갱신 (같은 GOTO 안에서 새 destination 가능)
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["destination_key"] == "X"
+
+
+def test_charging_locks_out_user_command():
+    bb, fsm = _bb_and_fsm(current="CHARGING")
+    result = reconcile({"target_state": "GOTO", "destination_key": "X"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is False
+    assert result.reason == "fsm_in_charging"
+    fsm.trigger.assert_not_called()
+
+
+def test_error_locks_out_all():
+    bb, fsm = _bb_and_fsm(current="ERROR")
+    result = reconcile({"target_state": "IDLE"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is False
+    assert result.reason == "fsm_in_error_terminal"
+
+
+def test_low_battery_return_locks_out_all():
+    bb, fsm = _bb_and_fsm(current="LOW_BATTERY_RETURN")
+    result = reconcile({"target_state": "GOTO", "destination_key": "X"}, fsm=fsm, blackboard=bb)
+    assert result.accepted is False
+    assert result.reason == "fsm_in_low_battery_return"
