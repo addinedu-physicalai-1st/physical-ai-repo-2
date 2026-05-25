@@ -53,8 +53,13 @@ _LABEL_TO_GOAL = {
     "숨바꼭질": lambda: Goal(
         target_state="HIDEANDSEEK",
         target_id=DEMO_DEFAULT_CHILD_ID,
-        # 데모 기본 patrol waypoints — robots.json 에 정의된 search 경로로 교체 예정.
-        search_waypoints=["교실A", "교실B", "교실C"],
+        # nav_graph 의 named_pose 키 — robot-web fixtures.WAYPOINTS 와 일치.
+        # 실제 데모 환경의 DB 에 같은 키로 vertex 등록되어야 함 (운영자 책임).
+        # 향후 /api/nav/named_poses 동적 조회로 교체 예정.
+        search_waypoints=[
+            "patrol_slide", "patrol_sandbox", "patrol_tree",
+            "patrol_bench", "patrol_storage",
+        ],
         play_area_key="play_area",
     ),
 }

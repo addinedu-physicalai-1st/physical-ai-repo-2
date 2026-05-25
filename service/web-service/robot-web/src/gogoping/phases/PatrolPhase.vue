@@ -3,11 +3,18 @@
  * 순찰 단계 — 모든 웨이포인트를 한 번씩 지나가면서 노드마다 카메라 회전.
  * 메인은 GogoPing 라이브 카메라 화면 (CameraView). 우측에 웨이포인트 진행,
  * 하단에 참가자 상태 strip. 발견 토스트는 카메라 위에 띄움.
+ *
+ * 카메라뷰 위에 `useHideSeekRecognition` 인식 파이프라인을 mount —
+ * 매 frame face detect + identify, 등록자 매칭 시 음성 호명 + caught API +
+ * 부모로 caught 이벤트 emit. 로봇은 정지하지 않고 다음 노드로 계속 진행.
  */
-import { computed } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import CameraView from '../CameraView.vue';
 import type { CaptureBanner, Participant } from '../useHideAndSeekState';
 import type { Waypoint } from '../fixtures';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
+import { useHideSeekRecognition } from '../composables/useHideSeekRecognition';
+import { postCaught } from '../api/hideseekApi';
 
 const props = defineProps<{
   waypoints: Waypoint[];
@@ -15,6 +22,10 @@ const props = defineProps<{
   waypointStatus: (idx: number) => 'visited' | 'rotating' | 'pending';
   participants: Participant[];
   captureBanners: CaptureBanner[];
+}>();
+
+const emit = defineEmits<{
+  caught: [childId: number, childName: string, waypointLabel: string | undefined];
 }>();
 
 const total = computed(() => props.waypoints.length);
@@ -33,6 +44,31 @@ const hidingParticipants = computed(() =>
 const caughtParticipants = computed(() =>
   props.participants.filter((p) => p.registered && p.caught),
 );
+
+const voiceController = inject(VOICE_CONTROLLER_KEY);
+const cameraViewRef = ref<{ getImgEl: () => HTMLImageElement | null } | null>(null);
+const captureCanvasRef = ref<HTMLCanvasElement | null>(null);
+const cameraImgEl = computed(() => cameraViewRef.value?.getImgEl() ?? null);
+
+const currentWaypointLabel = computed<string | undefined>(() => {
+  if (props.currentIdx < 0 || props.currentIdx >= props.waypoints.length) return undefined;
+  return props.waypoints[props.currentIdx].label;
+});
+
+const recognition = useHideSeekRecognition({
+  imgEl: cameraImgEl,
+  captureCanvas: captureCanvasRef,
+  isRegistered: (id) => props.participants.find((p) => p.id === id)?.registered ?? false,
+  isCaught: (id) => props.participants.find((p) => p.id === id)?.caught ?? false,
+  onCaught: (childId, childName) => {
+    voiceController?.speak(`${childName} 찾았다!`);
+    void postCaught(childId, currentWaypointLabel.value);
+    emit('caught', childId, childName, currentWaypointLabel.value);
+  },
+});
+
+onMounted(() => recognition.start());
+onBeforeUnmount(() => recognition.stop());
 </script>
 
 <template>
@@ -51,7 +87,8 @@ const caughtParticipants = computed(() =>
     <div class="body">
       <!-- 카메라 — 라이브 영상 (useVideoStream + CAMERA_PAN_KEY 주입은 App.vue 에서 처리) -->
       <div class="camera-wrap">
-        <CameraView />
+        <CameraView ref="cameraViewRef" />
+        <canvas ref="captureCanvasRef" hidden />
         <div class="banners">
           <TransitionGroup name="banner">
             <div

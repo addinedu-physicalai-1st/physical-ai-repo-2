@@ -157,10 +157,31 @@ async function close(): Promise<void> {
   }
 }
 
-function restart(): void {
+async function restart(): Promise<void> {
+  // BT_hide_and_seek_sub 가 Sequence(memory=True) 라 step_end 의 Running 이
+  // 살아있는 동안 같은 mode 재요청 (same_state) 만으로는 처음으로 못 돌아간다.
+  // → 명시적으로 cancel ("대기") 했다가 다시 "숨바꼭질" 발화 → BT 빌더 재실행.
   actions.reset();
-  // 신규 게임 시작 — control-service 에 같은 모드 재진입 → reconciler 가 BT 재실행.
-  void postModeClick('숨바꼭질', 'gogoping');
+  try {
+    await postModeClick('대기', 'gogoping');
+  } catch {
+    /* BT 미연결이어도 UI 는 진행 */
+  }
+  try {
+    await postModeClick('숨바꼭질', 'gogoping');
+  } catch {
+    /* noop */
+  }
+}
+
+// PatrolPhase 인식 → caught 처리. waypoint label 그대로 기록.
+function onPatrolCaught(childId: number, _childName: string, waypoint?: string): void {
+  actions.markCaught(childId, waypoint ?? '');
+}
+
+// ReturnPhase 인식 → caught 처리. 복귀 중이라 정적 라벨.
+function onReturnCaught(childId: number, _childName: string): void {
+  actions.markCaught(childId, '복귀 중');
 }
 </script>
 
@@ -205,10 +226,13 @@ function restart(): void {
             :waypoint-status="state.waypointStatus"
             :participants="state.participants"
             :capture-banners="state.captureBanners"
+            @caught="onPatrolCaught"
           />
           <ReturnPhase
             v-else-if="state.phase === 'return'"
             :play-area="state.playArea"
+            :participants="state.participants"
+            @caught="onReturnCaught"
           />
           <EndPhase
             v-else

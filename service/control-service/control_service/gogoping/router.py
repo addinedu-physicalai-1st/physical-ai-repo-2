@@ -361,6 +361,9 @@ def install(
             target_state="HIDEANDSEEK",
             target_id="patrol_debug",
             search_waypoints=ordered,
+            # reconciler 가 HIDEANDSEEK 진입 시 필수 필드 (missing_play_area_key 방지).
+            # /debug/patrol 은 nav 검증용 — 운동장2 default 로 충분.
+            play_area_key="play_area",
         )
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
