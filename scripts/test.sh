@@ -100,6 +100,9 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_verify_docking_contact.py \
   tests/test_gogoping_pan_camera_sweep.py \
   tests/test_gogoping_brake_and_wait.py \
+  tests/test_gogoping_countdown_behavior.py \
+  tests/test_gogoping_await_recruit_complete.py \
+  tests/test_gogoping_hide_seek_caught_monitor.py \
   tests/test_gogoping_patrol_subtree_builder.py \
   tests/test_gogoping_patrol_router.py \
   tests/test_gogoping_hide_and_seek_subtree_builder.py \
