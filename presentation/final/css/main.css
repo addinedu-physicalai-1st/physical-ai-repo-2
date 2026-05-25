@@ -207,6 +207,8 @@ html, body {
 
 /* content layer sits above decorative background */
 .layer { position: relative; z-index: 1; }
+/* ensure every slide's content div renders above the (injected) glow deco */
+.reveal .slides section > div:not(.bg-deco) { position: relative; z-index: 1; }
 
 /* eyebrow / section label */
 .eyebrow {

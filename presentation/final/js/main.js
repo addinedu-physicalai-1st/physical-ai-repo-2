@@ -16,6 +16,7 @@ var SLIDES = [
   '08-reveal.html',
   '09-solution.html',
   '10-idea.html',
+  '10b-agenda.html',
   // ── 2막 만나기 ──
   '11-robots-roster.html',
   '12-kindergarten-map.html',
@@ -48,6 +49,7 @@ var SLIDES = [
   '36-noriarm-shop-demo.html',
   // ── 4막 How it works ──
   '37-system-section.html',
+  '37b-tech-stack.html',
   '38-architecture.html',
   '39-ros-topology.html',
   '40-data-pipeline.html',
@@ -78,6 +80,7 @@ var SLIDE_TITLES = [
   'pingdergarten reveal',
   '네 가지 약속',
   '세 종류의 로봇',
+  '목차 — 오늘의 순서',
   // ── 2막 만나기 ──
   '로봇 라인업',
   '유치원 맵',
@@ -110,6 +113,7 @@ var SLIDE_TITLES = [
   '노리암 — 가게놀이 demo',
   // ── 4막 How it works ──
   '시스템 들어가기',
+  '기술 스택',
   '소프트웨어 아키텍처',
   'ROS2 토폴로지',
   '데이터 파이프라인',
@@ -172,13 +176,52 @@ async function initPresentation() {
     });
   }
 
-  // Re-trigger entrance motion (.r elements) each time a slide becomes current
+  // Inject a soft candy-glow background into any slide that doesn't define one
+  // (slides 01–10 ship their own .bg-deco; this covers 11–51 uniformly).
+  function injectGlows() {
+    var palette = ['--babypinkSoft', '--mintSoft', '--lavenderSoft', '--butterSoft', '--skySoft'];
+    document.querySelectorAll('.reveal .slides > section').forEach(function (sec, i) {
+      if (sec.querySelector(':scope > .bg-deco')) return; // already has one
+      var c1 = palette[i % palette.length];
+      var c2 = palette[(i + 2) % palette.length];
+      var deco = document.createElement('div');
+      deco.className = 'bg-deco';
+      deco.innerHTML =
+        '<div class="blob" style="width:420px;height:420px;background:var(' + c1 + ');top:-150px;left:-130px"></div>' +
+        '<div class="blob" style="width:360px;height:360px;background:var(' + c2 + ');bottom:-160px;right:-110px"></div>' +
+        '<div class="dots"></div>';
+      sec.insertBefore(deco, sec.firstChild);
+    });
+  }
+
+  // Stagger-animate the content children of a slide that has no explicit .r tags
+  function autoAnimate(section) {
+    var wrap = section.querySelector(':scope > div:not(.bg-deco)');
+    if (!wrap) return;
+    var kids = Array.prototype.slice.call(wrap.children);
+    kids.forEach(function (el) {
+      el.style.transition = 'none';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(16px)';
+    });
+    void wrap.offsetWidth; // reflow → restart from hidden state
+    kids.forEach(function (el, i) {
+      el.style.transition = 'opacity .5s ease, transform .5s cubic-bezier(.22,.7,.3,1)';
+      el.style.transitionDelay = (i * 65) + 'ms';
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    });
+  }
+
+  // Re-trigger entrance motion each time a slide becomes current
   function replayMotion() {
     document.querySelectorAll('.reveal .slides section').forEach(function (s) {
       s.classList.remove('go');
     });
     var cur = Reveal.getCurrentSlide();
-    if (cur) { void cur.offsetWidth; cur.classList.add('go'); } // reflow → restart transition
+    if (!cur) return;
+    if (cur.querySelector('.r')) { void cur.offsetWidth; cur.classList.add('go'); } // explicit (01–10)
+    else { autoAnimate(cur); }                                                       // auto (11–51)
   }
 
   Reveal.on('ready', function () {
@@ -190,6 +233,7 @@ async function initPresentation() {
     }
     initDraw();
     initImageZoom();
+    injectGlows();
     forceCenterAlign();
     replayMotion();
 
