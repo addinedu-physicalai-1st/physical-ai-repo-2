@@ -102,6 +102,10 @@ async def follow_start(
         "embedding": list(row.embedding),
         "ts_ms": int(time.time() * 1000),
     })
+    if _bridge is not None:
+        _bridge.publish_admin_event(
+            "follow_start", f"teacher={teacher.name!r}",
+        )
     return FollowStateOut(
         active=True,
         teacher_id=payload.teacher_id,
@@ -118,6 +122,8 @@ async def follow_stop(
     if publish_follow_stop is None:
         raise HTTPException(503, "ROS bridge not ready")
     publish_follow_stop()
+    if _bridge is not None:
+        _bridge.publish_admin_event("follow_stop")
     return FollowStateOut(active=False)
 
 

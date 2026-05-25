@@ -100,6 +100,13 @@ class GogopingModes:
         self._pending_state: str | None = None
         fsm.add_callback("on_state_change", self._on_state_change)
 
+        # SubBT transition tracker — SubTree (BT_*_sub) 안 Sequence 의 active child
+        # 변화를 admin UI 에 emit. py_trees 가 transition callback 을 제공하지 않으므로
+        # 매 tick polling 으로 변화 감지. BT swap 으로 SubTree 재빌드되면 reset.
+        self._subbt_display_name: str | None = None
+        self._subbt_sequence_id: int = 0
+        self._subbt_running_idx: int = -1
+
         # 부팅 시 INITIAL_STATE 의 트리 build (FSM 콜백은 state 변경 시에만 fire 라 초기 1회는 수동)
         self._build_tree_for_state(self.INITIAL_STATE)
 
@@ -183,6 +190,9 @@ class GogopingModes:
         # 1) BT tick
         self.tree.tick()
 
+        # 1.5) SubBT transition emit — Sequence 안 active leaf 변화 감지
+        self._emit_subbt_transitions()
+
         # 2) Root SUCCESS / FAILURE 처리
         root_status = self.tree.root.status
         if root_status == Status.SUCCESS:
@@ -200,6 +210,133 @@ class GogopingModes:
             )
             self.ctx.ui.publish_state(snap)
             self._last_publish = now
+
+    # ------------------------------------------------------------ SubBT 트랜지션
+
+    _SUBBT_SEARCH_MAX_DEPTH = 6
+    _SUBBT_DECORATOR_MAX_DEPTH = 4
+
+    def _emit_subbt_transitions(self) -> None:
+        """SubTree (``BT_*_sub``) 안 Sequence 의 active child 변경 시 ``[SubBT]`` event.
+
+        py_trees 는 transition callback 없음 → 매 tick polling. BT swap 이 SubTree 를
+        rebuild 하면 ``id(sequence)`` 가 바뀌므로 tracker state 자동 reset.
+
+        emit 케이스 (선택적 — 노이즈 줄이려고):
+          - 첫 RUNNING child 등장: ``"BT_X_sub: → step1"``
+          - active child 교체: ``"BT_X_sub: step1 ✓ → step2"`` / ``"step1 ✗ → step2"`` (warn)
+          - 마지막 child 종료 후 SubTree SUCCESS/FAILURE: ``"step3 ✓ (exit SUCCESS)"``
+        """
+        if self.ctx.debug_events is None or self.tree is None:
+            return
+
+        sub = self._find_subtree_by_name(self.tree.root)
+        if sub is None:
+            # 이전 SubTree 정보 정리 (BT swap 이 다른 state 로 갔거나 root 트리에 SubTree 자체가 없을 때)
+            self._subbt_display_name = None
+            self._subbt_sequence_id = 0
+            self._subbt_running_idx = -1
+            return
+
+        # SubTree 가 decorator (OneShot 등) 면 multi-child composite 까지 descend.
+        # BT_goto_sub 처럼 SubTree 자체가 Sequence 인 경우는 descend 즉시 자기 반환.
+        seq = self._descend_to_sequence(sub)
+        if seq is None:
+            return
+
+        # BT swap 으로 tree 가 재빌드되면 seq python id 가 바뀜 → tracker reset.
+        seq_id = id(seq)
+        if seq_id != self._subbt_sequence_id:
+            self._subbt_display_name = sub.name
+            self._subbt_sequence_id = seq_id
+            self._subbt_running_idx = -1
+
+        children = list(getattr(seq, "children", None) or [])
+        running_idx = -1
+        for i, child in enumerate(children):
+            st = getattr(child, "status", None)
+            if st is not None and getattr(st, "name", None) == "RUNNING":
+                running_idx = i
+                break
+
+        if running_idx == self._subbt_running_idx:
+            return  # 변화 없음
+
+        prev_idx = self._subbt_running_idx
+        self._subbt_running_idx = running_idx
+        display_name = self._subbt_display_name or sub.name
+
+        # 첫 RUNNING child 등장 — SubTree 시작 직후
+        if prev_idx < 0:
+            if running_idx >= 0:
+                curr = children[running_idx]
+                self.ctx.debug_events.event(
+                    "SubBT", f"{display_name}: → {curr.name}"
+                )
+            return
+
+        if not (0 <= prev_idx < len(children)):
+            return
+        prev_child = children[prev_idx]
+        prev_status_name = getattr(getattr(prev_child, "status", None), "name", "INVALID")
+        mark = {"SUCCESS": "✓", "FAILURE": "✗"}.get(prev_status_name, "○")
+        level = "warn" if prev_status_name == "FAILURE" else "info"
+
+        if running_idx >= 0:
+            curr = children[running_idx]
+            self.ctx.debug_events.event(
+                "SubBT",
+                f"{display_name}: {prev_child.name} {mark} → {curr.name}",
+                level=level,
+            )
+            return
+
+        # running 자식 없음 — Sequence 종료. SubTree 자체 status 도 함께 표시.
+        sub_status_name = getattr(getattr(sub, "status", None), "name", "INVALID")
+        if sub_status_name in ("SUCCESS", "FAILURE"):
+            sub_level = "warn" if sub_status_name == "FAILURE" else "info"
+            self.ctx.debug_events.event(
+                "SubBT",
+                f"{display_name}: {prev_child.name} {mark} (exit {sub_status_name})",
+                level=sub_level,
+            )
+        else:
+            self.ctx.debug_events.event(
+                "SubBT", f"{display_name}: {prev_child.name} {mark}", level=level,
+            )
+
+    def _find_subtree_by_name(self, node, depth: int = 0):
+        """``BT_*_sub`` 첫 매칭 노드. ``tree_inspector._find_subtree`` 와 달리 status 무관."""
+        if depth >= self._SUBBT_SEARCH_MAX_DEPTH:
+            return None
+        name = getattr(node, "name", "")
+        if name.startswith("BT_") and name.endswith("_sub"):
+            return node
+        children = getattr(node, "children", None)
+        if not children:
+            return None
+        for child in children:
+            found = self._find_subtree_by_name(child, depth + 1)
+            if found is not None:
+                return found
+        return None
+
+    def _descend_to_sequence(self, sub_node):
+        """OneShot 등 single-child wrapper 를 가로질러 첫 multi-child composite 반환.
+
+        BT_goto_sub 처럼 sub_node 자체가 Sequence (children ≥ 2) 면 그대로 반환.
+        BT_return_sub 처럼 OneShot decorator 는 child 1개라 descend.
+        max depth 안에서 multi-child 못 찾으면 None.
+        """
+        cur = sub_node
+        for _ in range(self._SUBBT_DECORATOR_MAX_DEPTH):
+            children = getattr(cur, "children", None)
+            if not children:
+                return None
+            if len(children) > 1:
+                return cur
+            cur = children[0]
+        return None
 
     def _on_tree_success(self) -> None:
         """MainTree root SUCCESS = task state 완료 → IDLE 복귀.

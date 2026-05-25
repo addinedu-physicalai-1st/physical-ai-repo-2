@@ -43,6 +43,36 @@ from gogoping_navigation.graph import Graph
 
 _DEBUG_TOPIC = "/gogoping/debug/nav_events"   # admin UI NavDebugLogCard 가 SSE 로 받음
 
+# action_msgs/GoalStatus — admin UI 에 raw int 대신 사람 말로 표시.
+# (STATUS_UNKNOWN=0 / ACCEPTED=1 / EXECUTING=2 / CANCELING=3 / SUCCEEDED=4 / CANCELED=5 / ABORTED=6)
+_NAV2_STATUS_NAME = {
+    0: "UNKNOWN",
+    1: "ACCEPTED",
+    2: "EXECUTING",
+    3: "CANCELING",
+    4: "SUCCEEDED",
+    5: "CANCELED",
+    6: "ABORTED",
+}
+
+
+def _nav2_status_str(status: int) -> str:
+    name = _NAV2_STATUS_NAME.get(int(status))
+    return f"{name}({status})" if name else f"UNKNOWN({status})"
+
+
+def _path_length_m(poses: list) -> float:
+    """PoseStamped 시퀀스의 총 거리 (m). 인접 점 간 유클리드 합."""
+    if len(poses) < 2:
+        return 0.0
+    total = 0.0
+    prev = poses[0].pose.position
+    for ps in poses[1:]:
+        cur = ps.pose.position
+        total += math.hypot(cur.x - prev.x, cur.y - prev.y)
+        prev = cur
+    return total
+
 
 class GraphRouterNode(Node):
     def __init__(self) -> None:
@@ -213,7 +243,14 @@ class GraphRouterNode(Node):
         target = gh.request.target_name
         result = NavigateToVertex.Result()
         nav_gh = None
-        self._dbg(f"act_navigate start (target={target!r})")
+        # target vertex 좌표 첨부 — "어디로 가려 했나" 가 admin UI 에 그대로 보임.
+        target_v = self._graph.vertices.get(target) if hasattr(self._graph, "vertices") else None
+        if target_v is not None:
+            self._dbg(
+                f"act_navigate start target={target!r} xy=({target_v.x:.2f}, {target_v.y:.2f})"
+            )
+        else:
+            self._dbg(f"act_navigate start target={target!r}")
 
         cur = self._current_xy()
         if cur is None:
@@ -302,7 +339,9 @@ class GraphRouterNode(Node):
                 self._dbg("abort: nav2 rejected goal", level="warn")
                 return result
 
-            self._dbg(f"nav2 goal accepted ({len(poses)} poses)")
+            self._dbg(
+                f"nav2 goal accepted ({len(poses)} poses, {_path_length_m(poses):.1f}m)"
+            )
 
             # 최종 결과 대기 — polling 으로 클라이언트 cancel request 검출.
             get_result_future = nav_gh.get_result_async()
@@ -351,7 +390,10 @@ class GraphRouterNode(Node):
                 result.success = False
                 result.message = f"nav2 status={wrapper.status}"
                 result.final_vertex = seq[last_idx] if last_idx < len(seq) else target
-                self._dbg(f"abort: nav2 status={wrapper.status}", level="warn")
+                self._dbg(
+                    f"abort: nav2 status={_nav2_status_str(wrapper.status)}",
+                    level="warn",
+                )
                 return result
 
             gh.succeed()
