@@ -51,6 +51,7 @@ from PyQt5.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -223,14 +224,31 @@ class _TreeCell(_Cell):
         )
         self._body.addWidget(self._title)
 
-        # children 은 <br> 로 줄바꿈된 단일 QLabel — 셀 높이는 자식 수에 따라 자동 증가
+        # children 은 <br> 로 줄바꿈된 단일 QLabel — 자식 수가 많으면 (patrol 처럼 13+
+        # vertex) 셀이 페이지를 벗어남. QScrollArea 로 감싸 max height 까지만 보이고
+        # 그 이상은 wheel 로 셀 내부 스크롤.
         self._children = QLabel("")
         self._children.setTextFormat(Qt.RichText)
         self._children.setWordWrap(False)
+        self._children.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self._children.setStyleSheet(
             f"font-size: 9pt; color: {COLORS['text_soft']}; line-height: 1.35;"
         )
-        self._body.addWidget(self._children)
+
+        self._children_scroll = QScrollArea()
+        self._children_scroll.setWidget(self._children)
+        self._children_scroll.setWidgetResizable(True)
+        self._children_scroll.setFrameShape(QScrollArea.NoFrame)
+        self._children_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._children_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # cell 의 자식 영역 max height — patrol 같은 긴 리스트는 이 안에서 스크롤.
+        # 13~14 줄 정도 보임 (9pt × line-height 1.35 ≈ 16px/line, 220/16 ≈ 13).
+        self._children_scroll.setMaximumHeight(220)
+        self._children_scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
+        self._body.addWidget(self._children_scroll)
 
         self.set_data(None)
 

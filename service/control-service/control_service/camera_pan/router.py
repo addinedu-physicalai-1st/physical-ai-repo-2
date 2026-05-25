@@ -90,7 +90,9 @@ class _Hub:
                 continue
 
 
-def make_router(bridge: CameraPanBridge) -> tuple[APIRouter, _Hub]:
+def make_router(
+    bridge: CameraPanBridge, gogoping_bridge=None,
+) -> tuple[APIRouter, _Hub]:
     router = APIRouter(prefix="/camera_pan", tags=["camera_pan"])
     hub = _Hub(bridge)
 
@@ -105,6 +107,18 @@ def make_router(bridge: CameraPanBridge) -> tuple[APIRouter, _Hub]:
             raise HTTPException(status_code=503, detail={
                 "ok": False, "reason": f"ros_not_ready: {exc}",
             }) from exc
+        if gogoping_bridge is not None:
+            parts: list[str] = []
+            if payload.pan is not None:
+                parts.append(f"pan={payload.pan}")
+            if payload.tilt is not None:
+                parts.append(f"tilt={payload.tilt}")
+            try:
+                gogoping_bridge.publish_admin_event(
+                    "camera_pan", " ".join(parts),
+                )
+            except Exception:
+                pass
         return {"ok": True, "ts_ms": int(time.time() * 1000)}
 
     @router.get("/health")
@@ -129,14 +143,18 @@ def make_router(bridge: CameraPanBridge) -> tuple[APIRouter, _Hub]:
     return router, hub
 
 
-def install(app: FastAPI, bridge: CameraPanBridge) -> _Hub:
+def install(
+    app: FastAPI, bridge: CameraPanBridge, gogoping_bridge=None,
+) -> _Hub:
     """app 에 camera_pan router 부착 + on_event 로 hub start/stop.
 
     main.py 가 lifespan= 을 지정한 app 에서는 on_event 가 무시되므로,
     main.py 측 lifespan 이 hub.start()/stop() 을 직접 호출한다.
     on_event 훅은 lifespan 없는 테스트용 FastAPI 인스턴스를 위해 남겨둠.
+
+    gogoping_bridge: NavDebugLogCard 로 AdminUI 입력 publish (camera_pan 도 admin 입력).
     """
-    router, hub = make_router(bridge)
+    router, hub = make_router(bridge, gogoping_bridge=gogoping_bridge)
     app.include_router(router)
 
     @app.on_event("startup")

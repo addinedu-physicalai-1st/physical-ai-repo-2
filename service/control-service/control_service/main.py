@@ -1,10 +1,35 @@
 """Control Service — REST gateway."""
 import asyncio
 import logging
+import logging.handlers
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
+
+
+# ─── 파일 로깅 — incident 사후 분석용 영구 저장 ──────────────────────────────
+# nav_events 는 메모리 ring buffer (200개) 만 → control-service 죽으면 휘발.
+# Python logger 출력도 별도 파일에 떨궈서 모듈별 traceback / warn / error 보존.
+# Location: repo_root/log/control-service.log (rotate 10MB × 5).
+_LOG_DIR = Path(__file__).resolve().parents[3] / "log"
+try:
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    _file_handler = logging.handlers.RotatingFileHandler(
+        _LOG_DIR / "control-service.log",
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    _file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)-5s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    _file_handler.setLevel(logging.INFO)
+    logging.getLogger().addHandler(_file_handler)
+    logging.getLogger().setLevel(logging.INFO)
+except Exception as _e:  # noqa: BLE001 — 로깅 설정 실패해도 서비스 자체는 떠야 함
+    print(f"[control-service] file logging 설정 실패: {_e}")
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
@@ -260,22 +285,30 @@ app.include_router(schedule_router.router)
 app.include_router(teachers_router.router)
 app.include_router(webrtc_voice_router.router)
 
+# gogoping FSM/BT — 먼저 생성. teleop / camera_pan router 가 AdminUI 입력 emit 용으로
+# gogoping bridge 의 publish_admin_event 를 사용하기 때문에 *변수 참조 시점* 이전에
+# 존재해야 한다. start() 순서는 lifespan 이 관리하므로 무관.
+_gogoping_bridge = GogopingRosBridge()
+
 # teleop (GogoPing keyboard control) — POST /teleop/cmd_vel, WS /teleop/state, GET /teleop/health
 # install_teleop 가 라우터를 부착하고 hub 를 반환한다. 실제 start/stop 은 lifespan 에서.
+# gogoping_bridge 주입 — teleop_start / teleop_stop 을 NavDebugLogCard 에 표시.
 _teleop_bridge = RosBridge()
-_teleop_hub = install_teleop(app, _teleop_bridge)
+_teleop_hub = install_teleop(app, _teleop_bridge, gogoping_bridge=_gogoping_bridge)
 
 # waypoints (GogoPing waypoint Goto / patrol) — REST + SSE
 _waypoints_bridge = WaypointsRosBridge()
 install_waypoints(app, _waypoints_bridge)
 
 # camera_pan (GogoPing 2-axis camera servo) — POST /camera_pan/cmd, WS /camera_pan/state
+# gogoping_bridge 주입 — camera_pan cmd 를 NavDebugLogCard 에 표시.
 _camera_pan_bridge = CameraPanBridge()
-_camera_pan_hub = install_camera_pan(app, _camera_pan_bridge)
+_camera_pan_hub = install_camera_pan(
+    app, _camera_pan_bridge, gogoping_bridge=_gogoping_bridge,
+)
 
 # gogoping FSM/BT — SetGoal srv client + /gogoping/state subscriber. /ws/robot-state fan-out.
 # waypoints_bridge 도 주입 — /debug/pose 에서 AMCL /initialpose 도 함께 publish (RViz 동기화).
-_gogoping_bridge = GogopingRosBridge()
 install_gogoping(app, _gogoping_bridge, _waypoints_bridge)
 # gogoping follow — POST /api/gogoping/follow/{start,stop} + GET /state
 install_gogoping_follow(app, _gogoping_bridge)
@@ -485,6 +518,7 @@ async def mode_click(req: ModeRequest) -> dict:
         from control_service.gogoping.state_to_goal import UnsupportedMode, mode_to_goal
         from control_service.gogoping.router import _build_hideseek_goal_dynamic
 
+        _gogoping_bridge.publish_admin_event("mode", f"mode={req.mode!r}")
         try:
             goal = mode_to_goal(req.mode)
         except UnsupportedMode as e:

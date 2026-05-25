@@ -404,16 +404,37 @@ class DebugDrawer(QWidget):
         self.toggle_btn.clicked.connect(self._toggle)
         lay.addWidget(self.toggle_btn)
 
-        # panel 컨테이너 — 3개 디버그 위젯 세로 stack
-        self.panel = QWidget()
+        # panel 컨테이너 — 4개 디버그 위젯 세로 stack.
+        # 작은 창에서도 NavDebugLogCard 가 충분히 크게 보이도록 inner widget 에 minimum
+        # height 부여 + QScrollArea 로 감싸서, viewport 가 짧으면 wheel 로 위/아래 이동
+        # 가능. viewport 가 inner 보다 크면 stretch=1 로 nav_debug_log 가 자동 확장.
+        #
+        # log card 도 표시 시 의미있는 크기 (≥400) 확보 — scroll 모드에서 "더 큰 화면" 체감.
+        nav_debug_log.setMinimumHeight(400)
+
+        inner = QWidget()
+        inner_lay = QVBoxLayout(inner)
+        inner_lay.setContentsMargins(8, 0, 0, 0)
+        inner_lay.setSpacing(10)
+        inner_lay.addWidget(debug_panel)
+        inner_lay.addWidget(battery_debug)
+        inner_lay.addWidget(pose_debug)
+        inner_lay.addWidget(nav_debug_log, stretch=1)
+        # inner 의 minimum height — 화면이 이 값보다 짧으면 scrollbar 가 나타남.
+        # ~ debug_panel(90) + battery_debug(60) + pose_debug(120) + nav_debug_log(400) + spacing(40)
+        inner.setMinimumHeight(720)
+
+        self.panel = QScrollArea()
         self.panel.setFixedWidth(self.PANEL_WIDTH)
-        panel_lay = QVBoxLayout(self.panel)
-        panel_lay.setContentsMargins(8, 0, 0, 0)
-        panel_lay.setSpacing(10)
-        panel_lay.addWidget(debug_panel)
-        panel_lay.addWidget(battery_debug)
-        panel_lay.addWidget(pose_debug)
-        panel_lay.addWidget(nav_debug_log, stretch=1)   # 로그가 남는 공간 차지
+        self.panel.setFrameShape(QScrollArea.NoFrame)
+        self.panel.setWidgetResizable(True)
+        self.panel.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.panel.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.panel.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
+        self.panel.setWidget(inner)
         lay.addWidget(self.panel)
 
         self._open = True

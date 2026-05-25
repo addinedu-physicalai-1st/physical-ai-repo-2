@@ -305,6 +305,7 @@ def install(
     async def set_mode(req: GogopingModeRequest) -> GogopingModeResponse:
         if req.robot != "gogoping":
             raise HTTPException(400, f"unsupported robot: {req.robot!r}")
+        bridge.publish_admin_event("mode", f"mode={req.mode!r}")
         try:
             goal = mode_to_goal(req.mode)
         except UnsupportedMode as e:
@@ -333,6 +334,7 @@ def install(
 
     @router.post("/goto_vertex", response_model=GogopingGotoVertexResponse)
     async def goto_vertex(req: GogopingGotoVertexRequest) -> GogopingGotoVertexResponse:
+        bridge.publish_admin_event("goto_vertex", f"name={req.name!r}")
         goal = Goal(target_state="GOTO", destination_key=req.name)
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
@@ -351,6 +353,7 @@ def install(
         """
         if req.target_state not in _VALID_FORCE_STATES:
             raise HTTPException(400, f"invalid target_state: {req.target_state!r}")
+        bridge.publish_admin_event("force_state", f"target={req.target_state!r}")
         accepted, reason = await asyncio.to_thread(
             bridge.force_state_sync, req.target_state,
         )
@@ -366,6 +369,7 @@ def install(
 
         운영(실물 Pi) 환경엔 server 없음 → ``service_unavailable`` 반환.
         """
+        bridge.publish_admin_event("set_battery", f"level={req.level}")
         accepted, reason = await asyncio.to_thread(
             bridge.set_battery_level_sync, req.level,
         )
@@ -388,6 +392,12 @@ def install(
 
         clear=True 면 SW override 만 해제 (가제보 텔레포트 + /initialpose skip).
         """
+        if req.clear:
+            bridge.publish_admin_event("set_pose", "clear=True")
+        else:
+            bridge.publish_admin_event(
+                "set_pose", f"x={req.x:.2f} y={req.y:.2f} yaw={req.yaw:.2f}"
+            )
         accepted, reason = await asyncio.to_thread(
             bridge.set_robot_pose_sync, req.x, req.y, req.yaw, req.clear,
         )
@@ -437,6 +447,7 @@ def install(
         - 다음 그룹들: 이전 그룹의 마지막 vertex 좌표에서 NN 시작
         - 결과: 모든 group vertex 가 하나의 search_waypoints 리스트에 들어감
         """
+        bridge.publish_admin_event("patrol_start")
         ordered, group_order, start_pose = await asyncio.to_thread(
             _build_group_patrol_order, bridge,
         )
@@ -581,6 +592,7 @@ def install(
         ERROR (terminal) 로 강제 전이. BT_error_main 의 StopAllMotors 가 cmd_vel=0 +
         torque OFF 실행. ERROR 는 사용자가 robot 재시작해야 복구 가능.
         """
+        bridge.publish_admin_event("estop", level="warn")
         accepted, reason = await asyncio.to_thread(bridge.emergency_stop_sync)
         if not accepted:
             logger.warning(f"EmergencyStop 거부: reason={reason!r}")
@@ -599,6 +611,7 @@ def install(
             raise HTTPException(
                 400, f"seconds out of range [1.0, 86400.0]: {req.seconds}"
             )
+        bridge.publish_admin_event("idle_timeout", f"seconds={req.seconds}")
         accepted, reason = await asyncio.to_thread(
             bridge.set_idle_timeout_sync, req.seconds,
         )

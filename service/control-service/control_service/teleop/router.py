@@ -62,12 +62,15 @@ class _Hub:
         self._bridge = bridge
         self._clients: list[asyncio.Queue] = []
         self._tasks: list[asyncio.Task] = []
+        self._extra_task_factory: Callable[[], Awaitable[None]] | None = None
         self._stopped = False
 
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
         self._tasks.append(loop.create_task(self._watchdog()))
         self._tasks.append(loop.create_task(self._broadcaster()))
+        if self._extra_task_factory is not None:
+            self._tasks.append(loop.create_task(self._extra_task_factory()))
 
     async def stop(self) -> None:
         self._stopped = True
@@ -156,10 +159,37 @@ class _Hub:
                 continue
 
 
-def make_router(bridge: RosBridge) -> tuple[APIRouter, _Hub]:
-    """teleop router + hub 페어 생성. 호출자가 lifespan 에서 hub.start()/stop() 관리."""
+# teleop activity 1초 무명령 후 stop event — 별도 background task 가 폴링.
+TELEOP_IDLE_S = 1.0
+TELEOP_WATCH_TICK_S = 0.2
+
+
+def make_router(
+    bridge: RosBridge, gogoping_bridge=None,
+) -> tuple[APIRouter, _Hub]:
+    """teleop router + hub 페어 생성. 호출자가 lifespan 에서 hub.start()/stop() 관리.
+
+    gogoping_bridge: AdminUI 입력 publisher (NavDebugLogCard 로 흐르는 cancel chain 옆
+    에 ``teleop_start`` / ``teleop_stop`` 도 함께 보이게). None 이면 emit skip.
+    """
     router = APIRouter(prefix="/teleop", tags=["teleop"])
     hub = _Hub(bridge)
+
+    # teleop 활성 추적 — 첫 cmd_vel (1s idle 후) 에 start emit, 1s 무명령 시 stop emit.
+    teleop_state = {"last_ts": 0.0, "active": False}
+
+    def _maybe_emit_start() -> None:
+        if gogoping_bridge is None:
+            return
+        now = time.time()
+        last = teleop_state["last_ts"]
+        if not teleop_state["active"] or (now - last) > TELEOP_IDLE_S:
+            try:
+                gogoping_bridge.publish_admin_event("teleop_start")
+            except Exception:
+                pass
+            teleop_state["active"] = True
+        teleop_state["last_ts"] = now
 
     @router.post("/cmd_vel")
     async def post_cmd_vel(payload: CmdVelIn) -> dict:
@@ -170,6 +200,7 @@ def make_router(bridge: RosBridge) -> tuple[APIRouter, _Hub]:
             raise HTTPException(status_code=503, detail={
                 "ok": False, "reason": f"ros_not_ready: {exc}",
             }) from exc
+        _maybe_emit_start()
         return {"ok": True, "ts_ms": int(time.time() * 1000)}
 
     @router.get("/health")
@@ -191,15 +222,35 @@ def make_router(bridge: RosBridge) -> tuple[APIRouter, _Hub]:
         finally:
             hub._remove_client(q)
 
+    # teleop idle watcher — 1s 동안 cmd_vel 없으면 stop emit.
+    async def _idle_watcher() -> None:
+        try:
+            while True:
+                await asyncio.sleep(TELEOP_WATCH_TICK_S)
+                if not teleop_state["active"]:
+                    continue
+                if (time.time() - teleop_state["last_ts"]) > TELEOP_IDLE_S:
+                    teleop_state["active"] = False
+                    if gogoping_bridge is not None:
+                        try:
+                            gogoping_bridge.publish_admin_event("teleop_stop")
+                        except Exception:
+                            pass
+        except asyncio.CancelledError:
+            return
+
+    # background task — hub 가 시작될 때 함께 시작되도록 hub 에 부착.
+    hub._extra_task_factory = _idle_watcher
+
     return router, hub
 
 
-def install(app: FastAPI, bridge: RosBridge) -> _Hub:
+def install(app: FastAPI, bridge: RosBridge, gogoping_bridge=None) -> _Hub:
     """app 에 teleop router 부착 + lifespan hook 으로 hub start/stop.
 
     호출자: control_service.main 의 startup 단계에서 부른다.
     """
-    router, hub = make_router(bridge)
+    router, hub = make_router(bridge, gogoping_bridge=gogoping_bridge)
     app.include_router(router)
 
     @app.on_event("startup")

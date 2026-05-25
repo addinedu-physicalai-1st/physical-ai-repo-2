@@ -27,6 +27,15 @@ logger = logging.getLogger(__name__)
 # 토픽 / 서비스 이름 (gogoping_modes 와 일치 — 모두 /gogoping/* namespace)
 TOPIC_STATE = "/gogoping/state"
 TOPIC_NAV_DEBUG_EVENTS = "/gogoping/debug/nav_events"
+# UIPublisher 의 일회성 이벤트 (lullaby_play / announce / countdown_start ...).
+# robot-web 만 구독하던 토픽 — admin NavDebugLogCard 가 cancel chain 옆에서
+# UX 이벤트 흐름을 cross-correlate 할 수 있도록 control-service 가 같이 구독해서
+# nav_event 파이프라인에 source="UI" 로 인젝션한다.
+TOPIC_UI_EVENT = "/gogoping/ui_event"
+# 카메라 pan 서보 setpoint — gogoping_camera_pan/camera_pan_client.TOPIC_CMD_PAN 와 동일.
+# PanCameraSweep (BT) / admin UI 슬라이더 / keyboard_teleop 가 publish. 빈도 저 —
+# step 진입 시 1회만 publish (servo_bridge 의 20Hz 재송신은 별도 시리얼 채널).
+TOPIC_CAMERA_PAN_CMD = "/servo_bridge/cmd_pan"
 SERVICE_SET_GOAL = "/gogoping/set_goal"
 SERVICE_FORCE_STATE = "/gogoping/debug/force_state"
 SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
@@ -106,6 +115,9 @@ class GogopingRosBridge:
         self._set_blackboard_cli: Any = None  # SetBlackboard.srv client — hideseek registered_ids / caught_ids
         self._sub: Any = None              # /gogoping/state subscriber
         self._nav_event_sub: Any = None    # /gogoping/debug/nav_events subscriber
+        self._nav_event_pub: Any = None    # /gogoping/debug/nav_events publisher (AdminUI 입력 송출)
+        self._ui_event_sub: Any = None     # /gogoping/ui_event subscriber → nav_event 파이프라인에 source="UI" 로 인젝션
+        self._camera_pan_sub: Any = None   # /servo_bridge/cmd_pan subscriber → source="CamPan"
         self._follow_target_pub: Any = None   # /gogoping/follow_target publisher
         self._follow_hint_pub: Any = None     # /gogoping/follow_hint publisher (debug)
         self._follow_state_sub: Any = None    # /gogoping/follow_state subscriber
@@ -183,6 +195,22 @@ class GogopingRosBridge:
         # publisher 와 맞춰 burst 안 잃도록.
         self._nav_event_sub = self._node.create_subscription(
             String, TOPIC_NAV_DEBUG_EVENTS, self._on_nav_event_msg, 20,
+        )
+        # admin UI 가 누른 버튼 → 같은 토픽에 source="AdminUI" 로 publish. 자기 subscription
+        # 으로 loopback 받아 ring buffer + WS 합류 (controller 측 publisher 들과 동일 경로).
+        self._nav_event_pub = self._node.create_publisher(
+            String, TOPIC_NAV_DEBUG_EVENTS, 20,
+        )
+        # /gogoping/ui_event 도 같이 구독 — UIPublisher 의 일회성 이벤트 (lullaby_play 등)
+        # 를 source="UI" 로 nav_event 파이프라인에 인젝션 (publish 아닌 직접 callback 호출).
+        self._ui_event_sub = self._node.create_subscription(
+            String, TOPIC_UI_EVENT, self._on_ui_event_msg, 10,
+        )
+        # /servo_bridge/cmd_pan (Float32 deg) 도 구독 — 카메라 pan 명령 흐름을
+        # source="CamPan" 으로 nav_event 파이프라인에 인젝션.
+        from std_msgs.msg import Float32
+        self._camera_pan_sub = self._node.create_subscription(
+            Float32, TOPIC_CAMERA_PAN_CMD, self._on_camera_pan_msg, 10,
         )
         # follow target publisher + tracking state subscriber
         from gogoping_msgs.msg import FollowTarget, TrackingState
@@ -657,6 +685,102 @@ class GogopingRosBridge:
                     pass
 
         return unregister
+
+    # ----------------------------------------------------------- ui_event 인젝션
+
+    @staticmethod
+    def _ui_event_to_msg(payload: dict) -> str:
+        """``{"event": "lullaby_play", "src": "lullaby.mp3", "loop": True}`` →
+        ``"event='lullaby_play' src='lullaby.mp3' loop=True"`` 한 줄.
+
+        문자열 값은 ``!r`` (따옴표 포함), 그 외 타입은 그대로.
+        """
+        parts: list[str] = []
+        for k, v in payload.items():
+            if isinstance(v, str):
+                parts.append(f"{k}={v!r}")
+            else:
+                parts.append(f"{k}={v}")
+        return " ".join(parts)
+
+    def _on_ui_event_msg(self, msg: Any) -> None:
+        """``/gogoping/ui_event`` → nav_event 형태로 변환 후 ring buffer + listener.
+
+        publish 가 아닌 *직접 callback 호출* — ui_event 는 robot-web 도 같은 토픽을 구독
+        하므로 nav_events 로 republish 하면 양쪽에 중복 표시됨.
+        """
+        try:
+            payload = json.loads(msg.data)
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.warning(f"invalid ui_event JSON: {e}")
+            return
+        nav_payload = {
+            "ts": time.time(),
+            "source": "UI",
+            "level": "info",
+            "msg": self._ui_event_to_msg(payload) if isinstance(payload, dict) else str(payload),
+        }
+        with self._lock:
+            self._nav_event_buffer.append(nav_payload)
+            callbacks = list(self._nav_event_callbacks)
+        for cb in callbacks:
+            try:
+                cb(nav_payload)
+            except Exception as e:
+                logger.warning(f"ui_event → nav_event callback 오류: {e}")
+
+    def _on_camera_pan_msg(self, msg: Any) -> None:
+        """``/servo_bridge/cmd_pan`` (Float32 deg) → nav_event 변환 + 직접 listener 호출.
+
+        Publisher: PanCameraSweep (BT) / CameraPanCard (admin UI) / keyboard_teleop.
+        Subscriber: servo_bridge (모터 제어). 우리는 *로깅용* 추가 subscriber.
+        """
+        try:
+            deg = float(msg.data)
+        except (TypeError, ValueError, AttributeError):
+            return
+        nav_payload = {
+            "ts": time.time(),
+            "source": "CamPan",
+            "level": "info",
+            "msg": f"pan={deg:.1f}°",
+        }
+        with self._lock:
+            self._nav_event_buffer.append(nav_payload)
+            callbacks = list(self._nav_event_callbacks)
+        for cb in callbacks:
+            try:
+                cb(nav_payload)
+            except Exception as e:
+                logger.warning(f"camera_pan → nav_event callback 오류: {e}")
+
+    # ----------------------------------------------------------- admin UI 입력 publish
+
+    def publish_admin_event(
+        self, action: str, args: str = "", level: str = "info",
+    ) -> None:
+        """admin UI 가 누른 버튼/입력을 ``/gogoping/debug/nav_events`` 에 publish.
+
+        ``source="AdminUI"`` 로 NavDebugLogCard 에 표시. self subscription 으로
+        loopback 받아 ring buffer + WS 합류.
+
+        bridge 가 아직 start() 안 했거나 ROS 미가용이면 silent no-op.
+        """
+        if self._nav_event_pub is None:
+            return
+        from std_msgs.msg import String
+        payload = {
+            "ts": time.time(),
+            "source": "AdminUI",
+            "level": level,
+            "msg": f"{action} {args}".rstrip() if args else action,
+        }
+        try:
+            out = String()
+            out.data = json.dumps(payload, ensure_ascii=False)
+            self._nav_event_pub.publish(out)
+        except Exception as e:
+            logger.warning(f"publish_admin_event 실패: {e}")
 
     # ----------------------------------------------------------- follow target
 
