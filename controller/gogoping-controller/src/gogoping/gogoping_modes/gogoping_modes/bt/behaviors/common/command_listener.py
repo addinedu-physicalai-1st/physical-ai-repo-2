@@ -257,6 +257,8 @@ class _BlackboardWriter:
         "hideseek_caught_ids", "hideseek_phase",
         # debug skip flag — countdown 즉시 SUCCESS (control-service debug API)
         "hideseek_skip_countdown",
+        # admin [순찰] 단독 모드 — BT_hide_and_seek_sub 가 patrol_sub 만 반환
+        "hideseek_patrol_only",
     )
 
     def __init__(self, behaviour_name: str):

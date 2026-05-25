@@ -30,6 +30,8 @@ _ALLOWED_KEYS = frozenset({
     "hideseek_caught_ids",
     # debug skip flag — Countdown behaviour 가 체크 (countdown phase 즉시 종료)
     "hideseek_skip_countdown",
+    # admin [순찰] 단독 모드 — BT_hide_and_seek_sub 가 patrol_sub 만 반환
+    "hideseek_patrol_only",
 })
 
 SERVICE_NAME = "blackboard/set"   # 노드 namespace 가 /gogoping 이라 /gogoping/blackboard/set

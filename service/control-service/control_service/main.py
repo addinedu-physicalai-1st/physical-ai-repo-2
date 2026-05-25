@@ -339,16 +339,27 @@ async def health() -> dict:
 async def mode_click(req: ModeRequest) -> dict:
     """모드 셀렉터 UI 클릭 — robot id 별 routing.
 
-    - ``gogoping`` → ``_gogoping_bridge.send_goal_sync`` (mode_to_goal 변환 후 SetGoal.srv)
+    - ``gogoping`` → ``_gogoping_bridge.send_goal_sync`` (mode_to_goal 변환 후 SetGoal.srv).
+      HIDEANDSEEK 진입 시 yaml 의 group 셔플된 vertex 로 search_waypoints 동적 채움 +
+      patrol_only=False 명시 cleanup — ``/api/gogoping/mode`` 와 동일 흐름.
     - ``eduping`` / ``noriarm`` — 현재 단순 로그 + ok 반환. 추후 각 brige 로 라우팅.
     """
     if req.robot == "gogoping":
         from control_service.gogoping.state_to_goal import UnsupportedMode, mode_to_goal
+        from control_service.gogoping.router import _build_hideseek_goal_dynamic
 
         try:
             goal = mode_to_goal(req.mode)
         except UnsupportedMode as e:
             raise HTTPException(400, str(e))
+
+        # HIDEANDSEEK 진입 — search_waypoints 동적 채움 + patrol_only=False 셋팅.
+        # 두 endpoint (/api/mode, /api/gogoping/mode) 동작 일치해야 robot-web 클릭이 어느 쪽으로 가도 OK.
+        if goal.target_state == "HIDEANDSEEK":
+            goal = await asyncio.to_thread(
+                _build_hideseek_goal_dynamic, _gogoping_bridge, goal,
+            )
+            await asyncio.to_thread(_gogoping_bridge.write_hideseek_patrol_only, False)
 
         accepted, reason = await asyncio.to_thread(_gogoping_bridge.send_goal_sync, goal)
         if not accepted:

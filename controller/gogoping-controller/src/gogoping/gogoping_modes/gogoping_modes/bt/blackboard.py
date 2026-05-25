@@ -20,7 +20,7 @@ from py_trees.common import Access
 
 
 class Keys:
-    """Blackboard 변수 이름 상수 — 29개.
+    """Blackboard 변수 이름 상수 — 30개.
 
     **문자열 직접 사용 금지** — 항상 ``Keys.<NAME>`` 형태로만 참조.
     """
@@ -58,6 +58,7 @@ class Keys:
     HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"         # list[int] — 발견 시 control-service 가 W
     HIDESEEK_PHASE = "hideseek_phase"                   # str — "move_to_play"/"recruit"/"countdown"/"patrol"/"return"/"end"/""
     HIDESEEK_SKIP_COUNTDOWN = "hideseek_skip_countdown" # bool — True 면 Countdown 즉시 SUCCESS (debug)
+    HIDESEEK_PATROL_ONLY = "hideseek_patrol_only"       # bool — True 면 BT_hide_and_seek_sub 가 patrol_sub 만 반환 (admin [순찰] 단독 모드)
 
     # 에러 (fault 발화한 monitor 가 W)
     ERROR_REASON = "error_reason"                 # str — e.g., "lidar_timeout"
@@ -101,6 +102,7 @@ _DEFAULTS: dict[str, object] = {
     Keys.HIDESEEK_CAUGHT_IDS: [],
     Keys.HIDESEEK_PHASE: "",
     Keys.HIDESEEK_SKIP_COUNTDOWN: False,
+    Keys.HIDESEEK_PATROL_ONLY: False,
     # 에러
     Keys.ERROR_REASON: "",
     Keys.ERROR_SOURCE: "",

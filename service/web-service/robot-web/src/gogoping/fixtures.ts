@@ -19,14 +19,11 @@ export interface Waypoint {
 
 export const PLAY_AREA_LABEL = '운동장2';
 
-// key 는 waypoints.yaml 에 실제 등록된 vertex 이름과 일치해야 한다 — UI 표시 라벨
-// 과 BT NavigateToVertex 의 destination 이 같은 vertex 를 가리키도록.
-// state_to_goal.py 의 "숨바꼭질" 분기 search_waypoints 와도 일치 유지.
-export const WAYPOINTS: Waypoint[] = [
-  { key: '운동장3', label: '운동장3' },
-  { key: '운동장입구', label: '운동장 입구' },
-  { key: '놀이방2', label: '놀이방2' },
-];
+// 빈 fixture — backend 가 BT snapshot 의 patrol.vertices 로 동적 채움.
+// PatrolPhase mount 직후 useGogopingStateWs → hideseekPhaseStore.setPatrol →
+// HideAndSeekGame watch → actions.setPatrolVertices → state.waypoints 갱신.
+// hardcoded fallback 없음 — BT 데이터 받기 전 잠깐 빈 list 가 UI 자연스러움.
+export const WAYPOINTS: Waypoint[] = [];
 
 export interface RosterEntry { id: number; name: string }
 

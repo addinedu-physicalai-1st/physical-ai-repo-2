@@ -310,14 +310,14 @@ def install(
         except UnsupportedMode as e:
             raise HTTPException(400, str(e))
 
-        # HIDEANDSEEK 진입 시 search_waypoints 를 동적으로 — group 별 random 1 vertex
-        # + 모든 group 순회. 카테고리 수 = patrol 진행 step 수.
-        # play_area_key 는 운동장 group 의 한 vertex (UI/도착점). state_to_goal 의
-        # hardcoded "운동장2" fallback 은 모집 단계 도착점으로 그대로 사용.
+        # HIDEANDSEEK 진입 — robot UI [숨바꼭질] 메뉴. 6-step Sequence 전체.
+        # search_waypoints 는 group 셔플 + NN 으로 동적 채움.
+        # patrol_only flag 는 명시 False — 이전 admin [순찰] 호출 잔여 cleanup.
         if goal.target_state == "HIDEANDSEEK":
             goal = await asyncio.to_thread(
                 _build_hideseek_goal_dynamic, bridge, goal,
             )
+            await asyncio.to_thread(bridge.write_hideseek_patrol_only, False)
 
         # bridge 의 동기 호출 — asyncio thread 에서 호출하므로 to_thread 로 offload
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
@@ -460,6 +460,9 @@ def install(
             # /debug/patrol 은 nav 검증용 — 운동장2 default 로 충분.
             play_area_key="운동장2",
         )
+        # patrol_only=True 셋 — SetGoal 보다 먼저 셋팅해야 BT builder 가 정확히 읽음.
+        # builder 가 이 flag 보면 6-step 전체 대신 SetHideseekPhase("patrol") + patrol_sub 만 반환.
+        await asyncio.to_thread(bridge.write_hideseek_patrol_only, True)
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
             logger.warning(
