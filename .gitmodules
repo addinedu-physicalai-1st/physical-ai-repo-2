@@ -40,3 +40,6 @@
 [submodule "controller/eduping-controller/src/openarm_teleop"]
 	path = controller/eduping-controller/src/openarm_teleop
 	url = https://github.com/enactic/openarm_teleop
+[submodule "controller/eduping-controller/src/openarm_mujoco"]
+	path = controller/eduping-controller/src/openarm_mujoco
+	url = https://github.com/enactic/openarm_mujoco

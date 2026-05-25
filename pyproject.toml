@@ -63,6 +63,9 @@ dependencies = [
   # NoriArm 블럭쌓기 — ACT (Action Chunking Transformer) 모방학습 추론.
   # 첫 실행 시 PyTorch + torchvision 을 transitive 로 끌어옴 (~2GB).
   "lerobot>=0.1",
+  # EduPing(OpenArm) 임피던스 — MuJoCo 물리 시뮬. 중력보상/임피던스(L1~) 검증.
+  # 모델·에셋은 controller/eduping-controller/src/openarm_mujoco (enactic 공식).
+  "mujoco>=3.2",
 ]
 
 [dependency-groups]
