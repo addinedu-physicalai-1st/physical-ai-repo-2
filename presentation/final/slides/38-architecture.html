@@ -40,10 +40,7 @@
         <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px;flex:2;display:flex;flex-direction:column;gap:6px">
           <p style="font-family:'Jua';color:var(--skyInk);font-size:0.55em;letter-spacing:0.1em">SERVER</p>
           <div class="font-display" style="font-size:1em;color:var(--ink)">Control Server (FastAPI)</div>
-          <p style="color:var(--inkSoft);font-size:0.62em;line-height:1.6">
-            HTTP REST / WebSocket / SSE 단일 진입점.
-            fastapi-users 세션, 출결/사진/모드/스트리밍 게이트웨이, ROS2 브리지.
-          </p>
+          <p style="color:var(--inkSoft);font-size:0.62em;line-height:1.6">REST · WebSocket · SSE 단일 진입점 · ROS2 브리지</p>
         </div>
         <div class="pastel-card" style="border-color:var(--butterSoft);background:var(--surface);padding:14px;flex:1;display:flex;flex-direction:column;gap:6px">
           <p style="font-family:'Jua';color:var(--butterInk);font-size:0.55em;letter-spacing:0.1em">SERVER</p>
@@ -79,4 +76,9 @@
     </div>
 
   </div>
+  <aside class="notes">
+    Control Server(FastAPI): HTTP REST / WebSocket / SSE 단일 진입점 — fastapi-users 세션, 출결·사진·모드·스트리밍 게이트웨이, ROS2 브리지.
+    AI Server: Ollama LLM + ai_job 큐 워커 — 의도 분류·사진 분류·보고서 생성.
+    하위 계층: 로봇별 namespace 토픽(/eduping·/gogoping·/noriarm) + PostgreSQL(child·attendance·photo·report·ai_job).
+  </aside>
 </section>

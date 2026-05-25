@@ -1,70 +1,56 @@
 <section>
-  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="padding:40px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
 
     <p style="color:var(--skyInk);font-family:'Jua';letter-spacing:0.2em;font-size:0.7em">SIM TO REAL</p>
-    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 14px">
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 6px">
       시뮬레이션 → 실물 이전
     </h2>
-
-    <p style="color:var(--inkSoft);font-size:0.75em;margin-bottom:18px">
-      모든 모드는 Gazebo 위에서 먼저 검증 → 실물 OpenArm · Vic Pinky · OMX 로 이전.
-      <b style="color:var(--ink)">토픽 이름·인터페이스를 sim/real 동일</b> 하게 유지해 정책·UI 코드는 어느 쪽인지 모릅니다.
+    <p style="color:var(--inkSoft);font-size:0.75em;margin-bottom:24px">
+      Gazebo에서 먼저 검증 → 실물로 이전. <b style="color:var(--ink)">토픽·인터페이스를 sim/real 동일</b>하게 유지.
     </p>
 
-    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:center">
 
-      <div class="pastel-card" style="border-color:var(--skySoft);background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:10px">
+      <div class="pastel-card" style="border-color:var(--skySoft);padding:20px;display:flex;flex-direction:column;gap:8px">
         <h3 class="font-display" style="font-size:1em;color:var(--ink)">
           <span class="material-icons-round" style="font-size:18px;color:var(--skyInk);vertical-align:-0.15em">view_in_ar</span>
           매니페스트 기반 분기
         </h3>
-        <p style="color:var(--inkSoft);font-size:0.7em;line-height:1.7">
-          NoriArm 게임은 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">game.yaml</code> 매니페스트에
-          카메라 · 팔 · 백엔드 (gazebo / dynamixel) 를 선언. 런처가 launch description 을 동적 합성.
-        </p>
-        <p style="color:var(--inkSoft);font-size:0.68em;line-height:1.7">
-          <code>target=sim</code> → Gazebo + 가상 카메라<br>
+        <p style="color:var(--inkSoft);font-size:0.68em;line-height:1.7"><code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">game.yaml</code>에 카메라·팔·백엔드 선언</p>
+        <p style="color:var(--inkSoft);font-size:0.66em;line-height:1.8">
+          <code>target=sim</code> → Gazebo<br>
           <code>target=real</code> → ros2_control + USB 카메라
         </p>
       </div>
 
-      <div class="pastel-card" style="border-color:var(--butterSoft);background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:10px">
+      <div class="pastel-card" style="border-color:var(--butterSoft);padding:20px;display:flex;flex-direction:column;gap:8px">
         <h3 class="font-display" style="font-size:1em;color:var(--ink)">
           <span class="material-icons-round" style="font-size:18px;color:var(--butterInk);vertical-align:-0.15em">precision_manufacturing</span>
           자동 감지 + 수동 override
         </h3>
-        <p style="color:var(--inkSoft);font-size:0.7em;line-height:1.7">
-          <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">/api/noriarm/health</code> 가
-          <code>/dev/omx_follower</code> 존재 + Dynamixel ping 으로 실물 가용성 판정 →
-          UI 가 디폴트 target 결정.
-        </p>
-        <p style="color:var(--inkSoft);font-size:0.68em;line-height:1.7">
-          토글로 강제 sim/real 지정 가능. 실물 미연결 상태에서 real 선택 시 명확한 에러.
-        </p>
+        <p style="color:var(--inkSoft);font-size:0.68em;line-height:1.7">health 체크로 실물 가용성 판정 → UI 디폴트 결정</p>
+        <p style="color:var(--inkSoft);font-size:0.66em;line-height:1.8">토글로 강제 sim/real 지정 가능</p>
       </div>
 
-      <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:18px;grid-column:1 / span 2">
+      <div class="pastel-card" style="border-color:var(--border);padding:18px;grid-column:1 / span 2">
         <h3 class="font-display" style="font-size:1em;color:var(--ink)">
           <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">compare_arrows</span>
           이전 시 발견한 차이 · 대응
         </h3>
-        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-top:8px">
-          <div style="color:var(--inkSoft);font-size:0.65em;line-height:1.6">
-            <b style="color:var(--ink)">조명 / ROI</b><br>
-            실물 조명 차이로 검출 ROI 흔들림 → 캘리브레이션 단계 분리
-          </div>
-          <div style="color:var(--inkSoft);font-size:0.65em;line-height:1.6">
-            <b style="color:var(--ink)">관절 임계</b><br>
-            sim 보다 실물 관절이 둔하게 멈춤 → HOME_POSE 임계 + holding window 적용
-          </div>
-          <div style="color:var(--inkSoft);font-size:0.65em;line-height:1.6">
-            <b style="color:var(--ink)">통신 지연</b><br>
-            UDP 영상 frame loss 대응 — magic/CRC32/frame_seq 4단 검증, drop-oldest
-          </div>
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-top:10px">
+          <div style="color:var(--inkSoft);font-size:0.66em;line-height:1.6"><b style="color:var(--ink)">조명 / ROI</b><br>캘리브레이션 단계 분리</div>
+          <div style="color:var(--inkSoft);font-size:0.66em;line-height:1.6"><b style="color:var(--ink)">관절 임계</b><br>HOME 임계 + holding window</div>
+          <div style="color:var(--inkSoft);font-size:0.66em;line-height:1.6"><b style="color:var(--ink)">통신 지연</b><br>4단 검증 + drop-oldest</div>
         </div>
       </div>
 
     </div>
 
   </div>
+  <aside class="notes">
+    모든 모드는 Gazebo 위에서 먼저 검증 → 실물 OpenArm·Vic Pinky·OMX 로 이전. 토픽 이름·인터페이스를 sim/real 동일하게 유지해 정책·UI 코드는 어느 쪽인지 모릅니다.
+    매니페스트 분기: NoriArm 게임은 game.yaml 에 카메라·팔·백엔드(gazebo/dynamixel)를 선언, 런처가 launch description 을 동적 합성. target=sim → Gazebo + 가상 카메라 / target=real → ros2_control + USB 카메라.
+    자동 감지: /api/noriarm/health 가 /dev/omx_follower 존재 + Dynamixel ping 으로 실물 가용성 판정 → UI 가 디폴트 target 결정. 토글로 강제 지정 가능, 실물 미연결 상태에서 real 선택 시 명확한 에러.
+    차이·대응: ① 조명/ROI — 실물 조명 차이로 검출 ROI 흔들림 → 캘리브레이션 단계 분리. ② 관절 임계 — sim 보다 실물 관절이 둔하게 멈춤 → HOME_POSE 임계 + holding window. ③ 통신 지연 — UDP 영상 frame loss 대응(magic/CRC32/frame_seq 4단 검증, drop-oldest).
+  </aside>
 </section>

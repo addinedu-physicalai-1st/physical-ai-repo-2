@@ -11,7 +11,7 @@
     </h2>
 
     <p style="color:var(--inkSoft);font-size:0.78em;margin-bottom:18px">
-      낮잠 시간 — 자장가를 틀고, 시작·종료 시각이 자동으로 기록되어 일일 보고서에 포함됩니다.
+      낮잠 시간 — 자장가 재생 + 시각 자동 기록.
     </p>
 
     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -22,12 +22,8 @@
           호출어로 시작 · 호출어로 종료
         </h3>
         <p style="color:var(--inkSoft);font-size:0.7em;line-height:1.7">
-          "고고핑, 자장가 틀어줘" 한 마디로 mp3 재생 시작.
-          호출어 + 모드 전환 발화로 정지.
-        </p>
-        <p style="color:var(--inkSoft);font-size:0.7em;line-height:1.7">
-          표정은 <span class="chip chip-lavender" style="font-size:0.55em;padding:2px 8px">sleep</span> 으로 자동 전환,
-          디스플레이가 어둑해지며 분위기 잡기.
+          호출어 한 마디로 mp3 재생·정지 +
+          <span class="chip chip-lavender" style="font-size:0.55em;padding:2px 8px">sleep</span> 표정 자동 전환
         </p>
       </div>
 
@@ -37,12 +33,7 @@
           낮잠 시각 자동 기록
         </h3>
         <p style="color:var(--inkSoft);font-size:0.7em;line-height:1.7">
-          자장가 모드 진입·종료 시각을 Control Server REST 로 전달 →
-          DB <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">mode_history</code> 에 기록.
-        </p>
-        <p style="color:var(--inkSoft);font-size:0.7em;line-height:1.7">
-          하원 시 일과 보고서 생성 (Ollama) 작업이 이 기록을 조회해
-          학부모에게 보낼 보고서에 <b style="color:var(--ink)">낮잠 시작·종료 시각</b> 자동 포함.
+          DB <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">mode_history</code> 기록 → 일과 보고서 자동 포함
         </p>
       </div>
 
@@ -53,4 +44,9 @@
     </p>
 
   </div>
+  <aside class="notes">
+    자장가 모드: 낮잠 시간 — 자장가를 틀고, 시작·종료 시각이 자동으로 기록되어 일일 보고서에 포함됩니다.
+    호출어로 시작 · 호출어로 종료: "고고핑, 자장가 틀어줘" 한 마디로 mp3 재생 시작. 호출어 + 모드 전환 발화로 정지. 표정은 sleep 으로 자동 전환, 디스플레이가 어둑해지며 분위기 잡기.
+    낮잠 시각 자동 기록: 자장가 모드 진입·종료 시각을 Control Server REST 로 전달 → DB mode_history 에 기록. 하원 시 일과 보고서 생성 (Ollama) 작업이 이 기록을 조회해 학부모에게 보낼 보고서에 낮잠 시작·종료 시각 자동 포함.
+  </aside>
 </section>

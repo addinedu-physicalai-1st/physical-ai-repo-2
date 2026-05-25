@@ -1,100 +1,74 @@
 <section>
-  <div style="padding:36px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="padding:40px 60px;height:680px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">
 
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="chip" style="font-size:0.55em">EDUPING</span>
       <span style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.2em">MODE · 3 · HERO</span>
     </div>
-    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 14px">
+    <h2 class="font-display" style="font-size:2.2em;color:var(--ink);margin:4px 0 24px">
       <span class="material-icons-round" style="font-size:0.85em;color:var(--babypink);vertical-align:-0.1em">local_florist</span>
       무궁화꽃이 피었습니다
     </h2>
 
-    <p style="color:var(--inkSoft);font-size:0.78em;margin-bottom:14px">
-      참가 아이 최대 5명을 추적하며 노래·관찰·탈락 판정을 자동 진행합니다.
-    </p>
+    <!-- 단계 머신 가로 흐름 -->
+    <div style="display:flex;align-items:stretch;gap:8px">
+      <div class="pastel-card text-center" style="border-color:var(--babypinkSoft);padding:16px 10px;flex:1">
+        <span style="font-family:'Jua';color:var(--babypink);font-size:0.55em;letter-spacing:0.1em">STEP 1</span>
+        <div class="font-display" style="font-size:0.92em;color:var(--ink);margin-top:6px">진입</div>
+        <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">얼굴 인식 · 5명 확정</p>
+      </div>
+      <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px;flex:0 0 auto">chevron_right</span>
+      <div class="pastel-card text-center" style="border-color:var(--mintSoft);padding:16px 10px;flex:1">
+        <span style="font-family:'Jua';color:var(--mintInk);font-size:0.55em;letter-spacing:0.1em">STEP 2</span>
+        <div class="font-display" style="font-size:0.92em;color:var(--ink);margin-top:6px">노래</div>
+        <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">mp3 + 양팔 눈가리기</p>
+      </div>
+      <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px;flex:0 0 auto">chevron_right</span>
+      <div class="pastel-card text-center" style="border-color:var(--lavenderSoft);padding:16px 10px;flex:1">
+        <span style="font-family:'Jua';color:var(--lavInk);font-size:0.55em;letter-spacing:0.1em">STEP 3</span>
+        <div class="font-display" style="font-size:0.92em;color:var(--ink);margin-top:6px">관찰</div>
+        <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">YOLOv8-Pose + ByteTrack</p>
+      </div>
+      <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px;flex:0 0 auto">chevron_right</span>
+      <div class="pastel-card text-center" style="border-color:var(--butterSoft);padding:16px 10px;flex:1">
+        <span style="font-family:'Jua';color:var(--butterInk);font-size:0.55em;letter-spacing:0.1em">STEP 4</span>
+        <div class="font-display" style="font-size:0.92em;color:var(--ink);margin-top:6px">탈락 대기</div>
+        <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">시야 밖으로 나갈 때까지</p>
+      </div>
+      <span class="self-center material-icons-round" style="color:var(--butter);font-size:20px;flex:0 0 auto">chevron_right</span>
+      <div class="pastel-card text-center" style="border-color:var(--skySoft);padding:16px 10px;flex:1">
+        <span style="font-family:'Jua';color:var(--skyInk);font-size:0.55em;letter-spacing:0.1em">LOOP</span>
+        <div class="font-display" style="font-size:0.92em;color:var(--ink);margin-top:6px">반복</div>
+        <p style="color:var(--inkSoft);font-size:0.58em;margin-top:6px;line-height:1.5">전원 탈락 / 종료까지</p>
+      </div>
+    </div>
 
-    <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
-
-      <!-- 단계 머신 가로 흐름 -->
-      <div style="display:flex;align-items:stretch;gap:6px">
-
-        <div class="pastel-card text-center" style="border-color:var(--babypinkSoft);padding:12px 10px;flex:1">
-          <span style="font-family:'Jua';color:var(--babypink);font-size:0.55em;letter-spacing:0.1em">STEP 1</span>
-          <div class="font-display" style="font-size:0.85em;color:var(--ink);margin-top:4px">진입</div>
-          <p style="color:var(--inkSoft);font-size:0.55em;margin-top:6px;line-height:1.5">
-            얼굴 인식<br>참가자 5명 확정<br>track_id 매핑
-          </p>
-        </div>
-
-        <span class="self-center material-icons-round" style="color:var(--butter);font-size:18px;flex:0 0 auto">chevron_right</span>
-
-        <div class="pastel-card text-center" style="border-color:var(--mintSoft);padding:12px 10px;flex:1">
-          <span style="font-family:'Jua';color:var(--mintInk);font-size:0.55em;letter-spacing:0.1em">STEP 2</span>
-          <div class="font-display" style="font-size:0.85em;color:var(--ink);margin-top:4px">노래</div>
-          <p style="color:var(--inkSoft);font-size:0.55em;margin-top:6px;line-height:1.5">
-            mp3 재생<br>양팔 눈 가리기<br>(속도 랜덤)
-          </p>
-        </div>
-
-        <span class="self-center material-icons-round" style="color:var(--butter);font-size:18px;flex:0 0 auto">chevron_right</span>
-
-        <div class="pastel-card text-center" style="border-color:var(--lavenderSoft);padding:12px 10px;flex:1">
-          <span style="font-family:'Jua';color:var(--lavInk);font-size:0.55em;letter-spacing:0.1em">STEP 3</span>
-          <div class="font-display" style="font-size:0.85em;color:var(--ink);margin-top:4px">관찰</div>
-          <p style="color:var(--inkSoft);font-size:0.55em;margin-top:6px;line-height:1.5">
-            2~5초 랜덤<br>YOLOv8-Pose + ByteTrack<br>관절 임계 초과 탈락
-          </p>
-        </div>
-
-        <span class="self-center material-icons-round" style="color:var(--butter);font-size:18px;flex:0 0 auto">chevron_right</span>
-
-        <div class="pastel-card text-center" style="border-color:var(--butterSoft);padding:12px 10px;flex:1">
-          <span style="font-family:'Jua';color:var(--butterInk);font-size:0.55em;letter-spacing:0.1em">STEP 4</span>
-          <div class="font-display" style="font-size:0.85em;color:var(--ink);margin-top:4px">탈락 대기</div>
-          <p style="color:var(--inkSoft);font-size:0.55em;margin-top:6px;line-height:1.5">
-            탈락자 시야 밖<br>나갈 때까지<br>대기
-          </p>
-        </div>
-
-        <span class="self-center material-icons-round" style="color:var(--butter);font-size:18px;flex:0 0 auto">chevron_right</span>
-
-        <div class="pastel-card text-center" style="border-color:var(--skySoft);padding:12px 10px;flex:1">
-          <span style="font-family:'Jua';color:var(--skyInk);font-size:0.55em;letter-spacing:0.1em">LOOP</span>
-          <div class="font-display" style="font-size:0.85em;color:var(--ink);margin-top:4px">반복</div>
-          <p style="color:var(--inkSoft);font-size:0.55em;margin-top:6px;line-height:1.5">
-            노래 → 관찰<br>전원 탈락 또는<br>교사 종료까지
-          </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">
+      <div class="pastel-card" style="border-color:var(--border);padding:16px 20px;display:flex;align-items:center;gap:14px">
+        <span class="material-icons-round" style="font-size:26px;color:var(--babypink);flex:0 0 auto">filter_center_focus</span>
+        <div>
+          <h3 class="font-display" style="font-size:0.92em;color:var(--ink)">추적 robustness</h3>
+          <p style="color:var(--inkSoft);font-size:0.66em;margin-top:3px">track 끊기면 얼굴로 재매핑</p>
         </div>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
-
-        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
-            <span class="material-icons-round" style="font-size:18px;color:var(--babypink);vertical-align:-0.15em">filter_center_focus</span>
-            추적 robustness
-          </h3>
-          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            occlusion 으로 track_id 끊기면 face match 로 재매핑.<br>
-            외부인·비참가 아이의 track_id 는 판정에서 제외.
-          </p>
+      <div class="pastel-card" style="border-color:var(--border);padding:16px 20px;display:flex;align-items:center;gap:14px">
+        <span class="material-icons-round" style="font-size:26px;color:var(--mintInk);flex:0 0 auto">photo_camera</span>
+        <div>
+          <h3 class="font-display" style="font-size:0.92em;color:var(--ink)">자연 촬영</h3>
+          <p style="color:var(--inkSoft);font-size:0.66em;margin-top:3px">감정 임계 시 자동 캡처 → 사진첩</p>
         </div>
-
-        <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:14px 18px">
-          <h3 class="font-display" style="font-size:0.9em;color:var(--ink)">
-            <span class="material-icons-round" style="font-size:18px;color:var(--mintInk);vertical-align:-0.15em">photo_camera</span>
-            자연 촬영
-          </h3>
-          <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            감정 임계 초과 (긍정/부정) 시 사진 자동 캡처.<br>
-            5단 throttling 후 Portal Web 사진첩에 자동 업로드.
-          </p>
-        </div>
-
       </div>
-
     </div>
 
   </div>
+  <aside class="notes">
+    참가 아이 최대 5명을 추적하며 노래·관찰·탈락 판정을 자동 진행.
+    STEP1 진입: 얼굴 인식으로 참가자 5명 확정, track_id 매핑.
+    STEP2 노래: mp3 재생 + 양팔로 눈 가리기 (속도 랜덤).
+    STEP3 관찰: 2~5초 랜덤, YOLOv8-Pose + ByteTrack 로 관절 임계 초과 시 탈락.
+    STEP4 탈락 대기: 탈락자가 시야 밖으로 나갈 때까지 대기.
+    LOOP: 노래 → 관찰 반복, 전원 탈락 또는 교사 종료까지.
+    추적 robustness: occlusion 으로 track_id 끊기면 face match 로 재매핑. 외부인·비참가 아이는 판정 제외.
+    자연 촬영: 감정 임계 초과(긍정/부정) 시 사진 자동 캡처, 5단 throttling 후 Portal Web 사진첩에 자동 업로드.
+  </aside>
 </section>

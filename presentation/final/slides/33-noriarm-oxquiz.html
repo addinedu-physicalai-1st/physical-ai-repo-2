@@ -22,10 +22,8 @@
           손 위치로 답하기
         </h3>
         <ul style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.7em;line-height:1.9;flex:1">
-          <li>· 책상 위 종이로 O / X 영역 표시</li>
-          <li>· overhead 카메라 + MediaPipe Hands 검출</li>
-          <li>· 5초 안에 손을 올리는 영역으로 정답 판정</li>
-          <li>· 검출 이벤트는 WebSocket 으로 UI 에 실시간 push</li>
+          <li>· overhead 카메라 + MediaPipe Hands</li>
+          <li>· 5초 안에 손 올린 영역으로 판정</li>
         </ul>
       </div>
 
@@ -37,20 +35,23 @@
         <ul style="list-style:none;padding:0;margin:8px 0 0;color:var(--ink);font-size:0.7em;line-height:1.9;flex:1">
           <li>· 정답 trajectory 를 룰베이스 정책으로 재생</li>
           <li>· three.js URDF 뷰어에 관절값 SSE 스트림</li>
-          <li>· sim/real 동일 vision 파이프라인 — OMX 팔 레이어만 분기</li>
-          <li>· 매니페스트 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">policy.kind</code> 변경 시 SmolVLA 로 교체 가능</li>
         </ul>
       </div>
 
       <div class="pastel-card" style="border-color:var(--border);background:var(--surface);grid-column:1 / span 2;padding:14px 22px;display:flex;align-items:center;gap:14px">
         <span class="material-icons-round" style="font-size:30px;color:var(--mintInk);flex:0 0 auto">science</span>
         <p style="color:var(--inkSoft);font-size:0.72em;line-height:1.7">
-          <b style="color:var(--ink)">실험적 정책 교체</b> — 같은 게임 루프 위에서 rule_based ↔ SmolVLA 모방학습으로 비교 가능.
-          매니페스트만 바꾸면 UI·통신·검출 파이프라인은 동일하게 유지.
+          <b style="color:var(--ink)">실험적 정책 교체</b> — 매니페스트 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">policy.kind</code> 로 rule_based ↔ SmolVLA
         </p>
       </div>
 
     </div>
 
   </div>
+  <aside class="notes">
+    OX 퀴즈는 3문제를 무작위 추출해 5초 카운트다운 후 손 위치로 정답을 판정하고, OMX 팔이 정답을 가리킵니다.
+    손 위치로 답하기: 책상 위 종이로 O / X 영역을 표시하고, overhead 카메라와 MediaPipe Hands 로 손을 검출합니다. 5초 안에 손을 올리는 영역으로 정답을 판정하며, 검출 이벤트는 WebSocket 으로 UI 에 실시간 push 합니다.
+    OMX 팔이 답을 가리킵니다: 정답 trajectory 를 룰베이스 정책으로 재생하고, three.js URDF 뷰어에 관절값을 SSE 로 스트림합니다. sim/real 은 동일한 vision 파이프라인을 쓰고 OMX 팔 레이어만 분기하며, 매니페스트 policy.kind 변경 시 SmolVLA 로 교체할 수 있습니다.
+    실험적 정책 교체: 같은 게임 루프 위에서 rule_based 와 SmolVLA 모방학습을 비교할 수 있고, 매니페스트만 바꾸면 UI·통신·검출 파이프라인은 동일하게 유지됩니다.
+  </aside>
 </section>

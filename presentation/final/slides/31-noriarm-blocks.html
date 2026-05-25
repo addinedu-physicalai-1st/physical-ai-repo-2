@@ -12,7 +12,7 @@
     </h2>
 
     <p style="color:var(--inkSoft);font-size:0.78em;margin-bottom:14px">
-      사람과 번갈아 블럭을 쌓는 협동 놀이. 로봇 행동은 <b style="color:var(--ink)">ACT (Action Chunking Transformer)</b> 모방학습 정책이 생성합니다.
+      사람과 번갈아 쌓는 협동 놀이 · <b style="color:var(--ink)">ACT (Action Chunking Transformer)</b> 모방학습
     </p>
 
     <div style="flex:1;display:grid;grid-template-columns:1.05fr 0.95fr;gap:16px">
@@ -42,7 +42,6 @@
           <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
             HuggingFace
             <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.9em">jisoo3/act_game_block_stacking_0520</code>
-            — 부트스트랩 시 자동 다운로드, 진행률 UI 배너 표시.
           </p>
         </div>
 
@@ -52,8 +51,7 @@
             세션 격리
           </h3>
           <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            lerobot ACTPolicy 를 서브프로세스로 실행 →
-            Control Server 세션 매니저가 라이프사이클 관리, 2회 SIGTERM 으로 안전 종료.
+            lerobot ACTPolicy 를 서브프로세스로 격리 실행
           </p>
         </div>
 
@@ -63,8 +61,7 @@
             홈 복귀 = 종료 신호
           </h3>
           <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">/joint_states</code> 가 HOME_POSE 임계 진입 frame 을
-            "1턴 완료" 로 카운트, 2회 도달 시 게임 종료. ROI 모니터링은 보조 안전망.
+            <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">/joint_states</code> HOME 진입 = 1턴 완료, 2회면 종료
           </p>
         </div>
 
@@ -73,4 +70,10 @@
     </div>
 
   </div>
+  <aside class="notes">
+    블럭쌓기는 사람과 로봇이 번갈아 블럭을 쌓는 협동 놀이이고, 로봇 행동은 ACT(Action Chunking Transformer) 모방학습 정책이 생성합니다.
+    ACT 체크포인트는 HuggingFace jisoo3/act_game_block_stacking_0520 으로, 부트스트랩 시 자동 다운로드되며 진행률을 UI 배너로 표시합니다.
+    세션 격리는 lerobot ACTPolicy 를 서브프로세스로 실행하고 Control Server 세션 매니저가 라이프사이클을 관리하며, 2회 SIGTERM 으로 안전하게 종료합니다.
+    홈 복귀가 종료 신호입니다. /joint_states 가 HOME_POSE 임계에 진입한 frame 을 "1턴 완료" 로 카운트하고, 2회 도달 시 게임을 종료합니다. ROI 모니터링은 보조 안전망입니다.
+  </aside>
 </section>

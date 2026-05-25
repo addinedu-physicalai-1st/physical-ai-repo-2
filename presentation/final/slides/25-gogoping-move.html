@@ -38,8 +38,7 @@
             nav graph 직접 편집
           </h3>
           <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            Admin UI 에서 노드·간선·이름을 시각적으로 편집.
-            거리 임계 자동 간선 / 1-step undo / yaml atomic write 로 즉시 반영.
+            노드·간선 시각 편집 → 즉시 반영
           </p>
         </div>
 
@@ -49,8 +48,7 @@
             동적 장애물 회피
           </h3>
           <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            LiDAR occupancy + 카메라 객체 인식 으로 사람·아이를 항상 감지.
-            인접 시 속도 스케일 다운, 임계 이하 즉시 정지.
+            사람·아이 감지 → 감속·즉시 정지
           </p>
         </div>
 
@@ -60,7 +58,7 @@
             저배터리 자동 복귀
           </h3>
           <p style="color:var(--inkSoft);font-size:0.65em;margin-top:6px;line-height:1.7">
-            배터리 임계 도달 시 비긴급 작업 cancel → <code>charger</code> named pose 로 자동 복귀.
+            임계 도달 시 <code>charger</code> 로 자동 복귀
           </p>
         </div>
 
@@ -69,4 +67,9 @@
     </div>
 
   </div>
+  <aside class="notes">
+    nav graph 직접 편집: Admin UI 에서 노드·간선·이름을 시각적으로 편집. 거리 임계 자동 간선 / 1-step undo / yaml atomic write 로 즉시 반영.
+    동적 장애물 회피: LiDAR occupancy + 카메라 객체 인식 으로 사람·아이를 항상 감지. 인접 시 속도 스케일 다운, 임계 이하 즉시 정지.
+    저배터리 자동 복귀: 배터리 임계 도달 시 비긴급 작업 cancel → charger named pose 로 자동 복귀.
+  </aside>
 </section>

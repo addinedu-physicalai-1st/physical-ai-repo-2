@@ -22,9 +22,6 @@
           <li>· <b>스피커</b> — <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">speechSynthesis</code> + <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px">&lt;audio&gt;</code></li>
           <li>· <b>등록 카메라</b> — WebRTC (운영시간 외)</li>
         </ul>
-        <p style="color:var(--inkSoft);font-size:0.62em;margin-top:8px;line-height:1.6">
-          호출어 wake word 모델 없이 STT 텍스트 매칭으로 처리.
-        </p>
       </div>
 
       <div class="pastel-card" style="border-color:var(--border);background:var(--surface);padding:18px">
@@ -37,9 +34,6 @@
           <li>· <b>LiDAR (RPLiDAR C1)</b> — 거리·장애물</li>
           <li>· <b>로봇팔 / 구동기</b> — JTC / cmd_vel</li>
         </ul>
-        <p style="color:var(--inkSoft);font-size:0.62em;margin-top:8px;line-height:1.6">
-          같은 호스트 노드들은 DDS shared memory 로 프레임 공유.
-        </p>
       </div>
 
       <div class="pastel-card" style="border-color:var(--skySoft);background:var(--surface);padding:14px 22px;grid-column:1 / span 2">
@@ -52,13 +46,15 @@
           <span class="chip chip-mint" style="font-size:0.55em;padding:6px 14px"><b>/gogoping/</b> mode · scan · cmd_vel · carry</span>
           <span class="chip chip-lavender" style="font-size:0.55em;padding:6px 14px"><b>/noriarm/</b> mode · joint_states · session</span>
         </div>
-        <p style="color:var(--inkSoft);font-size:0.62em;margin-top:10px;line-height:1.6">
-          mode 토픽은 latched — 각 로봇 노드들은 자기 namespace 만 구독.
-          한 로봇 모드 전환이 다른 로봇에 영향 없음.
-        </p>
       </div>
 
     </div>
 
   </div>
+  <aside class="notes">
+    마이크/스피커는 브라우저, 카메라/LiDAR/로봇팔은 ROS2 노드 — 충돌 방지를 위해 점유 주체를 분리.
+    브라우저 점유: 마이크(Web Speech STT 항상 듣기), 스피커(speechSynthesis + audio), 등록 카메라(WebRTC, 운영시간 외). 호출어는 wake word 모델 없이 STT 텍스트 매칭.
+    ROS2 노드 점유: 웹캠/Top/Gripper(얼굴·객체·자세·자연 촬영), LiDAR(RPLiDAR C1), 로봇팔/구동기(JTC/cmd_vel). 같은 호스트 노드는 DDS shared memory 로 프레임 공유.
+    namespace: mode 토픽은 latched, 각 로봇은 자기 namespace 만 구독 — 한 로봇 모드 전환이 다른 로봇에 영향 없음.
+  </aside>
 </section>

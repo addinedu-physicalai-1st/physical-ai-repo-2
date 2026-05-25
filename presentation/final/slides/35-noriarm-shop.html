@@ -81,12 +81,16 @@
           <p style="color:var(--ink);font-family:'Jua';font-size:0.7em;margin-top:4px">아이스크림콘</p>
         </div>
         <p style="color:var(--inkSoft);font-size:0.7em;flex:1;min-width:200px">
-          모형 3종 사전 배치 — 각 ROI 1개씩.<br>
-          의도 불분명 시 "다시 말해줄래?" 재요청.
+          모형 3종 사전 배치 — 각 ROI 1개씩
         </p>
       </div>
 
     </div>
 
   </div>
+  <aside class="notes">
+    가게놀이는 "사과 주세요" 한 마디에 OMX 팔이 모형을 집어 아이에게 건네는 놀이입니다.
+    단계는 다섯 가지입니다. STEP 1 요청 대기에서 "뭐 줄까?" 라고 묻고 호출어를 대기합니다. STEP 2 음성 인식에서 STT 후 의도 분류 LLM 으로 모형 3종 중 1개를 고릅니다. STEP 3 픽업에서 Top 카메라로 위치를 검출하고 그리퍼 카메라로 검증합니다. STEP 4 전달에서 "여기 있어" 와 함께 아이 측 ROI 로 release 합니다. STEP 5 확인·반복에서 ROI 가 비어있는지 검출하고 모형이 소진되면 종료합니다.
+    모형 3종은 사과·우유팩·아이스크림콘이며 각 ROI 에 1개씩 사전 배치됩니다. 의도가 불분명하면 "다시 말해줄래?" 라고 재요청합니다.
+  </aside>
 </section>
