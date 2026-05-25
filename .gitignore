@@ -42,3 +42,8 @@ service/web-service/portal-web/public/openarm/meshes/
 
 # Prismic 업로더 자격증명
 scripts/prismic/.env
+
+# rosbag 녹화 — scripts/record-gogoping.sh 출력
+log/rosbags/
+*.mcap
+*.db3
