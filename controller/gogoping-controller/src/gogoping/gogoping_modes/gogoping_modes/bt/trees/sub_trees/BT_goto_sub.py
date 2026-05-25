@@ -1,6 +1,6 @@
-"""ASSIST 의 goto_branch 의 자식. NavigateToVertex + 도착 알림.
+"""GOTO state MainTree (BT_goto_main) 의 body. NavigateToVertex + 도착 알림.
 
-운반 시나리오는 user 가 follow task + goto task 를 순차 chain (composition).
+운반 시나리오는 user 가 FOLLOW + GOTO 를 순차 chain (composition).
 이 SubTree 자체는 단일 이동 동작만 책임.
 
 자세한 명세: docs/bt/trees/BT_goto_sub.md

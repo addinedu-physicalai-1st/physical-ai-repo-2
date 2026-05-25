@@ -15,8 +15,8 @@
 각 visit Sequence 는 ``FailureIsSuccess`` decorator 로 감싸 한 vertex 실패가 전체 중단을
 일으키지 않게 함 (skip-on-failure 정책).
 
-본 빌더는 *building block* — FSM trigger / TaskSelector 결선은 별도 (호출자가 책임).
-일반 호출자가 빌드 후 main_tree 에 삽입한다. 단독 단위 테스트도 가능.
+본 빌더는 *building block* — FSM trigger 결선은 별도 (호출자가 책임).
+일반 호출자가 빌드 후 main_tree 에 삽입한다 (현재 호출처: BT_hide_and_seek_sub). 단독 단위 테스트도 가능.
 
 자세한 명세: docs/bt/trees/BT_patrol_sub.md (작성 예정)
 """

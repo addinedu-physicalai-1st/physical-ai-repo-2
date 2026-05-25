@@ -8,7 +8,7 @@
 ``missing_search_waypoints`` 로 미리 차단 — ForceState 디버그 우회 시 방어).
 
 진짜 hideseek (아이 인식 / FOUND 처리 / target_id 매칭) 은 추후 확장. 본 빌더는
-*building block* — ``BT_play_main`` 의 hideseek_branch 에서 호출됨.
+``BT_hide_and_seek_main`` 의 body 로 직접 호출됨 (평탄화 이후 TaskSelector 없음).
 
 자세한 명세: docs/bt/trees/BT_hide_and_seek_sub.md
 """

@@ -57,22 +57,21 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_idle_main 만
         │   │   │   ├── map_boundary_monitor.[py|/]   # 로봇 pose 가 맵 영역 밖 → "fault" (✅)
         │   │   │   │                                 #   MapCache.is_outside(x,y) — 격자 박스 + unknown 셀 체크.
-        │   │   │   │                                 #   Used in: 7 트리 (CHARGING/IDLE/ASSIST/PLAY/MANUAL/
-        │   │   │   │                                 #            RETURNING/LOW_BATTERY_RETURNING, ERROR 만 제외)
+        │   │   │   │                                 #   Used in: 9 트리 (ERROR 만 제외 — CHARGING/IDLE/GOTO/FOLLOW/
+        │   │   │   │                                 #            LULLABY/HIDEANDSEEK/MANUAL/RETURNING/LOW_BATTERY_RETURNING)
         │   │   │   ├── hardware_health_monitor.py    # LIDAR/odom staleness → "fault" trigger (✅)
         │   │   │   │                                 #   /gogoping/scan + /gogoping/odom 직접 sub.
         │   │   │   │                                 #   ROS param hw_health_staleness_seconds (기본 3.0s).
-        │   │   │   │                                 #   Used in: 6 트리 (CHARGING/IDLE/ASSIST/PLAY/RETURNING/
-        │   │   │   │                                 #            LOW_BATTERY_RETURNING — MANUAL/ERROR 제외)
-        │   │   │   ├── collision_event_handler.[py|/] # Nav2 Collision Monitor 비정상 상태 → "fault" trigger
-        │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main, BT_returning_main
-        │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → blackboard 세팅 + fsm.trigger 호출 (✅)
+        │   │   │   │                                 #   Used in: 8 트리 (CHARGING/IDLE/GOTO/FOLLOW/LULLABY/
+        │   │   │   │                                 #            HIDEANDSEEK/RETURNING/LOW_BATTERY_RETURNING — MANUAL/ERROR 제외)
+        │   │   │   ├── collision_event_handler.[py|/] # Nav2 Collision Monitor 비정상 상태 → "fault" trigger (☐ wiring 미완)
+        │   │   │   │                                 #   Used in (정책 ON): GOTO/FOLLOW/LULLABY/HIDEANDSEEK/RETURNING/LOW_BATTERY_RETURNING
+        │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → reconciler 호출 → fsm.trigger 자체 발화 (✅)
         │   │   │   │                                 #   SetGoal + ForceState + SetRobotPose + emergency_stop 4 server.
-        │   │   │   │                                 #   Used in: BT_charging_main, BT_idle_main, BT_assist_main, BT_play_main, BT_manual_main, BT_returning_main
+        │   │   │   │                                 #   Used in: CHARGING/IDLE/GOTO/FOLLOW/LULLABY/HIDEANDSEEK/MANUAL/RETURNING
+        │   │   │   │                                 #   (LOW_BATTERY_RETURNING / ERROR 만 제외 — lockdown)
         │   │   │   ├── docking_contact_check.[py|/]  # 도킹 접점 전류 흐름 감시, 끊김 시 fault
         │   │   │   │                                 #   Used in: BT_charging_main
-        │   │   │   ├── check_task.[py|/]             # blackboard.assist_task/play_task 값 비교 (✅)
-        │   │   │   │                                 #   Used in: BT_assist_main, BT_play_main (TaskSelector 분기)
         │   │   │   ├── select_vertex.py              # 고정 vertex 이름을 BB.target_vertex_name 에 W 후 SUCCESS (✅)
         │   │   │   │                                 #   NavigateToVertex 와 짝 — Sequence(SelectVertex + NavigateToVertex) 패턴
         │   │   │   │                                 #   Used in: BT_patrol_sub
@@ -89,7 +88,7 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_hide_and_seek_sub, BT_return_sub
         │   │   │   ├── navigate_to_vertex.py         # graph_router NavigateToVertex 액션 호출 (target_vertex_name 인자) (✅)
         │   │   │   │                                 #   다익스트라 lane 따라 이동. 자세한 설계: docs/graph-routing.md
-        │   │   │   │                                 #   Used in: BT_goto_sub, BT_return_sub, BT_assist_main 의 named-pose 이동
+        │   │   │   │                                 #   Used in: BT_goto_sub, BT_return_sub, BT_patrol_sub
         │   │   │   ├── align_to_dock.py              # blackboard target yaw 까지 cmd_vel.angular.z 로 제자리 회전 (✅) → docs/bt/behaviors/navigation.md#align_to_dock
         │   │   │   │                                 #   Used in: BT_return_sub
         │   │   │   ├── reverse_into_dock.py          # N초 동안 cmd_vel.linear.x 음수 publish (후진 진입) (✅) → docs/bt/behaviors/navigation.md#reverse_into_dock
@@ -150,22 +149,25 @@ controller/gogoping-controller/src/gogoping/
         │   │       │                     #   grep -rn "STUB:" controller/gogoping-controller/ 로 검색.
         │   │       ├── __init__.py
         │   │       ├── _base.py                     # StubRunningThenSuccess (30 tick → SUCCESS) + StubInfiniteRunning (항상 RUNNING)
-        │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미)
-        │   │       └── stub_hideseek.py             # ★ 사용 안 함 — BT_play_main 이 build_hide_and_seek_sub(ctx) 호출하도록 교체됨. 파일은 잔존 (다른 stub 정리 시 함께 삭제)
+        │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미). BT_follow_main body 로 사용 중
+        │   │       └── stub_hideseek.py             # ★ 사용 안 함 — BT_hide_and_seek_main 이 build_hide_and_seek_sub(ctx) 호출. 파일은 잔존 (다른 stub 정리 시 함께 삭제)
         │   │
         │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
         │       ├── __init__.py
         │       │
-        │       ├── main_trees/           # FSM state 별 MainTree (총 8개)
-        │       │   ├── __init__.py                       # build_main_tree(state, ctx) dispatcher
-        │       │   ├── BT_charging_main.py               # CHARGING — BatteryFullMonitor + CommandListener
-        │       │   ├── BT_idle_main.py                   # IDLE — CommandListener
-        │       │   ├── BT_assist_main.py                 # ASSIST — CommandListener + TaskSelector(goto ✅ + follow stub + lullaby ✅)
-        │       │   ├── BT_play_main.py                   # PLAY — CommandListener + TaskSelector(hideseek → build_hide_and_seek_sub(ctx)) (✅ patrol-only)
-        │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). torque OFF/ON ✅
-        │       │   ├── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
-        │       │   ├── BT_returning_main.py              # RETURNING — CommandListener
-        │       │   └── BT_low_battery_returning_main.py    # LOW_BATTERY_RETURNING — 빈 lockdown (CommandListener 없음)
+        │       ├── main_trees/           # FSM state 별 MainTree (총 10개) — 모두 _shell.py 의 build_active_main_tree() 사용 (ERROR 만 예외)
+        │       │   ├── __init__.py                       # build_main_tree(state, ctx) dispatcher — 10 state 매핑
+        │       │   ├── _shell.py                         # build_active_main_tree(name, ctx, body, **flags) — monitor 셸 조립 helper (✅)
+        │       │   ├── BT_charging_main.py               # CHARGING — BatteryFullMonitor + MapBoundary + HW + CommandListener (✅)
+        │       │   ├── BT_idle_main.py                   # IDLE — BatteryLow + IdleTimeout + MapBoundary + HW + CommandListener (✅)
+        │       │   ├── BT_goto_main.py                   # GOTO — task_body=True. body=BT_goto_sub (✅)
+        │       │   ├── BT_follow_main.py                 # FOLLOW — task_body=True. body=StubFollow (BT_follow_sub 미완성 ☐)
+        │       │   ├── BT_lullaby_main.py                # LULLABY — task_body=True. body=BT_lullaby_sub (LullabyAudio leaf, 영구 RUNNING) (✅)
+        │       │   ├── BT_hide_and_seek_main.py          # HIDEANDSEEK — task_body=True. body=BT_hide_and_seek_sub (patrol-only) (✅)
+        │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). 자동 monitor 미배치 ✅
+        │       │   ├── BT_returning_main.py              # RETURNING — BatteryLow + MapBoundary + HW + CommandListener + BT_return_sub (✅)
+        │       │   ├── BT_low_battery_returning_main.py  # LOW_BATTERY_RETURNING — MapBoundary + HW + BT_return_sub. lockdown (CommandListener 없음) (✅)
+        │       │   └── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
         │       │
         │       └── sub_trees/            # SubTree (mode/task 단위 5개 + 빌딩 블록)
         │           ├── __init__.py

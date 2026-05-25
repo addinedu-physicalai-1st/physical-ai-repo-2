@@ -1,7 +1,7 @@
 """# STUB — 공통 베이스 (2 종류).
 
-진짜 BT_*_sub 트리가 작성될 때 ``_stubs/`` 폴더 통째로 삭제 + 사용처 (BT_assist_main /
-BT_play_main 의 TaskSelector 자식) 교체.
+진짜 BT_*_sub 트리가 작성될 때 ``_stubs/`` 폴더 통째로 삭제 + 사용처 (현재
+``BT_follow_main`` 의 body 가 StubFollow 사용 — 평탄화 이후 TaskSelector 없음) 교체.
 
 ## 2 가지 stub 행동 패턴
 
@@ -35,8 +35,7 @@ py_trees 의 단독 ``tick_once()`` 는 직전 status 가 SUCCESS/FAILURE 면 �
 
     grep -rn "STUB:" controller/gogoping-controller/
 
-위 명령으로 본 폴더의 5개 파일 + 사용처 (BT_assist_main.py, BT_play_main.py) 의 import
-라인이 모두 잡힘.
+위 명령으로 본 폴더의 stub 파일들 + 사용처 (BT_follow_main.py 의 StubFollow import) 가 모두 잡힘.
 """
 from __future__ import annotations
 

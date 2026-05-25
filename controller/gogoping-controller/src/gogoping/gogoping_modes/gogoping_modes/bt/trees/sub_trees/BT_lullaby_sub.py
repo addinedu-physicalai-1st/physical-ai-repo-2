@@ -1,6 +1,6 @@
 """BT_lullaby_sub — 자장가 SubTree.
 
-ASSIST 의 TaskSelector 의 ``lullaby_branch`` 자식 (CheckTask SUCCESS 후 호출).
+LULLABY state MainTree (BT_lullaby_main) 의 body 로 직접 호출됨 (평탄화 이후 TaskSelector 없음).
 
 흐름:
     LullabyAudio (단일 leaf)
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 
 def build_lullaby_subtree(ctx: "Context") -> py_trees.behaviour.Behaviour:
-    """ASSIST 의 lullaby_branch 자식. 단일 ``LullabyAudio`` 리턴.
+    """LULLABY MainTree 의 body. 단일 ``LullabyAudio`` 리턴.
 
     name="BT_lullaby_sub" 필수 — tree_inspector 패턴 매칭으로 admin UI SUB 영역 표시.
     """
