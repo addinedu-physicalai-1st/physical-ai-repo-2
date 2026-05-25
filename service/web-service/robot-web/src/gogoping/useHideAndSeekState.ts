@@ -2,14 +2,14 @@
  * GogoPing 숨바꼭질 UI 상태 머신 — SR-PLAY-007.
  *
  * 단계 흐름:
- *   recruit → move_to_play → countdown → patrol → return → end
+ *   move_to_play → recruit → countdown → patrol → return → end
  *
  * patrol 단계 안에서 "사람 발견" 이벤트가 인터럽트로 들어와 참가자를 caught 처리.
  * 발견 자체는 별도 phase 가 아니라 patrol 위에 깔리는 토스트/배너로 표시.
  *
- * 본 composable 은 백엔드 미연결 상태의 UI mock — fakeBackend 가 타이머로
- * "도착" / "발견" / "순찰 소진" 이벤트를 생성한다. 실 도입 시 fakeBackend 만
- * gogoping BT/Control Server WS 로 교체하면 된다.
+ * 단계 전이는 BT 가 publish 하는 hideseek_phase 가 단일 진실원
+ * (`useHideseekPhaseStore` → `syncFromBtPhase`). 본 composable 은 BT snapshot
+ * 매핑 + countdown 카운터/캡처 배너 같은 부속 UI 상태만 책임진다.
  */
 import { computed, reactive, ref } from 'vue';
 import {
@@ -92,10 +92,15 @@ export interface HideAndSeekActions {
   finishPatrol: () => void;
   /** 운동장2 복귀 도착 → 발표 단계로. */
   finishReturn: () => void;
-  /** 카운트다운 1초 감소 — fakeBackend 1Hz tick. */
+  /** 카운트다운 1초 감소 — HideAndSeekGame 의 1Hz tick. */
   tickCountdown: () => void;
   /** roster 초기화 — recruit 진입 시 1회. */
   setRoster: (roster: RosterEntry[]) => void;
+  /**
+   * BT 가 publish 하는 hideseek_phase 문자열을 UI Phase 머신에 동기화.
+   * useGogopingStateWs → hideseekPhaseStore → 본 setter.
+   */
+  syncFromBtPhase: (btPhase: string) => void;
   /** 초기화 (모드 재진입 시). */
   reset: () => void;
 }
@@ -111,7 +116,7 @@ function makeInitialParticipants(roster: RosterEntry[]): Participant[] {
 }
 
 export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideAndSeekActions } {
-  const phase = ref<Phase>('recruit');
+  const phase = ref<Phase>('move_to_play');
   const participants = ref<Participant[]>(makeInitialParticipants(ROSTER_FALLBACK));
   const waypoints = ref<Waypoint[]>([...WAYPOINTS]);
   const currentWaypointIdx = ref<number>(-1);
@@ -212,8 +217,39 @@ export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideA
     if (countdownSec.value > 0) countdownSec.value -= 1;
   }
 
+  /**
+   * BT 가 publish 하는 hideseek_phase 문자열을 UI Phase 머신에 동기화.
+   * 알 수 없는 문자열 (e.g. "") 은 early-return — phase 유지.
+   *
+   * patrol 첫 진입 시 currentWaypointIdx 를 0 으로 초기화 (BT 가 patrol_sub
+   * 안에서 `set_patrol_index` 로 갱신하지만, BT 와 UI 의 타이밍 간극 동안
+   * 표시가 -1 으로 깜빡이는 것을 막기 위한 안전 초기화).
+   *
+   * countdown 첫 진입 시 countdownSec 을 COUNTDOWN_SEC 으로 리셋 — 1Hz 타이머는
+   * HideAndSeekGame.vue 의 phase watcher 가 관리.
+   */
+  function syncFromBtPhase(btPhase: string): void {
+    const map: Record<string, Phase> = {
+      move_to_play: 'move_to_play',
+      recruit: 'recruit',
+      countdown: 'countdown',
+      patrol: 'patrol',
+      return: 'return',
+      end: 'end',
+    };
+    const mapped = map[btPhase];
+    if (!mapped) return;
+    if (mapped === 'patrol' && phase.value !== 'patrol') {
+      currentWaypointIdx.value = 0;
+    }
+    if (mapped === 'countdown' && phase.value !== 'countdown') {
+      countdownSec.value = COUNTDOWN_SEC;
+    }
+    phase.value = mapped;
+  }
+
   function reset(): void {
-    phase.value = 'recruit';
+    phase.value = 'move_to_play';
     participants.value = makeInitialParticipants(ROSTER_FALLBACK);
     currentWaypointIdx.value = -1;
     countdownSec.value = COUNTDOWN_SEC;
@@ -246,6 +282,7 @@ export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideA
     finishReturn,
     tickCountdown,
     setRoster,
+    syncFromBtPhase,
     reset,
   };
 

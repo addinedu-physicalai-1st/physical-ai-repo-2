@@ -1,15 +1,14 @@
 <script setup lang="ts">
 /**
  * 30초 카운트다운 + "꼭꼭 숨어라 머리카락 보일라" 챈트 반복.
- * chant 시점은 fakeBackend 가 트리거 — onHideChant 콜백을 props 로 받지 않고
- * chant 표시는 부모(HideAndSeekGame) 에서 chant tick 을 prop 으로 내려준다.
+ * chant tick 은 부모 (HideAndSeekGame) 가 HIDE_CHANT_INTERVAL_MS 마다 +1 해 내려준다.
  */
 import { computed } from 'vue';
 
 const props = defineProps<{
   remainingSec: number;
   totalSec: number;
-  /** chant 발생 카운터 — 부모가 fakeBackend 콜백에서 +1 하면 애니메이션 트리거. */
+  /** chant 발생 카운터 — 부모가 HIDE_CHANT_INTERVAL_MS 마다 +1 하면 애니메이션 트리거. */
   chantTick: number;
 }>();
 
