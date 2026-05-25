@@ -12,7 +12,7 @@
 내부 상태는 ``self._level`` (0.0 ~ 100.0). srv 호출 시 clamp 후 즉시 다음 publish
 tick 부터 새 값 반영. BatterySubscriber 가 받아 blackboard.BATTERY_LEVEL 갱신 →
 battery_low_monitor 가 50% 진입 시 ``battery_low`` trigger 발화 → RETURNING /
-LOW_BATTERY_RETURN escalation 검증 가능.
+LOW_BATTERY_RETURNING escalation 검증 가능.
 """
 
 from __future__ import annotations

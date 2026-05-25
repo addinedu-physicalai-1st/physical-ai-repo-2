@@ -71,7 +71,7 @@ npx wscat -c ws://localhost:8000/ws/nav-debug-events
 | 못 보이는 첫 event | 끊긴 지점 |
 |---|---|
 | `[SetGoal]` | admin UI / robot-web 이 SetGoal 자체를 안 보냄 |
-| `[reconcile] accepted=False` | reconciler 거부 — 현재 state 가 명령 못 받음 (LOW_BATTERY_RETURN lockdown 등) |
+| `[reconcile] accepted=False` | reconciler 거부 — 현재 state 가 명령 못 받음 (LOW_BATTERY_RETURNING lockdown 등) |
 | `[FSM]` | `transitions` trigger 실패 (invalid trigger 등) |
 | `[BT swap]` (FSM 만 보임) | main thread `_tick` 멈춤 |
 | `[NavTo terminate]` (BT swap 까진 있음) | 트리 `root.stop(INVALID)` 가 NavTo 까지 전파 안 됨 |

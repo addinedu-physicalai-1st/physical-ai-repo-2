@@ -343,7 +343,7 @@ async def mode_click(req: ModeRequest) -> dict:
     - ``eduping`` / ``noriarm`` — 현재 단순 로그 + ok 반환. 추후 각 brige 로 라우팅.
     """
     if req.robot == "gogoping":
-        from control_service.gogoping.mode_to_goal import UnsupportedMode, mode_to_goal
+        from control_service.gogoping.state_to_goal import UnsupportedMode, mode_to_goal
 
         try:
             goal = mode_to_goal(req.mode)
@@ -360,8 +360,7 @@ async def mode_click(req: ModeRequest) -> dict:
             "robot": req.robot,
             "mode": req.mode,
             "reason": reason,
-            "goal_mode": goal.mode,
-            "goal_task": goal.task,
+            "goal_target_state": goal.target_state,
         }
 
     # eduping / noriarm — TODO: 각 robot 의 router 가 mode 클릭 처리하면 그쪽으로 라우팅.

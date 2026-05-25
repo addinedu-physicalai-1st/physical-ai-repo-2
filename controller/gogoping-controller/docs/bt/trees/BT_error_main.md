@@ -22,7 +22,7 @@ Parallel(SuccessOnAll(synchronise=False))
 | Trigger | From | Source 발화 주체 |
 |---|---|---|
 | `fault` (reason="user_emergency_stop") | 거의 모든 state | `/gogoping/emergency_stop` (Trigger srv) — admin UI e-stop 버튼 / 외부 안전 시스템 |
-| `fault` (reason="out_of_map") | CHARGING/IDLE/ASSIST/PLAY/MANUAL/RETURNING/LOW_BATTERY_RETURN | `MapBoundaryMonitor` |
+| `fault` (reason="out_of_map") | CHARGING/IDLE/GOTO/FOLLOW/LULLABY/HIDEANDSEEK/MANUAL/RETURNING/LOW_BATTERY_RETURNING | `MapBoundaryMonitor` |
 | `fault` (reason="lidar_timeout" 등) | 동일 | `HardwareHealthMonitor` (스켈레톤) |
 | `fault` (reason="...") | 동일 | `CollisionEventHandler` (스켈레톤) |
 

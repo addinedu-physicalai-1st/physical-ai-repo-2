@@ -253,7 +253,7 @@ main.py._on_state_change → BT swap
 | 사용자 "대기" | `cancel` (ASSIST→IDLE) | ✅ INVALID | ✅ |
 | 사용자 다른 모드 (carry/follow) | reconciler 가 `assist_task` 갱신 — same ASSIST, TaskSelector 가 다른 branch → lullaby_branch RUNNING 끊김 | ✅ INVALID | ✅ |
 | 사용자 "복귀" | `return_request` (ASSIST→RETURNING) | ✅ INVALID | ✅ |
-| 배터리 ≤20% | `battery_low` (ASSIST→LOW_BATTERY_RETURN) | ✅ INVALID | ✅ |
+| 배터리 ≤20% | `battery_low` (ASSIST→LOW_BATTERY_RETURNING) | ✅ INVALID | ✅ |
 | HW fault / 맵 이탈 | `fault` (ASSIST→ERROR) | ✅ INVALID | ✅ |
 | 다른 active mode (PLAY/MANUAL) | `play_request`/`manual_request` | ✅ INVALID | ✅ |
 

@@ -8,18 +8,43 @@
   - 작업 완료 → SUCCESS, 실패 → FAILURE 리턴 (정상 BT 규약)
   - trigger 호출도 가능 (예: `verify_docking_contact` 가 `docked` trigger 발사 후 SUCCESS)
   - `terminate(new_status)` 는 **idempotent** — 진행 중 외부 작업 cancel
-- **MainTree root SUCCESS** (ASSIST/PLAY 한정) = task 완료. `main.py` 의 spin 루프가 감지 후 `assist_done` / `play_done` trigger 발사 + 트리 swap.
-  CHARGING / IDLE / RETURNING / LOW_BATTERY_RETURN / ERROR 의 MainTree 는 root SUCCESS 가 task 완료 의미 아님 — state 전이는 trigger 발화 (`battery_*` / `docked` / `fault` / `*_request`) 가 담당.
-  ERROR / LOW_BATTERY_RETURN 은 lockdown — 사용자 명령 차단 (CommandListener 미배치). reset trigger 없음.
+- **MainTree root SUCCESS** (4 task state 한정: GOTO / FOLLOW / LULLABY / HIDEANDSEEK) = task 완료. `main.py` 의 spin 루프가 감지 후 `task_done` trigger 발사 + 트리 swap.
+  - `_shell.py` 의 `build_active_main_tree(..., task_body=True)` 로 빌드된 트리가 해당. body (SubTree) 가 SUCCESS 를 root 까지 전파 → task_done.
+  - CHARGING / IDLE / RETURNING / LOW_BATTERY_RETURNING / ERROR / MANUAL 의 MainTree 는 root SUCCESS 가 task 완료 의미 아님 (`task_body=False`) — state 전이는 trigger 발화 (`battery_*` / `docked` / `fault` / `*_request`) 가 담당.
+  - ERROR / LOW_BATTERY_RETURNING 은 lockdown — 사용자 명령 차단 (CommandListener 미배치). reset trigger 없음.
 - **MainTree root FAILURE** → `main.py._on_tree_failure()` 가 `return_request` trigger 발사 → RETURNING 으로 도피 (예: FollowSubTree Loss Recovery 끝까지 실패)
 - 자세한 trigger 이름·시그니처: [fsm-triggers.md](fsm-triggers.md)
 - 자세한 blackboard 키: [blackboard-schema.md](blackboard-schema.md)
-- **Active mode 직접 전이** — `assist_request` / `play_request` / `manual_request` 는 IDLE 뿐 아니라 *다른 active mode* 에서도 발화 가능 (예: ASSIST 중 PLAY 누르면 직접 PLAY 로). BT swap 1회로 처리되며 `terminate(INVALID)` 가 이전 트리의 시간-구속 cleanup 보장 (ManualTorqueHold 의 torque ON 복원, NavigateToPose 의 nav2 goal cancel 등). 따라서 모든 behavior 의 `terminate()` 는 **idempotent + cleanup-complete** 해야 함.
+- **task state 직접 전이** — `goto_request` / `follow_request` / `lullaby_request` / `hideseek_request` / `manual_request` 는 IDLE 뿐 아니라 *다른 task state* 에서도 발화 가능 (예: GOTO 중 FOLLOW 누르면 직접 FOLLOW 로). BT swap 1회로 처리되며 `terminate(INVALID)` 가 이전 트리의 시간-구속 cleanup 보장 (ManualTorqueHold 의 torque ON 복원, NavigateToVertex 의 nav2 goal cancel 등). 따라서 모든 behavior 의 `terminate()` 는 **idempotent + cleanup-complete** 해야 함.
+- **shell helper** `bt/trees/main_trees/_shell.py` — `build_active_main_tree(body, task_body, ctx, monitors)` 가 monitor Parallel 셸을 조립. task state 4개 (`task_body=True`) 와 기타 state (`task_body=False`) 가 동일 helper 사용. 중복 코드 제거.
+
+---
+
+## monitor 정책 매트릭스
+
+`collision` 열은 `_shell.py` 의 `include_collision` flag 로 정책상 ON 이지만 `CollisionMonitor`
+behavior **실제 wiring 미구현** (`_shell.py` 의 TODO 주석). 따라서 현재 모든 state 의 children
+에 실제로 추가되지 않음. behavior 작성 시 helper TODO 만 해제하면 매트릭스대로 자동 배치됨.
+의도/실제를 구분하기 위해 "🟡 (정책 ON, wiring ☐)" 로 표시.
+
+| state | battery_low | battery_full | idle_timeout | map_boundary | hw_health | collision | command_listener |
+|---|---|---|---|---|---|---|---|
+| IDLE | ✅ | — | ✅ | ✅ | ✅ | — | ✅ |
+| CHARGING | — | ✅ | — | ✅ | ✅ | — | ✅ |
+| GOTO | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
+| FOLLOW | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
+| LULLABY | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
+| HIDEANDSEEK | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
+| MANUAL | — | — | — | ✅ | — | — | ✅ |
+| RETURNING | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
+| LOW_BATTERY_RETURNING | — | — | — | ✅ | ✅ | 🟡 | ❌ (lockdown) |
+| ERROR | — | — | — | — | — | — | ❌ (terminal) |
 
 ---
 
 CHARGING
-  main: Parallel
+  main: `build_active_main_tree(body=None, task_body=False, ...)`
+        Parallel
         ├─ BatteryFullMonitor     (✅ ≥ 70% → battery_full → IDLE)
         ├─ MapBoundaryMonitor     (✅ amcl 미스로컬라이즈 / 누군가 들고 옮긴 케이스 안전망)
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
@@ -29,8 +54,9 @@ CHARGING
 
 
 IDLE
-  main: Parallel
-        ├─ BatteryLowMonitor      (✅ — battery ≤ 20% → battery_low → RETURNING)
+  main: `build_active_main_tree(body=None, task_body=False, ...)`
+        Parallel
+        ├─ BatteryLowMonitor      (✅ — battery ≤ 20% → battery_low → LOW_BATTERY_RETURNING 방향)
         ├─ IdleTimeoutMonitor     (✅ — idle_timeout_seconds 경과 → idle_timeout → RETURNING)
         ├─ MapBoundaryMonitor     (✅ — 비정상 pose 감지 → fault)
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
@@ -38,35 +64,65 @@ IDLE
   sub: 없음
 
 
-ASSIST
-  main: Parallel (SuccessOnSelected=[TaskSelector])
-        ├─ BatteryLowMonitor      (✅ ≤20% → battery_low → RETURNING)
-        ├─ MapBoundaryMonitor     (✅ OccupancyGrid 기반 → fault(reason="out_of_map") → ERROR)
+GOTO
+  main: `build_active_main_tree(body=build_goto_subtree(ctx), task_body=True, ...)`
+        Parallel (SuccessOnSelected=[GotoSubTree])
+        ├─ BatteryLowMonitor      (✅ ≤20% → battery_low → LOW_BATTERY_RETURNING)
+        ├─ MapBoundaryMonitor     (✅ → fault(reason="out_of_map") → ERROR)
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
-        ├─ CommandListener        (✅)  ※ cancel 외 active mode 전이 (assist/play/manual_request) 도 가능
-        │
-        └─ TaskSelector (Selector, memory=False)
-              ├─ Sequence: CheckTask("goto")    → BT_goto_sub      (✅)
-              ├─ Sequence: CheckTask("follow")  → FollowSubTree    (stub) ※ ASSIST 직속 단독 추종
-              └─ Sequence: CheckTask("lullaby") → LullabySubTree   (✅) ※ 교사 명령 — ASSIST 에 분류
-                                                                     (아이 자발적 놀이 = PLAY)
+        ├─ CommandListener        (✅)  ※ cancel / 다른 task_request 도 가능
+        └─ GotoSubTree            (✅ — body SUCCESS → root SUCCESS → task_done → IDLE)
+
+  sub: BT_goto_sub — Sequence(NavigateToVertex + UIPublish)
+       body SUCCESS = 이동 완료 → task_done
 
 
-PLAY
-  main: Parallel (SuccessOnSelected=[TaskSelector])
+FOLLOW
+  main: `build_active_main_tree(body=build_follow_subtree(ctx), task_body=True, ...)`
+        Parallel (SuccessOnSelected=[FollowSubTree])
         ├─ BatteryLowMonitor      (✅)
         ├─ MapBoundaryMonitor     (✅)
-        ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
+        ├─ HardwareHealthMonitor  (✅)
         ├─ CollisionEventHandler  (추후)
-        ├─ CommandListener        (✅)  ※ cancel / 다른 active mode 전이
-        │
-        └─ TaskSelector (Selector, memory=False)
-              └─ Sequence: CheckTask("hideseek") → HideAndSeekSubTree (stub) ※ 1회 실행 후 종료
+        ├─ CommandListener        (✅)
+        └─ FollowSubTree          (🟡 StubFollow 로 대체 중 — 진짜 follow 미완성)
+
+  sub: BT_follow_sub — StubFollow (stub: InfiniteRunning)
+       ※ 사람 보이는 한 RUNNING, 잃으면 Loss Recovery (☐ 미구현)
+
+
+LULLABY
+  main: `build_active_main_tree(body=build_lullaby_subtree(ctx), task_body=True, ...)`
+        Parallel (SuccessOnSelected=[LullabySubTree])
+        ├─ BatteryLowMonitor      (✅)
+        ├─ MapBoundaryMonitor     (✅)
+        ├─ HardwareHealthMonitor  (✅)
+        ├─ CollisionEventHandler  (추후)
+        ├─ CommandListener        (✅)
+        └─ LullabySubTree         (✅ — body SUCCESS → task_done → IDLE)
+
+  sub: BT_lullaby_sub — LullabyAudio leaf
+       body SUCCESS = 자장가 1회 재생 완료 → task_done
+
+
+HIDEANDSEEK
+  main: `build_active_main_tree(body=build_hide_and_seek_subtree(ctx), task_body=True, ...)`
+        Parallel (SuccessOnSelected=[HideAndSeekSubTree])
+        ├─ BatteryLowMonitor      (✅)
+        ├─ MapBoundaryMonitor     (✅)
+        ├─ HardwareHealthMonitor  (✅)
+        ├─ CollisionEventHandler  (추후)
+        ├─ CommandListener        (✅)
+        └─ HideAndSeekSubTree     (✅ patrol-only — 진짜 hideseek 인식 ☐)
+
+  sub: BT_hide_and_seek_sub — BT_patrol_sub 빌딩블록 기반
+       BB.search_waypoints 읽어 동적 생성. body SUCCESS = 순찰 완료 → task_done
 
 
 MANUAL
-  main: Parallel
+  main: `build_active_main_tree(body=None, task_body=False, ...)`
+        Parallel
         ├─ ManualTorqueHold        (✅ initialise=torque OFF service 호출, terminate=torque ON 복원)
         ├─ MapBoundaryMonitor      (✅ — 위치 안전 예외)
         └─ CommandListener         (✅ — cancel / return_request / 다른 *_request)
@@ -86,8 +142,9 @@ MANUAL
 
 
 RETURNING
-  main: Parallel (SuccessOnSelected=[ReturnSubTree])
-        ├─ BatteryLowMonitor      (✅ — escalation: 또 떨어지면 LOW_BATTERY_RETURN)
+  main: `build_active_main_tree(body=build_return_subtree(ctx), task_body=False, ...)`
+        Parallel (SuccessOnSelected=[ReturnSubTree])
+        ├─ BatteryLowMonitor      (✅ — escalation: 또 떨어지면 LOW_BATTERY_RETURNING)
         ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map"))
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
@@ -102,8 +159,9 @@ RETURNING
           └─ VerifyDockingContact             (✅ — docked trigger 자동 발사 → CHARGING)
 
 
-LOW_BATTERY_RETURN
-  main: Parallel(SuccessOnAll)
+LOW_BATTERY_RETURNING
+  main: `build_active_main_tree(body=build_return_subtree(ctx), task_body=False, ...)`
+        Parallel (SuccessOnAll)
         ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 경계 이탈 시 fault)
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
         ├─ CollisionEventHandler  (추후)
@@ -118,7 +176,8 @@ LOW_BATTERY_RETURN
 
 
 ERROR
-  main: Parallel(SuccessOnAll)
+  main: `build_active_main_tree(body=None, task_body=False, ...)`
+        Parallel (SuccessOnAll)
         └─ StopAllMotors          (✅ initialise=cmd_vel=0 + release_torque, 1 tick SUCCESS)
   sub: 없음
 

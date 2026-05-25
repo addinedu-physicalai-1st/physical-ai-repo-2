@@ -34,8 +34,8 @@ def test_unknown_target_state_rejected():
 
 
 def test_internal_only_states_rejected():
-    """CHARGING / LOW_BATTERY_RETURN / ERROR 는 외부에서 직접 요청 불가."""
-    for s in ("CHARGING", "LOW_BATTERY_RETURN", "ERROR"):
+    """CHARGING / LOW_BATTERY_RETURNING / ERROR 는 외부에서 직접 요청 불가."""
+    for s in ("CHARGING", "LOW_BATTERY_RETURNING", "ERROR"):
         bb, fsm = _bb_and_fsm()
         result = reconcile({"target_state": s}, fsm=fsm, blackboard=bb)
         assert result.accepted is False
@@ -194,7 +194,7 @@ def test_error_locks_out_all():
 
 
 def test_low_battery_return_locks_out_all():
-    bb, fsm = _bb_and_fsm(current="LOW_BATTERY_RETURN")
+    bb, fsm = _bb_and_fsm(current="LOW_BATTERY_RETURNING")
     result = reconcile({"target_state": "GOTO", "destination_key": "X"}, fsm=fsm, blackboard=bb)
     assert result.accepted is False
-    assert result.reason == "fsm_in_low_battery_return"
+    assert result.reason == "fsm_in_low_battery_returning"

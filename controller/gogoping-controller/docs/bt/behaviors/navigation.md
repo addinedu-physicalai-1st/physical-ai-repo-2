@@ -17,7 +17,7 @@ nav2 / graph_router 호출 + 정지/도킹. 모두 `bt/behaviors/navigation/` �
 | Blackboard write | — |
 | Status | RUNNING (이동 중) / SUCCESS (도착) / FAILURE (vertex 없음·경로 없음·nav2 거부·취소) |
 | terminate(INVALID) | 진행 중 goal cancel |
-| Used in | BT_goto_sub, BT_return_sub, BT_assist_main 의 named-pose 이동 |
+| Used in | BT_goto_sub, BT_return_sub, BT_patrol_sub |
 
 ```python
 from gogoping_modes.bt.behaviors.navigation.navigate_to_vertex import NavigateToVertex
@@ -86,7 +86,7 @@ nav2 `NavigateToPose` 직접 호출 — vertex 그래프 무시, 임의 pose 로
 
 [bt/behaviors/navigation/verify_docking_contact.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/verify_docking_contact.py)
 
-ReverseIntoDock 완료 후 `docked` FSM trigger 발사 → RETURNING / LOW_BATTERY_RETURN → CHARGING 자동 전이. 자동 도킹 접점 센서는 미구현이라 현재 단순히 "후진 끝났으면 도크 도달 간주" 로 1tick SUCCESS + trigger 발사.
+ReverseIntoDock 완료 후 `docked` FSM trigger 발사 → RETURNING / LOW_BATTERY_RETURNING → CHARGING 자동 전이. 자동 도킹 접점 센서는 미구현이라 현재 단순히 "후진 끝났으면 도크 도달 간주" 로 1tick SUCCESS + trigger 발사.
 
 | 항목 | 값 |
 |---|---|

@@ -18,31 +18,28 @@ import { useModeStore } from '@/stores/mode';
 interface GogopingSnapshot {
   robot_id?: string;
   fsm_state?: string;
-  assist_task?: string;
-  play_task?: string;
+  // 평탄화 (2026-05-25): assist_task / play_task 필드 제거. fsm_state 자체가 task.
   // 그 외 필드는 본 composable 에서 사용 안 함 (main_tree / sub_tree / battery_level 등)
 }
 
 /**
- * snapshot 의 fsm_state + sub_task → robot-web 의 한국어 mode 라벨 매핑.
+ * snapshot 의 fsm_state → robot-web 의 한국어 mode 라벨 매핑.
  * 매핑 불가 (예: ERROR) 면 null.
  */
 function snapshotToModeLabel(snap: GogopingSnapshot): string | null {
   const fsm = snap.fsm_state ?? '';
-  if (fsm === 'IDLE' || fsm === 'CHARGING') return '대기';
-  if (fsm === 'MANUAL') return '수동';
-  if (fsm === 'RETURNING' || fsm === 'LOW_BATTERY_RETURN') return '복귀';
-  if (fsm === 'ASSIST') {
-    switch (snap.assist_task) {
-      case 'goto':    return '이동';
-      case 'follow':  return '추종';
-      case 'lullaby': return '자장가';
-      default:        return null;  // ASSIST 진입했는데 task 미세팅 — 잠시 후 다음 snapshot 으로
-    }
+  switch (fsm) {
+    case 'IDLE':
+    case 'CHARGING':            return '대기';
+    case 'MANUAL':              return '수동';
+    case 'RETURNING':
+    case 'LOW_BATTERY_RETURNING':  return '복귀';
+    case 'GOTO':                return '이동';
+    case 'FOLLOW':              return '추종';
+    case 'LULLABY':             return '자장가';
+    case 'HIDEANDSEEK':         return '숨바꼭질';
+    default:                    return null;  // ERROR / 알 수 없는 state — mode 변경 안 함
   }
-  if (fsm === 'PLAY' && snap.play_task === 'hideseek') return '숨바꼭질';
-  // ERROR / 알 수 없는 state — mode 변경 안 함
-  return null;
 }
 
 export function useGogopingStateWs(): { stop: () => void } {
@@ -65,7 +62,7 @@ export function useGogopingStateWs(): { stop: () => void } {
         if (snap.robot_id && snap.robot_id !== 'gogoping') return;
         const label = snapshotToModeLabel(snap);
         if (label && label !== mode.currentMode) {
-          // 추종 모드 진행 중인데 BT 가 아직 IDLE snapshot (ASSIST 진입 전) 이면
+          // 추종 모드 진행 중인데 BT 가 아직 IDLE snapshot (FOLLOW 진입 전) 이면
           // mode 를 '대기' 로 강제 전이하지 않음 — 인증 모달이 사라지는 race 차단.
           // 사용자 명시적 정지 / 다른 모드 선택은 별도 경로 (정지 버튼, 메뉴 click) 로 처리.
           if (mode.currentMode === '추종' && label === '대기') return;

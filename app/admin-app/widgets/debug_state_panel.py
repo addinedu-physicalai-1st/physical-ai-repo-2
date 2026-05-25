@@ -1,13 +1,14 @@
 """디버그 강제 state 전이 컴팩트 카드 — BT SUB 셀 옆.
 
-QComboBox 2개 (state / sub) + "적용" 버튼. state 선택 변경 시 sub 콤보 옵션 자동 갱신.
+평탄화 (2026-05-25): sub_task combo 제거. state combo + "적용" 버튼만.
+10 state 중 하나 선택 후 적용 → ForceState.srv 호출.
 
 BT SUB 셀과 같은 카드 스타일로 BTStateInline 의 가로 row 에 자연스럽게 들어감.
 
 사용:
     panel = DebugStatePanel()
     panel.force_state_requested.connect(
-        lambda state, sub: state_client.post_force_state(state, sub_task=sub, on_result=panel.set_last_result)
+        lambda state: state_client.post_force_state(state, on_result=panel.set_last_result)
     )
 """
 from __future__ import annotations
@@ -28,30 +29,16 @@ from theme import COLORS
 from . import soften
 
 _STATES = (
-    "CHARGING", "IDLE", "ASSIST", "PLAY", "MANUAL",
-    "RETURNING", "LOW_BATTERY_RETURN", "ERROR",
+    "IDLE", "CHARGING", "GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK",
+    "MANUAL", "RETURNING", "LOW_BATTERY_RETURNING", "ERROR",
 )
-
-# state → sub_task options. 빈 문자열 "" = "(none)" 라벨로 표시.
-_SUB_OPTIONS: dict[str, tuple[str, ...]] = {
-    "CHARGING":            ("",),
-    "IDLE":                ("",),
-    "ASSIST":              ("", "carry", "follow", "lullaby"),
-    "PLAY":                ("", "hideseek"),
-    "MANUAL":              ("",),
-    "RETURNING":           ("",),
-    "LOW_BATTERY_RETURN":  ("",),
-    "ERROR":               ("",),
-}
-
-_NONE_LABEL = "(none)"
 
 
 class DebugStatePanel(QFrame):
-    """state + sub_task 콤보 + 적용 버튼."""
+    """state 콤보 + 적용 버튼."""
 
-    # 적용 버튼 클릭 시 emit. 인자: (target_state, sub_task)
-    force_state_requested = pyqtSignal(str, str)
+    # 적용 버튼 클릭 시 emit. 인자: (target_state,)
+    force_state_requested = pyqtSignal(str)
     # 긴급정지 버튼 클릭 시 emit. 인자 없음.
     emergency_stop_requested = pyqtSignal()
     # [순찰] 빠른 버튼 클릭 시 emit. 인자 없음 — control-server 가 랜덤 그룹 선택.
@@ -158,7 +145,7 @@ class DebugStatePanel(QFrame):
         )
         self._quick_drive_btn.clicked.connect(lambda: self._quick_apply("IDLE"))
         quick_row.addWidget(self._quick_drive_btn, 1)
-        # [순찰] — control-server 가 random 그룹 선택 → SetGoal(PLAY/hideseek) 발사
+        # [순찰] — control-server 가 random 그룹 선택 → SetGoal(HIDEANDSEEK) 발사
         self._quick_patrol_btn = QPushButton("순찰")
         self._quick_patrol_btn.setCursor(Qt.PointingHandCursor)
         self._quick_patrol_btn.setStyleSheet(
@@ -181,26 +168,13 @@ class DebugStatePanel(QFrame):
         state_row.addWidget(state_label)
         self._state_combo = QComboBox()
         self._state_combo.addItems(list(_STATES))
-        self._state_combo.currentTextChanged.connect(self._on_state_changed)
         state_row.addWidget(self._state_combo, 1)
-        outer.addLayout(state_row)
-
-        # sub row + 적용 버튼
-        sub_row = QHBoxLayout()
-        sub_row.setSpacing(4)
-        sub_row.setContentsMargins(0, 0, 0, 0)
-        sub_label = QLabel("sub")
-        sub_label.setStyleSheet(
-            f"font-size: 8pt; color: {COLORS['text_soft']}; min-width: 28px;"
-        )
-        sub_row.addWidget(sub_label)
-        self._sub_combo = QComboBox()
-        sub_row.addWidget(self._sub_combo, 1)
+        # 적용 버튼 — state row 옆에 배치
         self._apply_btn = QPushButton("적용")
         self._apply_btn.setCursor(Qt.PointingHandCursor)
         self._apply_btn.clicked.connect(self._on_apply)
-        sub_row.addWidget(self._apply_btn, 0)
-        outer.addLayout(sub_row)
+        state_row.addWidget(self._apply_btn, 0)
+        outer.addLayout(state_row)
 
         # 마지막 결과 표시 (한 줄)
         self._last_result = QLabel("")
@@ -209,38 +183,23 @@ class DebugStatePanel(QFrame):
         )
         outer.addWidget(self._last_result)
 
-        # 초기 sub combo 옵션 채움
-        self._refresh_sub_options(self._state_combo.currentText())
-
     # --------------------------------------------------------------- internal
-
-    def _on_state_changed(self, state: str) -> None:
-        self._refresh_sub_options(state)
-
-    def _refresh_sub_options(self, state: str) -> None:
-        self._sub_combo.blockSignals(True)
-        self._sub_combo.clear()
-        for opt in _SUB_OPTIONS.get(state, ("",)):
-            self._sub_combo.addItem(_NONE_LABEL if opt == "" else opt, opt)
-        self._sub_combo.blockSignals(False)
 
     def _on_apply(self) -> None:
         state = self._state_combo.currentText()
-        # currentData() 가 actual sub_task 값 ("" / "carry" / "follow" / ...)
-        sub_task = self._sub_combo.currentData() or ""
-        self._last_result.setText(f"sending → {state} / {sub_task or _NONE_LABEL} ...")
+        self._last_result.setText(f"sending → {state} ...")
         self._last_result.setStyleSheet(
             f"font-size: 8pt; font-weight: 600; color: {COLORS['text_soft']};"
         )
-        self.force_state_requested.emit(state, sub_task)
+        self.force_state_requested.emit(state)
 
     def _quick_apply(self, state: str) -> None:
-        """수동/주행 빠른 토글 — sub_task 없이 즉시 force-state. combo 동기화 안 함."""
+        """수동/주행 빠른 토글 — 즉시 force-state. combo 동기화 안 함."""
         self._last_result.setText(f"sending → {state} (quick) ...")
         self._last_result.setStyleSheet(
             f"font-size: 8pt; font-weight: 600; color: {COLORS['text_soft']};"
         )
-        self.force_state_requested.emit(state, "")
+        self.force_state_requested.emit(state)
 
     def _on_estop_clicked(self) -> None:
         """긴급정지 버튼 — 확인 없이 즉시 발사 (안전 우선)."""

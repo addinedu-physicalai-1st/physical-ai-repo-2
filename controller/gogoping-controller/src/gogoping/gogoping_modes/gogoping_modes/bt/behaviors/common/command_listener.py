@@ -12,9 +12,9 @@
 
 ## py_trees behavior 측면
 
-본 behaviour 는 *모든 MainTree 의 monitor 분기에서 항상 tick* 된다 (idle/assist/play/
-manual/charging/error 의 root Parallel 자식). 매 tick ``RUNNING`` 유지 — SUCCESS / FAILURE
-리턴 금지 (monitor 컨벤션, ``docs/conventions.md`` §2).
+본 behaviour 는 *모든 MainTree 의 monitor 분기에서 항상 tick* 된다 (10 state 의 root
+Parallel 자식, ERROR/LOW_BATTERY_RETURNING lockdown 제외). 매 tick ``RUNNING`` 유지 —
+SUCCESS / FAILURE 리턴 금지 (monitor 컨벤션, ``docs/conventions.md`` §2).
 
 실제 trigger 발화는 ``update()`` 가 아닌 *서비스 콜백* 에서 (rclpy executor 가 별도 thread
 또는 같은 thread 에서 호출). ``update()`` 자체는 빈 routine.
@@ -26,7 +26,7 @@ manual/charging/error 의 root Parallel 자식). 매 tick ``RUNNING`` 유지 —
 sourcing 후 ROS 노드로 실행해야 동작.
 
 (reconciler 로직 자체는 ``goal_reconciler.py`` 에 분리되어 있어 ROS 없이도 단위 테스트
-가능 — 13 시나리오 검증 완료.)
+가능 — 17 시나리오 검증 완료.)
 """
 from __future__ import annotations
 
@@ -114,11 +114,10 @@ class CommandListener(py_trees.behaviour.Behaviour):
         콜백을 동기 호출하므로 main.py 의 ``_on_state_change`` 가 같은 thread 에서
         실행될 수 있음. 트리 swap 은 main.py 가 다음 tick 에 처리 (deferred).
         """
-        # Goal.msg → dict 변환
+        # Goal.msg → dict 변환 (평탄화: target_state 단일 필드)
         g = request.goal
         goal_dict = {
-            "mode": g.mode,
-            "task": g.task,
+            "target_state": g.target_state,
             "destination_key": g.destination_key,
             "target_id": g.target_id,
             "search_waypoints": list(g.search_waypoints),
@@ -129,11 +128,11 @@ class CommandListener(py_trees.behaviour.Behaviour):
         if dbg is not None:
             dbg.event(
                 "SetGoal",
-                f"mode={g.mode!r} task={g.task!r}"
+                f"target_state={g.target_state!r}"
                 f" dest={g.destination_key!r} target_id={g.target_id!r}",
             )
 
-        # reconcile — 순수 함수, 단위 테스트 13건 통과한 로직
+        # reconcile — 순수 함수, 단위 테스트 17건 통과한 로직
         result = reconcile(goal_dict, self.ctx.fsm, self._bb_writer)
 
         if dbg is not None:
@@ -150,7 +149,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
 
         # 로깅 — debug 시 도움
         self.ctx.node.get_logger().info(
-            f"SetGoal mode={g.mode!r} task={g.task!r} → "
+            f"SetGoal target_state={g.target_state!r} → "
             f"accepted={result.accepted} trigger={result.trigger_fired!r} "
             f"reason={result.reason!r}"
         )
@@ -159,49 +158,21 @@ class CommandListener(py_trees.behaviour.Behaviour):
 
     # ------------------------------------------------------------ ForceState callback
 
-    # ASSIST/PLAY 의 sub_task 매핑 — admin UI debug dropdown 의 옵션과 일치
-    _ASSIST_SUB_TASKS = ("goto", "follow", "lullaby")
-    _PLAY_SUB_TASKS = ("hideseek",)
-
     def _on_force_state_request(self, request, response):
-        """``ForceState.srv`` 콜백 — admin UI 디버그가 호출.
+        """``ForceState.srv`` 콜백 — admin UI DebugStatePanel 이 호출.
 
-        transition 규칙 우회. ``fsm.force_state(target)`` + (옵션) blackboard.task 세팅.
-        sub_task 가 비어있지 않으면 force_state 전에 blackboard 의 assist_task / play_task
-        세팅 — BT swap 후 TaskSelector 가 해당 branch 진입.
+        transition 규칙 우회. ``fsm.force_state(target)`` 직접 호출 — CHARGING /
+        LOW_BATTERY_RETURNING / ERROR 도 진입 가능.
+
+        평탄화 (2026-05-25): sub_task 필드 제거. state 자체가 task 라 추가 분기 불필요.
+        task body 의 destination_key / target_id 등을 디버그로 주고 싶으면 SetGoal.srv 사용.
         """
         target = request.target_state
-        sub_task = getattr(request, "sub_task", "") or ""
-
-        # sub_task 유효성 (state 와 짝)
-        if sub_task:
-            if target == "ASSIST" and sub_task not in self._ASSIST_SUB_TASKS:
-                response.accepted = False
-                response.reason = "invalid_sub_task"
-                return response
-            if target == "PLAY" and sub_task not in self._PLAY_SUB_TASKS:
-                response.accepted = False
-                response.reason = "invalid_sub_task"
-                return response
-            if target not in ("ASSIST", "PLAY"):
-                # ASSIST/PLAY 외에는 sub_task 무시 (warn only)
-                self.ctx.node.get_logger().warning(
-                    f"ForceState: sub_task={sub_task!r} ignored for state={target!r}"
-                )
-                sub_task = ""
-
-        # blackboard 의 task 키 미리 세팅 — TaskSelector 가 BT swap 직후 올바른 branch 진입
-        if sub_task:
-            if target == "ASSIST":
-                self._bb_writer.set("assist_task", sub_task)
-            elif target == "PLAY":
-                self._bb_writer.set("play_task", sub_task)
-
         ok = self.ctx.fsm.force_state(target)
         response.accepted = ok
         response.reason = "" if ok else "invalid_state"
         self.ctx.node.get_logger().info(
-            f"ForceState target={target!r} sub_task={sub_task!r} → accepted={ok}, "
+            f"ForceState target={target!r} → accepted={ok}, "
             f"current_state={self.ctx.fsm.current_state!r}"
         )
         return response
@@ -275,7 +246,6 @@ class _BlackboardWriter:
     """
 
     _WRITE_KEYS = (
-        "assist_task", "play_task",
         "destination_key", "target_person_id",
         "search_waypoints",
         # _on_emergency_stop_request 가 fault reason 기록용으로 W

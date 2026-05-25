@@ -1,6 +1,6 @@
 # BT_goto_sub
 
-ASSIST 의 `goto` task 본체. `destination_key` (waypoints.yaml 의 vertex 이름) 까지 graph_router 의 lane 따라 이동, 도착 시 `/gogoping/ui_event` 토픽으로 알림.
+GOTO state MainTree (BT_goto_main) 의 body. `destination_key` (waypoints.yaml 의 vertex 이름) 까지 graph_router 의 lane 따라 이동, 도착 시 `/gogoping/ui_event` 토픽으로 알림.
 
 자세한 설계 배경 (carry → goto rename 사유 포함): [`docs/superpowers/specs/2026-05-20-bt-goto-sub-design.md`](../../../../docs/superpowers/specs/2026-05-20-bt-goto-sub-design.md).
 
@@ -31,10 +31,10 @@ BT_goto_sub (Sequence, memory=True)
 
 | 이벤트 | 처리 |
 |---|---|
-| 진입 | `command_listener` SetGoal.srv → `assist_task="goto"`, `destination_key=<vertex>` → `assist_request(task="goto")` → ASSIST 진입 → TaskSelector(`goto` 분기) → BT_goto_sub |
-| SUCCESS | NavigateToVertex SUCCESS → UIPublish SUCCESS → Sequence SUCCESS → MainTree root SUCCESS → `_on_tree_success()` → `assist_done` → IDLE |
+| 진입 | `command_listener` SetGoal.srv → `destination_key=<vertex>` → `goto_request` → GOTO 진입 → BT_goto_main body 로 직접 호출 → BT_goto_sub |
+| SUCCESS | NavigateToVertex SUCCESS → UIPublish SUCCESS → Sequence SUCCESS → MainTree root SUCCESS → `_on_tree_success()` → `task_done` → IDLE |
 | FAILURE | NavigateToVertex FAILURE (경로 불가 / destination_key 빈 값 / 잘못된 vertex 이름) → Sequence FAILURE → `_on_tree_failure()` → `return_request` → RETURNING |
-| Cancel | `cancel` trigger → ASSIST→IDLE → BT swap → `terminate(INVALID)` cascade → NavigateToVertex 의 `_cancel_pending` flag → graph_router action cancel → cmd_vel=0 |
+| Cancel | `cancel` trigger → GOTO→IDLE → BT swap → `terminate(INVALID)` cascade → NavigateToVertex 의 `_cancel_pending` flag → graph_router action cancel → cmd_vel=0 |
 | battery_low / fault | Parallel sibling monitor 발화 → 동일 cancel cascade |
 
 ## 알려진 이슈

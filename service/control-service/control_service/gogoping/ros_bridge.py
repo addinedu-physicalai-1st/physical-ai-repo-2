@@ -19,7 +19,7 @@ import threading
 import time
 from typing import Any, Callable
 
-from .mode_to_goal import Goal
+from .state_to_goal import Goal
 
 logger = logging.getLogger(__name__)
 
@@ -213,8 +213,7 @@ class GogopingRosBridge:
 
         from gogoping_msgs.srv import SetGoal
         req = SetGoal.Request()
-        req.goal.mode = goal.mode
-        req.goal.task = goal.task
+        req.goal.target_state = goal.target_state
         req.goal.destination_key = goal.destination_key
         req.goal.target_id = goal.target_id
         req.goal.search_waypoints = list(goal.search_waypoints)
@@ -230,14 +229,14 @@ class GogopingRosBridge:
 
     # ----------------------------------------------------------- force_state (디버그)
 
-    def force_state_sync(
-        self, target_state: str, sub_task: str = "",
-    ) -> tuple[bool, str]:
+    def force_state_sync(self, target_state: str) -> tuple[bool, str]:
         """**디버그 전용** — FSM 강제 state 전이.
 
-        ``ForceState.srv`` 동기 호출. transition 규칙 우회.
-        ``sub_task`` 비어있지 않으면 force_state 전에 blackboard 의 assist_task /
-        play_task 세팅 — admin debug UI 의 sub combo box 가 채움.
+        ``ForceState.srv`` 동기 호출. transition 규칙 우회 — CHARGING /
+        LOW_BATTERY_RETURNING / ERROR 도 진입 가능.
+
+        평탄화 (2026-05-25): sub_task 인자 제거. state 자체가 task 라 추가 분기 불필요.
+        task body 의 destination_key / target_id 등을 디버그로 주려면 SetGoal.srv 사용.
         """
         if not self._ros_ok or self._force_state_cli is None:
             return False, "bridge_not_started"
@@ -249,7 +248,6 @@ class GogopingRosBridge:
         from gogoping_msgs.srv import ForceState
         req = ForceState.Request()
         req.target_state = target_state
-        req.sub_task = sub_task
 
         future = self._force_state_cli.call_async(req)
         deadline = time.time() + self.SEND_GOAL_TIMEOUT_S

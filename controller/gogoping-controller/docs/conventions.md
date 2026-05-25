@@ -184,11 +184,10 @@ class GogopingModes:
             self._on_tree_failure()
 
     def _on_tree_success(self):
-        # MainTree root SUCCESS = task 완료 → state 별 done trigger
-        mapping = {"ASSIST": "assist_done", "PLAY": "play_done"}
-        trigger = mapping.get(self._current_state)
-        if trigger:
-            self.ctx.fsm.trigger(trigger)
+        # MainTree root SUCCESS = task 완료 → task_done trigger (4 task state 공통)
+        _TASK_STATES = {"GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK"}
+        if self._current_state in _TASK_STATES:
+            self.ctx.fsm.trigger("task_done")
 
     def _on_tree_failure(self):
         # FollowSubTree Loss Recovery 끝까지 실패 등 → RETURNING 으로 도피
@@ -426,3 +425,27 @@ self.get_logger().error(f"failed: {e}\n{traceback.format_exc()}")
 - [ ] edge-triggered (같은 이벤트 매 tick 반복 호출 X)
 - [ ] 새 blackboard 키 / FSM trigger 추가 시 [blackboard-schema.md](blackboard-schema.md) / [fsm-triggers.md](fsm-triggers.md) 같이 갱신
 - [ ] **새 ActionServer 추가 시** [§5.1](#51-actionserverexecute_callback-은-sync-로-작성) (sync execute_callback) + [§5.2](#52-외부-action-goal-handle-은-tryfinally-safety-net-으로-cancel-forward) (try/finally) + [§5.3](#53-loggerexception-금지) (logger.error) 확인. 위반 시 좀비 goal / RuntimeError 함정 (사례: [nav-cancel-chain.md](nav-cancel-chain.md))
+
+---
+
+## 7. 새 task state 추가 체크리스트
+
+평탄화 모델 (10 state) 에서 새 task 를 추가하려면 (예: NORIARM_HANDOFF):
+
+1. `gogoping_msgs/msg/Goal.msg` 의 `target_state` 주석에 새 state 이름 추가
+2. `gogoping_msgs/msg/GoalStatus.msg` 의 `current_state` 주석에 추가
+3. `gogoping_msgs/srv/ForceState.srv` 의 `target_state` 주석에 추가
+4. `fsm/robot_fsm.py` — `STATES` 추가, `_TASK_STATES` 에 추가 (task 면), `_request_sources_excluding(...)` 로 task_request trigger 추가
+5. `bt/trees/sub_trees/BT_<task>_sub.py` 생성 — 핵심 행동
+6. `bt/trees/main_trees/BT_<task>_main.py` 생성 — `build_active_main_tree(body=build_<task>_subtree(ctx), task_body=True, ...)`
+7. `bt/trees/main_trees/__init__.py` — `_BUILDERS` dict 에 추가
+8. `utils/goal_reconciler.py` — `_EXTERNAL_STATES` 에 추가, `_REQUEST_TRIGGER` 매핑 추가, body validation 추가
+9. `service/control-service/control_service/gogoping/state_to_goal.py` — `_LABEL_TO_GOAL` 에 한국어 라벨 매핑 추가
+10. `shared/robots.json` — gogoping.modeTree / defaultEmotionByMode 등 라벨 추가
+11. `app/admin-app/widgets/debug_state_panel.py` — `_STATES` 에 추가
+12. `app/admin-app/widgets/bt_state_inline.py` — `_STATE_COLORS` 에 색 추가
+13. `tests/test_gogoping_fsm_transitions.py` — `_VALID_TRANSITIONS` 에 신규 trigger × source 추가
+14. `tests/test_gogoping_goal_reconciler.py` — 새 target_state body validation 테스트 추가
+15. 문서: `fsm-triggers.md`, `state-bt.md`, `bt/status.md`, `CLAUDE.md` 갱신
+
+대부분 한두 줄씩이라 실제론 ~10분 작업. shell helper 가 monitor 셸을 다 흡수해서 BT 자체는 1 파일 (MainTree).

@@ -24,11 +24,11 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `assist_task` | `str` (`goto` / `follow` / `lullaby` / `""`) | `command_listener` | `check_task` (BT_assist_main) | ASSIST 진입 시 세팅 |
-| `play_task` | `str` (`hideseek` / `""`) | `command_listener` | `check_task` (BT_play_main) | PLAY 진입 시 세팅 |
-| `target_person_id` | `str` | `command_listener` | `detect_target_person`, `child_face_tracker` | follow/hide-and-seek 추적 대상 (ReID/face_id) |
+| `target_person_id` | `str` | `command_listener` | `detect_target_person`, `child_face_tracker` | follow/hide-and-seek 추적 대상 (ReID/face_id). FOLLOW / HIDEANDSEEK 진입 시 세팅 |
 
 > 취소·복귀 등의 명령은 blackboard 플래그 없이 **`cancel` / `return_request` trigger 만 사용** — trigger ↔ blackboard 중복 방지.
+>
+> 이전 `assist_task` / `play_task` 키는 2026-05-25 평탄화 리팩터링으로 삭제됨 — GOTO/FOLLOW/LULLABY/HIDEANDSEEK 각 state 가 독립 BT 를 가지므로 task 분기 키 불필요.
 
 ### Perception (vision 토픽 어댑터가 W)
 
@@ -89,8 +89,6 @@ class Keys:
     ROBOT_POSE = "robot_pose"
     POSE_OVERRIDE_ACTIVE = "pose_override_active"
     # 명령 / 모드
-    ASSIST_TASK = "assist_task"
-    PLAY_TASK = "play_task"
     TARGET_PERSON_ID = "target_person_id"
     # Perception
     TARGET_VISIBLE = "target_visible"
@@ -135,7 +133,7 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
 | `docking_contact` | `False` |
 | `robot_pose` | `{"x": 0.0, "y": 0.0, "yaw": 0.0}` |
 | `pose_override_active` | `False` |
-| `assist_task` / `play_task` / `target_person_id` | `""` |
+| `target_person_id` | `""` |
 | `target_visible` / `found` | `False` |
 | `target_pose` / `target_face_bbox` | `None` (writer 가 세팅 전까진 미정의 — reader 는 try/except) |
 | `target_seen_at` | `0.0` |

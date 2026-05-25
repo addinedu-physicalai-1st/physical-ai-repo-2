@@ -10,7 +10,7 @@
 # FSM 현재 state (10 상태 중 하나) — string, 대문자
 string current_state    # "IDLE" / "CHARGING" / "GOTO" / "FOLLOW" / "LULLABY" /
                         # "HIDEANDSEEK" / "MANUAL" / "RETURNING" /
-                        # "LOW_BATTERY_RETURN" / "ERROR"
+                        # "LOW_BATTERY_RETURNING" / "ERROR"
 
 # 최근 수락된 goal (없으면 target_state="" 등 빈 문자열)
 gogoping_msgs/Goal current_goal

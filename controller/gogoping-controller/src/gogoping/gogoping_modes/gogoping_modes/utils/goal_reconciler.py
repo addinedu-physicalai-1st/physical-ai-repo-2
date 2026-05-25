@@ -39,11 +39,11 @@ class ReconcileResult:
 
 
 # 외부에서 SetGoal.srv 로 요청 가능한 state.
-# CHARGING / LOW_BATTERY_RETURN / ERROR 는 내부 trigger 전용.
+# CHARGING / LOW_BATTERY_RETURNING / ERROR 는 내부 trigger 전용.
 _EXTERNAL_STATES = frozenset({
     "IDLE", "GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK", "MANUAL", "RETURNING",
 })
-_INTERNAL_ONLY = frozenset({"CHARGING", "LOW_BATTERY_RETURN", "ERROR"})
+_INTERNAL_ONLY = frozenset({"CHARGING", "LOW_BATTERY_RETURNING", "ERROR"})
 
 # target_state → trigger 이름 매핑 (active 진입).
 _REQUEST_TRIGGER = {
@@ -104,8 +104,8 @@ def reconcile(
         return ReconcileResult(accepted=False, reason="fsm_in_charging")
     if current == "ERROR":
         return ReconcileResult(accepted=False, reason="fsm_in_error_terminal")
-    if current == "LOW_BATTERY_RETURN":
-        return ReconcileResult(accepted=False, reason="fsm_in_low_battery_return")
+    if current == "LOW_BATTERY_RETURNING":
+        return ReconcileResult(accepted=False, reason="fsm_in_low_battery_returning")
 
     # IDLE 요청 — active state 면 cancel.
     if target == "IDLE":

@@ -17,7 +17,7 @@ from . import (
     BT_goto_main,
     BT_hide_and_seek_main,
     BT_idle_main,
-    BT_low_battery_return_main,
+    BT_low_battery_returning_main,
     BT_lullaby_main,
     BT_manual_main,
     BT_returning_main,
@@ -33,7 +33,7 @@ _BUILDERS = {
     "HIDEANDSEEK":         BT_hide_and_seek_main.build,
     "MANUAL":              BT_manual_main.build,
     "RETURNING":           BT_returning_main.build,
-    "LOW_BATTERY_RETURN":  BT_low_battery_return_main.build,
+    "LOW_BATTERY_RETURNING":  BT_low_battery_returning_main.build,
     "ERROR":               BT_error_main.build,
 }
 

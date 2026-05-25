@@ -1,6 +1,6 @@
 # BT_return_sub
 
-도크 복귀 SubTree — RETURNING / LOW_BATTERY_RETURN MainTree 의 Parallel 자식으로 부착.
+도크 복귀 SubTree — RETURNING / LOW_BATTERY_RETURNING MainTree 의 Parallel 자식으로 부착.
 
 [bt/trees/sub_trees/BT_return_sub.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_return_sub.py)
 
@@ -26,7 +26,7 @@ OneShot (policy=ON_COMPLETION, name="BT_return_sub")
 
 ## Blackboard 사전 세팅 (빌더가 책임)
 
-빌더 `build_return_subtree(ctx)` 호출 시점 (= RETURNING / LOW_BATTERY_RETURN 진입에 따른 BT swap 시) 에 다음 키를 1회 채운다:
+빌더 `build_return_subtree(ctx)` 호출 시점 (= RETURNING / LOW_BATTERY_RETURNING 진입에 따른 BT swap 시) 에 다음 키를 1회 채운다:
 
 | 키 | 값 |
 |---|---|
@@ -60,7 +60,7 @@ yaml 이 admin UI graph editor 로 갱신되면 다음 RETURNING 진입 시 자�
 
 ## 알려진 이슈 — cancel cleanup (2026-05-18)
 
-RETURNING 또는 LOW_BATTERY_RETURN 중에 사용자가 다른 state 로 전이 (cancel / *_request / force_state) 했을 때 **robot 이 즉시 정지하지 않고 충전소입구까지 끝까지 이동**하는 문제.
+RETURNING 또는 LOW_BATTERY_RETURNING 중에 사용자가 다른 state 로 전이 (cancel / *_request / force_state) 했을 때 **robot 이 즉시 정지하지 않고 충전소입구까지 끝까지 이동**하는 문제.
 
 ### 증상
 

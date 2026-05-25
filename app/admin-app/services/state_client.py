@@ -106,7 +106,6 @@ class StateClient:
     def post_force_state(
         self,
         target_state: str,
-        sub_task: str = "",
         on_result: Callable[[str, bool, str], None] | None = None,
     ) -> None:
         """**디버그** — ``POST /api/gogoping/debug/force-state``.
@@ -115,7 +114,6 @@ class StateClient:
         ``on_result(state, ok, reason)`` 콜백 — Qt signal 또는 단순 함수.
 
         admin UI 의 DebugStatePanel 적용 버튼이 호출.
-        ``sub_task`` 비어있지 않으면 blackboard.assist_task / play_task 같이 세팅됨.
         """
         url = f"{self._base}/api/gogoping/debug/force-state"
 
@@ -126,7 +124,7 @@ class StateClient:
                 with httpx.Client(timeout=2.0) as client:
                     r = client.post(
                         url,
-                        json={"target_state": target_state, "sub_task": sub_task},
+                        json={"target_state": target_state},
                     )
                     if r.status_code == 200:
                         data = r.json()

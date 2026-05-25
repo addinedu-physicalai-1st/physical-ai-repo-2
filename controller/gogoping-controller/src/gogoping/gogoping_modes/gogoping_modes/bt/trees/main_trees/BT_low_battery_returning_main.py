@@ -1,4 +1,4 @@
-"""LOW_BATTERY_RETURN state MainTree — 배터리 긴급 복귀 lockdown.
+"""LOW_BATTERY_RETURNING state MainTree — 배터리 긴급 복귀 lockdown.
 
 monitor 정책 (state-bt.md):
 - MapBoundaryMonitor     ✅
@@ -19,7 +19,7 @@ from ._shell import build_active_main_tree
 
 def build(ctx: Context) -> py_trees.behaviour.Behaviour:
     return build_active_main_tree(
-        "MainTree[LOW_BATTERY_RETURN]", ctx,
+        "MainTree[LOW_BATTERY_RETURNING]", ctx,
         body=build_return_subtree(ctx),
         include_battery_low=False,
         include_map_boundary=True,
