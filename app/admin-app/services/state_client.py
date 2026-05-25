@@ -257,6 +257,48 @@ class StateClient:
 
         threading.Thread(target=_run, name="patrol", daemon=True).start()
 
+    def post_hideseek_skip_phase(
+        self,
+        current_phase: str,
+        on_result: Callable[[str, bool, str, str], None] | None = None,
+    ) -> None:
+        """[디버그] 숨바꼭질 현재 phase 를 즉시 SUCCESS — ``POST /api/gogoping/play/hideseek/debug/skip-phase``.
+
+        ``current_phase`` 가 ``recruit/countdown/patrol/return`` 중 하나여야 effect.
+        다른 phase 는 backend 가 reason=phase_not_skippable 로 거부.
+
+        응답 시 ``on_result(current_phase, ok, reason, advanced_to)`` 콜백.
+        """
+        url = f"{self._base}/api/gogoping/play/hideseek/debug/skip-phase"
+
+        def _run() -> None:
+            ok = False
+            reason = ""
+            advanced_to = ""
+            try:
+                with httpx.Client(timeout=2.0) as client:
+                    r = client.post(url, json={"current_phase": current_phase})
+                    if r.status_code == 200:
+                        data = r.json()
+                        ok = bool(data.get("accepted"))
+                        reason = str(data.get("reason", ""))
+                        advanced_to = str(data.get("advanced_to", ""))
+                    else:
+                        reason = f"http_{r.status_code}"
+            except httpx.HTTPError as e:
+                reason = f"http_error: {e}"
+            except Exception as e:
+                reason = f"unexpected: {e}"
+            if on_result is not None:
+                try:
+                    on_result(current_phase, ok, reason, advanced_to)
+                except Exception as e:
+                    logger.warning(f"hideseek_skip_phase on_result 콜백 오류: {e}")
+
+        threading.Thread(
+            target=_run, name="hideseek_skip_phase", daemon=True,
+        ).start()
+
     def post_idle_timeout(
         self,
         seconds: float,

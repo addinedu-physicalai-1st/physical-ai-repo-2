@@ -16,6 +16,31 @@ import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useHideSeekRecognition } from '../composables/useHideSeekRecognition';
 import { postCaught } from '../api/hideseekApi';
 
+const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
+
+// vertex name → group name. 마운트 시 1회 fetch — patrol 진행 중 vertex 가
+// 어느 카테고리에 속하는지 lookup 용.
+const vertexToGroup = ref<Record<string, string>>({});
+
+async function loadGroupMap(): Promise<void> {
+  try {
+    const res = await fetch('/api/waypoints', {
+      headers: { 'X-Device-Token': DEVICE_TOKEN },
+    });
+    if (!res.ok) return;
+    const body = await res.json() as {
+      waypoints?: Array<{ name: string; group?: string | null }>
+    };
+    const map: Record<string, string> = {};
+    for (const w of body.waypoints ?? []) {
+      if (w.group) map[w.name] = w.group;
+    }
+    vertexToGroup.value = map;
+  } catch {
+    // 네트워크 실패 — vertex name 그대로 표시 (group 없음).
+  }
+}
+
 const props = defineProps<{
   waypoints: Waypoint[];
   currentIdx: number;
@@ -28,13 +53,37 @@ const emit = defineEmits<{
   caught: [childId: number, childName: string, waypointLabel: string | undefined];
 }>();
 
-const total = computed(() => props.waypoints.length);
-const visitedCount = computed(() =>
-  Math.max(0, Math.min(props.currentIdx, total.value)),
+// "N 카테고리" 진행 — vertex 가 어느 group 에 속하는지 lookup 후 distinct count.
+// group 매핑 없는 vertex (yaml group=null) 는 vertex name 자체를 group 으로 fallback.
+function groupOf(vertexKey: string): string {
+  return vertexToGroup.value[vertexKey] ?? vertexKey;
+}
+
+const totalCategories = computed(() => {
+  const groups = new Set<string>();
+  for (const w of props.waypoints) groups.add(groupOf(w.key));
+  return groups.size;
+});
+
+const visitedCategories = computed(() => {
+  const groups = new Set<string>();
+  for (let i = 0; i < props.waypoints.length && i < props.currentIdx; i++) {
+    groups.add(groupOf(props.waypoints[i].key));
+  }
+  return groups.size;
+});
+
+const currentCategory = computed<string | null>(() => {
+  if (props.currentIdx < 0 || props.currentIdx >= props.waypoints.length) return null;
+  return groupOf(props.waypoints[props.currentIdx].key);
+});
+
+const remainingCategories = computed(() =>
+  Math.max(0, totalCategories.value - visitedCategories.value),
 );
-const remaining = computed(() => Math.max(0, total.value - visitedCount.value));
+
 const currentLabel = computed(() => {
-  if (props.currentIdx < 0 || props.currentIdx >= total.value) return null;
+  if (props.currentIdx < 0 || props.currentIdx >= props.waypoints.length) return null;
   return props.waypoints[props.currentIdx].label;
 });
 
@@ -67,7 +116,10 @@ const recognition = useHideSeekRecognition({
   },
 });
 
-onMounted(() => recognition.start());
+onMounted(() => {
+  recognition.start();
+  void loadGroupMap();
+});
 onBeforeUnmount(() => recognition.stop());
 </script>
 
@@ -76,10 +128,11 @@ onBeforeUnmount(() => recognition.stop());
     <header class="patrol-head">
       <div class="header-row">
         <h2 class="title">친구들을 찾는 중…</h2>
-        <div class="progress">{{ visitedCount }} / {{ total }} 곳 확인</div>
+        <div class="progress">{{ visitedCategories }} / {{ totalCategories }} 카테고리 확인</div>
       </div>
       <div v-if="currentLabel" class="now">
         지금: <strong>{{ currentLabel }}</strong>
+        <span v-if="currentCategory" class="category-tag">{{ currentCategory }}</span>
         <span class="rotate-tag">📷 회전 중</span>
       </div>
     </header>
@@ -150,7 +203,7 @@ onBeforeUnmount(() => recognition.stop());
           </ul>
         </div>
       </div>
-      <div class="remaining">{{ remaining }} 곳 남았어요</div>
+      <div class="remaining">{{ remainingCategories }} 카테고리 남았어요</div>
     </footer>
   </section>
 </template>

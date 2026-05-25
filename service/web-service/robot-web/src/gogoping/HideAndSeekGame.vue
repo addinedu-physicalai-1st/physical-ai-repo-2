@@ -30,7 +30,7 @@ const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change
 const mode = useModeStore();
 const voiceController = inject(VOICE_CONTROLLER_KEY);
 const hideseekStore = useHideseekPhaseStore();
-const { phase: btPhase } = storeToRefs(hideseekStore);
+const { phase: btPhase, patrol: btPatrol } = storeToRefs(hideseekStore);
 
 function speak(text: string): void {
   voiceController?.speak(text);
@@ -56,6 +56,17 @@ watch(
     if (p) actions.syncFromBtPhase(p);
   },
   { immediate: true },
+);
+
+// -------- BT → UI patrol 정보 동기화 (search_waypoints + current_index) --------
+watch(
+  btPatrol,
+  (info) => {
+    if (info && info.vertices.length > 0) {
+      actions.setPatrolVertices(info.vertices, info.currentIndex);
+    }
+  },
+  { immediate: true, deep: true },
 );
 
 // -------- phase 진입/이탈 부수 효과 (음성 + 타이머) --------
@@ -178,6 +189,9 @@ async function restart(): Promise<void> {
 function onPatrolCaught(childId: number, _childName: string, waypoint?: string): void {
   actions.markCaught(childId, waypoint ?? '');
 }
+
+// Debug "→ 다음 단계" skip 은 admin UI 의 DebugStatePanel 에서 처리.
+// (robot-web 은 운영용 — 사용자가 노출 안 됨)
 
 // ReturnPhase 인식 → caught 처리. 복귀 중이라 정적 라벨.
 function onReturnCaught(childId: number, _childName: string): void {

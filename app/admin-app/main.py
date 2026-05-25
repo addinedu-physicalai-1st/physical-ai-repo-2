@@ -443,6 +443,14 @@ class AdminWindow(QMainWindow):
             )
         )
 
+        # 숨바꼭질 [→ 다음] debug → state_client.post_hideseek_skip_phase
+        self.dashboard.debug_panel.hideseek_skip_phase_requested.connect(
+            lambda phase: self.state_client.post_hideseek_skip_phase(
+                phase,
+                on_result=self.dashboard.debug_panel.set_hideseek_skip_result,
+            )
+        )
+
         # 배터리 디버그 슬라이더 → state_client.post_battery_level
         self.dashboard.battery_debug.battery_level_requested.connect(
             lambda level: self.state_client.post_battery_level(
@@ -644,6 +652,15 @@ class AdminWindow(QMainWindow):
         if "patrol" in snap:
             try:
                 self.dashboard.map_card.update_patrol(snap.get("patrol"))
+            except Exception:
+                pass
+
+        # 숨바꼭질 phase — debug_panel 의 라벨 + skip 버튼 enable 상태 갱신
+        if "hideseek_phase" in snap:
+            try:
+                self.dashboard.debug_panel.set_hideseek_phase(
+                    snap.get("hideseek_phase") or "",
+                )
             except Exception:
                 pass
 

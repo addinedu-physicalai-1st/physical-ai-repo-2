@@ -108,6 +108,12 @@ export interface HideAndSeekActions {
    * useGogopingStateWs → hideseekPhaseStore → 본 setter.
    */
   syncFromBtPhase: (btPhase: string) => void;
+  /**
+   * BT snapshot 의 patrol.vertices + current_index 를 받아 state.waypoints /
+   * currentWaypointIdx 동기화. 동적 group 셔플 결과를 UI 가 그대로 표시.
+   * vertex name 을 key + label 양쪽에 사용 — 별도 label 매핑 없음.
+   */
+  setPatrolVertices: (vertexNames: string[], currentIndex: number) => void;
   /** 초기화 (모드 재진입 시). */
   reset: () => void;
 }
@@ -275,9 +281,20 @@ export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideA
   function reset(): void {
     phase.value = 'move_to_play';
     participants.value = makeInitialParticipants(ROSTER_FALLBACK);
+    waypoints.value = [...WAYPOINTS];
     currentWaypointIdx.value = -1;
     countdownSec.value = COUNTDOWN_SEC;
     captureBanners.value = [];
+  }
+
+  function setPatrolVertices(vertexNames: string[], currentIndex: number): void {
+    // BT 가 publish 하는 search_waypoints — UI 표시용 waypoints 로 동기화.
+    // vertex name 을 key 와 label 양쪽에 그대로 (별도 label 매핑 시점에 확장 가능).
+    waypoints.value = vertexNames.map((n) => ({ key: n, label: n }));
+    // current_index 가 -1 이면 그대로 두고, 0 이상이면 동기화.
+    if (currentIndex >= 0) {
+      currentWaypointIdx.value = currentIndex;
+    }
   }
 
   const state = reactive({
@@ -308,6 +325,7 @@ export function useHideAndSeekState(): { state: HideAndSeekState; actions: HideA
     tickCountdown,
     setRoster,
     syncFromBtPhase,
+    setPatrolVertices,
     reset,
   };
 

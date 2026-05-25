@@ -43,6 +43,7 @@ TOPIC_TRACKING_STATE = "/gogoping/tracking_state"
 # Blackboard 키 — gogoping_modes 의 SetBlackboard 서버가 허용하는 allowlist 와 일치.
 BB_KEY_HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids"
 BB_KEY_HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"
+BB_KEY_HIDESEEK_SKIP_COUNTDOWN = "hideseek_skip_countdown"
 
 # admin UI NavDebugLogCard 가 WS 연결 시 backfill 받는 최근 이벤트 수.
 # 시나리오 재현 직후 늦게 연결해도 직전 cancel chain 한 cycle 정도는 보임.
@@ -495,6 +496,38 @@ class GogopingRosBridge:
             self._hideseek_caught_ids_cache = set()
         return self._call_set_blackboard_sync(
             BB_KEY_HIDESEEK_REGISTERED_IDS, list(child_ids),
+        )
+
+    def write_hideseek_skip_countdown(self, value: bool = True) -> tuple[bool, str]:
+        """``hideseek_skip_countdown`` blackboard flag set.
+
+        Debug API /api/gogoping/play/hideseek/debug/skip-phase 가 countdown phase
+        에서 호출. BT Countdown behaviour 가 다음 tick 에 이 flag True 면 즉시
+        SUCCESS + flag 를 False 로 reset → 다음 카운트다운 진입 시 정상 30초.
+        """
+        return self._call_set_blackboard_sync(
+            BB_KEY_HIDESEEK_SKIP_COUNTDOWN, bool(value),
+        )
+
+    def write_hideseek_caught_ids_complete(self) -> tuple[bool, str]:
+        """``hideseek_caught_ids`` 를 누적 캐시 + registered_ids 와 동일 셋으로 set —
+        CaughtMonitor 가 registered ⊆ caught 검사 → 즉시 SUCCESS → patrol/return
+        parallel SUCCESS.
+
+        Debug API /skip-phase 가 patrol/return phase 에서 호출. 실 round 의
+        진짜 발견과 구분 안 됨 (snapshot 상 모두 caught) — 디버그 전용.
+        """
+        # registered_ids 는 snapshot 에서 못 읽음 (BT 가 publish 안 함). control-service
+        # 의 in-process cache 도 caught_ids 만 유지. 안전한 가정:
+        #   - 정상 흐름이면 BT 의 registered_ids 가 셋돼 있음 (recruit phase 완료 후)
+        #   - 그 정확한 값을 알아야 ⊆ 만족 가능. 그렇지 않으면 dummy 큰 셋으로
+        #     덮어쓰면 BT registered 가 그 셋 부분집합이 되어 SUCCESS.
+        # 단순화: 매우 큰 sentinel set (1..100) — 일반적 child_id 범위 커버.
+        sentinel_set = list(range(1, 101))
+        with self._hideseek_caught_lock:
+            self._hideseek_caught_ids_cache = set(sentinel_set)
+        return self._call_set_blackboard_sync(
+            BB_KEY_HIDESEEK_CAUGHT_IDS, sentinel_set,
         )
 
     def append_hideseek_caught_id(self, child_id: int) -> tuple[bool, str]:

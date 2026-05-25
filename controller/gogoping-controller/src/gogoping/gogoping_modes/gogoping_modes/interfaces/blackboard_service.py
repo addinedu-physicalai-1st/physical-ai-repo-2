@@ -28,6 +28,8 @@ import rclpy.node
 _ALLOWED_KEYS = frozenset({
     "hideseek_registered_ids",
     "hideseek_caught_ids",
+    # debug skip flag — Countdown behaviour 가 체크 (countdown phase 즉시 종료)
+    "hideseek_skip_countdown",
 })
 
 SERVICE_NAME = "blackboard/set"   # 노드 namespace 가 /gogoping 이라 /gogoping/blackboard/set

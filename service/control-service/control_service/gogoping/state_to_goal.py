@@ -53,14 +53,12 @@ _LABEL_TO_GOAL = {
     "숨바꼭질": lambda: Goal(
         target_state="HIDEANDSEEK",
         target_id=DEMO_DEFAULT_CHILD_ID,
-        # nav_graph 의 named_pose 키 — robot-web fixtures.WAYPOINTS 와 일치.
-        # 실제 데모 환경의 DB 에 같은 키로 vertex 등록되어야 함 (운영자 책임).
+        # waypoints.yaml 에 실제 등록된 vertex 이름 — 데모 운영자 환경 기반.
+        # play_area_key 와 search_waypoints 는 robot-web fixtures.ts WAYPOINTS 와
+        # 일치해야 UI 표시 ↔ BT 실제 nav 가 같은 위치를 가리킨다.
         # 향후 /api/nav/named_poses 동적 조회로 교체 예정.
-        search_waypoints=[
-            "patrol_slide", "patrol_sandbox", "patrol_tree",
-            "patrol_bench", "patrol_storage",
-        ],
-        play_area_key="play_area",
+        search_waypoints=["운동장3", "운동장입구", "놀이방2"],
+        play_area_key="운동장2",
     ),
 }
 

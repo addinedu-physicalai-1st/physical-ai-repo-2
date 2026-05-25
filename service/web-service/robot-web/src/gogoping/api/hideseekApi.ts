@@ -48,3 +48,23 @@ export async function postCaught(
     return false;
   }
 }
+
+/**
+ * Debug: 현재 phase 를 즉시 SUCCESS 시켜 다음 phase 로 advance.
+ * 지원: recruit / countdown / patrol / return. 그 외 phase 는 reject.
+ */
+export async function postSkipPhase(currentPhase: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/gogoping/play/hideseek/debug/skip-phase', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Device-Token': DEVICE_TOKEN,
+      },
+      body: JSON.stringify({ current_phase: currentPhase }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

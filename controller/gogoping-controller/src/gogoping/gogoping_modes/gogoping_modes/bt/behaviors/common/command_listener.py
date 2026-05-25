@@ -255,6 +255,8 @@ class _BlackboardWriter:
         # HIDEANDSEEK 진입 시 reconciler 가 set (Task 8) — play_area + reset 3 키
         "hideseek_play_area_key", "hideseek_registered_ids",
         "hideseek_caught_ids", "hideseek_phase",
+        # debug skip flag — countdown 즉시 SUCCESS (control-service debug API)
+        "hideseek_skip_countdown",
     )
 
     def __init__(self, behaviour_name: str):
