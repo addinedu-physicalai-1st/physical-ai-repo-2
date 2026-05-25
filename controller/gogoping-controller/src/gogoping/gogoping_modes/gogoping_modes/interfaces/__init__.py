@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from .base_driver_client import BaseDriverClient
 from .battery_subscriber import BatterySubscriber
+from .blackboard_service import BlackboardServiceServer
 from .camera_pan_client import CameraPanClient
 from .collision_subscriber import CollisionSubscriber
 from .db_logger import DBLogger
@@ -24,6 +25,7 @@ from .ui_publisher import UIPublisher
 __all__ = [
     "BaseDriverClient",
     "BatterySubscriber",
+    "BlackboardServiceServer",
     "CameraPanClient",
     "CollisionSubscriber",
     "DBLogger",

@@ -27,6 +27,7 @@ class Goal:
     destination_key: str = ""
     target_id: str = ""
     search_waypoints: list[str] = field(default_factory=list)
+    play_area_key: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -34,6 +35,7 @@ class Goal:
             "destination_key": self.destination_key,
             "target_id": self.target_id,
             "search_waypoints": list(self.search_waypoints),
+            "play_area_key": self.play_area_key,
         }
 
 
@@ -53,6 +55,7 @@ _LABEL_TO_GOAL = {
         target_id=DEMO_DEFAULT_CHILD_ID,
         # 데모 기본 patrol waypoints — robots.json 에 정의된 search 경로로 교체 예정.
         search_waypoints=["교실A", "교실B", "교실C"],
+        play_area_key="play_area",
     ),
 }
 

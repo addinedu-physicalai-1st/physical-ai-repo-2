@@ -59,6 +59,10 @@ _REQUEST_TRIGGER = {
 _K_DESTINATION_KEY = "destination_key"
 _K_TARGET_PERSON_ID = "target_person_id"
 _K_SEARCH_WAYPOINTS = "search_waypoints"
+_K_HIDESEEK_PLAY_AREA = "hideseek_play_area_key"
+_K_HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids"
+_K_HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"
+_K_HIDESEEK_PHASE = "hideseek_phase"
 
 
 def _validate(goal: dict) -> str | None:
@@ -78,6 +82,8 @@ def _validate(goal: dict) -> str | None:
             return "missing_target_id"
         if not goal.get("search_waypoints"):
             return "missing_search_waypoints"
+        if not goal.get("play_area_key"):
+            return "missing_play_area_key"
     return None
 
 
@@ -133,6 +139,13 @@ def _set_body_blackboard(goal: dict, blackboard: _BlackboardProto) -> None:
     elif target == "HIDEANDSEEK":
         blackboard.set(_K_TARGET_PERSON_ID, goal.get("target_id", ""))
         blackboard.set(_K_SEARCH_WAYPOINTS, list(goal.get("search_waypoints", [])))
+        blackboard.set(_K_HIDESEEK_PLAY_AREA, goal.get("play_area_key", ""))
+        # 같은 게임을 다시 돌릴 때 이전 round 의 registered/caught/phase 가 남아
+        # AwaitRecruitComplete 가 즉시 SUCCESS 되거나 CaughtMonitor 가 즉시 SUCCESS
+        # 되어 게임이 진행되지 않는 것을 막는다. HIDEANDSEEK 진입 시마다 reset.
+        blackboard.set(_K_HIDESEEK_REGISTERED_IDS, [])
+        blackboard.set(_K_HIDESEEK_CAUGHT_IDS, [])
+        blackboard.set(_K_HIDESEEK_PHASE, "")
 
 
 __all__ = ["ReconcileResult", "reconcile"]

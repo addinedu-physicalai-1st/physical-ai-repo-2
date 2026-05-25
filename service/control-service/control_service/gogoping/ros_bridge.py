@@ -33,11 +33,16 @@ SERVICE_SET_BATTERY_LEVEL = "/gogoping/sim/set_battery_level"
 SERVICE_SET_ROBOT_POSE = "/gogoping/debug/set_robot_pose"
 SERVICE_SET_GAZEBO_POSE = "/gogoping/sim/teleport_pose"
 SERVICE_EMERGENCY_STOP = "/gogoping/emergency_stop"
+SERVICE_SET_BLACKBOARD = "/gogoping/blackboard/set"
 # gogoping_modes 노드 (namespace gogoping, name gogoping_modes) 의 표준 ParamServer.
 # admin UI 에서 IDLE → RETURNING 임계값 (idle_timeout_seconds) 조정 시 호출.
 SERVICE_SET_PARAMETERS = "/gogoping/gogoping_modes/set_parameters"
 TOPIC_FOLLOW_TARGET = "/gogoping/follow_target"
 TOPIC_TRACKING_STATE = "/gogoping/tracking_state"
+
+# Blackboard 키 — gogoping_modes 의 SetBlackboard 서버가 허용하는 allowlist 와 일치.
+BB_KEY_HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids"
+BB_KEY_HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"
 
 # admin UI NavDebugLogCard 가 WS 연결 시 backfill 받는 최근 이벤트 수.
 # 시나리오 재현 직후 늦게 연결해도 직전 cancel chain 한 cycle 정도는 보임.
@@ -52,7 +57,8 @@ def ros_available() -> bool:
     try:
         import rclpy  # noqa: F401
         from gogoping_msgs.srv import (  # noqa: F401
-            ForceState, SetBatteryLevel, SetGazeboPose, SetGoal, SetRobotPose,
+            ForceState, SetBatteryLevel, SetBlackboard, SetGazeboPose,
+            SetGoal, SetRobotPose,
         )
         return True
     except ImportError:
@@ -94,6 +100,7 @@ class GogopingRosBridge:
         self._set_gazebo_pose_cli: Any = None  # SetGazeboPose.srv client (sim 디버그 전용)
         self._estop_cli: Any = None        # std_srvs/Trigger client — emergency_stop
         self._set_params_cli: Any = None   # rcl_interfaces/SetParameters — idle_timeout 등 ROS param 조정
+        self._set_blackboard_cli: Any = None  # SetBlackboard.srv client — hideseek registered_ids / caught_ids
         self._sub: Any = None              # /gogoping/state subscriber
         self._nav_event_sub: Any = None    # /gogoping/debug/nav_events subscriber
         self._follow_target_pub: Any = None   # /gogoping/follow_target publisher
@@ -101,6 +108,14 @@ class GogopingRosBridge:
         self._last_tracking_state: dict | None = None
         self._tracking_state_callbacks: list[Callable[[dict], None]] = []
         self._executor: Any = None
+
+        # 숨바꼭질 caught_ids 누적 캐시 — append semantics 구현용.
+        # SetBlackboard.srv 는 set 만 지원하므로, control-service 가 round 별 누적 set 을
+        # 유지하고 매 caught 마다 sorted list 전체를 셋팅한다. recruit-complete 호출 시 reset.
+        # 단일 control-service 프로세스 가정 — multi-replica 운영은 추후 BT 측 append 서비스
+        # 분리 시 검토.
+        self._hideseek_caught_lock = threading.Lock()
+        self._hideseek_caught_ids_cache: set[int] = set()
 
     # ----------------------------------------------------------- lifecycle
 
@@ -117,7 +132,8 @@ class GogopingRosBridge:
         # lazy import (top-level 에서 import 하면 ROS 없는 환경에서 control-service 자체가 죽음)
         import rclpy
         from gogoping_msgs.srv import (
-            ForceState, SetBatteryLevel, SetGazeboPose, SetGoal, SetRobotPose,
+            ForceState, SetBatteryLevel, SetBlackboard, SetGazeboPose,
+            SetGoal, SetRobotPose,
         )
         from rcl_interfaces.srv import SetParameters
         from std_msgs.msg import String
@@ -149,6 +165,9 @@ class GogopingRosBridge:
         )
         self._set_params_cli = self._node.create_client(
             SetParameters, SERVICE_SET_PARAMETERS,
+        )
+        self._set_blackboard_cli = self._node.create_client(
+            SetBlackboard, SERVICE_SET_BLACKBOARD,
         )
         self._sub = self._node.create_subscription(
             String, TOPIC_STATE, self._on_state_msg, 10,
@@ -217,6 +236,7 @@ class GogopingRosBridge:
         req.goal.destination_key = goal.destination_key
         req.goal.target_id = goal.target_id
         req.goal.search_waypoints = list(goal.search_waypoints)
+        req.goal.play_area_key = goal.play_area_key
 
         future = self._cli.call_async(req)
         deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
@@ -426,6 +446,74 @@ class GogopingRosBridge:
         r0 = result.results[0]
         return bool(r0.successful), str(r0.reason or "")
 
+    # ----------------------------------------------------------- hideseek blackboard
+
+    def _call_set_blackboard_sync(self, key: str, value: Any) -> tuple[bool, str]:
+        """``SetBlackboard.srv`` 동기 호출 — allowlist 키만 허용.
+
+        반환: ``(ok, reason)``. service 미가용 / server 거부 시 False.
+
+        호출자는 asyncio handler — to_thread 로 오프로드해서 본 메서드의 blocking
+        wait 가 event loop 를 막지 않게 한다.
+        """
+        if not self._ros_ok or self._set_blackboard_cli is None:
+            return False, "bridge_not_started"
+
+        if not self._set_blackboard_cli.service_is_ready():
+            if not self._set_blackboard_cli.wait_for_service(timeout_sec=0.5):
+                return False, "service_unavailable"
+
+        from gogoping_msgs.srv import SetBlackboard
+        req = SetBlackboard.Request()
+        req.key = key
+        try:
+            req.value_json = json.dumps(value)
+        except (TypeError, ValueError) as e:
+            return False, f"json_encode_error: {e}"
+
+        future = self._set_blackboard_cli.call_async(req)
+        deadline = time.time() + self.SEND_GOAL_TIMEOUT_S
+        while not future.done() and time.time() < deadline:
+            time.sleep(0.01)
+        if not future.done():
+            return False, "timeout"
+        result = future.result()
+        return bool(result.ok), str(result.reason or "")
+
+    def write_hideseek_registered_ids(
+        self, child_ids: list[int],
+    ) -> tuple[bool, str]:
+        """``hideseek_registered_ids`` blackboard 키를 set.
+
+        robot-web RecruitPhase '출발' 버튼 → control-service handler 가 호출.
+        BT 의 AwaitRecruitComplete 가 본 키 polling 해 SUCCESS → CountDown 단계로.
+
+        부수효과: 본 호출은 새 round 시작 신호로 해석 — caught_ids 내부 누적 캐시도
+        reset (다음 caught append 호출이 빈 set 부터 시작).
+        """
+        with self._hideseek_caught_lock:
+            self._hideseek_caught_ids_cache = set()
+        return self._call_set_blackboard_sync(
+            BB_KEY_HIDESEEK_REGISTERED_IDS, list(child_ids),
+        )
+
+    def append_hideseek_caught_id(self, child_id: int) -> tuple[bool, str]:
+        """``hideseek_caught_ids`` 에 ``child_id`` 추가 (cumulative set).
+
+        robot-web PatrolPhase / ReturnPhase 인식 파이프라인이 호출. SetBlackboard.srv
+        는 set 만 지원하므로 control-service 가 in-process 누적 set 을 유지하고
+        매 호출마다 sorted list 전체를 셋팅한다.
+
+        같은 child_id 중복 호출 무해 (set conversion). recruit-complete 호출 시
+        본 캐시가 reset 되어 round 별로 분리된다.
+        """
+        with self._hideseek_caught_lock:
+            self._hideseek_caught_ids_cache.add(int(child_id))
+            ids = sorted(self._hideseek_caught_ids_cache)
+        return self._call_set_blackboard_sync(
+            BB_KEY_HIDESEEK_CAUGHT_IDS, ids,
+        )
+
     # ----------------------------------------------------------- state pubsub
 
     def _on_state_msg(self, msg: Any) -> None:
@@ -596,4 +684,6 @@ __all__ = [
     "SERVICE_SET_GOAL", "SERVICE_FORCE_STATE",
     "SERVICE_SET_BATTERY_LEVEL", "SERVICE_SET_ROBOT_POSE",
     "SERVICE_SET_GAZEBO_POSE", "SERVICE_EMERGENCY_STOP",
+    "SERVICE_SET_BLACKBOARD",
+    "BB_KEY_HIDESEEK_REGISTERED_IDS", "BB_KEY_HIDESEEK_CAUGHT_IDS",
 ]
