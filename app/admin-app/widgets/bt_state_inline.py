@@ -19,7 +19,7 @@ snapshot 포맷:
     "robot_id": "gogoping",
     "fsm_state": "GOTO",
     "main_tree": {
-      "name": "BT_assist_main",
+      "name": "MainTree[GOTO]",
       "children": [
         {"name": "BatteryLowMonitor",     "status": "RUNNING"},
         {"name": "HardwareHealthMonitor", "status": "RUNNING"},

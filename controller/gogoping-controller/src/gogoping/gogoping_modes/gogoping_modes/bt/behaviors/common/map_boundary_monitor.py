@@ -8,13 +8,15 @@
 - 맵 미수신 시 (``is_outside`` 가 ``None`` 리턴) → 발화 안 함 (보수적 default)
 
 배치:
-- ``BT_assist_main``, ``BT_play_main``, ``BT_returning_main`` (자동 ERROR 전이 가능 state)
-- ``MANUAL`` 의도적 제외 — 사용자가 직접 들고 가도 ERROR 안 됨 (``docs/state-bt.md``)
+- ERROR 외 모든 state — CHARGING / IDLE / GOTO / FOLLOW / LULLABY / HIDEANDSEEK /
+  MANUAL / RETURNING / LOW_BATTERY_RETURNING (9 트리)
+- MANUAL 도 예외적 배치 — 사용자가 들고 옮기다 맵 경계 넘으면 nav2 가 path planning 불가
+  하므로 즉시 ERROR 알림 필요 (``docs/state-bt.md``)
 
 monitor 컨벤션 (``docs/conventions.md`` §2):
 - 매 tick RUNNING 리턴
 - edge-triggered — 1회 발화 후 ``ERROR`` terminal 이라 re-arm 불필요. ``initialise()`` 가
-  새 트리 진입 시 호출하므로 ASSIST/PLAY/RETURNING 재진입 시 다시 발화 가능.
+  새 트리 진입 시 호출하므로 다른 state 재진입 시 다시 발화 가능.
 - 발화 전 ``blackboard.ERROR_REASON / ERROR_SOURCE`` 세팅 (admin UI 가 빨간 알약 옆에 표시 가능).
 """
 from __future__ import annotations

@@ -2,12 +2,13 @@
 #
 # Goal-based 아키텍처의 단일 진입점.
 # command_listener 가 본 srv 의 server 가 되어:
-#   1) Goal validation (mode/task 조합이 valid 한지)
-#   2) blackboard.current_goal 세팅
-#   3) 현재 state ↔ goal 차이 비교 후 적절한 FSM trigger 자체 발화
-#      (assist_request / play_request / cancel / return_request / manual_request 등)
+#   1) Goal validation (target_state 및 필수 body 필드 검증)
+#   2) blackboard 의 task body 필드 (destination_key / target_id / search_waypoints) 세팅
+#   3) 현재 state ↔ desired target_state 차이 비교 후 적절한 FSM trigger 자체 발화
+#      (goto_request / follow_request / lullaby_request / hideseek_request /
+#       manual_request / return_request / cancel)
 #
-# 같은 goal 재호출 = 무해. 다른 goal 호출 = preempt.
+# 같은 goal 재호출 = 무해 (idempotent). 다른 goal 호출 = preempt (active ↔ active 직접 전이).
 #
 # UI 는 본 srv 만 호출하면 됨 — FSM trigger 이름은 internal API 로 외부에 노출 안 됨.
 # 자세한 Goal 의미: msg/Goal.msg 참조.
@@ -18,10 +19,11 @@ gogoping_msgs/Goal goal
 ---
 bool accepted          # validation 통과 + goal 수락 여부
 string reason          # accepted=false 시 사유:
-                       #   "invalid_mode" — mode 가 IDLE/ASSIST/PLAY/RETURNING 외
-                       #   "missing_task" — mode=ASSIST/PLAY 인데 task 비어있음
-                       #   "invalid_task_for_mode" — task 가 mode 와 안 맞음 (예: ASSIST+hideseek)
-                       #   "missing_destination" — task=goto 인데 destination_key 비어있음
-                       #   "missing_target_id" — follow / hideseek 인데 target_id 비어있음
-                       #   "fsm_in_charging" — CHARGING 상태에서 ASSIST/PLAY/RETURNING 요청
-                       #                       (battery_full 으로 IDLE 진입 대기 필요)
+                       #   "invalid_target_state"        — target_state 가 10개 STATES 외
+                       #   "internal_only_state"         — CHARGING/LOW_BATTERY_RETURNING/ERROR 요청 (내부 전용)
+                       #   "missing_destination"         — target_state=GOTO 인데 destination_key 비어있음
+                       #   "missing_target_id"           — FOLLOW / HIDEANDSEEK 인데 target_id 비어있음
+                       #   "missing_search_waypoints"    — HIDEANDSEEK 인데 search_waypoints 비어있음
+                       #   "fsm_in_charging"             — CHARGING 상태에서 사용자 명령 (battery_full IDLE 대기 필요)
+                       #   "fsm_in_error_terminal"       — ERROR 상태 (재시작만 복구)
+                       #   "fsm_in_low_battery_returning" — LOW_BATTERY_RETURNING lockdown (docked 만 탈출)

@@ -10,7 +10,7 @@ FSM 및 Behavior Tree 관련 모든 설계는 [docs/](docs/) 디렉토리에 있
 |---|---|
 | [docs/gogoping-file-structure.md](docs/gogoping-file-structure.md) | `src/gogoping/` 패키지별 폴더 구조 + behavior 별 책임 + "Used in:" 역참조 |
 | [docs/state-bt.md](docs/state-bt.md) | FSM 10 states (IDLE / CHARGING / GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL / RETURNING / LOW_BATTERY_RETURNING / ERROR) × MainTree 구조 + 트리 컨벤션 |
-| [docs/subtree-flow.md](docs/subtree-flow.md) | SubTree 5종 (Carry / Follow / Lullaby / HideAndSeek / Return) 의 자세한 노드 흐름 |
+| [docs/subtree-flow.md](docs/subtree-flow.md) | SubTree 5종 (Goto / Follow / Lullaby / HideAndSeek / Return) + 빌딩블록 Patrol 의 자세한 노드 흐름 |
 | [docs/blackboard-schema.md](docs/blackboard-schema.md) | Blackboard 키 목록 + R/W 매트릭스 + 초기값 |
 | [docs/fsm-triggers.md](docs/fsm-triggers.md) | FSM trigger 이름 / kwargs / 전이 다이어그램 |
 | [docs/conventions.md](docs/conventions.md) | `context.py` / behavior DI / `main.py` BT swap 패턴 + 코딩 체크리스트 |
