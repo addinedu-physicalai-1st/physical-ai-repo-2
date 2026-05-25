@@ -128,6 +128,36 @@ class IdleTimeoutResponse(BaseModel):
     seconds: float = 0.0
 
 
+class HideseekRecruitCompleteRequest(BaseModel):
+    """robot-web RecruitPhase '출발' 버튼이 POST.
+
+    child_ids: 모집된 아이들의 DB child_id 리스트 (빈 리스트도 허용 — UI 측이 검증).
+    """
+    child_ids: list[int]
+
+
+class HideseekRecruitCompleteResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    count: int = 0
+
+
+class HideseekCaughtRequest(BaseModel):
+    """robot-web PatrolPhase/ReturnPhase 인식 파이프라인이 POST.
+
+    child_id: 발견된 아이의 DB child_id.
+    caught_at_waypoint: 발견 시 vertex 이름 (UI 표시용 — BT 는 사용 안 함).
+    """
+    child_id: int
+    caught_at_waypoint: str | None = None
+
+
+class HideseekCaughtResponse(BaseModel):
+    accepted: bool
+    reason: str = ""
+    child_id: int = 0
+
+
 class PatrolRequest(BaseModel):
     """admin UI [순찰] 버튼이 POST 하는 payload — 현재 옵션 없음.
 
@@ -346,6 +376,60 @@ def install(
             used_robot_pose=used_robot_pose,
         )
 
+    @router.post(
+        "/play/hideseek/recruit-complete",
+        response_model=HideseekRecruitCompleteResponse,
+    )
+    async def hideseek_recruit_complete(
+        req: HideseekRecruitCompleteRequest,
+    ) -> HideseekRecruitCompleteResponse:
+        """robot-web RecruitPhase '출발' 버튼 — 모집된 child_ids 를 BT 에 전달.
+
+        ``bridge.write_hideseek_registered_ids(ids)`` 가 ``SetBlackboard.srv`` 로
+        ``hideseek_registered_ids`` 키를 셋팅. BT 의 AwaitRecruitComplete 가 polling →
+        SUCCESS → CountDown 단계로 진입.
+
+        부수효과: caught_ids 누적 캐시 reset (새 round 시작).
+        """
+        accepted, reason = await asyncio.to_thread(
+            bridge.write_hideseek_registered_ids, list(req.child_ids),
+        )
+        if not accepted:
+            logger.warning(
+                f"HideseekRecruitComplete 거부: child_ids={req.child_ids!r} "
+                f"reason={reason!r}"
+            )
+        return HideseekRecruitCompleteResponse(
+            accepted=accepted, reason=reason, count=len(req.child_ids),
+        )
+
+    @router.post(
+        "/play/hideseek/caught", response_model=HideseekCaughtResponse,
+    )
+    async def hideseek_caught(
+        req: HideseekCaughtRequest,
+    ) -> HideseekCaughtResponse:
+        """robot-web PatrolPhase/ReturnPhase 인식 — 발견한 child_id 누적.
+
+        ``bridge.append_hideseek_caught_id(child_id)`` 가 in-process 누적 set 에
+        추가 후 ``SetBlackboard.srv`` 로 sorted list 전체를 셋팅. BT 의
+        HideSeekCaughtMonitor 가 registered ⊆ caught 검사 → 모두 잡힘 시 SUCCESS.
+
+        같은 child_id 중복 호출 무해. ``caught_at_waypoint`` 는 로깅용
+        (BT 는 사용 안 함).
+        """
+        accepted, reason = await asyncio.to_thread(
+            bridge.append_hideseek_caught_id, int(req.child_id),
+        )
+        if not accepted:
+            logger.warning(
+                f"HideseekCaught 거부: child_id={req.child_id} "
+                f"caught_at_waypoint={req.caught_at_waypoint!r} reason={reason!r}"
+            )
+        return HideseekCaughtResponse(
+            accepted=accepted, reason=reason, child_id=req.child_id,
+        )
+
     @router.post("/emergency_stop", response_model=EmergencyStopResponse)
     async def emergency_stop() -> EmergencyStopResponse:
         """긴급정지 — Admin UI / 외부 안전 시스템 호출.
@@ -475,4 +559,6 @@ __all__ = [
     "BatteryDebugRequest", "BatteryDebugResponse",
     "RobotPoseDebugRequest", "RobotPoseDebugResponse",
     "EmergencyStopResponse",
+    "HideseekRecruitCompleteRequest", "HideseekRecruitCompleteResponse",
+    "HideseekCaughtRequest", "HideseekCaughtResponse",
 ]

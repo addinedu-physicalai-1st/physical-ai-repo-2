@@ -59,8 +59,8 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
 | `hideseek_play_area_key` | `str` | `command_listener` / `goal_reconciler` | `BT_hide_and_seek_sub` | named pose (= 운동장2) |
-| `hideseek_registered_ids` | `list[int]` | control-service (recruit-complete API) | `HideSeekCaughtMonitor`, `AwaitRecruitComplete` | 모집 종료 시 |
-| `hideseek_caught_ids` | `list[int]` | control-service (caught API) | `HideSeekCaughtMonitor` | 발견 시마다 추가 |
+| `hideseek_registered_ids` | `list[int]` | control-service (recruit-complete API → `SetBlackboard.srv`) | `HideSeekCaughtMonitor`, `AwaitRecruitComplete` | 모집 종료 시. control-service `bridge.write_hideseek_registered_ids()` → `blackboard_service` 서버가 set |
+| `hideseek_caught_ids` | `list[int]` | control-service (caught API → `SetBlackboard.srv`) | `HideSeekCaughtMonitor` | 발견 시마다 추가. control-service 가 in-process 누적 set 유지 → 매 호출마다 sorted list 전체 셋팅. recruit-complete 호출 시 캐시 reset |
 | `hideseek_phase` | `str` | `SetHideseekPhase` | `tree_inspector.snapshot`, robot-web hideseek phase store | UI 라우팅. `"move_to_play"`/`"recruit"`/`"countdown"`/`"patrol"`/`"return"`/`"end"`/`""` |
 
 ### 에러 (fault 발화한 monitor 가 W)

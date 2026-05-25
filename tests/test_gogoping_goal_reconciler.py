@@ -103,6 +103,7 @@ def test_hideseek_with_target_and_waypoints_accepted():
             "target_state": "HIDEANDSEEK",
             "target_id": "child_42",
             "search_waypoints": ["A", "B", "C"],
+            "play_area_key": "play_area",
         },
         fsm=fsm, blackboard=bb,
     )
@@ -116,7 +117,12 @@ def test_hideseek_with_target_and_waypoints_accepted():
 def test_hideseek_missing_search_waypoints_rejected():
     bb, fsm = _bb_and_fsm()
     result = reconcile(
-        {"target_state": "HIDEANDSEEK", "target_id": "x", "search_waypoints": []},
+        {
+            "target_state": "HIDEANDSEEK",
+            "target_id": "x",
+            "search_waypoints": [],
+            "play_area_key": "play_area",
+        },
         fsm=fsm, blackboard=bb,
     )
     assert result.accepted is False
@@ -127,7 +133,12 @@ def test_hideseek_search_waypoints_copied_not_aliased():
     bb, fsm = _bb_and_fsm()
     wps_in = ["X", "Y"]
     reconcile(
-        {"target_state": "HIDEANDSEEK", "target_id": "c", "search_waypoints": wps_in},
+        {
+            "target_state": "HIDEANDSEEK",
+            "target_id": "c",
+            "search_waypoints": wps_in,
+            "play_area_key": "play_area",
+        },
         fsm=fsm, blackboard=bb,
     )
     setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
@@ -135,6 +146,77 @@ def test_hideseek_search_waypoints_copied_not_aliased():
     assert stored == ["X", "Y"]
     wps_in.append("Z")
     assert stored == ["X", "Y"]
+
+
+# 신규 — Task 8 추가
+
+def test_hideseek_missing_play_area_key_rejected():
+    bb, fsm = _bb_and_fsm()
+    result = reconcile(
+        {
+            "target_state": "HIDEANDSEEK",
+            "target_id": "child_5",
+            "search_waypoints": ["patrol_a"],
+            # play_area_key 누락
+        },
+        fsm=fsm, blackboard=bb,
+    )
+    assert result.accepted is False
+    assert result.reason == "missing_play_area_key"
+
+
+def test_hideseek_sets_play_area_blackboard():
+    bb, fsm = _bb_and_fsm()
+    result = reconcile(
+        {
+            "target_state": "HIDEANDSEEK",
+            "target_id": "child_5",
+            "search_waypoints": ["patrol_a", "patrol_b"],
+            "play_area_key": "play_area",
+        },
+        fsm=fsm, blackboard=bb,
+    )
+    assert result.accepted is True
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["hideseek_play_area_key"] == "play_area"
+
+
+def test_hideseek_resets_registered_caught_phase_on_entry():
+    """게임 다시 돌릴 때 이전 round 잔여물 reset 검증."""
+    bb, fsm = _bb_and_fsm()
+    result = reconcile(
+        {
+            "target_state": "HIDEANDSEEK",
+            "target_id": "child_5",
+            "search_waypoints": ["patrol_a"],
+            "play_area_key": "play_area",
+        },
+        fsm=fsm, blackboard=bb,
+    )
+    assert result.accepted is True
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    # reset 3 키 모두 빈 값으로 셋
+    assert setters["hideseek_registered_ids"] == []
+    assert setters["hideseek_caught_ids"] == []
+    assert setters["hideseek_phase"] == ""
+
+
+def test_hideseek_resets_on_same_state_reentry():
+    """current == target 인 재요청 (HIDEANDSEEK → HIDEANDSEEK) 도 reset 일어남 (다시 하기)."""
+    bb, fsm = _bb_and_fsm(current="HIDEANDSEEK")
+    result = reconcile(
+        {
+            "target_state": "HIDEANDSEEK",
+            "target_id": "child_5",
+            "search_waypoints": ["patrol_a"],
+            "play_area_key": "play_area",
+        },
+        fsm=fsm, blackboard=bb,
+    )
+    assert result.accepted is True
+    assert result.reason == "same_state"
+    setters = {c.args[0]: c.args[1] for c in bb.set.call_args_list}
+    assert setters["hideseek_caught_ids"] == []
 
 
 # ---------------------------------------------------------------- MANUAL / RETURNING / IDLE

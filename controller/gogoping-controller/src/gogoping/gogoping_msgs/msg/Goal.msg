@@ -20,3 +20,4 @@ string target_state         # 위 7개 중 하나 (string, 대문자)
 string destination_key      # named_pose 키 — target_state=GOTO 시 필수
 string target_id            # child_id / teacher_id — FOLLOW / HIDEANDSEEK 시 필수
 string[] search_waypoints   # vertex name 리스트 — HIDEANDSEEK 시 필수 (빈 리스트 거부)
+string play_area_key        # named_pose 키 — HIDEANDSEEK 시 필수 (운동장2)

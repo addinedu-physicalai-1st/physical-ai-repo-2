@@ -1,0 +1,22 @@
+# control-service → gogoping_modes BT blackboard write 인터페이스.
+#
+# 외부 (control-service handler) 가 BT 의 blackboard 키를 set 하기 위한 service.
+# Goal-based 아키텍처의 보조 — Goal.srv 가 표현하기 어려운 "외부 이벤트 누적"
+# 데이터 (e.g., 숨바꼭질 caught_ids 같이 시간 따라 누적되는 list) 를 BT 가 참조하는
+# blackboard 에 직접 쓰기 위함.
+#
+# 보안: server 측에서 allowlist 키만 허용 (현재: hideseek_registered_ids /
+# hideseek_caught_ids).
+#
+# value 는 JSON 문자열로 전달 — list[int] / int / str 등 ROS msg 가 직접 표현하기
+# 어려운 다양한 타입 지원. server 가 json.loads 후 py_trees blackboard 에 set.
+#
+# 자세한 의미는 docs/blackboard-schema.md 의 R/W 매트릭스 참조.
+
+string key                # blackboard 키 이름 (allowlist 검사 대상)
+string value_json         # JSON 직렬화된 값 (list/int/str 등)
+---
+bool ok                   # 성공 여부
+string reason             # 거부 시 사유:
+                          #   "key_not_allowed: <key>"   — allowlist 외 키
+                          #   "json_parse_error: <msg>"  — value_json 파싱 실패

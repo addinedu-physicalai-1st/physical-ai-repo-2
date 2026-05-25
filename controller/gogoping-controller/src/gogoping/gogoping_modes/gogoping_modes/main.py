@@ -28,6 +28,7 @@ from .bt.tree_inspector import snapshot
 from .bt.trees.main_trees import build_main_tree
 from .context import Context
 from .fsm.robot_fsm import RobotFSM
+from .interfaces.blackboard_service import BlackboardServiceServer
 
 # 평탄화 (2026-05-25): 4 task state — root SUCCESS 시 task_done 발화 대상.
 _TASK_STATES = frozenset({"GOTO", "FOLLOW", "LULLABY", "HIDEANDSEEK"})
@@ -102,7 +103,11 @@ class GogopingModes:
         # 부팅 시 INITIAL_STATE 의 트리 build (FSM 콜백은 state 변경 시에만 fire 라 초기 1회는 수동)
         self._build_tree_for_state(self.INITIAL_STATE)
 
-        # 5) tick + publish 타이머
+        # 5) 외부 blackboard write 서비스 — control-service 의 hideseek 핸들러가 호출.
+        # CommandListener (BT behavior) 와 달리 *항상* live (트리 swap 무관) — 별도 노드 등록.
+        self._blackboard_service = BlackboardServiceServer(node)
+
+        # 6) tick + publish 타이머
         self._timer = node.create_timer(1.0 / self.TICK_HZ, self._tick)
         self._last_publish = 0.0
 

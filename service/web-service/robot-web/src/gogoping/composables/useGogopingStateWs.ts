@@ -14,10 +14,12 @@
  */
 import { onBeforeUnmount } from 'vue';
 import { useModeStore } from '@/stores/mode';
+import { useHideseekPhaseStore, type HideseekPhase } from '@/gogoping/stores/hideseekPhase';
 
 interface GogopingSnapshot {
   robot_id?: string;
   fsm_state?: string;
+  hideseek_phase?: string;  // BT blackboard 의 hideseek_phase (Task 7 에서 추가)
   // 평탄화 (2026-05-25): assist_task / play_task 필드 제거. fsm_state 자체가 task.
   // 그 외 필드는 본 composable 에서 사용 안 함 (main_tree / sub_tree / battery_level 등)
 }
@@ -44,6 +46,7 @@ function snapshotToModeLabel(snap: GogopingSnapshot): string | null {
 
 export function useGogopingStateWs(): { stop: () => void } {
   const mode = useModeStore();
+  const hideseekPhaseStore = useHideseekPhaseStore();
 
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${protocol}://${window.location.host}/ws/robot-state`;
@@ -67,6 +70,11 @@ export function useGogopingStateWs(): { stop: () => void } {
           // 사용자 명시적 정지 / 다른 모드 선택은 별도 경로 (정지 버튼, 메뉴 click) 로 처리.
           if (mode.currentMode === '추종' && label === '대기') return;
           mode.setMode(label);  // postModeClick 발동 안 함 — 무한루프 회피
+        }
+
+        // hideseek_phase → store (HideAndSeekGame 이 watch). 미지원 서버면 필드 없음 → no-op.
+        if (typeof snap.hideseek_phase === 'string') {
+          hideseekPhaseStore.setPhase(snap.hideseek_phase as HideseekPhase);
         }
       } catch {
         // JSON 파싱 실패는 무시 (서버 측 포맷 변경 등 — 다음 메시지에서 회복)

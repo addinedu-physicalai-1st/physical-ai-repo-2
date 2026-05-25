@@ -121,6 +121,7 @@ class CommandListener(py_trees.behaviour.Behaviour):
             "destination_key": g.destination_key,
             "target_id": g.target_id,
             "search_waypoints": list(g.search_waypoints),
+            "play_area_key": g.play_area_key,
         }
 
         # debug event (admin UI 추적용)
@@ -129,7 +130,8 @@ class CommandListener(py_trees.behaviour.Behaviour):
             dbg.event(
                 "SetGoal",
                 f"target_state={g.target_state!r}"
-                f" dest={g.destination_key!r} target_id={g.target_id!r}",
+                f" dest={g.destination_key!r} target_id={g.target_id!r}"
+                f" play_area={g.play_area_key!r}",
             )
 
         # reconcile — 순수 함수, 단위 테스트 17건 통과한 로직
@@ -250,6 +252,9 @@ class _BlackboardWriter:
         "search_waypoints",
         # _on_emergency_stop_request 가 fault reason 기록용으로 W
         "error_reason", "error_source",
+        # HIDEANDSEEK 진입 시 reconciler 가 set (Task 8) — play_area + reset 3 키
+        "hideseek_play_area_key", "hideseek_registered_ids",
+        "hideseek_caught_ids", "hideseek_phase",
     )
 
     def __init__(self, behaviour_name: str):
