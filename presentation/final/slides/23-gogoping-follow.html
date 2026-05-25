@@ -14,7 +14,9 @@
       카메라 ReID 로 <b style="color:var(--ink)">방위를 잠그고</b>, LiDAR 로 <b style="color:var(--ink)">거리를 잰다</b> — 두 센서가 역할을 나눕니다.
     </p>
 
-    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <div style="flex:1;display:flex;gap:18px;min-height:0">
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:18px;min-width:0">
 
       <div class="pastel-card" style="border-color:var(--babypinkSoft);background:var(--surface);display:flex;flex-direction:column">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -54,6 +56,12 @@
             카메라 = "<b>누가</b>" / LiDAR = "<b>어디서</b>"
           </p>
         </div>
+      </div>
+
+    </div>
+
+      <div style="flex:0 0 26%;display:flex;flex-direction:column;min-width:0">
+        <div class="photo-slot" style="width:100%;height:360px"><span class="material-icons-round" style="font-size:42px">add_photo_alternate</span><span class="ps-label">동작 사진</span><span class="ps-hint">교사 따라가는 컷</span></div>
       </div>
 
     </div>
