@@ -8,13 +8,14 @@ ros-jazzy-realsense2-camera 의 rs_launch.py 가 워낙 인자가 많아 매번 
     `d435_depth_optical_frame` / `d435_color_optical_frame` 이 되고, URDF (openarm_
     description v10.urdf.xacro) 에 박혀있는 동명 프레임과 그대로 매칭. 별도
     static_transform_publisher 가 필요 없음.
-  - `publish_tf:=false` — TF 는 URDF (robot_state_publisher) 가 이미 송출하므로
-    중복 publish 방지. (realsense2_camera 가 부모 link 없이 띄우는 d435_link 가
-    URDF tree 의 d435_link 와 충돌하지 않도록.)
+  - `publish_tf:=true` — realsense 가 d435_link → d435_depth_optical_frame 등
+    내부 chain 을 TF 로 publish. doctor_teleop.launch.py 의 static_tf 가
+    openarm_body_link0 → d435_link 부분을 채워 octomap 이 depth point 를
+    world frame 으로 변환 가능.
   - `align_depth.enable:=false` — octomap 은 depth 본연 intrinsics 그대로 받는 게
     가장 정확. aligned-to-color 는 색감 시각화용일 뿐.
-  - `pointcloud.enable:=false` — MoveIt DepthImageOctomapUpdater 는 depth image
-    한 장씩 받는 plugin. point_cloud 토픽 따로 만들 필요 없음.
+  - `pointcloud.enable:=true` — MoveIt PointCloudOctomapUpdater + octomap_server
+    사이드카 둘 다 pointcloud 를 입력으로 받음. `/d435/depth/color/points` 토픽 생성.
   - default 해상도/fps 는 기존 d435_depth.launch.py (WS 스트리머) 와 동일하게
     424×240 @ 15fps. octomap 갱신 부담 + USB bandwidth 둘 다 가볍게.
 
@@ -73,12 +74,13 @@ def generate_launch_description() -> LaunchDescription:
                 "enable_gyro": "false",
                 "enable_accel": "false",
                 "align_depth.enable": "false",
-                "pointcloud.enable": "false",
+                "pointcloud.enable": "true",
                 # profile = WxHxFPS (realsense2_camera 의 string convention)
                 "depth_module.depth_profile": [depth_width, "x", depth_height, "x", fps],
                 "rgb_camera.color_profile": [color_width, "x", color_height, "x", fps],
-                # TF 는 URDF 가 책임.
-                "publish_tf": "false",
+                # TF — realsense 가 d435_link → d435_*_optical 자체 chain publish.
+                # static_tf (doctor_teleop.launch.py) 가 openarm_body_link0 → d435_link 연결.
+                "publish_tf": "true",
                 "tf_publish_rate": "0.0",
                 "serial_no": serial_no,
                 # 빠른 octomap 갱신엔 unite_imu_method 등 IMU 옵션 모두 끔.

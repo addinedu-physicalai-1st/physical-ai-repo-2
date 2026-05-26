@@ -1,0 +1,25 @@
+# 양팔 그리퍼의 mimic joint 를 /joint_states 에 강제 포함.
+#
+# URDF (openarm v10 bimanual) 의 finger_joint2 는 finger_joint1 을 mimic 하는 prismatic
+# joint. mock_components/GenericSystem 은 mimic 을 state interface 로 노출하지 않아서
+# joint_state_broadcaster 의 기본 publish 에서 제외됨 (16/18 joint 만 보임). 그 결과
+# moveit_servo 의 CurrentStateMonitor.haveCompleteState() 가 영원히 false → "Waiting
+# to receive robot state update" 무한 루프.
+#
+# extra_joints 는 JSB 가 알려진 hardware interface 가 없는 joint 도 position=0 으로
+# publish 하게 강제. URDF 의 mimic 태그가 있어서 robot_state_publisher 가 어차피
+# finger_joint1 값에 맞춰 TF 를 재계산 — finger_joint2 의 publish 값은 시각적으로
+# 무시됨. 핵심은 haveCompleteState 체크 통과.
+controller_manager:
+  ros__parameters:
+    joint_state_broadcaster:
+      ros__parameters:
+        extra_joints:
+          - openarm_left_finger_joint2
+          - openarm_right_finger_joint2
+
+joint_state_broadcaster:
+  ros__parameters:
+    extra_joints:
+      - openarm_left_finger_joint2
+      - openarm_right_finger_joint2

@@ -41,6 +41,16 @@ setup(
             'd435_depth_streamer = eduarm.d435_depth_streamer:main',
             # 하이파이브 hand_point → IK → JointTrajectory. highfive_sim.launch.py 가 호출.
             'highfive_node = eduarm.highfive_node:main',
+            # 1Hz 로 /clear_octomap 서비스를 호출 — PointCloudOctomapUpdater stale voxel 제거.
+            'clear_octomap_timer = eduarm.clear_octomap_timer:main',
+            # 시뮬 부팅 시 양팔을 zero-pose (자연 singularity) → home pose 로 이동.
+            'home_pose_setter = eduarm.home_pose_setter:main',
+            # Leader → Follower 직결 passthrough — IK 없이 joint 1:1 매핑.
+            'leader_passthrough_node = eduarm.leader_passthrough_node:main',
+            # D435 RGB → control-service WebSocket producer (cross-machine ready).
+            'd435_rgb_uploader_node = eduarm.d435_rgb_uploader_node:main',
+            # D435 depth pointcloud → 1m filter + decimate + world transform → control-service WS.
+            'd435_pointcloud_uploader_node = eduarm.d435_pointcloud_uploader_node:main',
         ],
     },
 )

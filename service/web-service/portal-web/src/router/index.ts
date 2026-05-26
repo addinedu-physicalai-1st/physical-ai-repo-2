@@ -28,6 +28,10 @@ const routes = [
     ],
   },
 
+  // Doctor teleop — MVP 단계, auth guard 없음.
+  // 진찰 라우트: `/doctor/teleop?eduping_id=ed-01`
+  { path: '/doctor/teleop', component: () => import('@/doctor/DoctorTeleopView.vue') },
+
   { path: '/parent/login', component: () => import('@/views/parent/Login.vue') },
   {
     path: '/parent',

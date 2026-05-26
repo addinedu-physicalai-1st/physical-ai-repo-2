@@ -97,6 +97,18 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               ws: true,
             },
+            // 건강검진 자기 PIP — D435 RGB (eduarm uploader → control-service → 브라우저).
+            '/ws/eduping/rgb': {
+              target: controlTarget,
+              changeOrigin: true,
+              ws: true,
+            },
+            // WebRTC signaling — 의사 ↔ EduPing SDP/ICE 교환.
+            '/ws/doctor/signal': {
+              target: controlTarget,
+              changeOrigin: true,
+              ws: true,
+            },
           },
     },
     test: {

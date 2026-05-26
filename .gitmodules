@@ -34,9 +34,6 @@
 [submodule "controller/eduping-controller/src/openarm_description"]
 	path = controller/eduping-controller/src/openarm_description
 	url = https://github.com/enactic/openarm_description
-[submodule "controller/eduping-controller/src/openarm_ros2"]
-	path = controller/eduping-controller/src/openarm_ros2
-	url = https://github.com/enactic/openarm_ros2
 [submodule "controller/eduping-controller/src/openarm_teleop"]
 	path = controller/eduping-controller/src/openarm_teleop
 	url = https://github.com/enactic/openarm_teleop
