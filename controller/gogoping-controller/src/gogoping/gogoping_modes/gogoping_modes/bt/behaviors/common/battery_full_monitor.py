@@ -1,4 +1,4 @@
-"""BatteryFullMonitor — blackboard.BATTERY_LEVEL ≥ 80% 시 ``battery_full`` 발화.
+"""BatteryFullMonitor — blackboard.BATTERY_LEVEL ≥ 60% 시 ``battery_full`` 발화.
 
 CHARGING state MainTree 에 들어가는 monitor — 충전이 끝나면 자동으로 IDLE 로 전이.
 
@@ -29,9 +29,9 @@ if TYPE_CHECKING:
 
 
 class BatteryFullMonitor(py_trees.behaviour.Behaviour):
-    """배터리 ≥ 70% 시 ``battery_full`` FSM trigger 발화."""
+    """배터리 ≥ 60% 시 ``battery_full`` FSM trigger 발화."""
 
-    FULL_ENTER = 70.0  # 진입 임계 (%)
+    FULL_ENTER = 60.0  # 진입 임계 (%)
 
     def __init__(self, name: str, context: "Context"):
         super().__init__(name)
