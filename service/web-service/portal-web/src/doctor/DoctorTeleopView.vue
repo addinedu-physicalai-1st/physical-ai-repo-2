@@ -95,8 +95,8 @@ function schedulePointCloudReconnect(): void {
 }
 
 function onState(state: StateFrame): void {
-  if (armLeft) applyJoints(armLeft, state.left.joints);
-  if (armRight) applyJoints(armRight, state.right.joints);
+  if (armLeft) applyJoints(armLeft, state.left.joints, state.left.gripper);
+  if (armRight) applyJoints(armRight, state.right.joints, state.right.gripper);
 }
 
 onMounted(async () => {

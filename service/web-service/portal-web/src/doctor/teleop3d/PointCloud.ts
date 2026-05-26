@@ -50,20 +50,16 @@ export function createPointCloudLayer(): PointCloudLayer {
     const n = Math.min(count, MAX_POINTS);
     const posAttr = geom.getAttribute('position') as THREE.BufferAttribute;
     const colorAttr = geom.getAttribute('color') as THREE.BufferAttribute;
-    let off = 4;
+    // Float32Array view 로 한 번에 복사 (DataView 루프보다 빠름).
+    const src = new Float32Array(buffer, 4, n * 3);
+    positions.set(src);
+    // 컬러 계산 — z 만 봐서 사이즈 줄임.
     for (let i = 0; i < n; i++) {
-      const x = view.getFloat32(off, true);
-      const y = view.getFloat32(off + 4, true);
-      const z = view.getFloat32(off + 8, true);
-      off += 12;
-      positions[i * 3] = x;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = z;
-      // z 높이 0~1m 매핑: 0 → 핑크 (#db2777), 1 → cyan (#2bd9ff).
-      const t = Math.max(0, Math.min(1, z));
-      colors[i * 3]     = 0.86 * (1 - t) + 0.17 * t;
-      colors[i * 3 + 1] = 0.16 * (1 - t) + 0.85 * t;
-      colors[i * 3 + 2] = 0.47 * (1 - t) + 1.00 * t;
+      const z = positions[i * 3 + 2];
+      const t = z < 0 ? 0 : z > 1 ? 1 : z;
+      colors[i * 3]     = 0.86 - 0.69 * t;
+      colors[i * 3 + 1] = 0.16 + 0.69 * t;
+      colors[i * 3 + 2] = 0.47 + 0.53 * t;
     }
     posAttr.needsUpdate = true;
     colorAttr.needsUpdate = true;

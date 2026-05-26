@@ -103,10 +103,15 @@ export function splitBimanual(
   };
 }
 
-/** state frame 의 7-DOF joint 배열을 URDF joint 에 적용. 길이 불일치는 잘라낸다. */
-export function applyJoints(arm: LoadedArm, jointAngles: number[]): void {
+/** state frame 의 7-DOF joint 배열을 URDF joint 에 적용. 길이 불일치는 잘라낸다.
+ *  gripper 가 주어지면 prismatic finger_joint1 (양팔 동일 이름 패턴) 에 추가 적용. */
+export function applyJoints(arm: LoadedArm, jointAngles: number[], gripper?: number): void {
   const n = Math.min(arm.jointNames.length, jointAngles.length);
   for (let i = 0; i < n; i++) {
     arm.robot.setJointValue(arm.jointNames[i], jointAngles[i]);
+  }
+  if (gripper !== undefined) {
+    const fingerName = arm.jointNames.find((nm) => nm.endsWith('finger_joint1'));
+    if (fingerName) arm.robot.setJointValue(fingerName, gripper);
   }
 }

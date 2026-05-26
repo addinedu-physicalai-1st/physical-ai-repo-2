@@ -38,8 +38,13 @@ mkdir -p "$PID_DIR"
 # RMW 는 호출 셸의 환경변수를 그대로 상속 (시스템 default = Fast DDS).
 # 빌드는 루트에서 `colcon build` → 모든 패키지가 $ROOT/install/ 에 모임.
 build_ros_cmd() {
+  # 카메라 mount 보정 — 환경변수 또는 기본값. 위로 10° 들렸으면 -0.1745.
+  local pitch="${CAM_PITCH:--0.1745}"
+  local yaw="${CAM_YAW:-0.0}"
+  local roll="${CAM_ROLL:-0.0}"
   echo "source $ROOT/install/setup.bash && \
-        exec ros2 launch eduarm doctor_teleop.launch.py rviz:=false"
+        exec ros2 launch eduarm doctor_teleop.launch.py rviz:=false \
+            cam_pitch:=$pitch cam_yaw:=$yaw cam_roll:=$roll"
 }
 build_rviz_cmd() {
   echo "source $ROOT/install/setup.bash && \
@@ -101,6 +106,11 @@ stop_all() {
     local sess
     sess=$(cat "$PID_DIR/tmux.session")
     if tmux has-session -t "$sess" 2>/dev/null; then
+      # attached client 먼저 detach — 그래야 client 가 terminal mode (mouse tracking 등)
+      # 를 정상 복구하고 종료. detach 없이 kill-session 하면 SIGHUP 으로 죽어
+      # 마우스 휠 입력이 escape sequence 로 깨져 보임.
+      tmux detach-client -s "$sess" -a 2>/dev/null || true
+      sleep 0.1
       echo "killing tmux session $sess"
       tmux kill-session -t "$sess" || true
     fi
@@ -128,7 +138,6 @@ stop_all() {
   pkill -KILL -f "lib/moveit_ros_move_group/move_group" 2>/dev/null || true
   pkill -KILL -f "lib/moveit_servo/servo_node"       2>/dev/null || true
   pkill -KILL -f "robot_state_publisher"             2>/dev/null || true
-  pkill -KILL -f "eduarm/lib/eduarm/clear_octomap_timer" 2>/dev/null || true
   pkill -KILL -f "eduarm/lib/eduarm/joint_state_relay"   2>/dev/null || true
   pkill -KILL -f "eduarm/lib/eduarm/home_pose_setter"    2>/dev/null || true
   pkill -KILL -f "eduarm/lib/eduarm/leader_passthrough"  2>/dev/null || true
@@ -143,12 +152,12 @@ stop_all() {
 
 cmd="${1:-start}"
 shift || true
-rviz_arg="true"            # 기본 RViz ON.
+rviz_arg="false"           # 기본 RViz OFF — doctor UI 가 메인 뷰. 필요 시 --rviz.
 use_tmux=1                 # 기본 tmux 모드.
 for arg in "$@"; do
   case "$arg" in
-    --rviz)    rviz_arg="true" ;;   # 명시적 ON (기본과 동일, 호환성).
-    --no-rviz) rviz_arg="false" ;;
+    --rviz)    rviz_arg="true" ;;
+    --no-rviz) rviz_arg="false" ;;  # 명시적 OFF (기본과 동일, 호환성).
     --bg)      use_tmux=0 ;;
     --tmux)    use_tmux=1 ;;        # 명시적 ON (기본과 동일).
     *) echo "unknown flag: $arg"; exit 1 ;;

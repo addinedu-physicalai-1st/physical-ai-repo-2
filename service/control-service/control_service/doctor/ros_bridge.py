@@ -94,15 +94,27 @@ class DoctorRosBridge:
 
         def on_joint_states(msg: JointState) -> None:
             name_idx = {n: i for i, n in enumerate(msg.name)}
+            l_grip_key = "openarm_left_finger_joint1"
+            r_grip_key = "openarm_right_finger_joint1"
+            l_grip = (
+                msg.position[name_idx[l_grip_key]]
+                if l_grip_key in name_idx
+                else self._latest_left.gripper
+            )
+            r_grip = (
+                msg.position[name_idx[r_grip_key]]
+                if r_grip_key in name_idx
+                else self._latest_right.gripper
+            )
             with self._lock:
                 self._latest_left = ArmState(
                     joints=[msg.position[name_idx[j]] if j in name_idx else 0.0 for j in self._left_joints],
-                    gripper=self._latest_left.gripper,
+                    gripper=l_grip,
                     servo_status=self._latest_left.servo_status,
                 )
                 self._latest_right = ArmState(
                     joints=[msg.position[name_idx[j]] if j in name_idx else 0.0 for j in self._right_joints],
-                    gripper=self._latest_right.gripper,
+                    gripper=r_grip,
                     servo_status=self._latest_right.servo_status,
                 )
 
