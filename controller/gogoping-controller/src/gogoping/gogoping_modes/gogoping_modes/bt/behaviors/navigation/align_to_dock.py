@@ -19,7 +19,7 @@ Status:
 ROS param:
   align_tolerance_rad (기본 0.05 ≈ 3°)
   align_angular_speed (기본 0.5 rad/s)
-  align_timeout_sec   (기본 10.0)
+  align_timeout_sec   (기본 15.0)
 
 terminate(INVALID): cmd_vel = 0 publish 보장 — 트리 중간 종료 시 robot 정지.
 """
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_TOLERANCE_RAD = 0.05
 _DEFAULT_ANGULAR_SPEED = 0.5
-_DEFAULT_TIMEOUT_SEC = 10.0
+_DEFAULT_TIMEOUT_SEC = 15.0
 _CMD_VEL_TOPIC = "/gogoping/cmd_vel"
 
 
