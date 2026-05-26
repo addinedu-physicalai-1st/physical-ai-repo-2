@@ -2,7 +2,7 @@
 # scripts/device-gogoping-sim.sh — GogoPing 가제보 시뮬레이션 launcher.
 #
 # 동작:
-#   - tmux 세션 'gogoping-sim' 안에 window 5개:
+#   - tmux 세션 'gogoping-sim' 안에 window 7개 + 부가 (sim-teleport 등):
 #       gazebo       : gogoping_bringup sim.launch.py
 #                      (gogoping_navigation/launch_sim_with_pinky.launch.xml 을
 #                       namespace=gogoping 으로 include + sim_status_publisher 노드)
@@ -11,6 +11,12 @@
 #                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
 #       sim-battery  : sim_battery_node — /gogoping/battery 1Hz publish +
 #                      /gogoping/sim/set_battery_level srv 로 admin UI 슬라이더 디버그
+#       sim-teleport : sim_teleport_node — gz set_pose bridge for debug 좌표 override
+#       camera       : gogoping_camera camera_stream.launch.py — USB /dev/video0
+#                      → UDP 9013 → streaming server (sim 환경에서도 실 USB 카메라 사용).
+#                      Arduino 없으면 시리얼 에러 무시.
+#       camera-pan   : gogoping_camera_pan camera_pan.launch.py — Arduino MG995 ×2
+#                      pan/tilt 서보. /dev/arduino-camera 자동 udev install.
 #       rviz         : rviz2 시각화
 #
 # 사용:
@@ -83,6 +89,51 @@ case "$ACTION" in
 
     SOURCE_ENV="source $ROS_SETUP && source $WS_SETUP"
 
+    # /dev/arduino-camera (camera-pan 서보용 symlink) 없으면 udev rule 자동 install — 1회만, sudo 묻음.
+    # sim 환경에서도 실 Arduino USB 연결되어 있으면 동일하게 PT 서보 동작 가능.
+    # 실패해도 진행 — camera-pan window 에서 serial open 에러로 표시됨.
+    if [[ ! -e /dev/arduino-camera ]]; then
+      echo "[device-gogoping-sim] /dev/arduino-camera 없음 — udev rule 자동 install (sudo 묻음)"
+      _arduino_dev=""
+      for _d in /dev/ttyACM* /dev/ttyUSB*; do
+        [[ -e "$_d" ]] || continue
+        if udevadm info --query=property --name="$_d" 2>/dev/null | grep -q '^ID_BUS=usb$'; then
+          _arduino_dev="$_d"
+          break
+        fi
+      done
+      if [[ -z "$_arduino_dev" ]]; then
+        echo "[device-gogoping-sim] Arduino USB device 못 찾음 — sim 만 진행 (camera_pan 없이)" >&2
+      else
+        mapfile -t _ids < <(udevadm info -a -n "$_arduino_dev" 2>/dev/null | awk -F'==' '
+          $1 ~ /ATTRS\{idVendor\}/  && !v { gsub(/"/, "", $2); v=$2 }
+          $1 ~ /ATTRS\{idProduct\}/ && !p { gsub(/"/, "", $2); p=$2 }
+          $1 ~ /ATTRS\{serial\}/    && !s { gsub(/"/, "", $2); s=$2 }
+          END { print v; print p; print s }
+        ')
+        _v="${_ids[0]:-}"; _p="${_ids[1]:-}"; _s="${_ids[2]:-}"
+        if [[ -z "$_v" || -z "$_p" ]]; then
+          echo "[device-gogoping-sim] 경고: $_arduino_dev 의 vendor/product 추출 실패" >&2
+        else
+          if [[ -n "$_s" ]]; then
+            _rule='SUBSYSTEM=="tty", ATTRS{idVendor}=="'"$_v"'", ATTRS{idProduct}=="'"$_p"'", ATTRS{serial}=="'"$_s"'", SYMLINK+="arduino-camera", MODE="0660", GROUP="dialout"'
+          else
+            _rule='SUBSYSTEM=="tty", ATTRS{idVendor}=="'"$_v"'", ATTRS{idProduct}=="'"$_p"'", SYMLINK+="arduino-camera", MODE="0660", GROUP="dialout"'
+          fi
+          echo "[device-gogoping-sim] $_arduino_dev ($_v:$_p${_s:+, serial=$_s}) → /etc/udev/rules.d/99-arduino-camera.rules"
+          echo "$_rule" | sudo tee /etc/udev/rules.d/99-arduino-camera.rules >/dev/null
+          sudo udevadm control --reload
+          sudo udevadm trigger
+          sleep 0.5
+          if [[ -e /dev/arduino-camera ]]; then
+            echo "[device-gogoping-sim] /dev/arduino-camera ready"
+          else
+            echo "[device-gogoping-sim] 경고: udev rule 추가 후에도 symlink 안 생김 — Arduino 재연결 후 재실행" >&2
+          fi
+        fi
+      fi
+    fi
+
     # 시연/디버그 — 환경변수 → ros-args. gogoping_modes 노드의 IdleTimeout/Battery/Health
     # monitor 들이 declare_parameter 로 받음 (utils/safety_flags.py).
     MODES_ARGS=""
@@ -146,7 +197,24 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n sim-teleport -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 run gogoping_bringup sim_teleport_node --ros-args -r __ns:=/gogoping"
 
-    # window 5: rviz (map / TF / AMCL / costmap / plan 시각화)
+    # window 5: camera (USB 웹캠 → UDP MJPEG, sim 환경에서도 실 USB 카메라 사용 시).
+    # /dev/video0 없으면 노드는 뜨지만 카메라 open 에러 — robot-web 의 CameraView 는
+    # "영상 대기 중…" 으로 표시. CONTROL_SERVER_NAME 은 자기 자신 hostname (machine_ips.json 기준).
+    _cam_w="${CAMERA_WIDTH:-640}"
+    _cam_h="${CAMERA_HEIGHT:-480}"
+    _cam_be="${CAMERA_BACKEND:-cv2}"   # sim 환경 default cv2 (외장 웹캠 호환성)
+    _cam_server="${CONTROL_SERVER_NAME:-leekt}"   # 자기 hostname — machine_ips.json 에서 자기 IP
+    tmux new-window -t "$SESSION" -n camera -c "$REPO_ROOT" \
+      "$SOURCE_ENV && export CAMERA_WIDTH='$_cam_w' CAMERA_HEIGHT='$_cam_h' && exec ros2 launch gogoping_camera camera_stream.launch.py backend:=$_cam_be control_server:=$_cam_server"
+
+    # window 6: camera-pan (Arduino MG995 ×2 pan/tilt 서보, /dev/arduino-camera 필요)
+    # sim 환경에서도 실 Arduino USB 연결되어 있으면 동일하게 동작.
+    # /dev/arduino-camera 없으면 노드는 뜨지만 serial open 에러 — admin UI 의 텔레옵
+    # pan/tilt 슬라이더는 비-effect 로 동작 (REST 응답만 OK).
+    tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
+
+    # window 7: rviz (map / TF / AMCL / costmap / plan 시각화)
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
     tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
