@@ -65,12 +65,14 @@ GRIPPER_MAX_EFFORT = 10.0
 MAX_JOINT_VEL = 1.0             # rad/s
 
 # Collision-aware velocity scaling.
-D_STOP = 0.05      # 이 거리 이내면 V_FLOOR 적용.
-D_SLOW = 0.25      # 이 거리부터 감속 시작.
-V_FLOOR = 0.05     # 최소 속도 — leader 따라가는 능력 유지 (멀어질 때 자연 복귀).
+D_STOP = 0.03      # 3cm 이내면 V_FLOOR — 청진기 접촉 직전까지 허용.
+D_SLOW = 0.20      # 20cm 이내부터 감속 시작.
+V_FLOOR = 0.05     # 최소 속도 — leader 따라가는 능력 유지.
 TRACKED_LINKS = {
-    "left":  ["openarm_left_link4", "openarm_left_link6", "openarm_left_hand_tcp"],
-    "right": ["openarm_right_link4", "openarm_right_link6", "openarm_right_hand_tcp"],
+    # 팔뚝 (link4) 만 — 손목/그리퍼는 환자 접촉 (청진기 등) 위해 자유롭게.
+    # 팔뚝 본체가 환자 몸통/얼굴 충돌하는 것만 방지.
+    "left":  ["openarm_left_link4"],
+    "right": ["openarm_right_link4"],
 }
 WORLD_FRAME = "world"
 

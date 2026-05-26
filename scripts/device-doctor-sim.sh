@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
-# Doctor teleop ROS launch 만 띄움.
+# Doctor teleop ROS launch — **시뮬 (mock_components) 모드.**
+#
+# 실물 OpenArm CAN HW 로 테스트할 땐 → device-doctor-real.sh
 #
 # 다른 런처 책임 분리:
-#   - run_server.sh    → control-service :8000 / streaming :8100 / pgweb / ai-hub
-#   - ui-portal.sh     → portal-web :5174
-#   - doctor_sim.sh    → ROS 측 eduarm doctor_teleop launch 만 (이 파일)
+#   - run_server.sh             → control-service :8000 / streaming :8100 / pgweb / ai-hub
+#   - ui-portal.sh              → portal-web :5174
+#   - device-doctor-sim.sh      → ROS 측 doctor_teleop launch (mock — 이 파일)
+#   - device-doctor-real.sh     → ROS 측 doctor_teleop launch (real CAN HW)
 #
 # 사용:
-#   doctor_sim.sh start             # tmux + RViz (기본, 저장된 moveit.rviz 자동 로드)
-#   doctor_sim.sh start --no-rviz   # RViz 없이
-#   doctor_sim.sh start --bg        # tmux 대신 백그라운드 + 로그 파일
-#   doctor_sim.sh stop              # 띄운 ROS launch / tmux 모두 종료
-#   doctor_sim.sh status            # PID/tmux 상태
-#   doctor_sim.sh attach            # tmux 세션 attach (Ctrl+B D 로 detach)
+#   device-doctor-sim.sh start            # tmux + (옵션 RViz)
+#   device-doctor-sim.sh start --rviz     # RViz 같이
+#   device-doctor-sim.sh start --bg       # tmux 대신 백그라운드 + 로그 파일
+#   device-doctor-sim.sh stop             # 띄운 ROS launch / tmux 모두 종료
+#   device-doctor-sim.sh status
+#   device-doctor-sim.sh attach
 #
 # ─────────────────────────────────────────────
 # 수동 검증 체크리스트 (Acceptance — 8 시나리오)
@@ -42,7 +45,9 @@ build_ros_cmd() {
   local pitch="${CAM_PITCH:--0.1745}"
   local yaw="${CAM_YAW:-0.0}"
   local roll="${CAM_ROLL:-0.0}"
-  echo "source $ROOT/install/setup.bash && \
+  # mock_components (sim). doctor_teleop.launch.py 가 USE_FAKE_HARDWARE 읽음.
+  echo "export USE_FAKE_HARDWARE=true && \
+        source $ROOT/install/setup.bash && \
         exec ros2 launch eduarm doctor_teleop.launch.py rviz:=false \
             cam_pitch:=$pitch cam_yaw:=$yaw cam_roll:=$roll"
 }

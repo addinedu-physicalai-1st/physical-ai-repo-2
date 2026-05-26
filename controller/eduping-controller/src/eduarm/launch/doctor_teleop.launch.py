@@ -45,7 +45,14 @@ import xacro
 
 
 def _build_robot_description() -> str:
-    """Render openarm bimanual URDF with mock_components (use_fake_hardware=true)."""
+    """Render openarm bimanual URDF.
+
+    USE_FAKE_HARDWARE 환경변수:
+      "true"  (default) → mock_components (sim)
+      "false"           → openarm_hardware (실물 CAN, right=can0 left=can1)
+    device-doctor-sim.sh / device-doctor-real.sh 에서 env 설정.
+    """
+    use_fake = os.environ.get("USE_FAKE_HARDWARE", "true")
     description_pkg_share = get_package_share_directory("openarm_description")
     xacro_path = os.path.join(description_pkg_share, "urdf", "robot", "v10.urdf.xacro")
     return xacro.process_file(
@@ -53,7 +60,7 @@ def _build_robot_description() -> str:
         mappings={
             "arm_type": "v10",
             "bimanual": "true",
-            "use_fake_hardware": "true",
+            "use_fake_hardware": use_fake,
             "ros2_control": "true",
             "right_can_interface": "can0",
             "left_can_interface": "can1",
@@ -216,7 +223,9 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # mock_components 의 initial_value 가 모두 0.0 인 자연 singularity 회피용 —
-    # controller spawn 직후 양팔을 home pose (elbow 90° + 비대칭 비틀림) 로 이동.
+    # controller spawn 직후 양팔을 home pose 로 이동. 실물 HW 에선 사용 금지
+    # (현재 자세에서 즉시 home 으로 가버리면 위험) — USE_FAKE_HARDWARE=false 면 skip.
+    enable_home_pose = os.environ.get("USE_FAKE_HARDWARE", "true").lower() != "false"
     home_pose_setter = Node(
         package="eduarm",
         executable="home_pose_setter",
@@ -253,7 +262,7 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration("rviz")),
     )
 
-    return LaunchDescription([
+    actions = [
         rviz_arg,
         cam_pitch_arg, cam_yaw_arg, cam_roll_arg,
         robot_state_publisher,
@@ -262,11 +271,13 @@ def generate_launch_description() -> LaunchDescription:
         delayed_jsb,
         delayed_arm,
         delayed_gripper,
-        delayed_home,
         move_group_node,
         d435_launch,
         d435_rgb_uploader,
         d435_pointcloud_uploader,
         delayed_passthrough,
         rviz_node,
-    ])
+    ]
+    if enable_home_pose:
+        actions.insert(actions.index(move_group_node), delayed_home)
+    return LaunchDescription(actions)

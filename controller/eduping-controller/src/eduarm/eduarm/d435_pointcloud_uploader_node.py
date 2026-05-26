@@ -40,6 +40,17 @@ from websockets.sync.client import connect as ws_connect
 
 WORLD_FRAME = "world"
 
+# Self-filter — D435 가 자기 robot 의 팔/몸을 obstacle 로 잡지 않게 voxel 제거.
+# 각 link 원점 중심 + 반경 SELF_FILTER_RADIUS 의 sphere 안 voxel 은 skip.
+SELF_FILTER_LINKS = (
+    "openarm_body_link0",
+    *(f"openarm_left_link{i}" for i in range(8)),    # link0~7
+    *(f"openarm_right_link{i}" for i in range(8)),
+    "openarm_left_hand",
+    "openarm_right_hand",
+)
+SELF_FILTER_RADIUS = 0.10        # 10cm — 팔 두께 + 여유.
+
 
 PATH = "/ws/doctor/pointcloud?role=producer"
 
@@ -125,6 +136,22 @@ class D435PointCloudUploader(Node):
             self._stop.wait(backoff)
             backoff = min(backoff * 2, 30.0)
 
+    def _lookup_self_centers(self) -> np.ndarray | None:
+        """추적해야 할 robot link 들의 world 좌표 (N, 3). TF 미준비 link 는 skip."""
+        centers: list[tuple[float, float, float]] = []
+        for link in SELF_FILTER_LINKS:
+            try:
+                t = self._tf_buffer.lookup_transform(
+                    WORLD_FRAME, link, rclpy.time.Time(),
+                )
+            except TransformException:
+                continue
+            tr = t.transform.translation
+            centers.append((tr.x, tr.y, tr.z))
+        if not centers:
+            return None
+        return np.asarray(centers, dtype=np.float32)
+
     def _lookup_transform_matrix(self, src_frame: str) -> np.ndarray | None:
         """world ← src_frame 4x4 동차 변환 행렬. TF 미준비면 None."""
         try:
@@ -151,10 +178,13 @@ class D435PointCloudUploader(Node):
         return T
 
     def _filter_and_transform(
-        self, points_iter, T_world_src: np.ndarray,
+        self,
+        points_iter,
+        T_world_src: np.ndarray,
+        self_centers: np.ndarray | None,
     ) -> list[tuple[float, float, float]]:
-        """optical frame points → world frame, with depth filter + stride."""
-        # 먼저 필터링 + decimation 한 후 행렬 곱.
+        """optical points → depth filter + stride → world → self-filter."""
+        # 1) depth filter + stride.
         limit = self._depth_limit
         skip = self._stride
         cap = self._max_points
@@ -165,7 +195,6 @@ class D435PointCloudUploader(Node):
             if idx % skip != 0:
                 continue
             x_opt, y_opt, z_opt = p[0], p[1], p[2]
-            # optical frame 의 z = depth (camera 앞쪽 거리).
             if not (0.0 < z_opt < limit):
                 continue
             if math.isnan(x_opt) or math.isnan(y_opt):
@@ -175,10 +204,17 @@ class D435PointCloudUploader(Node):
                 break
         if not kept:
             return []
-        # 4x4 변환 일괄 적용.
-        arr = np.asarray(kept, dtype=np.float32)        # (N, 3)
-        homo = np.hstack([arr, np.ones((arr.shape[0], 1), dtype=np.float32)])  # (N, 4)
-        world = homo @ T_world_src.T                    # (N, 4)
+        # 2) world 변환.
+        arr = np.asarray(kept, dtype=np.float32)
+        homo = np.hstack([arr, np.ones((arr.shape[0], 1), dtype=np.float32)])
+        world = (homo @ T_world_src.T)[:, :3]            # (N, 3)
+        # 3) self-filter — robot link 주변 voxel 제거.
+        if self_centers is not None and self_centers.shape[0] > 0:
+            # (N, M, 3) → (N, M) → (N,)  vectorized squared distance.
+            diffs = world[:, None, :] - self_centers[None, :, :]
+            min_d_sq = (diffs * diffs).sum(axis=2).min(axis=1)
+            mask = min_d_sq > (SELF_FILTER_RADIUS * SELF_FILTER_RADIUS)
+            world = world[mask]
         return [(float(r[0]), float(r[1]), float(r[2])) for r in world]
 
     def _on_pointcloud(self, msg: PointCloud2) -> None:
@@ -191,8 +227,9 @@ class D435PointCloudUploader(Node):
         if T is None:
             return  # TF 아직 안 옴 — 다음 frame 에서 시도.
 
+        self_centers = self._lookup_self_centers()
         pts_iter = pc2.read_points(msg, field_names=("x", "y", "z"), skip_nans=False)
-        world_pts = self._filter_and_transform(pts_iter, T)
+        world_pts = self._filter_and_transform(pts_iter, T, self_centers)
         if not world_pts:
             return
 
