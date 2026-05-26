@@ -41,7 +41,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/games/store-play", tags=["noriarm"])
 
 READY_TIMEOUT_S = 120.0   # ACT phase5: ~10s + YOLO load + 양팔 connect + 카메라 warmup × 3 (~5s each).
-TASK_TIMEOUT_S = 120.0    # 한 task 최대 시간 (runner --episode_s 와 비슷한 값 + 여유).
+TASK_TIMEOUT_S = 1300.0   # 한 task 최대 시간. game.yaml episode_timeout_s(1000) + sub-realtime
+                          # 오버헤드(추론 ~40ms/frame → ~25Hz → 30000 frame≈1200s wall) + 여유.
+                          # 이 값보다 episode 가 길면 control 이 task 를 mid-way abort 하니 동기 유지 필수.
 
 # runner_entry 가 LeRobot BiOmxFollower / ultralytics YOLO 등을 import 하므로
 # 이들이 설치된 venv 의 Python interpreter 필요. control_service venv 에 없으면
@@ -166,7 +168,10 @@ async def create_session(body: CreateSessionRequest) -> dict:
     """모드 진입 시 1회 호출 — runner spawn (heavy init 시작)."""
     session = _store.create()
     argv = _runner_argv(body.target)
-    session.process = RunnerProcess(argv, env_extra=_runner_env_extra())
+    # runner 도메인 이벤트(bell_rung / missing) → SSE 로 흘림 (session.push_event).
+    session.process = RunnerProcess(
+        argv, env_extra=_runner_env_extra(), on_event=session.push_event,
+    )
     try:
         await session.process.start()
     except Exception as e:

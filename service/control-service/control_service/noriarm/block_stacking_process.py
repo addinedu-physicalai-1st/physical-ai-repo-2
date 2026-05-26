@@ -6,10 +6,11 @@ asyncio.subprocess 로 spawn → stdout 의 "READY" 줄을 읽을 때까지 대�
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
-from typing import Sequence
+from typing import Callable, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,13 @@ class RunnerProcess:
       각 send_prompt 후 wait_task_done 으로 task 완료 신호 (TASK_DONE 줄) 대기.
     """
 
-    def __init__(self, argv: Sequence[str], *, env_extra: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        argv: Sequence[str],
+        *,
+        env_extra: dict[str, str] | None = None,
+        on_event: "Callable[[dict], None] | None" = None,
+    ) -> None:
         self._argv = list(argv)
         self._env_extra = env_extra or {}
         self._proc: asyncio.subprocess.Process | None = None
@@ -32,6 +39,9 @@ class RunnerProcess:
         self._stdout_task: asyncio.Task | None = None
         # long-lived (store_play) 용 — TASK_DONE 줄을 큐로 받아 매 task 마다 wait 가능.
         self._task_done_queue: asyncio.Queue[bool] = asyncio.Queue(maxsize=8)
+        # runner → UI 이벤트 콜백 — runner 가 "EVENT {json}" stdout 으로 보내면 호출.
+        # store_play 의 bell_rung / missing 등 도메인 이벤트를 SSE 로 흘리는 통로.
+        self._on_event = on_event
 
     async def start(self) -> None:
         env = os.environ.copy()
@@ -53,6 +63,9 @@ class RunnerProcess:
                 break
             text = line.decode("utf-8", errors="replace").rstrip()
             logger.info("[runner] %s", text)
+            # uvicorn 이 application logger.info 를 stdout 에 안 흘려서 runner 출력(크래시
+            # traceback 포함)이 control 로그에 안 보임 → print 로 직접 흘림 (디버깅 필수).
+            print(f"[runner] {text}", flush=True)
             if text == "READY":
                 self._ready_event.set()
             elif text == "TASK_DONE":
@@ -60,6 +73,12 @@ class RunnerProcess:
                     self._task_done_queue.put_nowait(True)
                 except asyncio.QueueFull:
                     pass  # 미소비 신호 누적 시 drop — 호출자가 timely consume 가정.
+            elif text.startswith("EVENT ") and self._on_event is not None:
+                # runner 도메인 이벤트 ("EVENT {json}") → UI 콜백 (SSE).
+                try:
+                    self._on_event(json.loads(text[len("EVENT "):]))
+                except Exception:
+                    pass  # 잘못된 EVENT 줄 무시 — 추론에 영향 없음.
 
     async def wait_ready(self, *, timeout_s: float) -> bool:
         try:

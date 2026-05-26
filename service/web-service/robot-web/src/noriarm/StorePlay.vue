@@ -2,6 +2,8 @@
 import { computed, inject, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
+import { useVoiceStore } from '@/stores/voice';
+import { useModeIntents } from '@/composables/useModeIntents';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 
 // 5종 과일 — game.yaml 의 paraphrases 와 1:1.
@@ -11,6 +13,20 @@ const ITEMS: { id: string; label: string; prompts: string[] }[] = [
   { id: 'kiwi',       label: '키위',     prompts: ['give me kiwi', 'bring me kiwi', 'pass me the kiwi', 'I want kiwi'] },
   { id: 'strawberry', label: '딸기',     prompts: ['give me strawberry', 'bring me strawberry', 'pass me the strawberry', 'I want strawberry'] },
   { id: 'pineapple',  label: '파인애플', prompts: ['give me pineapple', 'bring me pineapple', 'pass me the pineapple', 'I want pineapple'] },
+];
+
+// STT 동적 힌트 — 가게놀이 모드일 때 whisper initial_prompt 에 주입 (stt_hints_set).
+// 짧은 발화 오인식 방지. 음식 단어 + 시나리오 명령어("시작"/"또 할래"/"그만") 둘 다.
+// 명령어 없으면 small 모델이 "또 할래"를 '잘래/오할로래' 로 오인식 → start 매칭 실패.
+const STT_FOOD_HINTS: string[] = [
+  // 음식
+  '딸기', '포도', '키위', '브로콜리', '파인애플',
+  '딸기 줘', '포도 줘', '키위 줘', '브로콜리 줘', '파인애플 줘',
+  '딸기 주세요', '줘', '주세요',
+  // 시나리오 명령어
+  '시작', '시작할게', '취소',
+  '또 할래', '더 할래', '또 해', '또 하자',
+  '그만', '그만하기', '끝내기',
 ];
 
 // long-lived runner UX 흐름:
@@ -25,6 +41,7 @@ const voiceController = inject(VOICE_CONTROLLER_KEY);
 const speak = (text: string) => voiceController?.speak(text);
 
 const mode = useModeStore();
+const voice = useVoiceStore();
 const { currentMode, requestedStoreItem } = storeToRefs(mode);
 const isActive = computed(() => currentMode.value === '가게놀이');
 
@@ -43,6 +60,47 @@ const PREVIEW_CAMS = [
 ];
 const previewTick = ref(0);
 let previewTimer: number | null = null;
+
+// 서빙 BGM — serving phase 동안 loop 재생. public/audio/storeplay_bgm.mp3 (사용자 제공).
+// 멘트(서버 WebRTC TTS)는 BGM(브라우저 로컬 오디오)과 별개 스트림이라 BGM 음량이 크면
+// 묻힘. 로봇이 말하는 동안(voice.state==='speaking') BGM 을 BGM_DUCK 으로 낮추고 복구.
+const BGM_VOLUME = 0.45;
+const BGM_DUCK = 0.0;  // 멘트 중엔 완전 음소거 — 0.1 로는 센 BGM 에 "주문 나왔습니다" 가 묻혀서.
+let bgm: HTMLAudioElement | null = null;
+function startBgm(): void {
+  if (!bgm) {
+    bgm = new Audio('/audio/storeplay_bgm.mp3');
+    bgm.loop = true;
+  }
+  bgm.volume = voice.state === 'speaking' ? BGM_DUCK : BGM_VOLUME;
+  void bgm.play().catch(() => { /* 음원 없거나 자동재생 차단 — 무시 */ });
+}
+function stopBgm(): void {
+  if (bgm) {
+    bgm.pause();
+    bgm.currentTime = 0;
+  }
+  if (bellSfx) {
+    bellSfx.pause();
+    bellSfx.currentTime = 0;
+  }
+}
+
+// 벨 누름 효과음 — bell_rung 시점에 재생 (음성 멘트 대신, 사용자 선택). 사용자 제공
+// public/audio/storeplay_bell.mp3. 재생 동안 서빙 BGM 음소거 → 효과음 끝나면 복구.
+let bellSfx: HTMLAudioElement | null = null;
+function restoreServingBgm(): void {
+  if (bgm && phase.value === 'serving') bgm.volume = BGM_VOLUME;
+}
+function playBellSfx(): void {
+  if (!bellSfx) {
+    bellSfx = new Audio('/audio/storeplay_bell.mp3');
+    bellSfx.addEventListener('ended', restoreServingBgm);
+  }
+  if (bgm) bgm.volume = 0.0;  // 효과음 안 묻히게 BGM 음소거
+  bellSfx.currentTime = 0;
+  void bellSfx.play().catch(() => { restoreServingBgm(); });  // 음원 없음/차단 시 BGM 복구
+}
 
 function previewUrl(cam: string): string {
   if (!sessionId.value) return '';
@@ -148,7 +206,7 @@ function subscribeEvents(sid: string): void {
   eventSource = new EventSource(`/api/noriarm/games/store-play/sessions/${sid}/events`);
   eventSource.onmessage = (ev) => {
     try {
-      const payload = JSON.parse(ev.data) as { type: string; prompt?: string };
+      const payload = JSON.parse(ev.data) as { type: string; prompt?: string; what?: string };
       switch (payload.type) {
         case 'ready':
           // start 완료 — bootSession 에서 phase 처리하지만 보강.
@@ -157,9 +215,21 @@ function subscribeEvents(sid: string): void {
         case 'task_started':
           // 클라이언트가 이미 'serving' 으로 갱신했지만 일관성 위해 보강.
           break;
+        case 'bell_rung':
+          // 로봇이 벨 누른 시점 — 효과음만 재생 (음성 멘트 생략, 사용자 선택). task 당 1회.
+          playBellSfx();
+          break;
+        case 'missing': {
+          // serve 시작 시 target/plate 미검출 — 멘트만 (serve 는 그대로 진행).
+          const ko = payload.what === 'plate'
+            ? '접시'
+            : (ITEMS.find((it) => it.id === payload.what)?.label ?? payload.what ?? '물건');
+          speak(`${ko}가 없어요. ${ko}를 놓아주세요`);
+          break;
+        }
         case 'task_done':
+          // 홈 복귀 = 완료 → done 화면. 멘트는 bell_rung 에서 이미 함.
           phase.value = 'done';
-          speak('다 됐어!');
           break;
         case 'task_timeout':
           phase.value = 'ready';
@@ -199,21 +269,34 @@ async function endSession(): Promise<void> {
 
 watch(isActive, async (active, prev) => {
   if (!active && prev) {
+    voice.setSttHints([]);  // 가게놀이 나가면 음식 힌트 제거
     stopPreview();
+    stopBgm();
     await endSession();
     phase.value = 'intro';
     selectedItem.value = null;
     error.value = null;
   }
   if (active && !prev) {
+    voice.setSttHints(STT_FOOD_HINTS);  // 음식 단어 STT 힌트 주입 (짧은 발화 오인식 방지)
     phase.value = 'intro';
+  }
+}, { immediate: true });
+
+// 서빙 중에만 카메라 미리보기 polling + BGM. 그 외 정지.
+watch(phase, (p) => {
+  if (p === 'serving') {
+    startPreview();
+    startBgm();
+  } else {
+    stopPreview();
+    stopBgm();
   }
 });
 
-// 서빙 중에만 카메라 미리보기 polling (추론 중 ROI 프레임 갱신됨). 그 외 정지.
-watch(phase, (p) => {
-  if (p === 'serving') startPreview();
-  else stopPreview();
+// BGM ducking — 로봇이 말하는 동안 BGM 낮춰 멘트가 안 묻히게. serving 외엔 bgm null/정지라 noop.
+watch(() => voice.state, (s) => {
+  if (bgm) bgm.volume = s === 'speaking' ? BGM_DUCK : BGM_VOLUME;
 });
 
 // 음성 명령 ("딸기 줘") — store_item intent 가 mode.requestedStoreItem 채움.
@@ -228,8 +311,23 @@ watch(requestedStoreItem, (req) => {
   if (item) void serveItem(item);
 });
 
+// 음성 sub_command — useVoiceController 가 호출.
+//   onStart  (sub_command 'start': "시작", "또 할래" 등) → phase 별 시작/또하기
+//   onModeExit (sub_command 'stop': "취소", "그만"; 또는 mode_change '대기') → 중단/끝내기
+useModeIntents('가게놀이', {
+  onStart: () => {
+    if (phase.value === 'intro') void bootSession();      // "시작"
+    else if (phase.value === 'done') phase.value = 'ready'; // "또 할래"
+  },
+  onModeExit: () => {
+    if (phase.value === 'serving') void abortServe();      // "그만" — task 중단
+    else exitToIdle();                                     // "취소"/"끝내기" — 모드 종료
+  },
+});
+
 onUnmounted(() => {
   stopPreview();
+  stopBgm();
   void endSession();
 });
 </script>

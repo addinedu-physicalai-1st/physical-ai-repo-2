@@ -18,7 +18,7 @@ class 순서) 도 그대로. YOLO R8 모델 경로는 build_roi_masker 인자로
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -141,6 +141,7 @@ class RoiMasker:
     iou: float
     pad: int
     cam_policy: dict[str, dict[str, Any]]
+    last_detected: set = field(default_factory=set)  # 직전 mask_images 검출 class.
 
     def mask_images(
         self,
@@ -162,6 +163,7 @@ class RoiMasker:
 
         target = prompt_to_target(task)
         out: dict[str, np.ndarray] = {}
+        detected: set[str] = set()  # 이번 호출에서 검출된 class (전체 cam 합집합) — 객체없음 감지용.
         for cam_key, img in images.items():
             policy = self.cam_policy.get(cam_key)
             if policy is None:
@@ -172,9 +174,13 @@ class RoiMasker:
             img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)  # YOLO 용 BGR
             results = self.yolo.predict(img_bgr, conf=self.conf, iou=self.iou, verbose=False)
             r = results[0]
+            if r.boxes is not None and len(r.boxes):
+                for cid in r.boxes.cls.cpu().numpy().astype(int):
+                    detected.add(YOLO_CLASSES[int(cid)])
             target_fruit = target if policy["keep_target_fruit"] else None
             bboxes = _select_bboxes(r, policy["always_keep"], target_fruit)
             out[cam_key] = _apply_roi_mask(img, bboxes, pad=self.pad, W=W, H=H)  # mask 는 원본 RGB
+        self.last_detected = detected  # runner 가 읽어 target/plate 미검출 판단.
         return out
 
 

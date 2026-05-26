@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import base64
 import io
+import json
 import logging
 import os
 import signal
@@ -302,6 +303,7 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
         # 2) ROI mask 적용 — phase5_roi 학습본이면 필수. 매 frame 갱신 (closed-loop).
         if masker is not None:
             remapped = masker.mask_images(remapped, task)
+            provider.last_detected = masker.last_detected  # runner 가 missing 판단에 사용.
         # 2.5) UI 미리보기 — 모델이 실제 보는 ROI masked 프레임을 5fps 로 저장.
         _save_preview(remapped)
         observation: dict[str, Any] = {
@@ -325,6 +327,9 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
 
     # _run_one_task 가 task 시작 시 호출 — PROMPT 마다 무조건 reset (동일 prompt 연속도 포함).
     provider.reset = _reset  # type: ignore[attr-defined]
+    # runner 가 missing(target/plate 미검출) 판단에 읽음. masker 있을 때만 갱신.
+    provider.last_detected = set()  # type: ignore[attr-defined]
+    provider.roi_active = masker is not None  # type: ignore[attr-defined]
     return provider
 
 
@@ -338,6 +343,7 @@ def _run_one_task(
     fps: int,
     episode_s: int,
     home: dict[str, float] | None = None,
+    bell: dict | None = None,
 ) -> None:
     """단일 task — obs → provider → action 루프.
 
@@ -366,6 +372,31 @@ def _run_one_task(
     moved_away = False
     home_count = 0
 
+    # 카메라 일시 끊김(USB 대역폭 글리치 → Corrupt JPEG / async_read TimeoutError) 내성.
+    # 한 frame 의 get_observation 실패로 task 전체가 죽지 않게 skip+retry. 단 연속
+    # CAM_FAIL_ABORT frame(=3s) 끊기면 진짜 카메라 다운으로 보고 task 종료(60s 무한 skip 방지).
+    cam_fail = 0
+    CAM_FAIL_ABORT = fps * 3
+
+    # 벨 누름 감지 — bell_pose 근접 시 EVENT bell_rung (task 당 1회) → UI "주문 나왔습니다".
+    b = bell or {}
+    bell_enabled = bool(b.get("enabled", False))
+    bell_pose = (
+        np.asarray(b["pose"], dtype=np.float32)
+        if bell_enabled and b.get("pose") else None
+    )
+    bell_thresh = float(b.get("thresh", 14.0))
+    bell_rung = False
+
+    # 객체없음 감지 — serve 첫 1초간 target(과일)/plate 한 번도 검출 안 되면 EVENT missing.
+    # ACT + roi 일 때만 (provider.roi_active). "멘트만, serve 는 계속" 정책.
+    from noriarm_framework.games.store_play.roi_masker import prompt_to_target
+    roi_active = bool(getattr(provider, "roi_active", False))
+    target_cls = prompt_to_target(task) if roi_active else None
+    detected_acc: set[str] = set()
+    missing_checked = False
+    MISSING_CHECK_FRAME = 30  # 1초 @30fps 누적 후 판정.
+
     # task 시작 시 정책 reset — 이전 episode 의 stale action queue 제거 (closed-loop 정합).
     reset_fn = getattr(provider, "reset", None)
     if callable(reset_fn):
@@ -376,24 +407,56 @@ def _run_one_task(
             logger.info("task 중단 신호 — 루프 탈출 (frame %d/%d)", i, n_frames)
             break
         t0 = time.perf_counter()
-        obs = robot.get_observation()
+        try:
+            obs = robot.get_observation()
+        except Exception as e:
+            cam_fail += 1
+            logger.warning("get_observation 실패 (frame %d, 연속 %d): %s — frame skip",
+                           i, cam_fail, e)
+            if cam_fail >= CAM_FAIL_ABORT:
+                logger.error("카메라 %d frame(=%.0fs) 연속 끊김 — task 종료", cam_fail, CAM_FAIL_ABORT / fps)
+                break
+            time.sleep(dt)
+            continue
+        cam_fail = 0  # 성공 시 연속 실패 카운터 리셋
         state_vec = _obs_to_state_vec(obs)
 
-        # ── 홈 복귀 감지 ──
+        # ── 홈 복귀 감지 (per-joint L∞) ──
+        # L2 는 큰 관절(어깨·팔꿈치)이 지배해서, 손목/그리퍼 한 관절이 20~25 어긋나도
+        # L2<thresh 면 종료돼 버림 (손목 안 돌아왔는데 끝나는 버그). → 관절별 절대편차의
+        # 최댓값(L∞)을 씀: "모든 관절이 각자 home_thresh 이내" 여야 홈 인정. 학습 teleop
+        # 은 전 관절 p95≈4.2/p99≈7.5 로 정밀 복귀하므로 손목/그리퍼도 임계 안에 들어옴.
         if home_enabled:
             cur = np.asarray(state_vec, dtype=np.float32)
             if start_pose is None:
                 start_pose = cur.copy()
-            dist = float(np.linalg.norm(cur - start_pose))
-            if dist > move_thresh:
+                logger.info("home: start_pose=%s", np.round(start_pose, 1).tolist())
+            joint_dev = np.abs(cur - start_pose)          # 관절별 절대편차 (12,)
+            max_dev = float(joint_dev.max())               # L∞ — 가장 안 돌아온 관절
+            lag_i = int(joint_dev.argmax())                # 그 관절 index
+            if max_dev > move_thresh:
                 moved_away = True
-            if moved_away and dist < home_thresh:
+            if moved_away and max_dev < home_thresh:       # 모든 관절이 home_thresh 이내
                 home_count += 1
                 if home_count >= stable_frames:
-                    logger.info("홈 복귀 감지 (frame %d, dist=%.1f) — task 완료", i, dist)
+                    logger.info("홈 복귀 감지 (frame %d, max_dev=%.1f) — task 완료", i, max_dev)
                     break
             else:
                 home_count = 0
+            # 진단: 1초마다 — 어느 관절(lag)이 얼마나 안 돌아왔는지 추적.
+            if i % fps == 0:
+                logger.info("home: frame=%d max_dev=%.1f@%s moved_away=%s hc=%d (move>%.0f, home<%.0f)",
+                            i, max_dev, MOTOR_ORDER[lag_i], moved_away, home_count, move_thresh, home_thresh)
+
+        # ── 벨 누름 감지 (task 당 1회 EVENT) ──
+        if bell_pose is not None and not bell_rung:
+            cur_b = np.asarray(state_vec, dtype=np.float32)
+            bell_dist = float(np.linalg.norm(cur_b - bell_pose))
+            if bell_dist < bell_thresh:
+                bell_rung = True
+                logger.info("벨 누름 감지 (frame %d, dist=%.1f)", i, bell_dist)
+                # EVENT → control on_event → SSE → UI "주문 나왔습니다".
+                print(f'EVENT {json.dumps({"type": "bell_rung", "prompt": task})}', flush=True)
 
         if not queue:
             images = {key: obs[key] for key in CAMERA_KEYS}
@@ -409,6 +472,18 @@ def _run_one_task(
             # ACT closed-loop 는 매 frame 1개 반환 → 로그 1초마다. SmolVLA chunk(>1) 는 매번.
             if len(chunk) > 1 or i % fps == 0:
                 logger.info("frame %d: +%d action, provider=%.0fms", i, len(chunk), inf_ms)
+
+        # ── 객체없음 감지 (serve 첫 1초 누적 후 1회 판정, 멘트만) ──
+        if roi_active and not missing_checked:
+            detected_acc |= getattr(provider, "last_detected", set())
+            if i >= MISSING_CHECK_FRAME:
+                missing_checked = True
+                if target_cls and target_cls not in detected_acc:
+                    logger.info("객체없음: target %s 미검출", target_cls)
+                    print(f'EVENT {json.dumps({"type": "missing", "what": target_cls})}', flush=True)
+                if "plate" not in detected_acc:
+                    logger.info("객체없음: plate 미검출")
+                    print(f'EVENT {json.dumps({"type": "missing", "what": "plate"})}', flush=True)
 
         action_vec = queue.popleft()
         try:
@@ -470,9 +545,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", choices=("sim", "real"), default="real",
                         help="real: BiOmxFollower 직결. sim: 미지원 (TODO).")
-    parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--episode_s", type=int, default=60,
-                        help="task 1회 최대 시간 (s). 정책이 종료 신호 안 보내면 강제 cut.")
+    parser.add_argument("--fps", type=int, default=None,
+                        help="없으면 game.yaml runtime.rate_hz 사용.")
+    parser.add_argument("--episode_s", type=int, default=None,
+                        help="task 1회 최대 시간 (s). 정책이 종료 신호(홈 복귀) 안 보내면 강제 cut. "
+                             "없으면 game.yaml runtime.episode_timeout_s 사용.")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -523,10 +600,15 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, _handle_sigterm)
     signal.signal(signal.SIGUSR1, _handle_sigusr1)
 
-    # 홈 복귀 감지 설정 (game.yaml policy.home_detect) — 매 task 에 전달.
+    # fps / episode_s — CLI 명시값 우선, 없으면 game.yaml runtime (단일 진실원).
+    _fps = args.fps if args.fps is not None else int(config.runtime.rate_hz)
+    _episode_s = args.episode_s if args.episode_s is not None else int(config.runtime.episode_timeout_s)
+
+    # 홈 복귀 / 벨 감지 설정 (game.yaml policy.*) — 매 task 에 전달.
     _home_cfg = config.policy.extra.get("home_detect") or {}
-    logger.info("idle — PROMPT 대기 (kind=%s, home_detect=%s)",
-                config.policy.kind, _home_cfg if _home_cfg else "default")
+    _bell_cfg = config.policy.extra.get("bell_detect") or {}
+    logger.info("idle — PROMPT 대기 (kind=%s, fps=%d, episode_s=%d, home=%s, bell=%s)",
+                config.policy.kind, _fps, _episode_s, bool(_home_cfg), bool(_bell_cfg.get("enabled")))
 
     # 5) 명령 loop — PROMPT 받을 때마다 task 1회 실행.
     try:
@@ -551,7 +633,8 @@ def main(argv: list[str] | None = None) -> int:
                 t0 = time.perf_counter()
                 _run_one_task(
                     robot, provider, task,
-                    fps=args.fps, episode_s=args.episode_s, home=_home_cfg,
+                    fps=_fps, episode_s=_episode_s,
+                    home=_home_cfg, bell=_bell_cfg,
                 )
                 logger.info("task 종료: %r (%.1fs)", task, time.perf_counter() - t0)
                 print("TASK_DONE", flush=True)

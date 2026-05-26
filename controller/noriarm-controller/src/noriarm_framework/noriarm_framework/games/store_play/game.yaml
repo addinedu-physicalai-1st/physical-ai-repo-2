@@ -116,15 +116,25 @@ policy:
     iou: 0.5
     pad: 20
   # 홈 복귀 감지 — 서빙 후 시작 pose 로 돌아오면 task 자동 종료 (TASK_DONE).
-  # 학습 데이터 분석값: 복귀율 100%, start→end 거리 평균 6.6(max 15.8), 최대 이탈 평균 160.
-  #   move_thresh: 이만큼 벗어나야 "서빙하러 나감" 인정 (오탐 방지).
-  #   home_thresh: 시작 pose 와 이 거리 이내면 "홈".
-  #   stable_frames: 홈을 이 frame 수 연속 유지해야 완료 (스쳐 지나감 무시, 0.5s@30fps).
+  # ⚠️ per-joint L∞ 기준 (관절별 절대편차의 최댓값). L2(전체거리)는 큰 관절이 지배해
+  # 손목/그리퍼가 안 돌아와도 종료되던 버그가 있어 L∞ 로 바꿈 — "모든 관절이 각자 임계 이내".
+  #   move_thresh: 어느 한 관절이라도 이만큼 벗어나야 "서빙하러 나감" 인정 (서빙 중 어깨·
+  #                그리퍼는 50~100+ 움직이므로 40 이면 충분).
+  #   home_thresh: 모든 관절이 시작 pose 와 이 편차 이내여야 "홈". 학습 teleop 전 관절
+  #                p95≈4.2/p99≈7.5 로 복귀 → 추론 마진 포함 14. 손목 20~25 어긋나면 미감지(정상).
+  #   stable_frames: 홈을 이 frame 수 연속 유지해야 완료 (스쳐 지나감 무시).
   home_detect:
     enabled: true
     move_thresh: 40.0
-    home_thresh: 18.0
-    stable_frames: 15
+    home_thresh: 14.0
+    stable_frames: 5
+  # 벨 누름 감지 — 로봇이 bell_button 누르는 pose 근접 시 "주문 나왔습니다" 멘트 트리거.
+  # pose 는 학습 데이터(v2_en) 375 ep 의 wrist_right bell bbox peak frame joint 평균
+  # (std 2.9 로 일관). thresh 이내 근접 시 EVENT bell_rung (task 당 1회).
+  bell_detect:
+    enabled: true
+    pose: [-12.3, 27.9, -34.6, -2.5, 48.2, 59.6, 0.8, -16.2, 14.8, 36.2, -1.4, 54.8]
+    thresh: 14.0
   paraphrases:
     broccoli:
       - "give me broccoli"
@@ -154,4 +164,7 @@ policy:
 
 runtime:
   rate_hz: 30
-  episode_timeout_s: 60
+  # task 1회 최대 시간 (s). 홈 복귀 감지/abort 가 먼저 끝내는 게 정상이고, 이건 안전 cut.
+  # runner_entry 가 이 값을 직접 읽음(--episode_s 미지정 시). control 의 TASK_TIMEOUT_S 는
+  # 이 값 + sub-realtime 오버헤드(추론 ~40ms/frame → ~25Hz)보다 커야 mid-task abort 안 됨.
+  episode_timeout_s: 1000
