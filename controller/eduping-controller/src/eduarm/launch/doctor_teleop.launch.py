@@ -6,7 +6,6 @@
   - controller spawner       joint_state_broadcaster + left/right joint_trajectory_controller
                               + left/right gripper_controller
   - move_group               (MoveIt — planning scene + FK/IK service + collision)
-  - clear_octomap_timer      (octomap 1Hz clear)
 
 note: 이전엔 moveit_servo × 2 포함했었으나 spec §12 의 hybrid IK 채택 후 무용.
       텔레옵은 leader 가 leader_hybrid_ik_node 를 통해 처리 (leader_teleop.launch.py).
@@ -105,20 +104,25 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[robot_description_param],
     )
 
-    # D435 의 root frame (d435_link) 을 robot body 에 mount — octomap 이 depth point
-    # 를 world frame 으로 변환할 수 있게. realsense2_camera 가 publish_tf:=true 면
-    # d435_link → d435_depth_optical_frame 체인은 realsense 가 직접 publish.
-    # 위치는 robot-web URDF (openarm.urdf) 의 d435_mount_joint 와 동일:
-    # openarm_body_link0 기준 (0.05, 0, 0.62), rpy=0.
-    # args: x y z yaw pitch roll parent child
+    # D435 의 root frame (d435_link) 을 robot body 에 mount.
+    # 물리적 카메라가 살짝 위/아래/옆을 향하게 설치됐다면 cam_pitch/yaw/roll 로 보정.
+    # 양수 cam_pitch (rad) → 카메라 노즈 다운 (X→Z 회전 = 앞이 아래로). 위로 들렸을 때 음수.
+    # 적용 즉시 RViz + octomap + 의사 UI pointcloud + collision 거리 계산까지 일괄 반영.
+    # args: x y z yaw pitch roll parent child  (REP-103 ZYX intrinsic Euler)
+    cam_pitch_arg = DeclareLaunchArgument("cam_pitch", default_value="0.0",
+        description="D435 mount pitch (rad). 카메라가 위 향하면 음수 (e.g. -0.1).")
+    cam_yaw_arg = DeclareLaunchArgument("cam_yaw", default_value="0.0")
+    cam_roll_arg = DeclareLaunchArgument("cam_roll", default_value="0.0")
     static_tf_camera = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_tf_camera_to_body",
         arguments=[
-            "0.05", "0.0", "0.62",
-            "0", "0", "0",
-            "openarm_body_link0", "d435_link",
+            "--x", "0.05", "--y", "0.0", "--z", "0.62",
+            "--yaw", LaunchConfiguration("cam_yaw"),
+            "--pitch", LaunchConfiguration("cam_pitch"),
+            "--roll", LaunchConfiguration("cam_roll"),
+            "--frame-id", "openarm_body_link0", "--child-frame-id", "d435_link",
         ],
         output="screen",
     )
@@ -170,13 +174,6 @@ def generate_launch_description() -> LaunchDescription:
         name="move_group",
         output="screen",
         parameters=[moveit_params],
-    )
-
-    clear_octomap_timer = Node(
-        package="eduarm",
-        executable="clear_octomap_timer",
-        name="clear_octomap_timer",
-        output="screen",
     )
 
     # D435 RealSense — pointcloud publish (/d435/depth/color/points). 없으면 octomap
@@ -258,6 +255,7 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         rviz_arg,
+        cam_pitch_arg, cam_yaw_arg, cam_roll_arg,
         robot_state_publisher,
         static_tf_camera,
         ros2_control_node,
@@ -266,7 +264,6 @@ def generate_launch_description() -> LaunchDescription:
         delayed_gripper,
         delayed_home,
         move_group_node,
-        clear_octomap_timer,
         d435_launch,
         d435_rgb_uploader,
         d435_pointcloud_uploader,

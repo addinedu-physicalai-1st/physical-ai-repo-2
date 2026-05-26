@@ -1,23 +1,21 @@
-"""Leader → Follower 직결 passthrough + octomap collision gate.
+"""Leader → Follower 직결 passthrough + 거리 기반 velocity scaling.
 
-leader 와 follower 가 동일 URDF (양쪽 다 openarm v10) 라 joint 1:1 매핑이 자연스러움.
-move_group 의 FK/IK 호출 0. 대신 `/check_state_validity` 를 10Hz 백그라운드 호출해
-follower 의 다음 명령 (= leader 현재 값) 이 octomap voxel 과 충돌 안 하는지 확인.
+leader 와 follower 가 동일 URDF — joint 1:1 매핑. move_group FK/IK 호출 0.
+
+D435 octomap voxel 까지 거리 d 기반 v_scale:
+  d ≥ D_SLOW  → 1.0
+  d ≤ D_STOP  → V_FLOOR (최소 속도, 0 아님 — 멀어질 때 자연스럽게 따라감)
+  사이        → 선형 보간
+
+publish: scaled_target = current_follower + (leader - current_follower) × v_scale
 
 흐름:
-    /eduping/leader/joint_states  (FeetechLeader 30~50Hz)
-        │
-        ├─→ on_leader callback: valid flag 가 fresh (< 200ms) 면 → JTC publish.
-        │                       fresh 가 아니면 skip (마지막 안전 자세 hold).
-        │
-        └─→ _validity_timer (10Hz): RobotState 합성 → /check_state_validity 호출.
-                                    valid 면 _last_valid_at 갱신.
+  /eduping/leader/joint_states (30~50Hz) → on_leader
+  /eduping/world_voxels        (15Hz)   → voxel numpy array
+  /joint_states                          → current follower
+  /tf                                    → follower 링크 world 좌표
 
-active gate — UI 의 "Telehealth 시작" 버튼 (`~/set_active` SetBool) 이 켜기 전엔
-publish 안 함. False 면 JTC 가 마지막 명령 hold.
-
-충돌 감지 latency ≤ VALIDITY_FRESH_S (200ms). 그 시간 안에 follower 가 voxel 침범
-가능 — mock_components 시뮬에선 무해. 실물 HW 면 더 짧게 조절 필요.
+active gate — UI 의 "Telehealth 시작" 버튼 (`~/set_active` SetBool).
 """
 from __future__ import annotations
 
@@ -25,17 +23,18 @@ import math
 import threading
 import time
 
+import numpy as np
 import rclpy
 from builtin_interfaces.msg import Duration as DurMsg
 from control_msgs.action import GripperCommand
-from moveit_msgs.msg import RobotState
-from moveit_msgs.srv import GetStateValidity
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32MultiArray
 from std_srvs.srv import SetBool
+from tf2_ros import Buffer, TransformListener, TransformException
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
@@ -62,9 +61,18 @@ JTC_HOLD_S = 0.05               # 다음 leader frame 들어오기 전까지 hol
 GRIPPER_DELTA_THRESHOLD = 0.001
 GRIPPER_MAX_EFFORT = 10.0
 
-VALIDITY_PERIOD_S = 0.1         # 10Hz check.
-VALIDITY_FRESH_S = 0.25         # 최근 valid 결과가 250ms 이내일 때만 publish 통과.
-VALIDITY_SERVICE_TIMEOUT_S = 0.3
+# Telehealth 최대 joint 속도 — 안전 우선 (~57°/s, 사람 팔 속도). 7 joint 공통.
+MAX_JOINT_VEL = 1.0             # rad/s
+
+# Collision-aware velocity scaling.
+D_STOP = 0.05      # 이 거리 이내면 V_FLOOR 적용.
+D_SLOW = 0.25      # 이 거리부터 감속 시작.
+V_FLOOR = 0.05     # 최소 속도 — leader 따라가는 능력 유지 (멀어질 때 자연 복귀).
+TRACKED_LINKS = {
+    "left":  ["openarm_left_link4", "openarm_left_link6", "openarm_left_hand_tcp"],
+    "right": ["openarm_right_link4", "openarm_right_link6", "openarm_right_hand_tcp"],
+}
+WORLD_FRAME = "world"
 
 
 class LeaderPassthrough(Node):
@@ -77,6 +85,23 @@ class LeaderPassthrough(Node):
             JointState, "/eduping/leader/joint_states", self._on_leader, 10,
             callback_group=self._cb_group,
         )
+        # 현재 follower 위치 — collision blending 의 출발점.
+        self.create_subscription(
+            JointState, "/joint_states", self._on_follower, 10,
+            callback_group=self._cb_group,
+        )
+        # D435 voxel 좌표 (world frame, m) — collision 거리 계산 입력.
+        self.create_subscription(
+            Float32MultiArray, "/eduping/world_voxels", self._on_voxels, 1,
+            callback_group=self._cb_group,
+        )
+        self._latest_follower: JointState | None = None
+        self._voxels: np.ndarray | None = None   # (N, 3) world frame.
+        self._lock = threading.Lock()
+
+        # TF 로 follower 링크 좌표 lookup.
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
 
         self._jtc_pub = {
             side: self.create_publisher(JointTrajectory, JTC_TOPIC[side], 10)
@@ -90,21 +115,11 @@ class LeaderPassthrough(Node):
             for side in SIDES
         }
         self._last_gripper_cmd = {side: math.nan for side in SIDES}
+        # 직전 publish 한 joint 위치 + 시각 — velocity cap 용.
+        self._last_pub_pos: dict[str, list[float] | None] = {side: None for side in SIDES}
+        self._last_pub_ts: dict[str, float] = {side: 0.0 for side in SIDES}
 
-        # Collision gate — /check_state_validity 의 fresh 결과만 publish 허용.
-        self._validity_client = self.create_client(
-            GetStateValidity, "/check_state_validity",
-            callback_group=self._cb_group,
-        )
-        self._last_valid_at: float = 0.0
-        self._latest_leader: JointState | None = None
-        self._lock = threading.Lock()
-        self._blocked_warned_at: float = 0.0
-        self.create_timer(
-            VALIDITY_PERIOD_S, self._validity_tick,
-            callback_group=self._cb_group,
-        )
-
+        self._slow_warned_at: float = 0.0
         self._active = False
         self.create_service(
             SetBool, "~/set_active", self._on_set_active,
@@ -122,80 +137,127 @@ class LeaderPassthrough(Node):
         self.get_logger().info(f"leader_passthrough {response.message}")
         return response
 
-    def _on_leader(self, msg: JointState) -> None:
+    def _on_follower(self, msg: JointState) -> None:
         with self._lock:
-            self._latest_leader = msg
+            self._latest_follower = msg
+
+    def _on_voxels(self, msg: Float32MultiArray) -> None:
+        data = msg.data
+        if not data:
+            with self._lock:
+                self._voxels = None
+            return
+        try:
+            arr = np.asarray(data, dtype=np.float32).reshape(-1, 3)
+        except ValueError:
+            return
+        with self._lock:
+            self._voxels = arr
+
+    def _on_leader(self, msg: JointState) -> None:
         if not self._active:
             return
-        # collision gate — fresh valid 결과 없으면 skip.
-        if time.monotonic() - self._last_valid_at > VALIDITY_FRESH_S:
-            now = time.monotonic()
-            if now - self._blocked_warned_at > 1.0:
-                self.get_logger().warn(
-                    "publish blocked — no fresh validity (collision suspected)"
-                )
-                self._blocked_warned_at = now
-            return
+        with self._lock:
+            follower = self._latest_follower
+            voxels = self._voxels
 
-        idx = {n: i for i, n in enumerate(msg.name)}
+        # 1) v_scale 계산 — follower 링크와 voxel 의 최소 거리 기반.
+        v_scale = self._compute_v_scale(voxels)
+
+        # 2) follower current 가 없으면 v_scale=1 (= 옛 passthrough 와 동일).
+        follower_idx = (
+            {n: i for i, n in enumerate(follower.name)} if follower is not None else {}
+        )
+
+        leader_idx = {n: i for i, n in enumerate(msg.name)}
         for side in SIDES:
             try:
-                positions = [msg.position[idx[j]] for j in ARM_JOINTS[side]]
+                leader_pos = [msg.position[leader_idx[j]] for j in ARM_JOINTS[side]]
             except (KeyError, IndexError):
                 continue
-            self._publish_jtc(side, positions)
 
-            if GRIPPER_JOINT[side] in idx:
-                grip = msg.position[idx[GRIPPER_JOINT[side]]]
+            # current follower joints — 없으면 leader 그대로 사용.
+            if follower is not None and all(j in follower_idx for j in ARM_JOINTS[side]):
+                cur_pos = [follower.position[follower_idx[j]] for j in ARM_JOINTS[side]]
+                blended = [
+                    cur + (lead - cur) * v_scale for cur, lead in zip(cur_pos, leader_pos)
+                ]
+            else:
+                blended = leader_pos
+            self._publish_jtc(side, blended)
+
+            if GRIPPER_JOINT[side] in leader_idx:
+                grip = msg.position[leader_idx[GRIPPER_JOINT[side]]]
                 self._send_gripper(side, grip)
 
-    # ── collision gate ──────────────────────────────────────────────────
-    def _validity_tick(self) -> None:
-        if not self._active:
-            return
-        with self._lock:
-            leader = self._latest_leader
-        if leader is None:
-            return
-        if not self._validity_client.service_is_ready():
-            return
-        # leader joint 값으로 follower RobotState 합성 (16 joint full state).
-        idx = {n: i for i, n in enumerate(leader.name)}
-        positions: list[float] = []
-        ok = True
-        for jn in ALL_ROBOT_JOINTS:
-            if jn in idx:
-                positions.append(leader.position[idx[jn]])
-            else:
-                positions.append(0.0)
-                ok = False
-        if not ok:
-            return
+    # ── velocity scaling ────────────────────────────────────────────────
+    def _compute_v_scale(self, voxels: np.ndarray | None) -> float:
+        """V_FLOOR ~ 1.0. 거리 기반 선형 스케일.
 
-        req = GetStateValidity.Request()
-        rs = RobotState()
-        rs.is_diff = False
-        js = JointState()
-        js.name = list(ALL_ROBOT_JOINTS)
-        js.position = positions
-        rs.joint_state = js
-        req.robot_state = rs
-        # group_name 비워두면 전체 robot 체크 (양팔 + grippers).
-        req.group_name = ""
+        d ≥ D_SLOW  → 1.0
+        d ≤ D_STOP  → V_FLOOR
+        사이        → 선형
+        """
+        if voxels is None or voxels.shape[0] == 0:
+            return 1.0
 
-        future = self._validity_client.call_async(req)
-        end = time.monotonic() + VALIDITY_SERVICE_TIMEOUT_S
-        while not future.done() and time.monotonic() < end:
-            time.sleep(0.005)
-        if not future.done():
-            return
-        res = future.result()
-        if not res:
-            return
-        if res.valid:
-            self._last_valid_at = time.monotonic()
+        min_d = float("inf")
+        for side in SIDES:
+            for link in TRACKED_LINKS[side]:
+                p = self._lookup_link_position(link)
+                if p is None:
+                    continue
+                diffs = voxels - p[None, :]
+                d = float(np.sqrt((diffs * diffs).sum(axis=1).min()))
+                if d < min_d:
+                    min_d = d
+        if min_d == float("inf"):
+            return 1.0
+
+        # 선형 보간 후 V_FLOOR 절대 하한 보장 — 뚫고 들어가 d < D_STOP 이 되거나
+        # 음수가 되는 edge case 에서도 최소 속도 유지.
+        if min_d >= D_SLOW:
+            interp = 1.0
+        else:
+            interp = V_FLOOR + (1.0 - V_FLOOR) * (min_d - D_STOP) / (D_SLOW - D_STOP)
+        scale = max(V_FLOOR, min(1.0, interp))
+
+        now = time.monotonic()
+        if scale < 0.99 and now - self._slow_warned_at > 1.0:
+            self.get_logger().info(f"slowdown — min_d={min_d:.3f}m v_scale={scale:.2f}")
+            self._slow_warned_at = now
+        return scale
+
+    def _lookup_link_position(self, link: str) -> np.ndarray | None:
+        try:
+            t = self._tf_buffer.lookup_transform(
+                WORLD_FRAME, link, rclpy.time.Time(),
+            )
+        except TransformException:
+            return None
+        p = t.transform.translation
+        return np.array([p.x, p.y, p.z], dtype=np.float32)
 
     def _publish_jtc(self, side: str, positions: list[float]) -> None:
+        # velocity cap — per-joint |delta| ≤ MAX_JOINT_VEL × dt.
+        now = time.monotonic()
+        last = self._last_pub_pos[side]
+        if last is not None:
+            dt = max(1e-3, now - self._last_pub_ts[side])
+            max_step = MAX_JOINT_VEL * dt
+            capped: list[float] = []
+            for prev, target in zip(last, positions):
+                d = target - prev
+                if d > max_step:
+                    capped.append(prev + max_step)
+                elif d < -max_step:
+                    capped.append(prev - max_step)
+                else:
+                    capped.append(target)
+            positions = capped
+        self._last_pub_pos[side] = list(positions)
+        self._last_pub_ts[side] = now
+
         jt = JointTrajectory()
         jt.joint_names = ARM_JOINTS[side]
         pt = JointTrajectoryPoint()
