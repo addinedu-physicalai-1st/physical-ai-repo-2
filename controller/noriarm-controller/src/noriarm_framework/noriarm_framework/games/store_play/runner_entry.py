@@ -62,6 +62,36 @@ _CAMERA_DEVICES: dict[str, str] = {
     "camera3": "/dev/cam_wrist_right",
 }
 
+# UI 미리보기 — runner 가 카메라를 V4L2 점유하므로 브라우저가 직접 못 잡음.
+# ROI masked 프레임을 5fps 로 /tmp 에 JPEG 저장 → control_service 가 서빙 → UI 표시.
+_PREVIEW_DIR = "/tmp"
+_PREVIEW_PREFIX = "storeplay_preview"
+_PREVIEW_INTERVAL_S = 0.2  # 5fps — 모니터링용이라 추론 30Hz 다 안 보냄.
+_preview_last_write: list[float] = [0.0]
+
+
+def _save_preview(images_rgb: dict[str, np.ndarray]) -> None:
+    """ROI masked RGB 프레임을 5fps throttle 로 /tmp 에 JPEG 저장 (UI 미리보기).
+    실패해도 추론에 영향 없게 조용히 무시. 키는 모델 cam key (top/wrist_left/wrist_right).
+    """
+    now = time.monotonic()
+    if now - _preview_last_write[0] < _PREVIEW_INTERVAL_S:
+        return
+    _preview_last_write[0] = now
+    try:
+        import cv2
+        import os
+
+        for cam, img in images_rgb.items():
+            bgr = img[:, :, ::-1]  # RGB → BGR (cv2.imwrite 는 BGR 기대)
+            tmp = f"{_PREVIEW_DIR}/.{_PREVIEW_PREFIX}_{cam}.tmp.jpg"
+            dst = f"{_PREVIEW_DIR}/{_PREVIEW_PREFIX}_{cam}.jpg"
+            # 임시 파일에 쓴 뒤 atomic rename — control_service 가 부분 쓰기 읽는 것 방지.
+            if cv2.imwrite(tmp, bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 70]):
+                os.replace(tmp, dst)
+    except Exception:
+        pass
+
 # Chunk provider 타입 — state + raw RGB images + task → chunk (action sequence).
 ChunkProvider = Callable[[list[float], dict[str, np.ndarray], str], list[list[float]]]
 
@@ -226,14 +256,20 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
                 repo_id, device_str, image_key_map)
     t0 = time.perf_counter()
     policy = ACTPolicy.from_pretrained(str(repo_id)).to(device_str).eval()
+    # closed-loop 재추론 주기. game.yaml n_action_steps (없으면 모델 chunk_size).
+    # roi_inference.py 와 동일하게 매 frame predict_action 호출하되, lerobot 가
+    # n_action_steps 마다만 실제 추론하고 그 사이는 캐시 action 을 pop.
+    n_action_steps = int(extra.get("n_action_steps") or policy.config.n_action_steps)
+    policy.config.n_action_steps = n_action_steps
     preprocessor, postprocessor = make_pre_post_processors(
         policy_cfg=policy.config,
         pretrained_path=str(repo_id),
         preprocessor_overrides={"device_processor": {"device": device_str}},
     )
-    n_chunk = int(policy.config.n_action_steps)
     device = torch.device(device_str)
-    logger.info("ACT 로드 완료 (%.1fs, chunk_size=%d)", time.perf_counter() - t0, n_chunk)
+    chunk_size = getattr(policy.config, "chunk_size", n_action_steps)
+    logger.info("ACT 로드 완료 (%.1fs, chunk_size=%d, n_action_steps=%d → %.2fs 마다 재추론)",
+                time.perf_counter() - t0, chunk_size, n_action_steps, n_action_steps / 30.0)
 
     # 학습 모델이 기대하는 image 키 셋 검증 — 누락된 매핑 있으면 즉시 에러.
     expected_image_keys = {
@@ -250,37 +286,45 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
             f"채워지지 않음. game.yaml policy.image_key_map 확인. 현재 매핑: {image_key_map}"
         )
 
+    def _reset() -> None:
+        """새 task(PROMPT) 시작 시 호출 — lerobot 내부 action queue / processor 초기화.
+        직전 episode 의 stale 캐시 action 이 새 episode 첫 ~1초간 실행되는 것 방지.
+        """
+        policy.reset()
+        preprocessor.reset()
+        postprocessor.reset()
+
     def provider(state: list[float], images: dict[str, np.ndarray], task: str) -> list[list[float]]:
         # 1) HW key (camera1/2/3) → 학습 모델 key (top/wrist_left/wrist_right) 매핑.
         remapped: dict[str, np.ndarray] = {
             image_key_map.get(hw_key, hw_key): images[hw_key] for hw_key in CAMERA_KEYS
         }
-        # 2) ROI mask 적용 — phase5_roi 학습본이면 필수. 학습 데이터와 분포 일치 보장.
+        # 2) ROI mask 적용 — phase5_roi 학습본이면 필수. 매 frame 갱신 (closed-loop).
         if masker is not None:
             remapped = masker.mask_images(remapped, task)
+        # 2.5) UI 미리보기 — 모델이 실제 보는 ROI masked 프레임을 5fps 로 저장.
+        _save_preview(remapped)
         observation: dict[str, Any] = {
             "observation.state": np.asarray(state, dtype=np.float32),
         }
         for model_key, img in remapped.items():
             # HWC uint8 RGB ndarray — lerobot preprocessor 가 normalize/permute 처리.
             observation[f"observation.images.{model_key}"] = img
-        chunk: list[list[float]] = []
-        policy.reset()
-        preprocessor.reset()
-        postprocessor.reset()
-        for _ in range(n_chunk):
-            action = predict_action(
-                observation,
-                policy,
-                device,
-                preprocessor=preprocessor,
-                postprocessor=postprocessor,
-                use_amp=False,
-                task=task,
-            )
-            chunk.append(action.detach().cpu().numpy().reshape(-1).tolist())
-        return chunk
+        # 3) predict_action 1회 — lerobot 가 n_action_steps 마다만 실제 추론, 그 외 캐시 pop.
+        #    1 action 반환 → run loop 가 매 frame provider 재호출 = closed-loop.
+        action = predict_action(
+            observation,
+            policy,
+            device,
+            preprocessor=preprocessor,
+            postprocessor=postprocessor,
+            use_amp=False,
+            task=task,
+        )
+        return [action.detach().cpu().numpy().reshape(-1).tolist()]
 
+    # _run_one_task 가 task 시작 시 호출 — PROMPT 마다 무조건 reset (동일 prompt 연속도 포함).
+    provider.reset = _reset  # type: ignore[attr-defined]
     return provider
 
 
@@ -293,17 +337,39 @@ def _run_one_task(
     *,
     fps: int,
     episode_s: int,
+    home: dict[str, float] | None = None,
 ) -> None:
-    """단일 task — N frame 동안 obs → provider → action.
+    """단일 task — obs → provider → action 루프.
 
     종료 조건:
-      - episode_s × fps frame 완료
+      - 홈 복귀 감지 (서빙 후 시작 pose 로 복귀) — 정상 완료
+      - episode_s × fps frame 완료 (홈 복귀 못 했을 때 safety cut)
       - _SHUTDOWN (SIGTERM/SIGINT) 또는 _ABORT_TASK (SIGUSR1) 신호
       - send_action 실패 (모터 에러)
+
+    홈 복귀 감지: 학습 데이터가 "홈 시작 → 서빙(이탈) → 홈 복귀" 패턴 (분석 결과
+    복귀율 100%, start→end 거리 평균 6.6 vs 최대 이탈 160). task 시작 pose 를 홈으로
+    잡고, move_thresh 이상 이탈 후 home_thresh 이내로 stable_frames 동안 유지되면 완료.
     """
     queue: deque[list[float]] = deque()
     dt = 1.0 / fps
     n_frames = max(1, fps * episode_s)
+
+    # 홈 복귀 감지 파라미터 (game.yaml runtime.home_detect, 없으면 실측 디폴트).
+    h = home or {}
+    move_thresh = float(h.get("move_thresh", 40.0))    # 이만큼 벗어나야 "이탈" 인정
+    home_thresh = float(h.get("home_thresh", 18.0))    # 이 이내면 "홈"
+    stable_frames = int(h.get("stable_frames", 15))    # 홈 유지 frame 수 (0.5s @30fps)
+    home_enabled = bool(h.get("enabled", True))
+
+    start_pose: np.ndarray | None = None
+    moved_away = False
+    home_count = 0
+
+    # task 시작 시 정책 reset — 이전 episode 의 stale action queue 제거 (closed-loop 정합).
+    reset_fn = getattr(provider, "reset", None)
+    if callable(reset_fn):
+        reset_fn()
 
     for i in range(n_frames):
         if _SHUTDOWN.is_set() or _ABORT_TASK.is_set():
@@ -311,20 +377,38 @@ def _run_one_task(
             break
         t0 = time.perf_counter()
         obs = robot.get_observation()
+        state_vec = _obs_to_state_vec(obs)
+
+        # ── 홈 복귀 감지 ──
+        if home_enabled:
+            cur = np.asarray(state_vec, dtype=np.float32)
+            if start_pose is None:
+                start_pose = cur.copy()
+            dist = float(np.linalg.norm(cur - start_pose))
+            if dist > move_thresh:
+                moved_away = True
+            if moved_away and dist < home_thresh:
+                home_count += 1
+                if home_count >= stable_frames:
+                    logger.info("홈 복귀 감지 (frame %d, dist=%.1f) — task 완료", i, dist)
+                    break
+            else:
+                home_count = 0
 
         if not queue:
-            state_vec = _obs_to_state_vec(obs)
             images = {key: obs[key] for key in CAMERA_KEYS}
             try:
                 t_inf = time.perf_counter()
                 chunk = provider(state_vec, images, task)
                 inf_ms = (time.perf_counter() - t_inf) * 1e3
             except Exception as e:
-                logger.warning("chunk provider 실패 (frame %d): %s — 0.2s 후 retry", i, e)
+                logger.warning("provider 실패 (frame %d): %s — 0.2s 후 retry", i, e)
                 time.sleep(0.2)
                 continue
             queue.extend(chunk)
-            logger.info("chunk: %d actions, inference=%.0fms", len(chunk), inf_ms)
+            # ACT closed-loop 는 매 frame 1개 반환 → 로그 1초마다. SmolVLA chunk(>1) 는 매번.
+            if len(chunk) > 1 or i % fps == 0:
+                logger.info("frame %d: +%d action, provider=%.0fms", i, len(chunk), inf_ms)
 
         action_vec = queue.popleft()
         try:
@@ -439,7 +523,10 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, _handle_sigterm)
     signal.signal(signal.SIGUSR1, _handle_sigusr1)
 
-    logger.info("idle — PROMPT 대기 (kind=%s)", config.policy.kind)
+    # 홈 복귀 감지 설정 (game.yaml policy.home_detect) — 매 task 에 전달.
+    _home_cfg = config.policy.extra.get("home_detect") or {}
+    logger.info("idle — PROMPT 대기 (kind=%s, home_detect=%s)",
+                config.policy.kind, _home_cfg if _home_cfg else "default")
 
     # 5) 명령 loop — PROMPT 받을 때마다 task 1회 실행.
     try:
@@ -462,7 +549,10 @@ def main(argv: list[str] | None = None) -> int:
                 _ABORT_TASK.clear()  # 새 task 시작 — abort flag 리셋
                 logger.info("task 시작: %r", task)
                 t0 = time.perf_counter()
-                _run_one_task(robot, provider, task, fps=args.fps, episode_s=args.episode_s)
+                _run_one_task(
+                    robot, provider, task,
+                    fps=args.fps, episode_s=args.episode_s, home=_home_cfg,
+                )
                 logger.info("task 종료: %r (%.1fs)", task, time.perf_counter() - t0)
                 print("TASK_DONE", flush=True)
             else:

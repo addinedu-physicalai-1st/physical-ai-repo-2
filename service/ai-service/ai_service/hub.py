@@ -90,6 +90,13 @@ class GotoVertex(BaseModel):
     name: str
 
 
+class StoreItem(BaseModel):
+    """가게놀이 — 아이가 요청한 음식. noriarm 전용. robot-web 이 가게놀이 모드일 때
+    serve 로 연결. item 은 영어 id (strawberry/broccoli/grape/kiwi/pineapple)."""
+    kind: Literal["store_item"] = "store_item"
+    item: str
+
+
 class Chat(BaseModel):
     kind: Literal["chat"] = "chat"
     reply: str

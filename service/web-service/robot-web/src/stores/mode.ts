@@ -9,6 +9,9 @@ export const useModeStore = defineStore('mode', () => {
   const currentMode = ref<string>(robot.value.modes[0] ?? '대기');
   const currentEmotion = ref<EmotionId>('basic');
   const proximityHalt = ref<boolean>(false);
+  // 가게놀이 음성 요청 — store_item intent 가 채움. ts 로 같은 item 연속 발화도 watch 트리거.
+  // StorePlay.vue 가 watch 해서 (가게놀이 모드 + ready 일 때) serve 호출.
+  const requestedStoreItem = ref<{ item: string; ts: number } | null>(null);
 
   function setMode(mode: string): void {
     if (!robot.value.modes.includes(mode)) return;
@@ -73,6 +76,10 @@ export const useModeStore = defineStore('mode', () => {
       case 'confirm_no':
         // useVoiceController 가 등록된 mode handler / confirm callback 으로 위임. mode 자체 변경 없음.
         break;
+      case 'store_item':
+        // 가게놀이 음식 요청 — StorePlay.vue 가 watch 해서 serve. 모드 가드는 거기서.
+        requestedStoreItem.value = { item: response.item, ts: Date.now() };
+        break;
       case 'chat':
       case 'ignored':
         break;
@@ -84,6 +91,7 @@ export const useModeStore = defineStore('mode', () => {
     currentMode,
     currentEmotion,
     proximityHalt,
+    requestedStoreItem,
     setMode,
     setEmotionTransient,
     holdEmotionDuring,

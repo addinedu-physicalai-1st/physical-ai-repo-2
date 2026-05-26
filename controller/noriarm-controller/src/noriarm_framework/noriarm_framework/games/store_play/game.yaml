@@ -95,9 +95,15 @@ hardware:
 policy:
   kind: act_local
   module: noriarm_framework.games.store_play
-  # 로컬 체크포인트 (HF Hub 안 거치고 즉시 로드).
-  repo_id: /home/kyle/omx_store_play/models/store_play_act_phase5_roi/checkpoints/200000/pretrained_model
+  # HF Hub 최신 — phase6 (v2_en_phase6_roi, 1M step 학습본의 step400k checkpoint).
+  # 첫 로드 시 자동 다운로드(캐싱). 로컬 경로로 쓰려면 그 경로로 교체.
+  repo_id: minssuung/store_play_act_v2_en_phase6_roi_step400k
   device: cuda:0
+  # closed-loop 재추론 주기 — chunk(100) 중 30 frame(1초 @30Hz) 소비 후 재추론.
+  # roi_inference.py 와 동일. 효과: ROI/obs 1초마다 갱신 → target 이동·환경 변화에 적응
+  # (stale chunk 100개를 끝까지 밀지 않음). 단 긴급정지(abort)는 별개로 per-frame(~33ms)
+  # 처리됨 — n_action_steps 와 무관.
+  n_action_steps: 30
   # hw udev symlink → 학습 모델 input feature key
   image_key_map:
     camera1: top
@@ -105,10 +111,20 @@ policy:
     camera3: wrist_right
   # phase5_roi 학습본은 inference 시에도 ROI mask 필수 (학습 분포 일치).
   roi:
-    yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r11/weights/best.pt
+    yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r13_v2/weights/best.pt
     conf: 0.25
     iou: 0.5
     pad: 20
+  # 홈 복귀 감지 — 서빙 후 시작 pose 로 돌아오면 task 자동 종료 (TASK_DONE).
+  # 학습 데이터 분석값: 복귀율 100%, start→end 거리 평균 6.6(max 15.8), 최대 이탈 평균 160.
+  #   move_thresh: 이만큼 벗어나야 "서빙하러 나감" 인정 (오탐 방지).
+  #   home_thresh: 시작 pose 와 이 거리 이내면 "홈".
+  #   stable_frames: 홈을 이 frame 수 연속 유지해야 완료 (스쳐 지나감 무시, 0.5s@30fps).
+  home_detect:
+    enabled: true
+    move_thresh: 40.0
+    home_thresh: 18.0
+    stable_frames: 15
   paraphrases:
     broccoli:
       - "give me broccoli"

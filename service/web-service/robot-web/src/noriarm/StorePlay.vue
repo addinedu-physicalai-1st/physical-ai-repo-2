@@ -25,7 +25,7 @@ const voiceController = inject(VOICE_CONTROLLER_KEY);
 const speak = (text: string) => voiceController?.speak(text);
 
 const mode = useModeStore();
-const { currentMode } = storeToRefs(mode);
+const { currentMode, requestedStoreItem } = storeToRefs(mode);
 const isActive = computed(() => currentMode.value === '가게놀이');
 
 const phase = ref<Phase>('intro');
@@ -33,6 +33,31 @@ const sessionId = ref<string | null>(null);
 const selectedItem = ref<(typeof ITEMS)[number] | null>(null);
 const error = ref<string | null>(null);
 let eventSource: EventSource | null = null;
+
+// 카메라 미리보기 — runner 가 ROI masked 프레임을 /tmp JPEG 로 저장, control_service 가 서빙.
+// 5fps 로 img cache-bust 해서 polling. cam 키는 학습 모델 key.
+const PREVIEW_CAMS = [
+  { key: 'top', label: '탑뷰' },
+  { key: 'wrist_left', label: '왼손목' },
+  { key: 'wrist_right', label: '오른손목' },
+];
+const previewTick = ref(0);
+let previewTimer: number | null = null;
+
+function previewUrl(cam: string): string {
+  if (!sessionId.value) return '';
+  return `/api/noriarm/games/store-play/sessions/${sessionId.value}/preview/${cam}?t=${previewTick.value}`;
+}
+function startPreview(): void {
+  stopPreview();
+  previewTimer = window.setInterval(() => { previewTick.value++; }, 200);
+}
+function stopPreview(): void {
+  if (previewTimer !== null) {
+    window.clearInterval(previewTimer);
+    previewTimer = null;
+  }
+}
 
 function exitToIdle(): void {
   mode.setMode('대기');
@@ -174,6 +199,7 @@ async function endSession(): Promise<void> {
 
 watch(isActive, async (active, prev) => {
   if (!active && prev) {
+    stopPreview();
     await endSession();
     phase.value = 'intro';
     selectedItem.value = null;
@@ -184,7 +210,26 @@ watch(isActive, async (active, prev) => {
   }
 });
 
+// 서빙 중에만 카메라 미리보기 polling (추론 중 ROI 프레임 갱신됨). 그 외 정지.
+watch(phase, (p) => {
+  if (p === 'serving') startPreview();
+  else stopPreview();
+});
+
+// 음성 명령 ("딸기 줘") — store_item intent 가 mode.requestedStoreItem 채움.
+// 가게놀이 모드 + ready 일 때만 serve. ts 로 같은 item 연속 발화도 트리거.
+watch(requestedStoreItem, (req) => {
+  if (!req || !isActive.value) return;
+  if (phase.value !== 'ready') {
+    // loading/serving/done 중이면 음성 무시 (또는 큐잉 안 함 — 단순화).
+    return;
+  }
+  const item = ITEMS.find((it) => it.id === req.item);
+  if (item) void serveItem(item);
+});
+
 onUnmounted(() => {
+  stopPreview();
   void endSession();
 });
 </script>
@@ -226,6 +271,19 @@ onUnmounted(() => {
           <h2>서빙 중!</h2>
           <p class="item-name">{{ selectedItem?.label }}</p>
           <p class="hint">로봇 팔이 물건을 가져가고 있어…</p>
+          <div class="cam-grid">
+            <div v-for="cam in PREVIEW_CAMS" :key="cam.key" class="cam-cell">
+              <img
+                class="cam-img"
+                :src="previewUrl(cam.key)"
+                :alt="cam.label"
+                @error="(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')"
+                @load="(e) => ((e.target as HTMLImageElement).style.visibility = 'visible')"
+              />
+              <span class="cam-label">{{ cam.label }}</span>
+            </div>
+          </div>
+          <p class="cam-note">로봇이 보는 화면 (ROI)</p>
           <button class="ghost" @click="abortServe">그만</button>
         </div>
 
@@ -262,7 +320,39 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 16px;
 }
-.card.playing { min-width: 320px; }
+.card.playing { min-width: 360px; }
+.cam-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 4px 0;
+}
+.cam-cell {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #111;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cam-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cam-label {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.cam-note {
+  font-size: 11px;
+  color: #999;
+  margin: 0;
+}
 .item-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
