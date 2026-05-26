@@ -67,6 +67,13 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               ws: true,
             },
+            // GogoPing 추종 tracking state WS — control-service 의 /gogoping/tracking_state
+            // ROS bridge fan-out (5 Hz). FollowMode 의 BboxOverlay + FollowTelemetry 가 구독.
+            '/ws/tracking-state': {
+              target: controlTarget,
+              changeOrigin: true,
+              ws: true,
+            },
             // GogoPing 영상 stream (control_service.streaming.app, port 8100, 별도 uvicorn)
             '/ws/video-stream': {
               target: streamingTarget,
@@ -78,6 +85,14 @@ export default defineConfig(({ mode }) => {
             // 추가) 가 클라/서버 코드는 추가했지만 이 proxy rule 과 streaming/app.py
             // 의 include_router 가 빠져있어 브라우저 → 5173 → 8100 hop 이 닿지 않았다.
             '/ws/depth-stream': {
+              target: streamingTarget,
+              changeOrigin: true,
+              ws: true,
+            },
+            // GogoPing WebRTC signaling — control_service.streaming.webrtc_router
+            // SDP offer/answer + ICE candidate 교환. consumer (robot-web / admin)
+            // 와 producer (gogoping_camera 노드) 양쪽이 같은 endpoint 사용.
+            '/ws/webrtc/signaling': {
               target: streamingTarget,
               changeOrigin: true,
               ws: true,

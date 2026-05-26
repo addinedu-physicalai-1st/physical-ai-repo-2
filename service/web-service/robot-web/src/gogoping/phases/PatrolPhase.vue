@@ -171,7 +171,7 @@ onBeforeUnmount(() => recognition.stop());
     </header>
 
     <div class="body">
-      <!-- 카메라 — 라이브 영상 (useVideoStream + CAMERA_PAN_KEY 주입은 App.vue 에서 처리) -->
+      <!-- 카메라 — 라이브 영상 (useWebRTCStream + CAMERA_PAN_KEY 주입은 App.vue 에서 처리) -->
       <div class="camera-wrap">
         <CameraView ref="cameraViewRef" />
         <canvas ref="captureCanvasRef" hidden />

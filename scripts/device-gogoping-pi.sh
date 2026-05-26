@@ -2,20 +2,19 @@
 # scripts/device-gogoping-pi.sh — GogoPing 라즈베리파이에서 실행하는 ROS 노드 묶음.
 #
 # 분산 배포 모델 (gogoping-controller/docs/gogoping-file-structure.md):
-#   라즈베리파이 — 모터·센서·카메라 시리얼 (본 스크립트)
-#   노트북       — Nav2·modes·vision (scripts/device-gogoping-laptop.sh)
+#   라즈베리파이 — 모터·센서 (본 스크립트)
+#   노트북       — Nav2 + perception + follow + D435 camera + camera_pan (scripts/device-gogoping-laptop.sh)
 #
 # 두 머신은 같은 ROS_DOMAIN_ID 로 통신. ROS_DOMAIN_ID 환경변수는 양쪽 셸에서 일치하게.
 #
 # 동작:
-#   - tmux 세션 'gogoping-pi' 안에 window 2개 (bringup / camera-pan)
+#   - tmux 세션 'gogoping-pi' 안에 window 1개 (bringup) — camera/camera-pan 은 노트북 이동
 #   - bringup    : gogoping_bringup pi.launch.py
-#                  (모터 + sllidar_c1 + URDF + laser_filter + 카메라 UDP 송출 SR-CAM-001,
-#                   모두 '/gogoping' namespace 안)
-#   - camera-pan : gogoping_camera_pan camera_pan.launch.py (Arduino 시리얼 카메라 팬)
-#   - 한 화면엔 1개 window 만 표시. 하단 status bar 의 window 이름 클릭으로 전환
+#                  (모터 + sllidar_c1 + URDF + laser_filter, 모두 '/gogoping' namespace 안)
+#   - 하단 status bar 의 window 이름 클릭으로 전환
 #
-# graph-router 와 gogoping_modes 는 laptop 측에서 별도 띄움 — device-gogoping-laptop.sh.
+# graph-router / gogoping_modes / camera (D435 + WebRTC) / camera-pan 은 laptop 측에서 띄움 —
+# device-gogoping-laptop.sh.
 #
 # 사용:
 #   scripts/device-gogoping-pi.sh           # 세션 시작·attach (이미 떠있으면 attach)
@@ -28,10 +27,8 @@
 #   - repo root 에서 colcon build 완료 (./install/setup.bash 존재)
 #   - ROS_DOMAIN_ID 는 호출 셸 환경 그대로 사용 (export 안 함)
 #
-# 환경변수 (bringup 안 카메라 송출 노드에 전파):
-#   CONTROL_SERVER_NAME  shared/machine_ips.json 의 hostname (기본 'tonyno')
-#   기타 인자 — pi.launch.py 가 gogoping_camera launch 를 include 함.
-#   상세: controller/gogoping-controller/src/gogoping/gogoping_camera/CLAUDE.md
+# 환경변수:
+#   ROS_DOMAIN_ID  laptop 과 일치 (호출 셸에서 export)
 #
 # 단축키 (tmux):
 #   - 마우스로 하단 status bar 의 window 이름 클릭 → 전환
@@ -81,15 +78,8 @@ case "$ACTION" in
     tmux respawn-pane -k -t "$SESSION:bringup" -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_bringup pi.launch.py"
 
-    # window 1: camera-pan
-    tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
-
-    # graph-router / gogoping_modes 는 laptop 측 (scripts/device-gogoping-laptop.sh) 에서 띄움.
-    #
-    # 카메라 UDP MJPEG 송출 (SR-CAM-001) 은 bringup 안에 IncludeLaunchDescription 으로 통합됨.
-    # → pi.launch.py 가 gogoping_camera/launch/camera_stream.launch.py 호출.
-    # → 별도 window 불필요. CONTROL_SERVER_NAME env 는 bringup window 에 전파.
+    # graph-router / gogoping_modes / camera (D435 + WebRTC) / camera-pan 은 laptop 측
+    # (scripts/device-gogoping-laptop.sh) 에서 띄움.
 
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
     tmux set-option -t "$SESSION" -g mouse on
@@ -102,9 +92,8 @@ case "$ACTION" in
 
     echo "[device-gogoping-pi] 세션 '$SESSION' 시작 — attach"
     echo "[device-gogoping-pi] ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-<unset>}"
-    echo "[device-gogoping-pi] CONTROL_SERVER_NAME=${CONTROL_SERVER_NAME:-tonyno (default)}"
-    echo "[device-gogoping-pi] 하단 status bar 의 'bringup / camera-pan' 클릭으로 전환"
-    echo "[device-gogoping-pi] graph-router + gogoping_modes 는 노트북에서: scripts/device-gogoping-laptop.sh"
+    echo "[device-gogoping-pi] window: bringup (단일)"
+    echo "[device-gogoping-pi] graph-router / gogoping_modes / camera / camera-pan 은 노트북에서: scripts/device-gogoping-laptop.sh"
     exec tmux attach -t "$SESSION"
     ;;
   down)

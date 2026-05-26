@@ -389,6 +389,11 @@ export function useVoiceController(robot: RobotConfig): {
       return;
     }
     if (robot.id === 'gogoping') {
+      // UI 우선 — backend FSM 전이가 BT snapshot WS 로 돌아오기 전에 mode 직접 변경.
+      // X 버튼 (onFollowAuthCancel) 과 동일 패턴 — App.vue watch(currentMode) 가
+      // follow/stop 호출 + followAuthenticated reset 처리. ws/robot-state 가 끊겨도
+      // UI 즉시 반응 보장.
+      mode.setMode('대기');
       let confirmation = '';
       try {
         const r = await fetch('/api/gogoping/mode', {

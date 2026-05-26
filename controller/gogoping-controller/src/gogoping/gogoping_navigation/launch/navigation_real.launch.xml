@@ -74,7 +74,7 @@
         <param from="$(var params_file)"/>
         <param name="use_sim_time" value="$(var use_sim_time)"/>
         <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
-        <remap from="cmd_vel_smoothed" to="/gogoping/cmd_vel"/>
+        <remap from="cmd_vel_smoothed" to="/gogoping/cmd_vel_raw"/>
     </node>
 
     <!-- lifecycle_manager_navigation — 위 6 노드 autostart -->

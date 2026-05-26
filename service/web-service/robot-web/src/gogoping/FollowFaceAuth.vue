@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, onBeforeUnmount, ref, watch } from 'vue';
+import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { VIDEO_STREAM_KEY } from '@/gogoping/videoStreamKey';
-import { useVideoStream } from '@/gogoping/composables/useVideoStream';
+import { forceReconnectWebRTCStream, useWebRTCStream } from '@/gogoping/composables/useWebRTCStream';
 
 const props = defineProps<{
   /** true 면 스트림 연결하고 매칭 시도. false 면 teardown. */
@@ -27,7 +27,44 @@ const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change
 const POLL_INTERVAL_MS = 1500;
 
 const injected = inject(VIDEO_STREAM_KEY, null);
-const stream = injected ?? useVideoStream('gogoping');
+const ownHandle = injected ? null : useWebRTCStream('robot-web');
+const stream = injected ?? { stream: ownHandle!.stream, status: ownHandle!.status };
+
+const videoEl = ref<HTMLVideoElement | null>(null);
+// frame capture 용 hidden canvas — face 매칭 API 가 jpeg blob 을 받으므로 매 폴링마다 video 를 그려 toBlob.
+const captureCanvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+
+// watch source 에 videoEl 도 포함 — stream 이 mount 전에 set 되거나 videoEl 이
+// stream set 후 mount 되는 race 모두 대응 (둘 중 늦은 쪽이 채워질 때 fire).
+watch(
+  [() => stream.stream.value, videoEl],
+  ([s, el]) => {
+    if (el) el.srcObject = s ?? null;
+  },
+  { immediate: true },
+);
+
+// 모드 재진입 시 stream singleton 살아있어도 video track 이 ended 상태이거나
+// 디코더가 깨우지지 않는 경우를 처리.
+//
+// IMPORTANT: stream 이 null 인 케이스 (아직 ontrack 안 옴) 에선 forceReconnect 호출 X.
+// 그 때 호출하면 healthy connecting 상태를 끊어 reconnect 폭주 발생. watch immediate 가
+// 이미 stream.value 변경을 감지하고 있어 ontrack 시 자동 binding.
+onMounted(async () => {
+  const el = videoEl.value;
+  const s = stream.stream.value;
+  if (!el || !s) return;
+  // track 이 dead 일 때만 강제 reconnect
+  if (s.getVideoTracks().length === 0 || s.getVideoTracks().every(t => t.readyState === 'ended')) {
+    forceReconnectWebRTCStream();
+    return;
+  }
+  // 살아있는 track 이면 디코더 재시동
+  el.srcObject = null;
+  await nextTick();
+  el.srcObject = s;
+  try { await el.play(); } catch { /* autoplay policy 등 — 무시 */ }
+});
 
 const status = ref<string>('교사 얼굴을 인식 중...');
 
@@ -48,14 +85,26 @@ function stopPolling(): void {
 
 function teardown(): void {
   stopPolling();
-  // shared stream 은 부모(App.vue)가 lifecycle 관리. injected 인 경우 stop X.
-  if (!injected) stream.stop();
+  // shared stream 은 부모(App.vue)가 lifecycle 관리. own handle 인 경우만 stop.
+  ownHandle?.stop();
   succeeded.value = false;
 }
 
 async function captureFrame(): Promise<Blob | null> {
-  // WS source 의 마지막 frame blob 직접 반환. v4l2 충돌 없음.
-  return stream.currentBlob.value ?? null;
+  // 현재 <video> 의 프레임을 hidden canvas 에 그려 jpeg blob 으로 변환.
+  // WebRTC track 이 연결돼 있고 video 가 디코딩된 시점에만 유효.
+  const video = videoEl.value;
+  const canvas = captureCanvas;
+  if (!video || !canvas) return null;
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return null;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(video, 0, 0);
+  return await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85),
+  );
 }
 
 async function matchFace(blob: Blob): Promise<MatchResult | null> {
@@ -115,7 +164,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopPolling();
-  if (!injected) stream.stop();
+  ownHandle?.stop();
 });
 </script>
 
@@ -123,13 +172,14 @@ onBeforeUnmount(() => {
   <div class="follow-auth-root" :class="{ minimized: succeeded }">
     <div v-if="!succeeded" class="backdrop" />
     <div class="auth-card">
-      <img
-        v-if="stream.frameUrl.value"
-        :src="stream.frameUrl.value"
+      <video
+        ref="videoEl"
         class="cam-img"
-        alt="camera"
+        autoplay
+        playsinline
+        muted
       />
-      <div v-else class="cam-placeholder">영상 대기 중…</div>
+      <div v-if="!stream.stream.value" class="cam-placeholder">영상 대기 중…</div>
 
       <template v-if="!succeeded">
         <div class="top-bar">
@@ -199,11 +249,11 @@ onBeforeUnmount(() => {
   object-fit: cover;
 }
 .cam-placeholder {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
   color: #aaa;
 }
 .top-bar {

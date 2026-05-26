@@ -138,6 +138,39 @@ class ReIDEngine:
         except Exception:
             return 0.0
 
+    def extract_with_mask(
+        self,
+        roi_bgr: np.ndarray,
+        depth_mm: np.ndarray,
+        target_distance_mm: int,
+        tolerance_mm: int = 200,
+        min_valid_ratio: float = 0.3,
+    ) -> np.ndarray:
+        """depth-aware embedding 추출.
+
+        depth pixel 중 [target - tolerance, target + tolerance] mm 범위에 속하는
+        pixel 만 살린 BGR ROI 로 embedding 계산. 배경 (벽, 가구 등) 제거.
+
+        valid pixel 비율 < min_valid_ratio 면 mask 안 씌우고 full bbox 사용 (fallback).
+        """
+        if roi_bgr is None or roi_bgr.size == 0:
+            return np.zeros(self._feat_dim, dtype=np.float32)
+        if depth_mm is None or depth_mm.size == 0 or depth_mm.shape[:2] != roi_bgr.shape[:2]:
+            # depth 없음 / shape 불일치 — full bbox fallback
+            return self.extract_features(roi_bgr)
+
+        lo = max(0, int(target_distance_mm) - int(tolerance_mm))
+        hi = int(target_distance_mm) + int(tolerance_mm)
+        mask = (depth_mm >= lo) & (depth_mm <= hi)
+        valid_ratio = float(mask.sum()) / float(mask.size) if mask.size else 0.0
+        if valid_ratio < min_valid_ratio:
+            return self.extract_features(roi_bgr)
+
+        masked = roi_bgr.copy()
+        # mask=False 인 pixel 은 검정 (0) 으로 — embedding 시 배경 정보 손실
+        masked[~mask] = 0
+        return self.extract_features(masked)
+
     # ── private ───────────────────────────────────────────────────────────────
 
     def _cnn_features(self, roi_bgr) -> np.ndarray:

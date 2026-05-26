@@ -5,14 +5,18 @@ PLAN §8 단계 6, SR-CAM-004.
 대시보드 카드 내부에 배치. showEvent 에서 자동 subscribe, hideEvent 에서 unsubscribe
 (패턴 A — 배타적 전환). 받은 binary frame 의 (robot_id, stream_id) 가 자기 target
 과 매칭되는 것만 표시.
+
+GogoPing 은 1080p D435 + WebRTC 로 전환되어 `WebRTCStreamView` (QWebEngineView 기반)
+로 별 처리. EduPing / NoriArm 은 UDP→WS JPEG 그대로 `CameraStreamView` 사용.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QUrl
 from PyQt5.QtGui import (
     QBrush,
     QColor,
@@ -25,9 +29,42 @@ from PyQt5.QtGui import (
     QPixmap,
     QRadialGradient,
 )
-from PyQt5.QtWidgets import QSizePolicy, QWidget
+from PyQt5.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from theme import COLORS
+
+# QWebEngineView 는 별도 패키지 (PyQtWebEngine) — 미설치 시 placeholder fallback.
+try:
+    from PyQt5.QtWebEngineWidgets import (  # type: ignore[import-not-found]
+        QWebEnginePage,
+        QWebEngineSettings,
+        QWebEngineView,
+    )
+
+    _HAS_WEBENGINE = True
+
+    class _LocalhostPermissivePage(QWebEnginePage):
+        """Vite mkcert self-signed cert 를 localhost 한정으로 통과.
+
+        OpenSSL 1.x ↔ 3.x 호환성 이슈로 https 자체가 못 뚫리는 환경에서도 일단
+        cert 거부는 통과시킴 (page navigate 가 가능한 만큼). 실 동작에선 admin URL
+        을 control-service 의 HTTP mirror (/admin-embed/) 로 두어 https 자체를 회피.
+        """
+
+        def certificateError(self, error):  # type: ignore[override]
+            try:
+                host = error.url().host()
+            except Exception:
+                host = ""
+            return host in ("localhost", "127.0.0.1", "")
+
+except ImportError:
+    QWebEngineView = None  # type: ignore[assignment, misc]
+    QWebEnginePage = None  # type: ignore[assignment, misc]
+    QWebEngineSettings = None  # type: ignore[assignment, misc]
+    _LocalhostPermissivePage = None  # type: ignore[assignment, misc]
+    _HAS_WEBENGINE = False
+
 
 if TYPE_CHECKING:
     from services.stream_client import StreamClient
@@ -249,3 +286,74 @@ class CameraStreamView(QWidget):
         f.setPointSize(10)
         p.setFont(f)
         p.drawText(ts, Qt.AlignCenter, text)
+
+
+class WebRTCStreamView(QWidget):
+    """GogoPing D435 1080p WebRTC 영상 뷰어 — QWebEngineView 로 robot-web 임베드.
+
+    `CameraStreamView` (WS JPEG → QPainter) 와 동일 슬롯 대체 위젯. control-service
+    의 HTTP mirror (/admin-embed/, dist-admin/) 페이지를 임베드해 OpenSSL 1.x ↔ 3.x
+    호환성 이슈 우회. 임베드 페이지의 useWebRTCStream('admin-ui') 가 /ws/webrtc/
+    signaling 에 붙어 영상 받음. WebRTC SDP/ICE/DTLS/RTP/H.264 디코딩은 모두 Chromium
+    engine 이 처리.
+
+    셋업:
+      1. cd service/web-service/robot-web && npm run build:admin
+         (dist-admin/ 생성, base=/admin-embed/ 로 빌드)
+      2. control-service streaming uvicorn 이 /admin-embed/ 로 mount
+      3. admin-app 이 이 위젯으로 띄움
+
+    URL override: env ADMIN_GOGOPING_VIDEO_URL (기본 /admin-embed/?embed=gogoping-video).
+    PyQtWebEngine 미설치 환경에선 placeholder 라벨 표시 (fallback).
+    """
+
+    DEFAULT_URL = "http://localhost:8100/admin-embed/?embed=gogoping-video"
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setMinimumHeight(220)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        url = os.environ.get("ADMIN_GOGOPING_VIDEO_URL", self.DEFAULT_URL)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        if not _HAS_WEBENGINE or QWebEngineView is None:
+            placeholder = QLabel(
+                "PyQtWebEngine 미설치 — 가상환경에서\n"
+                "  pip install PyQtWebEngine\n"
+                "후 admin-app 재시작 필요"
+            )
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setWordWrap(True)
+            placeholder.setStyleSheet(
+                f"color: {COLORS.get('text_muted', '#888')}; padding: 16px;"
+            )
+            layout.addWidget(placeholder)
+            self._view = None
+            return
+
+        self._view = QWebEngineView(self)
+        if _LocalhostPermissivePage is not None:
+            self._page = _LocalhostPermissivePage(self._view)
+            self._view.setPage(self._page)
+        self._tune_settings(self._view)
+        self._view.setUrl(QUrl(url))
+        layout.addWidget(self._view)
+
+    @staticmethod
+    def _tune_settings(view: "QWebEngineView") -> None:
+        """HW WebGL / accel canvas 활성 — embed 페이지가 H.264 HW decode 쓰도록."""
+        if QWebEngineSettings is None:
+            return
+        try:
+            s = view.settings()
+            s.setAttribute(QWebEngineSettings.WebGLEnabled, True)
+            s.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
+            for attr in ("LocalContentCanAccessRemoteUrls", "AllowRunningInsecureContent"):
+                key = getattr(QWebEngineSettings, attr, None)
+                if key is not None:
+                    s.setAttribute(key, True)
+        except Exception:  # noqa: BLE001
+            pass

@@ -2,8 +2,8 @@
 # scripts/device-gogoping-laptop.sh — GogoPing 노트북에서 실행하는 ROS 노드 묶음.
 #
 # 분산 배포 모델 (gogoping-controller/docs/gogoping-file-structure.md):
-#   라즈베리파이 — 모터·센서 (vicpinky_bringup / sllidar / camera UDP / camera_pan)
-#   노트북       — Nav2·modes·vision (본 스크립트)
+#   라즈베리파이 — 모터·센서 (vicpinky_bringup / sllidar)
+#   노트북       — Nav2 + perception + follow + D435 camera + camera_pan
 #
 # 동작:
 #   - tmux 세션 'gogoping-laptop' 안에 window 9개:
@@ -15,7 +15,7 @@
 #       nav2         : navigation_real.launch.xml (controller + planner + bt_navigator …)
 #       modes        : gogoping_modes (FSM + BT 본체 — /gogoping/state publish,
 #                      /gogoping/set_goal service. control-server 가 이 둘로 connect.)
-#       camera       : USB 웹캠 → UDP MJPEG 송출 (gogoping_camera camera_stream, SR-CAM-001).
+#       camera       : D435 + WebRTC (gogoping_camera d435_webrtc_node, SR-CAM-001 후속).
 #       camera-pan   : Arduino 시리얼 MG995 ×2 pan/tilt (gogoping_camera_pan).
 #       perception   : gogoping_perception perception.launch.py — /camera/image_raw →
 #                      YOLO + ByteTrack + ReID → /gogoping/tracking_state (5 Hz). GPU lazy-load.
@@ -88,9 +88,9 @@ case "$ACTION" in
 
     # 시연/디버그 — 환경변수 → ros-args. gogoping_modes 노드의 monitor 들이 declare_parameter
     # 로 받음 (utils/safety_flags.py).
-    MODES_ARGS=""
+    # cmd_vel 을 safety_filter 경유시키기 위해 remap 고정 설정.
+    MODES_ARGS="--ros-args -r /gogoping/cmd_vel:=/gogoping/cmd_vel_raw"
     if [[ -n "${NO_BATTERY_SAFETY:-}" || -n "${NO_ERROR_SAFETY:-}" ]]; then
-      MODES_ARGS="--ros-args"
       [[ -n "${NO_BATTERY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_battery_safety:=true"
       [[ -n "${NO_ERROR_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_error_safety:=true"
       echo "[device-gogoping-laptop] modes 인자: $MODES_ARGS"
@@ -140,45 +140,6 @@ case "$ACTION" in
       fi
     fi
 
-    # CAMERA_DEVICE 결정 — 우선순위: caller env (존재할 때) → /dev/usb-webcam udev symlink → 자동 탐지.
-    if [[ -n "${CAMERA_DEVICE:-}" && ! -e "$CAMERA_DEVICE" ]]; then
-      echo "[device-gogoping-laptop] 경고: CAMERA_DEVICE=$CAMERA_DEVICE 가 존재하지 않음 — 자동 감지로 fallback" >&2
-      unset CAMERA_DEVICE
-    fi
-    if [[ -z "${CAMERA_DEVICE:-}" ]]; then
-      if [[ -e /dev/usb-webcam ]]; then
-        CAMERA_DEVICE=/dev/usb-webcam
-        echo "[device-gogoping-laptop] CAMERA_DEVICE=/dev/usb-webcam (udev symlink)"
-      else
-        # 자동 탐지: USB bus + MJPG 지원하는 /dev/video* 중 첫 device.
-        # 내장 카메라 (Bison/Chicony 등) 도 ID_BUS=usb 라 모델명 키워드로 외장만 필터.
-        _detected=""
-        for _n in 0 1 2 3 4 5 6 7 8 9; do
-          _dev="/dev/video$_n"
-          [[ -e "$_dev" ]] || continue
-          _props=$(udevadm info --query=property --name="$_dev" 2>/dev/null)
-          echo "$_props" | grep -q '^ID_BUS=usb$' || continue
-          if echo "$_props" | grep -qiE '^(ID_USB_MODEL|ID_MODEL)=.*(integrated|built.?in|internal)'; then
-            continue
-          fi
-          v4l2-ctl --device "$_dev" --list-formats 2>/dev/null | grep -qw 'MJPG' || continue
-          _detected="$_dev"
-          break
-        done
-        if [[ -n "$_detected" ]]; then
-          CAMERA_DEVICE="$_detected"
-          echo "[device-gogoping-laptop] CAMERA_DEVICE=$CAMERA_DEVICE (auto-detected, USB MJPG)"
-        else
-          echo "[device-gogoping-laptop] 경고: USB MJPG 웹캠 자동 감지 실패 — camera launch 가 실패할 수 있음" >&2
-          echo "[device-gogoping-laptop]   해결: CAMERA_DEVICE=/dev/videoN 명시 또는 scripts/setup_usb_webcam.sh --apply (udev 룰)" >&2
-          CAMERA_DEVICE=/dev/usb-webcam
-        fi
-      fi
-      export CAMERA_DEVICE
-    else
-      echo "[device-gogoping-laptop] CAMERA_DEVICE=$CAMERA_DEVICE (caller env)"
-    fi
-
     # tmux 3.4 의 server idle 종료 회피: sleep 으로 띄우고 respawn
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n graph-router \
       -c "$REPO_ROOT" "sleep infinity"
@@ -207,15 +168,12 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 run gogoping_modes gogoping_modes $MODES_ARGS"
 
-    # window 3: camera — USB 웹캠 → UDP MJPEG (SR-CAM-001).
-    # backend=cv2 default: 외장 웹캠 native MJPEG quality 높아 v4l2 직송 시 frame > 65.4KB drop.
-    #   cv2 는 decode 후 q=60 재인코딩 (~30KB). 다른 카메라는 CAMERA_BACKEND=v4l2 로 override.
-    # $CAMERA_* 는 outer shell 에서 치환 (escape 하면 tmux 안에서 unset).
-    _cam_w="${CAMERA_WIDTH:-640}"
-    _cam_h="${CAMERA_HEIGHT:-480}"
-    _cam_be="${CAMERA_BACKEND:-cv2}"
+    # window 3: camera — D435 + WebRTC (H.264 NVENC), SR-CAM-001 후속.
+    # camera_stream.launch.py 가 d435_webrtc_node 띄움 — robot-web(LAN P2P) + admin-ui 로 분배.
+    # perception 은 동시에 POSIX shm 으로 raw frame 읽음 (depth fusion).
+    # 상세: controller/gogoping-controller/src/gogoping/gogoping_camera/CLAUDE.md
     tmux new-window -t "$SESSION" -n camera -c "$REPO_ROOT" \
-      "$SOURCE_ENV && export CAMERA_DEVICE='$CAMERA_DEVICE' CAMERA_WIDTH='$_cam_w' CAMERA_HEIGHT='$_cam_h' && exec ros2 launch gogoping_camera camera_stream.launch.py backend:=$_cam_be"
+      "$SOURCE_ENV && exec ros2 launch gogoping_camera camera_stream.launch.py"
 
     # window 4: camera-pan — Arduino 시리얼 (MG995 ×2 pan/tilt, /dev/arduino-camera 필요)
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \

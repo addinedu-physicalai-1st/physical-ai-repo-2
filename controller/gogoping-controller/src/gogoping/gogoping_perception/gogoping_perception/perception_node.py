@@ -1,22 +1,21 @@
-"""gogoping_perception 노드 — WS /ws/video-stream → /gogoping/tracking_state.
+"""gogoping_perception 노드 — shm 카메라 frame → /gogoping/tracking_state.
 
 MultiThreadedExecutor + 2 callback group:
   target_cb  : /gogoping/follow_target 받아 set/clear_target
   publish_cb : 5 Hz timer — last_target 을 TrackingState 로 publish
 
-영상 수신은 WSVideoClient (daemon thread + asyncio loop) 가 담당.
+영상 수신은 ShmReader (POSIX shared memory attach) — gogoping_camera 가 writer.
 YOLOv8s + ByteTrack 은 ultralytics yolo.track(persist=True) 내장 사용.
 ReID 는 OSNet x0.25 (gogoping_perception.reid_engine).
+Depth fusion: bbox 중심 patch 의 median 으로 distance_mm 계산 (현재는 logger 출력).
 """
 from __future__ import annotations
 
-import asyncio
 import math
 import threading
 import time
 from typing import Optional
 
-import cv2
 import numpy as np
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -25,20 +24,76 @@ from rclpy.node import Node
 
 from gogoping_msgs.msg import FollowTarget, TrackingState
 
+from gogoping_perception import config
 from gogoping_perception.config import (
     LOST_TIMEOUT_S,
     TRACKER_NAME,
     TRACKING_STATE_HZ,
     YOLO_CONF_THRESHOLD,
     YOLO_DEVICE,
-    YOLO_IMG_SIZE,
     YOLO_MODEL_NAME,
     YOLO_PERSON_CLASS,
 )
 from gogoping_perception.reid_engine import ReIDEngine
+from gogoping_perception.shm_reader import ShmReader
 from gogoping_perception.target_tracker import TargetTracker
 from gogoping_perception.track import Track
-from gogoping_perception.ws_video_client import WSVideoClient
+
+
+# InsightFace lazy holder — first enrollment 시점에 load. 다른 process 와 중복 import 방지.
+_face_app = None
+
+
+def _get_face_app():
+    """lazy-load InsightFace buffalo_l. 첫 호출 시 ~500MB-1GB VRAM."""
+    global _face_app
+    if _face_app is None:
+        from insightface.app import FaceAnalysis  # local import — perception 외 contexts 에선 미사용
+        app = FaceAnalysis(name='buffalo_l', allowed_modules=['detection', 'recognition'])
+        # ctx_id=0 = GPU 0, -1 = CPU
+        import os
+        ctx_id = 0 if os.environ.get('PERCEPTION_FACE_CPU') != '1' else -1
+        app.prepare(ctx_id=ctx_id, det_size=(640, 640))
+        _face_app = app
+    return _face_app
+
+
+def _match_face_in_bboxes(
+    face_app,
+    color_bgr,
+    boxes_xyxy,
+    target_face_emb,
+    threshold: float,
+):
+    """boxes_xyxy 의 각 bbox 안에서 face detection + matching.
+
+    Returns
+    -------
+    (bbox_idx, sim): 매칭 성공 bbox 의 인덱스 + cosine sim. 매칭 실패 시 (-1, 0.0).
+    """
+    import numpy as np  # local
+    best_idx = -1
+    best_sim = -1.0
+    target = np.asarray(target_face_emb, dtype=np.float32)
+    target_norm = target / max(np.linalg.norm(target), 1e-8)
+    for i, box in enumerate(boxes_xyxy):
+        x1, y1, x2, y2 = map(int, box.tolist())
+        crop = color_bgr[max(0, y1):y2, max(0, x1):x2]
+        if crop.size == 0:
+            continue
+        faces = face_app.get(crop)
+        if not faces:
+            continue
+        # 가장 큰 face 하나만
+        f = max(faces, key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1]))
+        emb = f.normed_embedding  # already L2-normalized
+        sim = float(np.dot(target_norm, emb))
+        if sim > best_sim:
+            best_sim = sim
+            best_idx = i
+    if best_sim >= threshold:
+        return best_idx, best_sim
+    return -1, best_sim
 
 
 class PerceptionNode(Node):
@@ -55,16 +110,28 @@ class PerceptionNode(Node):
         self._reid: ReIDEngine | None = None
         self._tracker: TargetTracker | None = None
 
-        # WS video client (daemon thread + asyncio loop) — 첫 FollowTarget 시 시작.
-        self._ws_client: Optional[WSVideoClient] = None
-        self._ws_thread: Optional[threading.Thread] = None
-        self._ws_loop: Optional[asyncio.AbstractEventLoop] = None
+        # imgsz — preset 에서 가져옴 (camera 패키지 PERCEPTION_PRESETS 와 동기).
+        self._imgsz: int = config.PERCEPTION_PRESETS[config.ACTIVE_PRESET]["imgsz"]
 
-        # state — _on_ws_frame 이 갱신, publish_cb 가 읽음. lock 보호.
+        # shm reader + frame loop thread — 첫 FollowTarget 시 시작 (engines 와 동일 시점).
+        self._reader: Optional[ShmReader] = None
+        self._frame_thread: Optional[threading.Thread] = None
+        self._stop = threading.Event()
+
+        # state — frame loop 가 갱신, publish_cb 가 읽음. lock 보호.
         self._last_track: Track | None = None
         self._last_track_ts: float = 0.0
+        self._last_track_distance_mm: int = 0  # D435 depth median (mm), 0 = invalid
         self._teacher_id: str = ""
         self._image_width: int = 0
+
+        # ── enrollment state (depth-aware ReID auto-enroll) ──
+        # face matching 첫 frame retry 카운터.
+        self._enroll_face_retry_count: int = 0
+        # lock 된 enrollment 대상 track_id (face matching 통과 후 설정).
+        self._enroll_locked_track_id: int | None = None
+        # enrollment 시작 시각 — timeout 판정용.
+        self._enroll_start_ts: float = 0.0
 
         self.create_subscription(
             FollowTarget, "/gogoping/follow_target", self._on_follow_target, 10,
@@ -85,10 +152,11 @@ class PerceptionNode(Node):
 
     # ---------- cleanup ----------
     def destroy_node(self):
-        if self._ws_client is not None:
-            self._ws_client.stop()
-        if self._ws_loop is not None and self._ws_loop.is_running():
-            self._ws_loop.call_soon_threadsafe(self._ws_loop.stop)
+        self._stop.set()
+        if self._frame_thread is not None:
+            self._frame_thread.join(timeout=2.0)
+        if self._reader is not None:
+            self._reader.close()
         super().destroy_node()
 
     # ---------- lazy init ----------
@@ -108,28 +176,25 @@ class PerceptionNode(Node):
             self.get_logger().warn(f"Engine lazy-load failed: {e}")
             return False
 
-    def _ensure_ws_client(self) -> None:
-        """첫 FollowTarget 수신 시 WS client 시작 (engines lazy load 와 동일 시점)."""
-        if self._ws_thread is not None:
+    def _ensure_frame_loop(self) -> None:
+        """첫 FollowTarget 수신 시 shm reader attach + frame loop thread 시작."""
+        if self._frame_thread is not None:
             return
-        self._ws_client = WSVideoClient(
-            frame_callback=self._on_ws_frame,
-            logger=self.get_logger(),
-        )
-        self._ws_thread = threading.Thread(
-            target=self._run_ws_loop, name="perception_ws_client", daemon=True,
-        )
-        self._ws_thread.start()
-        self.get_logger().info("WS video client thread started")
-
-    def _run_ws_loop(self) -> None:
-        assert self._ws_client is not None
-        self._ws_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._ws_loop)
         try:
-            self._ws_loop.run_until_complete(self._ws_client.run())
-        finally:
-            self._ws_loop.close()
+            self._reader = ShmReader()
+        except FileNotFoundError as e:
+            self.get_logger().warn(
+                f"shm attach failed: {e} — gogoping_camera writer 가 떠 있어야 합니다"
+            )
+            return
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().warn(f"shm attach failed: {e}")
+            return
+        self._frame_thread = threading.Thread(
+            target=self._frame_loop, name="perception-frame-loop", daemon=True,
+        )
+        self._frame_thread.start()
+        self.get_logger().info("Shm frame loop thread started")
 
     # ---------- target_cb ----------
     def _on_follow_target(self, msg: FollowTarget) -> None:
@@ -137,6 +202,7 @@ class PerceptionNode(Node):
             with self._lock:
                 self._teacher_id = ""
                 self._last_track = None
+                self._last_track_distance_mm = 0
             if self._tracker is not None:
                 self._tracker.clear_target()
             self.get_logger().info("FollowTarget stop")
@@ -147,8 +213,18 @@ class PerceptionNode(Node):
             return
 
         assert self._tracker is not None  # _ensure_engines true 면 보장
-        self._ensure_ws_client()  # engines 준비 후 WS client 시작
-        self._tracker.set_target(list(msg.embedding))
+        self._ensure_frame_loop()  # engines 준비 후 shm reader/frame loop 시작
+        # 새 흐름: face emb 는 fallback 으로 보관, body emb 를 N frame 평균해 갱신.
+        face_emb = np.asarray(list(msg.embedding), dtype=np.float32)
+        self._tracker.set_face_template(face_emb)
+        self._tracker.start_enrollment(target_n=config.ENROLLMENT_N_FRAMES)
+        self._enroll_face_retry_count = 0
+        self._enroll_locked_track_id = None
+        self._enroll_start_ts = time.time()
+        self.get_logger().info(
+            f"Enrollment start: N={config.ENROLLMENT_N_FRAMES}, "
+            f"face_threshold={config.ENROLLMENT_FACE_THRESHOLD}"
+        )
         with self._lock:
             self._teacher_id = msg.teacher_id
             # set 직후 LOST_TIMEOUT_S 동안은 mode="searching" 으로 머물도록 ts 초기화.
@@ -159,36 +235,60 @@ class PerceptionNode(Node):
             f"FollowTarget start: {msg.teacher_name} ({msg.teacher_id[:8]}...)"
         )
 
-    # ---------- ws frame callback ----------
-    def _on_ws_frame(self, jpeg: bytes, frame_seq: int, ts_ms: int) -> None:
-        """WS thread (asyncio) 에서 호출. lock 보호로 inference + state 갱신.
+    # ---------- frame loop ----------
+    def _frame_loop(self) -> None:
+        """daemon thread — shm 에서 새 frame 을 poll 해서 _process_frame 호출."""
+        assert self._reader is not None
+        while not self._stop.is_set():
+            try:
+                snap = self._reader.poll(timeout=1.0)
+            except Exception as e:  # noqa: BLE001
+                self.get_logger().warn(f"shm poll failed: {e}")
+                time.sleep(0.5)
+                continue
+            if snap is None:
+                self.get_logger().warning("shm frame timeout — camera node alive?")
+                continue
+            self._process_frame(snap.color, snap.depth, snap.cap_ns)
 
-        기존 _on_image (ROS Image subscription) 의 inference 로직을 그대로 이식하되,
-        sensor_msgs/Image → cv2 변환 부분만 cv2.imdecode 로 교체.
+    @staticmethod
+    def _bbox_depth_median(depth, bbox, patch=5):
+        """bbox 상단 1/3 지점 (얼굴 영역) patch×patch median depth (mm). invalid 시 0.
+
+        bbox 중심 (가슴/명치) 은 옷 두께·주름·IR 반사 노이즈로 실제보다 ~10cm 멀게
+        측정됨. 얼굴은 IR 반사가 일정해 정확도 ↑. 얼굴 미검출 frame 에서도 bbox
+        상단은 거의 항상 사람 머리·얼굴 영역.
+        """
+        x1, y1, x2, y2 = bbox
+        cx = int((x1 + x2) / 2)
+        # 중심 (y1+y2)/2 → 상단 1/3 (y1 + (y2-y1)/3) — 얼굴 위치에 해당.
+        cy = int(y1 + (y2 - y1) / 3)
+        r = patch // 2
+        p = depth[max(0, cy - r): cy + r + 1, max(0, cx - r): cx + r + 1]
+        v = p[(p >= config.DEPTH_MIN_MM) & (p <= config.DEPTH_MAX_MM)]
+        return int(np.median(v)) if v.size else 0
+
+    def _process_frame(self, color: np.ndarray, depth: np.ndarray, cap_ns: int) -> None:
+        """YOLO + ByteTrack 추론 + depth fusion.
+
+        color: 640×480×3 BGR uint8 (이미 ndarray — cv2.imdecode 불필요).
+        depth: 640×480 uint16 (mm).
         """
         if self._yolo is None or self._tracker is None or not self._tracker.has_target():
             return
-        try:
-            arr = np.frombuffer(jpeg, dtype=np.uint8)
-            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        except Exception as e:  # noqa: BLE001
-            self.get_logger().warn(f"JPEG decode failed: {e}")
-            return
-        if frame is None:
-            return
 
-        h, w = frame.shape[:2]
+        h, w = color.shape[:2]
         with self._lock:
             self._image_width = w
 
         # ultralytics yolo.track — ByteTrack 통합. persist=True 로 track_id 유지.
         try:
             results = self._yolo.track(
-                frame,
+                color,
                 persist=True,
                 classes=[YOLO_PERSON_CLASS],
                 conf=YOLO_CONF_THRESHOLD,
-                imgsz=YOLO_IMG_SIZE,
+                imgsz=self._imgsz,
                 tracker=TRACKER_NAME,
                 verbose=False,
             )
@@ -202,31 +302,104 @@ class PerceptionNode(Node):
         if r.boxes is None or r.boxes.id is None:
             return
 
-        # multi-target → Track 리스트 (embedding 계산)
-        tracks: list[Track] = []
+        # ── all bboxes 의 OSNet emb (depth-aware mask 적용) ──
         boxes_xyxy = r.boxes.xyxy.cpu().numpy()
         boxes_id = r.boxes.id.cpu().numpy().astype(int)
         boxes_conf = r.boxes.conf.cpu().numpy()
+        in_enrollment = (self._tracker.state == "ENROLLING")
+        do_face_matching_this_frame = (
+            in_enrollment
+            and self._enroll_locked_track_id is None
+            and self._enroll_face_retry_count < config.ENROLLMENT_FACE_RETRY_FRAMES
+        )
+
+        # 각 bbox 의 depth median + body embedding (mask 적용)
+        bbox_meta: list[tuple] = []  # (bbox_xyxy, depth_median, emb, track_id, conf)
         for i in range(len(boxes_id)):
             x1, y1, x2, y2 = map(int, boxes_xyxy[i].tolist())
-            crop = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
-            if crop.size == 0:
+            crop_color = color[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+            crop_depth = depth[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+            if crop_color.size == 0:
                 continue
+            bbox = (x1, y1, x2, y2)
+            d_med = self._bbox_depth_median(depth, bbox)
             assert self._reid is not None
-            emb = self._reid.extract_features(crop)
-            tracks.append(Track(
-                track_id=int(boxes_id[i]),
-                bbox=(x1, y1, x2, y2),
-                embedding=emb,
-                conf=float(boxes_conf[i]),
-            ))
+            if d_med > 0 and crop_depth.size > 0:
+                emb = self._reid.extract_with_mask(
+                    crop_color, crop_depth, d_med,
+                    tolerance_mm=config.DEPTH_MASK_TOLERANCE_MM,
+                    min_valid_ratio=config.DEPTH_MASK_MIN_VALID_RATIO,
+                )
+            else:
+                emb = self._reid.extract_features(crop_color)
+            bbox_meta.append((bbox, d_med, emb, int(boxes_id[i]), float(boxes_conf[i])))
 
-        # target 식별 — track_id 유지 우선, drift 시 ReID 재매칭
+        # ── enrollment 첫 frame face matching ──
+        if do_face_matching_this_frame and bbox_meta:
+            face_template = self._tracker._face_template  # type: ignore[attr-defined]
+            if face_template is not None and face_template.size > 0:
+                try:
+                    face_app = _get_face_app()
+                    boxes_np = np.stack([np.array(b[0]) for b in bbox_meta])
+                    matched_idx, sim = _match_face_in_bboxes(
+                        face_app, color, boxes_np, face_template,
+                        threshold=config.ENROLLMENT_FACE_THRESHOLD,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    self.get_logger().warn(f"face matching failed: {e}")
+                    matched_idx = -1
+                    sim = 0.0
+                if matched_idx >= 0:
+                    self._enroll_locked_track_id = bbox_meta[matched_idx][3]
+                    self.get_logger().info(
+                        f"Enrollment lock: track_id={self._enroll_locked_track_id} face_sim={sim:.3f}"
+                    )
+                else:
+                    self._enroll_face_retry_count += 1
+                    if self._enroll_face_retry_count >= config.ENROLLMENT_FACE_RETRY_FRAMES:
+                        # fallback: largest bbox 1회
+                        biggest = max(
+                            bbox_meta,
+                            key=lambda b: (b[0][2] - b[0][0]) * (b[0][3] - b[0][1]),
+                        )
+                        self._enroll_locked_track_id = biggest[3]
+                        self.get_logger().warn(
+                            f"Enrollment fallback (face retry exhausted): "
+                            f"largest bbox track_id={self._enroll_locked_track_id}"
+                        )
+
+        # ── ENROLLING 중 lock 된 track 의 body emb accumulate ──
+        if in_enrollment and self._enroll_locked_track_id is not None:
+            for bbox, d_med, emb, track_id, _conf in bbox_meta:
+                if track_id == self._enroll_locked_track_id:
+                    self._tracker.accumulate_body(emb)
+                    break
+
+        # ── enrollment timeout — force finalize ──
+        if (
+            in_enrollment
+            and (time.time() - self._enroll_start_ts) > config.ENROLLMENT_TIMEOUT_S
+            and self._tracker.state == "ENROLLING"
+        ):
+            self.get_logger().warn("Enrollment timeout — forcing finalize")
+            self._tracker.finalize_enrollment(force=True)
+
+        # ── 일반 매칭 (ACTIVE) — bbox_meta 를 Track 리스트로 변환 후 update ──
+        tracks: list[Track] = []
+        for bbox, _d, emb, track_id, conf in bbox_meta:
+            tracks.append(Track(track_id=track_id, bbox=bbox, embedding=emb, conf=conf))
+
         target = self._tracker.update(tracks)
         if target is not None:
+            d_med = self._bbox_depth_median(depth, target.bbox)
             with self._lock:
                 self._last_track = target
                 self._last_track_ts = time.time()
+                self._last_track_distance_mm = d_med
+            self.get_logger().info(
+                f"target: id={target.track_id} bbox={target.bbox} distance={d_med} mm "
+                f"state={self._tracker.state} sim={self._tracker.last_sim}"
+            )
 
     # ---------- publish_cb ----------
     def _tick_publish(self) -> None:
@@ -235,6 +408,7 @@ class PerceptionNode(Node):
         with self._lock:
             track = self._last_track
             ts = self._last_track_ts
+            distance_mm = self._last_track_distance_mm
             teacher_id = self._teacher_id
             image_w = self._image_width
 
@@ -250,7 +424,9 @@ class PerceptionNode(Node):
             msg.mode = "searching" if (now - ts) < LOST_TIMEOUT_S * 2 else "lost"
             msg.matched = False
 
-        msg.distance_m = float("nan")  # LiDAR fusion 은 follow_node 책임 (현재는 NaN)
+        # D435 depth fusion — bbox 중심 patch median (mm) → m. invalid 시 NaN.
+        # LiDAR fusion 은 Phase B (실 빅핀키 + LiDAR) 에서 합산 예정.
+        msg.distance_m = float(distance_mm) / 1000.0 if distance_mm > 0 else float("nan")
         if track is not None and msg.matched:
             x1, y1, x2, y2 = track.bbox
             cx = (x1 + x2) / 2.0

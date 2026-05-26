@@ -37,13 +37,22 @@ Addinedu 최종 프로젝트 — **pingdergarten**. 유치원에서 아이와 �
 - `venv`, `uv` 등 별도 가상환경을 새로 생성하지 않는다. `.venv/`, `uv.lock` 파일을 만들지 않는다.
 - 서비스별 `requirements.txt` 나 `pyproject.toml` 을 새로 만들지 않는다.
 - **ROS Python 노드** (controller/* 의 ament_python 패키지) 는 `colcon build` 후 install 의 shebang 이 `#!/usr/bin/python3` 로 고정 — venv 와 무관하게 system python3 에서 실행된다. ROS 노드가 import 하는 비표준 패키지는 system python 에도 깔아둔다.
-  - apt: `python3-serial` (camera_pan), `ros-jazzy-cv-bridge`, `ros-jazzy-nav2-msgs`, `ros-jazzy-tf2-ros`, `ros-jazzy-tf2-geometry-msgs`
+  - apt: `python3-serial` (camera_pan), `ros-jazzy-cv-bridge`, `ros-jazzy-nav2-msgs`,
+         `ros-jazzy-tf2-ros`, `ros-jazzy-tf2-geometry-msgs`,
+         `librealsense2-utils`, `librealsense2-dev`, `ffmpeg`
   - pip (Ubuntu 24.04 PEP 668 — `--break-system-packages` 필요):
     ```bash
     sudo /usr/bin/python3 -m pip install --break-system-packages \
-      "ultralytics>=8.4,<9" "lap>=0.5.12" "websockets>=13" torchreid
+      "ultralytics>=8.4,<9" "lap>=0.5.12" "websockets>=13" torchreid \
+      "pyrealsense2>=2.55" "aiortc>=1.9" "av>=12.0"
     ```
   - 위 패키지는 `gogoping_perception` (YOLO + ByteTrack + ReID + WS video client) 에 사용. `torchreid` 미설치 시 ReIDEngine 이 colour-stats fallback 으로 동작 — 정확도 ↓.
+  - `pyrealsense2` / `aiortc` / `av` 는 `gogoping_camera` (노트북 D435 → WebRTC) 에서 사용. `librealsense2-utils` 는 `rs-enumerate-devices` / `rs-fw-update` CLI, `ffmpeg` 는 NVENC (`h264_nvenc`) 가용성 확인용.
+  - **GPU 인코더 (NVENC) 는 NVIDIA dGPU 종속이라 CPU (Intel/AMD) 와 무관**. 위 apt 리스트는 두 케이스 모두 그대로 사용:
+    - **Intel CPU + iGPU** (예: Core Ultra) — QSV fallback 까지 대비하려면 추가:
+      `sudo apt install intel-media-va-driver-non-free libva-dev`
+    - **AMD CPU + NVIDIA dGPU** (예: Ryzen + RTX) — Intel iGPU 패키지 불필요. 위 기본 apt + NVIDIA driver 만으로 NVENC 작동.
+    - 검증: `ffmpeg -hide_banner -encoders 2>/dev/null | grep h264_nvenc` 가 `V..... h264_nvenc ...` 출력하면 OK.
 
 ## 테스트
 
