@@ -29,6 +29,10 @@ YOLO_CLASSES: tuple[str, ...] = (
 )
 FRUITS: tuple[str, ...] = ("strawberry", "broccoli", "grape", "kiwi", "pineapple")
 
+# plate 2번째 인스턴스는 이 conf 이상일 때만 keep — 학습(gen_roi_masked_videos_phase5.py)
+# / 추론(roi_inference.py) 의 PLATE_CONF_2ND 와 동일. 1번째는 기본 conf(0.25).
+PLATE_CONF_2ND: float = 0.55
+
 # 카메라별 keep 정책 — 학습 코드와 동일.
 CAM_POLICY: dict[str, dict[str, Any]] = {
     "top":         {"keep_target_fruit": True,  "always_keep": ["plate"]},
@@ -49,8 +53,8 @@ def prompt_to_target(prompt: str) -> str | None:
 
 
 def _select_bboxes(result: Any, always_keep: list[str], target_fruit: str | None) -> list[tuple]:
-    """학습 코드 select_bboxes 1:1 재현.
-    - plate: top-2 confidence
+    """학습 코드 select_bboxes_phase5 1:1 재현.
+    - plate: 1번째 기본 conf, 2번째는 PLATE_CONF_2ND(0.55) 이상만 (dual threshold)
     - bell_button + 그 외 always_keep: top-1
     - target fruit: top-1
     """
@@ -65,13 +69,15 @@ def _select_bboxes(result: Any, always_keep: list[str], target_fruit: str | None
         x1, y1, x2, y2 = boxes[i]
         return (float(x1), float(y1), float(x2), float(y2))
 
-    # plate: top-2 by confidence
+    # plate: dual conf threshold (1번째 기본 conf, 2번째 ≥0.55) — 학습/roi_inference 와 동일.
     if "plate" in always_keep:
         plate_id = YOLO_CLASSES.index("plate")
         plate_idxs = [i for i, c in enumerate(cls_ids) if int(c) == plate_id]
         plate_idxs.sort(key=lambda i: -confs[i])
-        for i in plate_idxs[:2]:
-            bboxes.append(box_tuple(i))
+        if plate_idxs:
+            bboxes.append(box_tuple(plate_idxs[0]))
+        if len(plate_idxs) >= 2 and confs[plate_idxs[1]] >= PLATE_CONF_2ND:
+            bboxes.append(box_tuple(plate_idxs[1]))
     # bell_button (및 plate 아닌 always_keep): best 1
     for cls in always_keep:
         if cls == "plate":
@@ -141,12 +147,19 @@ class RoiMasker:
         images: dict[str, np.ndarray],
         task: str,
     ) -> dict[str, np.ndarray]:
-        """images: {hw_cam_key: HWC uint8 RGB/BGR ndarray}. 같은 dtype/color order 로 반환.
+        """images: {hw_cam_key: HWC uint8 **RGB** ndarray (lerobot OpenCVCamera 기본)}.
+        ROI masked RGB 반환 (모델 입력용, 색공간 유지).
 
-        hw_cam_key 는 game.yaml hardware.cameras 의 id (camera1/2/3 등). cam_policy 키
-        (top/wrist_left/wrist_right) 와 매핑은 image_key_map 으로 외부에서 처리해 두고,
-        여기서는 그 매핑 결과 (학습 시 사용한 cam key) 를 받는다고 가정.
+        ⚠️ YOLO(ultralytics) 는 입력을 BGR 로 가정한다. lerobot 카메라는 RGB 를 주므로
+        detect 전에 RGB→BGR 변환 필수 (안 하면 빨간 딸기가 파랑으로 보여 conf 0).
+        roi_inference.py / gen_roi_masked_videos_phase5.py 와 동일 — 거기도 cvtColor 함.
+        mask 자체는 원본 RGB 에 적용 (모델은 RGB 학습).
+
+        hw_cam_key 는 cam_policy 키 (top/wrist_left/wrist_right) — image_key_map 으로
+        외부에서 매핑된 결과를 받는다고 가정.
         """
+        import cv2  # lazy — ultralytics 의존이라 이미 설치됨.
+
         target = prompt_to_target(task)
         out: dict[str, np.ndarray] = {}
         for cam_key, img in images.items():
@@ -156,11 +169,12 @@ class RoiMasker:
                 out[cam_key] = img
                 continue
             H, W = img.shape[:2]
-            results = self.yolo.predict(img, conf=self.conf, iou=self.iou, verbose=False)
+            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)  # YOLO 용 BGR
+            results = self.yolo.predict(img_bgr, conf=self.conf, iou=self.iou, verbose=False)
             r = results[0]
             target_fruit = target if policy["keep_target_fruit"] else None
             bboxes = _select_bboxes(r, policy["always_keep"], target_fruit)
-            out[cam_key] = _apply_roi_mask(img, bboxes, pad=self.pad, W=W, H=H)
+            out[cam_key] = _apply_roi_mask(img, bboxes, pad=self.pad, W=W, H=H)  # mask 는 원본 RGB
         return out
 
 
