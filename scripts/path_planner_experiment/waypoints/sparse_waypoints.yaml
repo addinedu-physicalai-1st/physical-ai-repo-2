@@ -1,0 +1,60 @@
+# Sparse vertex 설정 — path planner / controller 비교 실험용.
+#
+# 목적 : Dense (35 vertex) 대비 vertex 의 sub-segment 분할이
+#        controller 성능에 미치는 영향을 측정.
+#
+# 7 vertex 만 유지 — 의미적 목적지 (운동장 / 출입구 / 놀이방 /
+# 놀이방5 / 수면실 / 충전소 / 충전소입구) 만 남기고 복도 / 입구
+# 중간 vertex 전부 제거.
+#
+# 좌표 / yaw 는 src/.../config/waypoints.yaml 의 동일 vertex 와
+# 100% 일치 (실험 변수는 vertex "밀도" 만 — 좌표는 동일).
+# id 는 sparse 내부에서 유일하게 1-7 재할당 (graph_router 내부 식별용).
+#
+# 사용 :
+#   bash swap_vertex.sh sparse    # 본 파일을 config/waypoints.yaml 로 swap
+#   bash swap_vertex.sh dense     # 원본 복원
+
+waypoints:
+- name: 운동장
+  x: 5.6789482079
+  y: 2.815
+  yaw: -3.141592653589793
+  id: 1
+  group: 운동장
+- name: 출입구
+  x: 0.53
+  y: 0.03668039426028358
+  yaw: 0.0
+  id: 2
+  group: 출입구
+- name: 놀이방5
+  x: -3.94
+  y: 3.4639531233802643
+  yaw: 0.0
+  id: 3
+  group: 놀이방_하
+- name: 놀이방
+  x: -3.94
+  y: 9.92785152520675
+  yaw: 0.0
+  id: 4
+  group: 놀이방_상
+- name: 충전소입구
+  x: 0.5297559089
+  y: 11.852758055015384
+  yaw: -1.5707963267948966
+  id: 5
+  group: 통로
+- name: 수면실
+  x: -3.5821659912
+  y: 12.133442249758824
+  yaw: 0.0
+  id: 6
+  group: 수면실
+- name: 충전소
+  x: 0.53
+  y: 12.834519743089727
+  yaw: -1.5502512727614963
+  id: 7
+  group: 통로
