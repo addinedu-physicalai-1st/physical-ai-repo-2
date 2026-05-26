@@ -28,9 +28,9 @@ const canStart = computed(() => props.registeredCount > 0);
 const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
 const STABLE_FRAMES_REQUIRED = 5;
 
-const cameraViewRef = ref<{ getImgEl: () => HTMLImageElement | null } | null>(null);
+const cameraViewRef = ref<{ getVideoEl: () => HTMLVideoElement | null } | null>(null);
 const captureCanvasRef = ref<HTMLCanvasElement | null>(null);
-const cameraImgEl = computed(() => cameraViewRef.value?.getImgEl() ?? null);
+const cameraVideoEl = computed(() => cameraViewRef.value?.getVideoEl() ?? null);
 
 const tracker = useFaceTracker();
 let latestTracks: TrackedFace[] = [];
@@ -71,14 +71,14 @@ function applyBindings(): void {
 }
 
 async function loop(): Promise<void> {
-  const img = cameraImgEl.value;
+  const video = cameraVideoEl.value;
   const canvas = captureCanvasRef.value;
-  if (img && canvas && img.complete && img.naturalWidth > 0) {
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
+  if (video && canvas && video.readyState >= 2 && video.videoWidth > 0) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(video, 0, 0);
       try { await detector.send(canvas); } catch { /* noop */ }
     }
   }

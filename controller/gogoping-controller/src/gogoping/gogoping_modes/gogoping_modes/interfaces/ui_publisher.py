@@ -35,12 +35,14 @@ class UIPublisher:
     # 상대 path — node namespace ("gogoping") 가 자동으로 prefix.
     # 절대 path 로 박지 않는 이유: 멀티 robot / launch 에서 override 용이.
     TOPIC_STATE = "state"
+    TOPIC_STATE_STR = "state_str"
     TOPIC_EVENT = "ui_event"
     QOS_DEPTH = 1
 
     def __init__(self, node: "rclpy.node.Node"):
         self.node = node
         self._pub = node.create_publisher(String, self.TOPIC_STATE, self.QOS_DEPTH)
+        self._state_str_pub = node.create_publisher(String, self.TOPIC_STATE_STR, self.QOS_DEPTH)
         self._event_pub = node.create_publisher(
             String, self.TOPIC_EVENT, self.QOS_DEPTH,
         )
@@ -54,6 +56,7 @@ class UIPublisher:
         msg = String()
         msg.data = json.dumps(snapshot, ensure_ascii=False)
         self._pub.publish(msg)
+        self._state_str_pub.publish(String(data=snapshot.get("fsm_state", "")))
 
     def publish_event(self, message: dict) -> None:
         """일회성 UI 이벤트 publish — BT 의 ``UIPublish`` / ``LullabyAudio`` 가 호출.

@@ -1,19 +1,48 @@
 <script setup lang="ts">
-import { inject, onBeforeUnmount, ref } from 'vue';
-import { useVideoStream, type StreamStatus } from './composables/useVideoStream';
+import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { forceReconnectWebRTCStream, useWebRTCStream } from './composables/useWebRTCStream';
 import { CAMERA_PAN_KEY } from './cameraPanKey';
-import { VIDEO_STREAM_KEY } from './videoStreamKey';
+import { VIDEO_STREAM_KEY, type VideoStreamStatus } from './videoStreamKey';
 
+// App.vue 가 provide 한 공유 인스턴스가 있으면 그걸 쓰고, 없으면 (예: 테스트 / 단독 사용)
+// 자체 WebRTC 핸들을 만든다. 자체 생성한 경우만 unmount 때 stop.
 const injected = inject(VIDEO_STREAM_KEY, null);
-const stream = injected ?? useVideoStream('gogoping');
+const ownHandle = injected ? null : useWebRTCStream('robot-web');
+const stream = injected ?? { stream: ownHandle!.stream, status: ownHandle!.status };
 const cameraPan = inject(CAMERA_PAN_KEY);
 
-const imgEl = ref<HTMLImageElement | null>(null);
-defineExpose({ getImgEl: (): HTMLImageElement | null => imgEl.value });
+const videoEl = ref<HTMLVideoElement | null>(null);
+defineExpose({ getVideoEl: (): HTMLVideoElement | null => videoEl.value });
 
-function statusClass(s: StreamStatus): string {
-  if (s === 'streaming') return 'ok';
-  if (s === 'open') return 'warn';
+// watch source 에 videoEl 도 포함 — stream 이 mount 전에 set 되거나 videoEl 이
+// stream set 후 mount 되는 race 모두 대응.
+watch(
+  [() => stream.stream.value, videoEl],
+  ([s, el]) => {
+    if (el) el.srcObject = s ?? null;
+  },
+  { immediate: true },
+);
+
+// 모드 재진입 시 track ended 검사 → 강제 reconnect, 살아있으면 디코더 재시동.
+// stream 이 null 이면 watch immediate 가 ontrack 시 처리하므로 여기선 return.
+onMounted(async () => {
+  const el = videoEl.value;
+  const s = stream.stream.value;
+  if (!el || !s) return;
+  if (s.getVideoTracks().length === 0 || s.getVideoTracks().every(t => t.readyState === 'ended')) {
+    forceReconnectWebRTCStream();
+    return;
+  }
+  el.srcObject = null;
+  await nextTick();
+  el.srcObject = s;
+  try { await el.play(); } catch { /* autoplay policy — 무시 */ }
+});
+
+function statusClass(s: VideoStreamStatus): string {
+  if (s === 'connected') return 'ok';
+  if (s === 'connecting') return 'warn';
   return 'err';
 }
 
@@ -41,7 +70,7 @@ function viewPointerUp(ev: PointerEvent) {
   dragView.value?.releasePointerCapture(ev.pointerId);
 }
 
-onBeforeUnmount(() => { if (!injected) stream.stop(); });
+onBeforeUnmount(() => { ownHandle?.stop(); });
 </script>
 
 <template>
@@ -53,14 +82,14 @@ onBeforeUnmount(() => { if (!injected) stream.stop(); });
     @pointerup="viewPointerUp"
     @pointercancel="viewPointerUp"
   >
-    <img
-      v-if="stream.frameUrl.value"
-      ref="imgEl"
-      :src="stream.frameUrl.value"
+    <video
+      ref="videoEl"
       class="frame"
-      alt="camera"
+      autoplay
+      playsinline
+      muted
     />
-    <div v-else class="placeholder">영상 대기 중…</div>
+    <div v-if="!stream.stream.value" class="placeholder">영상 대기 중…</div>
     <div class="status" :class="statusClass(stream.status.value)">●</div>
     <div v-if="cameraPan" class="angles">
       pan {{ Math.round(cameraPan.setpoint.value.pan) }}° ·
@@ -88,10 +117,11 @@ onBeforeUnmount(() => { if (!injected) stream.stop(); });
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  pointer-events: none;   /* 이미지가 드래그 이벤트 가로채는 것 방지 */
+  pointer-events: none;   /* 비디오가 드래그 이벤트 가로채는 것 방지 */
   -webkit-user-drag: none;
 }
 .placeholder {
+  position: absolute;
   color: #aaa;
   font-size: 18px;
 }

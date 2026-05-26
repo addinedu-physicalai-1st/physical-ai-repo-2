@@ -44,5 +44,5 @@ ROS 서비스 / 메시지 계약은 `src/gogoping/gogoping_msgs/{srv,msg,action}
 
 추가 CLAUDE.md 가 있는 패키지:
 
-- [src/gogoping/gogoping_camera/CLAUDE.md](src/gogoping/gogoping_camera/CLAUDE.md) — USB 카메라 → UDP MJPEG 송출 (SR-CAM-001)
+- [src/gogoping/gogoping_camera/CLAUDE.md](src/gogoping/gogoping_camera/CLAUDE.md) — D435 + WebRTC (H.264 NVENC) 송출 + perception shm fan-out (SR-CAM-001 후속)
 - [src/gogoping/gogoping_camera_pan/CLAUDE.md](src/gogoping/gogoping_camera_pan/CLAUDE.md) — Arduino Uno + MG995 ×2 (pan/tilt) 서보. 시리얼 프로토콜 / udev / keyboard·admin teleop 키맵

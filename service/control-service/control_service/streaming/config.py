@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     # 환경변수 STREAMING_REQUIRE_AUTH=true|false 로 override
     require_auth: bool = False
 
+    # gogoping UDP 영상 수신 활성화 — D435 + WebRTC 로 전환됨.
+    # eduping/noriarm 은 계속 UDP 사용. 운영 중 fallback 필요 시
+    # STREAMING_GOGOPING_UDP_ENABLED=true 로 다시 켤 수 있음.
+    gogoping_udp_enabled: bool = False
+
     class Config:
         env_prefix = "STREAMING_"
         extra = "ignore"

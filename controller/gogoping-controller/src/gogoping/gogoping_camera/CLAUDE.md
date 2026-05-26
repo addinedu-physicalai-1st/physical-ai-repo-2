@@ -1,107 +1,62 @@
 # gogoping_camera
 
-GogoPing/EduPing/NoriArm 의 USB 웹캠 영상을 MJPEG 으로 캡처해 Control Server (UDP) 로 송출하는 ROS2 ament_python 패키지.
+GogoPing 노트북의 **Intel RealSense D435** 영상을 **WebRTC (H.264 NVENC)** 로 두 경로에 송출하는 ROS2 ament_python 패키지.
 
-관련 SR: SR-CAM-001 ([docs/implementation-plan.md §2.7](../../../../../docs/implementation-plan.md)).
-Server 측: [service/control-service/control_service/streaming/](../../../../../service/control-service/control_service/streaming/) (port 8100/TCP, `/ws/video-stream`).
+영상은 한 번 캡처되어 in-process fan-out:
+- **WebRTC**: aiortc MediaRelay → robot-web (LAN P2P) + control-service relay → admin-ui
+- **POSIX shm**: gogoping_perception 이 raw frame 으로 직접 읽음 (depth fusion 포함)
 
-## 모듈 구성
+관련 SR: SR-CAM-001 (USB MJPEG → D435 + WebRTC 로 갱신).
+서버 측: [service/control-service/control_service/streaming/](../../../../../service/control-service/control_service/streaming/) `webrtc_router.py`.
+
+## 모듈
 
 | 파일 | 역할 |
 |---|---|
-| [`gogoping_camera/streamer.py`](gogoping_camera/streamer.py) | **cv2 backend (fallback)** — opencv VideoCapture 로 캡처 + JPEG 재인코딩. `Config`/`StateController` 등 공통 코드 보유 |
-| [`gogoping_camera/streamer_v4l2.py`](gogoping_camera/streamer_v4l2.py) | **v4l2 backend (default)** — linuxpy 로 카메라 native MJPEG 직접 송신 (저지연, 이중 인코드 제거) |
-| [`launch/camera_stream.launch.py`](launch/camera_stream.launch.py) | ROS2 launch — `robot/backend/control_server` 인자로 backend 선택 |
+| `gogoping_camera/config.py` | 해상도/fps/bitrate/preset 상수 |
+| `gogoping_camera/shm_layout.py` | POSIX shm 이름/크기/dtype (writer+reader 공유) |
+| `gogoping_camera/d435_capture.py` | D435 pipeline + rs.align + shm writer |
+| `gogoping_camera/webrtc_track.py` | aiortc VideoStreamTrack + NVENC codec opts |
+| `gogoping_camera/signaling_client.py` | WS signaling producer 측 |
+| `gogoping_camera/webrtc_node.py` | ROS node — capture + WebRTC + signaling lifecycle |
 
-## 와이어 프로토콜
+## 해상도 / 코덱
 
-- UDP 영상 패킷 (28B 헤더 + JPEG): `streamer.py` 의 `VIDEO_HEADER_FMT` 와 `parse_video_packet`
-- UDP 제어 패킷 (12B): server 가 STOP/START 송신 (Pi 측 `StateController` 가 listen)
-- 포트 매핑: `9_DD_R` (DD=robot_id 01~99, R=role 0~9). `streamer.py` 의 `Config.video_port` / `control_listen_port` 함수 참조
+- Color: 1920×1080 @ 30fps (사용자 시청)
+- Depth: 848×480 @ 30fps (IR sensor native sweet spot)
+- rs.align(color) 로 depth → color 시점 + 1920×1080 으로 upscale
+- 640×480 다운스케일 후 shm 에 write (perception 용)
+- WebRTC: H.264 NVENC, 4 Mbps, GOP 30, preset p4, tune ll, rc cbr, bf 0
 
 ## 사용
 
-### Console scripts (직접 실행)
-
 ```bash
-# v4l2 backend (default, 저지연)
-ros2 run gogoping_camera camera_streamer_v4l2 --robot gogoping
-# cv2 fallback
-ros2 run gogoping_camera camera_streamer --robot gogoping
-```
-
-### Launch (권장)
-
-```bash
-# default (gogoping / v4l2 / tonyno)
 ros2 launch gogoping_camera camera_stream.launch.py
-
-# 인자 override
-ros2 launch gogoping_camera camera_stream.launch.py robot:=eduping backend:=cv2 control_server:=leekt
-
-# 환경변수 override (launch 인자 default 와 연동)
-CONTROL_SERVER_NAME=leekt ros2 launch gogoping_camera camera_stream.launch.py
 ```
 
-### Bringup 통합 (Phase 2 후 자동)
-
-`gogoping_bringup/launch/pi.launch.py` 가 IncludeLaunchDescription 으로 본 launch 를 포함.
-`scripts/device-gogoping-pi.sh` 실행 시 bringup 과 함께 자동 시작/종료.
-
-## Launch 인자
-
-| 인자 | 기본값 | 설명 |
-|---|---|---|
-| `robot` | `gogoping` | UDP 패킷의 `robot_id` 결정 (gogoping/eduping/noriarm) |
-| `backend` | `v4l2` | `v4l2` (linuxpy 직접) / `cv2` (opencv fallback) |
-| `control_server` | env `CONTROL_SERVER_NAME` 또는 `tonyno` | shared/machine_ips.json 의 hostname key |
-
-추가 환경변수 (직접 실행 시 / Node `additional_env` 로 전달 시):
-- `CAMERA_DEVICE` (default `/dev/video0`)
-- `CAMERA_WIDTH` / `CAMERA_HEIGHT` / `CAMERA_FPS` / `CAMERA_QUALITY` (cv2 전용)
-- `CAMERA_LOG_LEVEL` (DEBUG/INFO/WARNING/ERROR)
-- `CAMERA_SERVER_IP` (직접 IP, lookup 우회)
+`device-gogoping-laptop.sh` 의 camera tmux window 가 자동 launch.
 
 ## 의존성
 
-| | |
-|---|---|
-| build | `ament_python` (setuptools) |
-| runtime (v4l2) | `linuxpy>=0.24` (Linux 전용, `pyproject.toml` 에 conditional 등록) |
-| runtime (cv2) | `opencv-python-headless` (이미 프로젝트 dep) |
+- `librealsense2-utils`, `librealsense2-dev` (apt)
+- `ffmpeg` with nvenc support (Ubuntu 24.04 기본)
+- `pyrealsense2`, `aiortc`, `av` (Python)
+- NVIDIA driver + CUDA (NVENC 용)
 
-Pi 측 1회 설치:
-```bash
-cd ~/pingdergarten
-pip install -e .   # linuxpy 자동 설치 (Linux)
-colcon build --packages-select gogoping_camera --symlink-install
-source install/setup.bash
-```
+[../../../../../CLAUDE.md](../../../../../CLAUDE.md) 의 Python 환경 섹션 참조.
 
-## 검증 체크
+## 검증
 
 ```bash
-# 1. 패키지 빌드
-colcon build --packages-select gogoping_camera --symlink-install
-
-# 2. 단독 launch
-ros2 launch gogoping_camera camera_stream.launch.py
-
-# 3. Server 측 frame 도착 확인
-curl -sf http://<control_server>:8100/health | python3 -m json.tool
-# udp_receivers[0].frames_received 가 25/초 속도로 증가
+# 1. D435 firmware + USB
+rs-enumerate-devices --compact
+# 2. NVENC 가용
+ffmpeg -encoders 2>/dev/null | grep h264_nvenc
+# 3. shm 정리 (비정상 종료 후)
+rm -f /dev/shm/gogoping_color_640 /dev/shm/gogoping_depth_640 /dev/shm/gogoping_meta
 ```
 
-## 추후 확장 슬롯 (예약 — 현재 미사용)
+## 폐기
 
-| 포트 슬롯 | 용도 | 추후 SR |
-|---|---|---|
-| `role 0` (X0) | Pi → Server 제어 (telemetry/error 보고) | telemetry SR |
-| `role 1` (X1) | Pi → Server 제어 (다른 용도) | TBD |
-| `role 4~9` | 추가 영상 stream (후방·그리퍼 카메라 등) | multi-cam SR |
-
-## 변경 시 주의
-
-- 와이어 프로토콜은 server 측 [service/control-service/control_service/streaming/protocol.py](../../../../../service/control-service/control_service/streaming/protocol.py) 와 **반드시 일치** 시킬 것 (헤더 포맷, 포트 매핑)
-- `parse_known_args()` 사용 — ROS2 launch 가 주입하는 `--ros-args` 를 무시해야 정상 동작
-- `streamer_v4l2.py` 는 `streamer.py` 에서 공통 코드 import — `streamer.py` 의 클래스/상수 변경 시 v4l2 도 같이 검증
+- `streamer.py` / `streamer_v4l2.py`: USB MJPEG → UDP 9013 송출. WebRTC 로 대체됨.
+- UDP 와이어 프로토콜 (28B 헤더): gogoping 만 미사용. eduping/noriarm 은 streaming(8100) 에서 유지.

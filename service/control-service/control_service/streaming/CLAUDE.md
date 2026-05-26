@@ -5,6 +5,16 @@ UDP 영상 수신 + WebSocket fan-out 게이트웨이. **별도 uvicorn 프로�
 관련 SR: SR-CAM-002 / SR-CAM-003 / SR-CAM-005 ([docs/implementation-plan.md §2.7](../../../../docs/implementation-plan.md))
 프로토콜 명세는 [protocol.py](protocol.py) 의 헤더 상수와 `parse_video_packet`/`encode_*` 함수 참조.
 
+## GogoPing UDP 비활성화 (2026-05-23)
+
+GogoPing 영상은 D435 + WebRTC 로 전환. UDP 9013 receiver 는 기본 비활성화:
+
+- 활성화: `STREAMING_GOGOPING_UDP_ENABLED=true` env 또는 settings 의 `gogoping_udp_enabled=True`
+- 비활성 시 `udp_receivers` 에 gogoping 미표시 (`/health` 응답)
+- EduPing(9023) / NoriArm(9033) 은 그대로 활성
+
+WebRTC signaling 은 `webrtc_router.py` 의 `/ws/webrtc/signaling` 참조.
+
 ## 데이터 흐름
 
 ```
@@ -16,6 +26,8 @@ Pi (camera_streamer.py) ─UDP 9013/9023/9033─→ udp_receiver thread (per rob
                                               ws_router send_loop → ws.send_bytes
 Admin UI (websockets.sync.client) ────WS /ws/video-stream──┘
 ```
+
+> 2026-05-23 이후: 9013 gogoping 은 D435 + WebRTC 로 전환됨. 본 다이어그램은 9023 eduping / 9033 noriarm 에만 해당.
 
 ## 모듈
 
@@ -89,4 +101,4 @@ Admin UI 의 GogoPing 대시보드 → 실 영상 표시. 첫 frame ≤100ms.
 - **UDP 수신 thread 안에서는 asyncio 호출 금지** — 반드시 `loop.call_soon_threadsafe`.
 - **`FrameHub` / `ClientRegistry` 메서드는 asyncio 단일 thread 에서만 호출** — lock 없음.
 - **WS auth 강화 시** `require_auth=true` 로 전환 — 단, Admin UI 가 로그인 흐름 추가 필요 (별도 SR).
-- **포트 컨벤션** (9_DD_R 포맷: role 0=예약 ws, role 1=Pi→Server 제어, role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6) 변경 시 [config.py](config.py) + Pi 측 [controller/gogoping-controller/src/gogoping/gogoping_camera/gogoping_camera/streamer.py](../../../../controller/gogoping-controller/src/gogoping/gogoping_camera/gogoping_camera/streamer.py) 동시 갱신.
+- **포트 컨벤션** (9_DD_R 포맷: role 0=예약 ws, role 1=Pi→Server 제어, role 2=Server→Pi 제어, role 3=영상 primary, role 4~9=영상 stream 1~6) 변경 시 [config.py](config.py) + 송출 측 (eduping/noriarm 의 카메라 launch) 동시 갱신.

@@ -22,7 +22,7 @@ import OXQuiz from '@/noriarm/OXQuiz.vue';
 import BlockStacking from '@/noriarm/BlockStacking.vue';
 import { useCameraPan } from '@/gogoping/composables/useCameraPan';
 import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
-import { useVideoStream } from '@/gogoping/composables/useVideoStream';
+import { useWebRTCStream } from '@/gogoping/composables/useWebRTCStream';
 import { VIDEO_STREAM_KEY } from '@/gogoping/videoStreamKey';
 import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
@@ -32,9 +32,12 @@ import HideAndSeekGame from '@/gogoping/HideAndSeekGame.vue';
 import FollowMode from '@/gogoping/FollowMode.vue';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
 import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
+import AdminGogopingVideo from '@/admin/AdminGogopingVideo.vue';
 
-// `?embed=openarm`         → fullscreen OpenArm viewer for the PyQt admin app
-// `?embed=openarm-compare` → side-by-side two-viewer comparison popup
+// `?embed=openarm`          → fullscreen OpenArm viewer for the PyQt admin app
+// `?embed=openarm-compare`  → side-by-side two-viewer comparison popup
+// `?embed=gogoping-video`   → fullscreen WebRTC consumer for the admin
+//                             camera card (peer_id='admin-ui')
 const embedMode = (() => {
   if (typeof window === 'undefined') return null;
   try {
@@ -45,6 +48,7 @@ const embedMode = (() => {
 })();
 const isAdminOpenArmEmbed = embedMode === 'openarm';
 const isAdminOpenArmCompare = embedMode === 'openarm-compare';
+const isAdminGogopingVideo = embedMode === 'gogoping-video';
 
 const mode = useModeStore();
 const voice = useVoiceStore();
@@ -80,16 +84,23 @@ const showGogopingHideAndSeek = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '숨바꼭질'
 );
 
+// embed (admin QWebEngineView) 페이지에서는 main app 측 gogoping 리소스를 생성하지 않는다.
+// AdminGogopingVideo 가 자체적으로 useWebRTCStream('admin-ui') 을 만들기 때문에, 같은
+// 페이지에서 robot-web peer 까지 동시 생성되면 control-service 에 중복 consumer 가 붙는다.
+const isAnyEmbed = isAdminOpenArmEmbed || isAdminOpenArmCompare || isAdminGogopingVideo;
+const isMainGogoping = !isAnyEmbed && robot.value.id === 'gogoping';
+
 // gogoping 일 때만 useCameraPan 인스턴스를 생성해서 두 컴포넌트 공유
-const cameraPan = robot.value.id === 'gogoping' ? useCameraPan() : null;
+const cameraPan = isMainGogoping ? useCameraPan() : null;
 if (cameraPan) provide(CAMERA_PAN_KEY, cameraPan);
 
-// gogoping 일 때만 useVideoStream 인스턴스를 한 번만 생성해서 CameraView/FollowFaceAuth 공유
-const videoStream = robot.value.id === 'gogoping' ? useVideoStream('gogoping') : null;
-if (videoStream) provide(VIDEO_STREAM_KEY, videoStream);
+// gogoping 일 때만 useWebRTCStream 인스턴스를 한 번만 생성해서 CameraView/FollowFaceAuth 공유.
+// control-service 의 /ws/webrtc/signaling 으로 server-side offer 흐름을 받아 MediaStream 으로 표시.
+const videoStream = isMainGogoping ? useWebRTCStream('robot-web') : null;
+if (videoStream) provide(VIDEO_STREAM_KEY, { stream: videoStream.stream, status: videoStream.status });
 
 // gogoping 일 때만 BT snapshot WS 구독 — admin UI 가 mode 바꾸면 자동 반영
-const gogopingStateWs = robot.value.id === 'gogoping' ? useGogopingStateWs() : null;
+const gogopingStateWs = isMainGogoping ? useGogopingStateWs() : null;
 
 onBeforeUnmount(() => {
   cameraPan?.stop();
@@ -142,7 +153,11 @@ async function onFollowAuthenticated(payload: { name: string; teacher_id: string
 }
 
 async function onFollowAuthCancel(): Promise<void> {
+  // UI 우선 — 서버가 hang 해도 X 버튼은 즉시 반응해야 함.
+  // setMode('대기') → showGogopingFollowAuth=false → 오버레이 unmount + 카메라 정지.
+  // 백엔드 stop 은 mode watch (currentMode → 추종 이탈) 가 follow/stop 재호출로 중복 보장.
   followAuthenticated.value = false;
+  mode.setMode('대기');
   try {
     await fetch('/api/gogoping/follow/stop', {
       method: 'POST',
@@ -153,8 +168,6 @@ async function onFollowAuthCancel(): Promise<void> {
       body: '{}',
     });
   } catch { /* 오프라인 — UI 는 진행 */ }
-  // 인증 취소 — 모드를 대기로 되돌리면 showGogopingFollowAuth=false → 오버레이 unmount + 카메라 정지.
-  mode.setMode('대기');
   try {
     await postModeClick('대기', robot.value.id);
   } catch {
@@ -222,6 +235,7 @@ function handleStart(): void {
        viewer, no overlays/voice/mode-selector. -->
   <AdminOpenArmEmbed v-if="isAdminOpenArmEmbed" />
   <AdminOpenArmCompare v-else-if="isAdminOpenArmCompare" />
+  <AdminGogopingVideo v-else-if="isAdminGogopingVideo" />
   <div v-else class="app" :class="`bg-${robot.id}`">
     <EmotionDisplay :emotion="currentEmotion" />
     <BottomDock />

@@ -169,7 +169,7 @@ from widgets import (
     TaskQueue,
     soften,
 )
-from widgets.camera_widget import CameraStreamView
+from widgets.camera_widget import CameraStreamView, WebRTCStreamView
 from widgets.waypoint_map_card import WaypointMapCard
 
 
@@ -527,7 +527,12 @@ class GogoPingDashboard(QWidget):
 
         # 좌측 컬럼 — 각 카드 minimumHeight 명시해 페이지 세로 확장 (스크롤 허용).
         self.camera_card = Card("전방 카메라")
-        if stream_client is not None:
+        # GogoPing 은 D435 + WebRTC (1080p H.264) 로 전환 — QWebEngineView 가
+        # control-service 의 HTTP mirror (/admin-embed/?embed=gogoping-video) 임베드.
+        # 다른 로봇 (EduPing/NoriArm) 은 기존 WS JPEG 그대로.
+        if self.NAME == "gogoping":
+            self.camera = WebRTCStreamView()
+        elif stream_client is not None:
             self.camera = CameraStreamView(
                 robot=self.NAME, stream_client=stream_client, stream_id=0,
             )

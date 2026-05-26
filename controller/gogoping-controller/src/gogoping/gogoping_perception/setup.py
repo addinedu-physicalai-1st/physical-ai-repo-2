@@ -22,6 +22,8 @@ setup(
     entry_points={
         'console_scripts': [
             'perception_node = gogoping_perception.perception_node:main',
+            'safety_monitor = gogoping_perception.safety_monitor:main',
+            'safety_filter = gogoping_perception.safety_filter:main',
         ],
     },
 )

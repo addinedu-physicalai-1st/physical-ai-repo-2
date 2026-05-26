@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:admin": "vue-tsc --noEmit && vite build --base=/admin-embed/ --outDir=dist-admin",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "test": "vitest"

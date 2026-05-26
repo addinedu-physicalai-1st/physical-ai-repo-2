@@ -42,7 +42,12 @@ class Settings:
     # fastapi-users 세션 쿠키 수명(초). 7일.
     cookie_max_age: int = 60 * 60 * 24 * 7
     # 얼굴 매칭 cosine distance — 작을수록 엄격.
-    face_match_threshold: float = 0.45
+    # 0.45 는 EduPing 단일 카메라 매칭 기준(같은 머신 등록↔조회). GogoPing 추종 게이트는
+    # 등록(웹캠/스마트폰) ↔ D435 (1080p, 다른 조명/거리) 사이 도메인 차로 distance 가
+    # 0.55~0.65 구간으로 튄다. photos.py 의 _FACE_MATCH_MAX_DISTANCE=0.75 보단 엄격하게,
+    # 같은 머신 매칭 0.45 보단 느슨하게 가져가되, 0.6 은 경계선이라 인증 실패가 잦아
+    # 0.7 로 완화 (개발 테스트). 실 운영 전 distance 분포 재측정 후 재조정.
+    face_match_threshold: float = 0.7
 
 
 settings = Settings()
