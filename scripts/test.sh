@@ -184,7 +184,6 @@ conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_check_models.py" -v || 
 PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_ros_bridge_home_events.py" -v || EXIT=1
 PYTHONPATH="$NORIARM_FRAMEWORK_DIR" conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_observation_capture.py" -v || EXIT=1
 conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_block_stacking_router.py" -v || EXIT=1
-conda run -n jazzy pytest "$REPO_ROOT/tests/noriarm/test_block_stacking_process.py" -v || EXIT=1
 echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo

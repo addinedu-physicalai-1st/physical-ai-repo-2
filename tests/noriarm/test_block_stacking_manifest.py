@@ -14,7 +14,7 @@ def test_load_block_stacking_game_yaml() -> None:
     assert config.name == "block_stacking"
     assert config.display == "블럭쌓기"
     assert config.policy.kind == "act"
-    assert config.policy.extra["repo_id"] == "jisoo3/act_game_block_stacking_0520"
+    assert config.policy.extra["repo_id"] == "jisoo3/act_game_block_stacking_0521"
     assert len(config.arms) == 1
 
 
@@ -23,6 +23,6 @@ def test_block_stacking_repo_id_matches_game_yaml() -> None:
         block_stacking_repo_id,
         load_block_stacking_config,
     )
-    assert block_stacking_repo_id() == "jisoo3/act_game_block_stacking_0520"
+    assert block_stacking_repo_id() == "jisoo3/act_game_block_stacking_0521"
     # 같은 호출은 cache 로 동일 객체 반환.
     assert load_block_stacking_config() is load_block_stacking_config()

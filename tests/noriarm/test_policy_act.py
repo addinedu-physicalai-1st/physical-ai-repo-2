@@ -33,7 +33,7 @@ def test_adapter_import_does_not_require_lerobot() -> None:
 
 def test_step_is_idle_when_not_ready() -> None:
     adapter = ACTPolicyAdapter(
-        repo_id="jisoo3/act_game_block_stacking_0520",
+        repo_id="jisoo3/act_game_block_stacking_0521",
         joint_names=("joint1", "joint2", "joint3", "joint4", "joint5"),
     )
     adapter.reset(_ctx())
@@ -51,7 +51,7 @@ def test_build_policy_from_manifest() -> None:
             kind="act",
             module="noriarm_framework.games.block_stacking.policy_act",
             extra={
-                "repo_id": "jisoo3/act_game_block_stacking_0520",
+                "repo_id": "jisoo3/act_game_block_stacking_0521",
                 "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5"],
             },
         ),
@@ -65,13 +65,13 @@ def test_build_policy_from_manifest() -> None:
 def test_load_and_step_when_lerobot_available() -> None:
     """lerobot 이 있는 환경에서 load_policy() 호출 + 더미 obs 로 1 step.
 
-    jisoo3/act_game_block_stacking_0520 모델 스펙:
+    jisoo3/act_game_block_stacking_0521 모델 스펙:
       - image_features: observation.images.front (3,480,640), observation.images.wrist (3,480,640)
       - action shape: (6,)
     camera_keys 는 obs.images 키와 모델의 feature 키를 동시에 결정한다.
     """
     adapter = ACTPolicyAdapter(
-        repo_id="jisoo3/act_game_block_stacking_0520",
+        repo_id="jisoo3/act_game_block_stacking_0521",
         joint_names=("joint1", "joint2", "joint3", "joint4", "joint5", "joint6"),
         camera_keys=("front", "wrist"),
     )

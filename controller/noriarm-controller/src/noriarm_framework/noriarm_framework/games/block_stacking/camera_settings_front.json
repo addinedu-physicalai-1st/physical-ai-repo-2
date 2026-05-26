@@ -1,0 +1,19 @@
+{
+    "sliders": {
+        "brightness": -85,
+        "contrast": 84,
+        "saturation": 177,
+        "hue": 0,
+        "gamma": 55,
+        "gain": 0,
+        "sharpness": 4,
+        "backlight_compensation": 0,
+        "exposure_time_absolute": 123,
+        "white_balance_temperature": 7266,
+        "focus_absolute": 4096,
+        "zoom_absolute": 2
+    },
+    "checks": {
+        "auto_exposure": 0
+    }
+}

@@ -2,7 +2,6 @@
 import { computed, inject, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
-import UrdfViewer from '@/noriarm/UrdfViewer.vue';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 
 type Phase = 'intro' | 'rps' | 'announce' | 'playing' | 'done';
@@ -64,6 +63,9 @@ function subscribeEvents(sid: string): void {
       const payload = JSON.parse(ev.data);
       if (payload.type === 'home_event') {
         homeEventCount.value = payload.count;
+        if (payload.count === 1) {
+          void tts.speak('잘했어! 이번엔 초록색 블록을 쌓아봐!');
+        }
       } else if (payload.type === 'done') {
         phase.value = 'done';
         void tts.speak('잘했어! 다 쌓았어!');
@@ -85,19 +87,16 @@ async function playRps(): Promise<void> {
   await fetch(`/api/noriarm/games/block-stacking/sessions/${sessionId.value}/rps`, {
     method: 'POST',
   });
-  // RPS trajectory 재생 시간 동안 자동 진행 — 응답의 duration_s 활용.
-  // 데모 단순화: 4 초 후 사람 승 안내.
   clearTimers();
   phaseTimer = window.setTimeout(() => {
     phaseTimer = null;
     void announceWinner();
-  }, 4000);
+  }, 6000);
 }
 
 async function announceWinner(): Promise<void> {
   phase.value = 'announce';
   void tts.speak('네가 이겼어! 네가 먼저야!');
-  // 안내 종료 후 ACT 루프 시작.
   clearTimers();
   phaseTimer = window.setTimeout(() => {
     phaseTimer = null;
@@ -113,7 +112,7 @@ async function startPlaying(): Promise<void> {
     });
     if (!r.ok) throw new Error(`start 실패 (${r.status})`);
     phase.value = 'playing';
-    void tts.speak('이제 네 차례야. 먼저 블럭을 쌓아!');
+    void tts.speak('파란색 블록을 쌓아봐!');
   } catch (e) {
     error.value = String(e);
     phase.value = 'intro';
@@ -171,10 +170,15 @@ onUnmounted(() => {
           <p>먼저 블럭을 쌓아!</p>
         </div>
 
-        <div v-else-if="phase === 'playing'" class="card playing">
+        <div v-else-if="phase === 'playing'" class="card">
           <h2>블럭을 쌓고 있어요</h2>
+          <div v-if="homeEventCount === 0" class="notice" style="color:#1d4ed8;background:#eff6ff;border-color:#93c5fd;">
+            🟦 파란색 블록을 쌓아봐!
+          </div>
+          <div v-else-if="homeEventCount === 1" class="notice" style="color:#166534;background:#f0fdf4;border-color:#86efac;">
+            🟩 초록색 블록을 쌓아봐!
+          </div>
           <div class="counter">로봇이 블럭을 쌓은 횟수: <strong>{{ homeEventCount }}</strong> / 2</div>
-          <UrdfViewer />
           <button class="ghost" @click="exitToIdle">그만</button>
         </div>
 
@@ -209,7 +213,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 16px;
 }
-.card.playing { min-width: 480px; }
 .primary {
   padding: 12px 32px;
   font-size: 1.2rem;
@@ -225,6 +228,15 @@ onUnmounted(() => {
   border: 1px solid #ccc;
   border-radius: 8px;
   cursor: pointer;
+}
+.notice {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 2px solid #93c5fd;
+  border-radius: 12px;
+  padding: 12px 20px;
 }
 .counter { font-size: 1.1rem; }
 .hint { color: #666; }

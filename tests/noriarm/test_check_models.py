@@ -15,11 +15,11 @@ import noriarm_check_models as ncm  # noqa: E402
 
 def test_resolve_repo_id_from_game_yaml() -> None:
     """game.yaml 의 policy.repo_id 가 단일 진실원."""
-    assert ncm.resolve_repo_id() == "jisoo3/act_game_block_stacking_0520"
+    assert ncm.resolve_repo_id() == "jisoo3/act_game_block_stacking_0521"
 
 
 def test_is_cached_returns_true_when_snapshot_exists(tmp_path: Path) -> None:
-    repo_id = "jisoo3/act_game_block_stacking_0520"
+    repo_id = "jisoo3/act_game_block_stacking_0521"
     cache_root = tmp_path / "hub"
     repo_dir = cache_root / f"models--{repo_id.replace('/', '--')}" / "snapshots" / "abc123"
     repo_dir.mkdir(parents=True)

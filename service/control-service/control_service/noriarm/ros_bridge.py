@@ -613,6 +613,32 @@ class NoriarmRosBridge:
         asyncio.create_task(self._play_trajectory(traj, "rps_paper_trajectory.json"))
         return {"ok": True, "action": "replay_trajectory", "duration_s": traj.duration_s}
 
+    async def send_home(self, *, duration_s: float = 2.0) -> None:
+        """OMX 를 HOME pose 로 천천히 복귀시키는 단일 point trajectory publish.
+
+        사용자가 '그만' 누른 후 호출 — ACT 자식 프로세스가 종료된 뒤 controller 가
+        마지막 ACT 명령 위치에 holding 하지 않도록 명시적으로 HOME 으로 보낸다.
+        """
+        if self._jt_pub is None or self._node is None:
+            return
+        from noriarm_framework.games.block_stacking.home_pose import HOME_POSE  # lazy
+        from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint  # type: ignore
+        n = len(self._controller_joint_names)
+        if n == 0:
+            return
+        msg = JointTrajectory()
+        msg.joint_names = list(self._controller_joint_names)
+        pt = JointTrajectoryPoint()
+        pt.positions = list(HOME_POSE)[:n]
+        sec = int(duration_s)
+        pt.time_from_start.sec = sec
+        pt.time_from_start.nanosec = int((duration_s - sec) * 1e9)
+        msg.points = [pt]
+        self._jt_pub.publish(msg)
+        logger.info(f"[send_home] HOME pose publish — duration={duration_s:.2f}s")
+        # 복귀 동작 끝날 때까지 약간 대기 (호출자가 await 한 후 정리 진행 가능).
+        await asyncio.sleep(duration_s + 0.2)
+
     # ---------------------------------------------- 정보 조회
 
     def info(self) -> dict:

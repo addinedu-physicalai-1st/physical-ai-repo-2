@@ -16,6 +16,7 @@ lerobot 의 ACTPolicy 를 noriarm_framework 의 Policy 프로토콜에 맞춰 �
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from typing import Any
 
@@ -31,6 +32,28 @@ from noriarm_framework.policy import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# lerobot 정규화 ↔ URDF 라디안 변환 — service/.../ros_bridge.py 의 _norm_to_rad 와 동일.
+# m100_100: -100..100 → -π..π, range_0_100: 0..100 → -π..π, degrees: -180..180 → -π..π.
+def _norm_to_rad(value: float, mode: str) -> float:
+    if mode == "m100_100":
+        return value * math.pi / 100
+    if mode == "range_0_100":
+        return (value - 50) * math.pi / 50
+    if mode == "degrees":
+        return value * math.pi / 180
+    return float(value)  # unknown → identity
+
+
+def _rad_to_norm(value: float, mode: str) -> float:
+    if mode == "m100_100":
+        return value * 100 / math.pi
+    if mode == "range_0_100":
+        return (value * 50 / math.pi) + 50
+    if mode == "degrees":
+        return value * 180 / math.pi
+    return float(value)
 
 
 class ACTPolicyAdapter(Policy):
@@ -52,9 +75,13 @@ class ACTPolicyAdapter(Policy):
         joint_names: tuple[str, ...],
         camera_keys: tuple[str, ...] = ("top", "gripper"),
         device: str | None = None,
+        joint_norm_modes: tuple[str, ...] | None = None,
     ) -> None:
         self._repo_id = repo_id
         self._joint_names = tuple(joint_names)
+        # ACT 학습 데이터 단위 (lerobot 정규화). state 입력은 rad→norm, action 출력은
+        # norm→rad 양방향 변환에 사용. None 이면 identity (이미 라디안이라 가정).
+        self._joint_norm_modes = tuple(joint_norm_modes) if joint_norm_modes else None
         self._camera_keys = tuple(camera_keys)
         self._device = device  # None → lerobot 가 cuda → cpu fallback
         self._policy: Any = None
@@ -119,18 +146,50 @@ class ACTPolicyAdapter(Policy):
     def step(self, obs: Observation) -> Action:
         if self._policy is None:
             return Actions.idle()
+        # obs.state (라디안) → norm 변환해서 ACT 입력 분포와 일치시킨다.
+        obs_normed = self._normalize_obs_state(obs)
         try:
-            joint_target = _select_action(self._policy, obs, self._camera_keys)
+            joint_target = _select_action(self._policy, obs_normed, self._camera_keys)
         except Exception as e:  # noqa: BLE001
             logger.exception("ACTPolicy step 실패: %s", e)
             return Actions.idle()
-        positions = np.asarray(joint_target[: len(self._joint_names)], dtype=np.float64)
+        n = len(self._joint_names)
+        positions = np.asarray(joint_target[:n], dtype=np.float64)
+        # ACT action (norm) → 라디안 변환. controller 는 라디안 받음.
+        if self._joint_norm_modes is not None:
+            positions = np.array(
+                [
+                    _norm_to_rad(positions[i], self._joint_norm_modes[i])
+                    for i in range(n)
+                ],
+                dtype=np.float64,
+            )
         return Actions.joint_targets(
             arm_id="pointer",
             joint_names=self._joint_names,
             positions=positions,
             duration_s=0.1,  # 30Hz 추론 루프 가정 — 다음 step 직전까지 이동.
         )
+
+    def _normalize_obs_state(self, obs: Observation) -> Observation:
+        """obs.joint_states 의 라디안 값을 norm 으로 변환한 새 Observation 반환."""
+        if self._joint_norm_modes is None or not obs.joint_states:
+            return obs
+        modes = self._joint_norm_modes
+        new_states: dict[str, np.ndarray] = {}
+        for key, arr in obs.joint_states.items():
+            a = np.asarray(arr, dtype=np.float64)
+            n = min(len(a), len(modes))
+            normed = np.array(
+                [_rad_to_norm(a[i], modes[i]) for i in range(n)],
+                dtype=np.float64,
+            )
+            if len(a) > n:
+                normed = np.concatenate([normed, a[n:]])
+            new_states[key] = normed
+        # Observation 은 dataclass — replace 로 새 인스턴스 생성.
+        from dataclasses import replace
+        return replace(obs, joint_states=new_states)
 
     @property
     def loaded(self) -> bool:
@@ -209,11 +268,15 @@ def build_policy(config: GameConfig) -> Policy:
         raise RuntimeError("policy_act.build_policy: 'joint_names' 가 매니페스트에 필요")
     camera_keys = tuple(extra.get("camera_keys") or ("top", "gripper"))
     device = extra.get("device")
+    # 학습 단위 — arm.sim 의 joint_norm_modes 차용 (예: [m100_100]*5 + [range_0_100]).
+    arm = config.arms[0] if config.arms else None
+    norm_modes = arm.sim.get("joint_norm_modes") if arm else None
     return ACTPolicyAdapter(
         repo_id=str(repo_id),
         joint_names=tuple(str(j) for j in joint_names),
         camera_keys=camera_keys,
         device=str(device) if device else None,
+        joint_norm_modes=tuple(str(m) for m in norm_modes) if norm_modes else None,
     )
 
 
