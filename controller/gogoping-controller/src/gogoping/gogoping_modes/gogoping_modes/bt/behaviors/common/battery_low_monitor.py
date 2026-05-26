@@ -1,4 +1,4 @@
-"""BatteryLowMonitor — blackboard.BATTERY_LEVEL ≤ 50% 시 ``battery_low`` 발화.
+"""BatteryLowMonitor — blackboard.BATTERY_LEVEL ≤ 15% 시 ``battery_low`` 발화.
 
 IDLE / ASSIST / PLAY / RETURNING MainTree 에 들어가는 monitor.
 - IDLE / ASSIST / PLAY → RETURNING (자동 도크 복귀)
@@ -7,7 +7,7 @@ IDLE / ASSIST / PLAY / RETURNING MainTree 에 들어가는 monitor.
 
 monitor 컨벤션 (``docs/conventions.md`` §2):
 - 매 tick RUNNING 리턴 (SUCCESS / FAILURE 금지)
-- edge-triggered + hysteresis — 20% 진입 fire, 25% 진출 reset (chattering 방지)
+- edge-triggered + hysteresis — 15% 진입 fire, 25% 진출 reset (chattering 방지)
 - ``initialise()`` 에서 ``_fired = False`` 리셋 — 트리 swap 후 재진입 시 재발화 가능
 
 추후 ``BatterySubscriber`` 가 실제 ROS 토픽 구독으로 교체되면 자연스럽게 진짜 배터리
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 
 
 class BatteryLowMonitor(py_trees.behaviour.Behaviour):
-    """배터리 ≤ 20% 시 ``battery_low`` FSM trigger 발화 (hysteresis 25% 진출)."""
+    """배터리 ≤ 15% 시 ``battery_low`` FSM trigger 발화 (hysteresis 25% 진출)."""
 
-    LOW_ENTER = 20.0  # 진입 임계 (%)
+    LOW_ENTER = 15.0  # 진입 임계 (%)
     LOW_EXIT = 25.0   # 진출 임계 (%) — chattering 방지
 
     def __init__(self, name: str, context: "Context"):

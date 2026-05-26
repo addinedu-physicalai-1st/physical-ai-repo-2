@@ -56,7 +56,7 @@ def test_low_monitor_no_fire_above_threshold(bb_writer):
 
 
 def test_low_monitor_no_fire_at_hysteresis_band(bb_writer):
-    """LOW_EXIT (25%) 보다 위면 fire 안 함 (진입 임계 20% 안 들어감)."""
+    """LOW_EXIT (25%) 보다 위면 fire 안 함 (진입 임계 15% 안 들어감)."""
     ctx = _Ctx()
     mon = BatteryLowMonitor("low", ctx); mon.setup(); mon.initialise()
     bb_writer.set(Keys.BATTERY_LEVEL, 25.0)
@@ -67,7 +67,7 @@ def test_low_monitor_no_fire_at_hysteresis_band(bb_writer):
 def test_low_monitor_fires_at_enter(bb_writer):
     ctx = _Ctx()
     mon = BatteryLowMonitor("low", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 20.0)
+    bb_writer.set(Keys.BATTERY_LEVEL, 15.0)
     mon.update()
     assert ctx.fsm.calls == ["battery_low"]
 
@@ -75,18 +75,18 @@ def test_low_monitor_fires_at_enter(bb_writer):
 def test_low_monitor_no_double_fire(bb_writer):
     ctx = _Ctx()
     mon = BatteryLowMonitor("low", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 20.0); mon.update()
+    bb_writer.set(Keys.BATTERY_LEVEL, 15.0); mon.update()
     bb_writer.set(Keys.BATTERY_LEVEL, 10.0); mon.update()
     assert ctx.fsm.calls == ["battery_low"]
 
 
 def test_low_monitor_hysteresis_refire(bb_writer):
-    """20% fire → 26% reset → 20% re-fire."""
+    """15% fire → 26% reset → 15% re-fire."""
     ctx = _Ctx()
     mon = BatteryLowMonitor("low", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 20.0); mon.update()
+    bb_writer.set(Keys.BATTERY_LEVEL, 15.0); mon.update()
     bb_writer.set(Keys.BATTERY_LEVEL, 26.0); mon.update()  # reset
-    bb_writer.set(Keys.BATTERY_LEVEL, 20.0); mon.update()  # re-fire
+    bb_writer.set(Keys.BATTERY_LEVEL, 15.0); mon.update()  # re-fire
     assert ctx.fsm.calls == ["battery_low", "battery_low"]
 
 
@@ -94,9 +94,9 @@ def test_low_monitor_initialise_rearm(bb_writer):
     """initialise() 호출 시 _fired 리셋 — 트리 swap 후 재진입 보장."""
     ctx = _Ctx()
     mon = BatteryLowMonitor("low", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 20.0); mon.update()  # fire
+    bb_writer.set(Keys.BATTERY_LEVEL, 15.0); mon.update()  # fire
     mon.initialise()                                       # re-enter tree
-    bb_writer.set(Keys.BATTERY_LEVEL, 20.0); mon.update()  # re-fire
+    bb_writer.set(Keys.BATTERY_LEVEL, 15.0); mon.update()  # re-fire
     assert ctx.fsm.calls == ["battery_low", "battery_low"]
 
 
@@ -105,7 +105,7 @@ def test_low_monitor_initialise_rearm(bb_writer):
 def test_full_monitor_no_fire_below_threshold(bb_writer):
     ctx = _Ctx()
     mon = BatteryFullMonitor("full", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 60.0)
+    bb_writer.set(Keys.BATTERY_LEVEL, 50.0)
     mon.update()
     assert ctx.fsm.calls == []
 
@@ -113,7 +113,7 @@ def test_full_monitor_no_fire_below_threshold(bb_writer):
 def test_full_monitor_fires_at_enter(bb_writer):
     ctx = _Ctx()
     mon = BatteryFullMonitor("full", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 70.0)
+    bb_writer.set(Keys.BATTERY_LEVEL, 60.0)
     mon.update()
     assert ctx.fsm.calls == ["battery_full"]
 
@@ -121,6 +121,6 @@ def test_full_monitor_fires_at_enter(bb_writer):
 def test_full_monitor_no_double_fire(bb_writer):
     ctx = _Ctx()
     mon = BatteryFullMonitor("full", ctx); mon.setup(); mon.initialise()
-    bb_writer.set(Keys.BATTERY_LEVEL, 70.0); mon.update()
+    bb_writer.set(Keys.BATTERY_LEVEL, 60.0); mon.update()
     bb_writer.set(Keys.BATTERY_LEVEL, 90.0); mon.update()
     assert ctx.fsm.calls == ["battery_full"]
