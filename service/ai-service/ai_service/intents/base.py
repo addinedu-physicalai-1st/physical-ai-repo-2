@@ -15,6 +15,7 @@ from ai_service.hub import (
     ModeChange,
     RhythmPlay,
     RhythmStop,
+    StoreItem,
     SubCommand,
 )
 
@@ -27,6 +28,7 @@ IntentResponse = (
     | RhythmStop
     | ConfirmYes
     | ConfirmNo
+    | StoreItem
 )
 
 

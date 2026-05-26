@@ -20,6 +20,7 @@ import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
 import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
 import BlockStacking from '@/noriarm/BlockStacking.vue';
+import StorePlay from '@/noriarm/StorePlay.vue';
 import { useCameraPan } from '@/gogoping/composables/useCameraPan';
 import { CAMERA_PAN_KEY } from '@/gogoping/cameraPanKey';
 import { useWebRTCStream } from '@/gogoping/composables/useWebRTCStream';
@@ -244,6 +245,7 @@ function handleStart(): void {
     <AttendanceCamera :mode="attendanceMode" />
     <OXQuiz v-if="showOXQuiz" />
     <BlockStacking v-if="showOXQuiz" />
+    <StorePlay v-if="showOXQuiz" />
     <DanceManager v-if="showDanceManager" />
     <DancePlayPopup v-if="showDancePopup" />
     <GreetingManager v-if="showGreetingManager" />

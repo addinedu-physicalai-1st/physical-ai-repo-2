@@ -8,6 +8,7 @@ export type IntentResponse =
   | { kind: 'mode_change'; mode: string }
   | { kind: 'sub_command'; action: 'stop' | 'return' | 'start' }
   | { kind: 'goto_vertex'; name: string }
+  | { kind: 'store_item'; item: string }
   | { kind: 'chat'; reply: string; emotion: EmotionId }
   | { kind: 'rhythm_play'; song: string; display_name: string }
   | { kind: 'rhythm_stop' }

@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
@@ -32,10 +33,15 @@ from noriarm_framework.policy import (
     GameContext,
     IdleAction,
     JointTargetsAction,
+    MultiArmJointTargetsAction,
     Observation,
     Policy,
     ReplayTrajectoryAction,
 )
+
+# obs (이미지 + joint_states) 캡처가 필요한 policy.kind 목록.
+# 새 chunk-기반 정책을 추가하면 여기에 등록.
+_OBS_CAPTURE_KINDS: frozenset[str] = frozenset({"act", "smolvla"})
 from noriarm_framework.runner import RunnerConfig
 from noriarm_framework.trajectory import (
     build_joint_trajectory,
@@ -120,51 +126,96 @@ class GameRunner(Node):
                 "control_msgs.action.GripperCommand import 실패 — 그리퍼 명령 비활성화"
             )
 
-        # ACT 정책이면 카메라 + /joint_states 구독 셋업 — observation 채우기용.
+        # chunk-기반 정책 (act / smolvla) 이면 카메라 + /joint_states 구독 셋업.
+        # 단팔/양팔 모두 동일 경로 — arms 갯수만큼 LatestJointState 인스턴스 생성.
         self._obs_capture: dict | None = None
-        if cfg.config.policy.kind == "act":
-            self._setup_act_observation_capture()
+        if cfg.config.policy.kind in _OBS_CAPTURE_KINDS:
+            self._setup_observation_capture()
 
-    def _setup_act_observation_capture(self) -> None:
+    def _setup_observation_capture(self) -> None:
         from noriarm_framework.observation_capture import LatestFrameBuffer, LatestJointState
 
-        arm = self._cfg.config.arms[0]
+        arms = self._cfg.config.arms
+        if not arms:
+            raise RuntimeError(
+                f"policy.kind={self._cfg.config.policy.kind} 인데 manifest 에 arm 이 없음"
+            )
         camera_keys = tuple(c.id for c in self._cfg.config.cameras) or ("top",)
-        self._obs_capture = {
-            "arm_id": arm.id,
-            "frames": LatestFrameBuffer(keys=camera_keys),
-            "joint_state": LatestJointState(expected_names=arm.controller_joint_names),
+        per_arm_state: dict[str, Any] = {
+            arm.id: LatestJointState(expected_names=arm.controller_joint_names)
+            for arm in arms
         }
-        # /joint_states 구독 — sim/real 동일.
-        topic = arm.backend(self._cfg.target).get("joint_state_topic", "/joint_states")
-        self.create_subscription(
-            JointState, topic, self._on_joint_state_for_act, 10
-        )
+        # 팔 순서 — manifest 선언 순서를 그대로 state 벡터 concat 순서로 사용.
+        # bimanual SmolVLA 학습 시 state = [left 6, right 6] 인데 manifest 의 arms 순서가
+        # [left, right] 면 일치. game.yaml 에서 순서 잘못 잡으면 정책이 거꾸로 동작.
+        arm_order = tuple(arm.id for arm in arms)
+        self._obs_capture = {
+            "arm_order": arm_order,
+            "frames": LatestFrameBuffer(keys=camera_keys),
+            "per_arm_state": per_arm_state,
+        }
+        # /joint_states 구독 — arm 별 backend.joint_state_topic 이 다를 수 있어 각각 구독.
+        # 같은 topic 으로 합쳐 들어와도 update() 가 expected_names 로 필터링하므로 안전.
+        subscribed: set[str] = set()
+        for arm in arms:
+            topic = arm.backend(self._cfg.target).get("joint_state_topic", "/joint_states")
+            if topic in subscribed:
+                continue
+            self.create_subscription(JointState, topic, self._on_joint_state_obs, 10)
+            subscribed.add(topic)
         # 카메라는 cv2.VideoCapture 로 백그라운드 스레드에서 push.
         self._start_camera_capture_threads(camera_keys)
 
-    def _on_joint_state_for_act(self, msg) -> None:
+    def _on_joint_state_obs(self, msg) -> None:
         if self._obs_capture is None:
             return
-        self._obs_capture["joint_state"].update(list(msg.name), list(msg.position))
+        names = list(msg.name)
+        positions = list(msg.position)
+        # 모든 arm 의 LatestJointState 에 broadcast — 각 인스턴스가 expected_names 로
+        # 자기에 해당하는 부분만 추출. 양팔이 같은 topic 으로 들어와도 분리 보관.
+        for state in self._obs_capture["per_arm_state"].values():
+            state.update(names, positions)
 
     def _start_camera_capture_threads(self, camera_keys: tuple[str, ...]) -> None:
         import threading
-        import cv2  # lazy — OX 퀴즈는 안 씀
 
+        cameras_by_id = {c.id: c for c in self._cfg.config.cameras}
         for i, key in enumerate(camera_keys):
+            spec = cameras_by_id.get(key)
+            device = self._resolve_camera_device(spec, fallback_index=i) if spec else i
             t = threading.Thread(
-                target=self._camera_capture_loop, args=(key, i), daemon=True
+                target=self._camera_capture_loop, args=(key, device), daemon=True
             )
             t.start()
 
-    def _camera_capture_loop(self, key: str, device_index: int) -> None:
+    def _resolve_camera_device(self, spec: Any, *, fallback_index: int) -> int | str:
+        """manifest 의 카메라 spec → cv2.VideoCapture 에 넘길 device 인자.
+
+        우선순위 (현재 target = sim/real 의 backend dict 기준):
+          1. by_id="..."   → /dev/v4l/by-id/<id> 경로 (안정)
+          2. device="..."  → udev symlink 또는 device path (e.g. /dev/cam_top)
+          3. index=<int>   → enumeration index
+          4. fallback (camera_keys 순서) — 마지막 수단
+        """
+        backend = spec.device(self._cfg.target) if spec else {}
+        by_id = backend.get("by_id")
+        if isinstance(by_id, str) and by_id and not by_id.startswith("PLACEHOLDER"):
+            return f"/dev/v4l/by-id/{by_id}"
+        device = backend.get("device")
+        if isinstance(device, str) and device:
+            return device
+        index = backend.get("index")
+        if isinstance(index, int):
+            return index
+        return fallback_index
+
+    def _camera_capture_loop(self, key: str, device: int | str) -> None:
         import cv2
 
-        cap = cv2.VideoCapture(device_index)
+        cap = cv2.VideoCapture(device)
         if not cap.isOpened():
             self.get_logger().warn(
-                f"카메라 {key} (index={device_index}) open 실패 — obs.images 미공급"
+                f"카메라 {key} (device={device!r}) open 실패 — obs.images 미공급"
             )
             return
         try:
@@ -210,16 +261,23 @@ class GameRunner(Node):
         self.get_logger().info(f"게임 종료: steps={step}")
 
     def _sense(self, step: int) -> Observation:
-        """ACT 모드일 때만 실제 obs 채움. 그 외 (OX 퀴즈 등) 빈 obs."""
+        """chunk 정책 (act / smolvla) 일 때만 실제 obs 채움. 그 외 (OX 퀴즈 등) 빈 obs."""
         if not hasattr(self, "_obs_capture") or self._obs_capture is None:
             return Observation(timestamp=float(step), extra=dict(self._cfg.inputs))
         capture: dict = self._obs_capture
         images = capture["frames"].snapshot()
-        js = capture["joint_state"].snapshot()
-        joint_states = {capture["arm_id"]: js} if js is not None else None
+        joint_states: dict[str, np.ndarray] = {}
+        for arm_id, state in capture["per_arm_state"].items():
+            snap = state.snapshot()
+            if snap is not None:
+                joint_states[arm_id] = snap
+        # lang_prompt 는 runner inputs (--input prompt=...) 로 들어옴. smolVLA 외 정책에선 무시.
+        prompt_raw = self._cfg.inputs.get("prompt")
+        lang_prompt = str(prompt_raw) if prompt_raw is not None else None
         return Observation(
             images=images if images else None,
-            joint_states=joint_states,
+            joint_states=joint_states if joint_states else None,
+            lang_prompt=lang_prompt,
             timestamp=float(step),
             extra=dict(self._cfg.inputs),
         )
@@ -233,8 +291,16 @@ class GameRunner(Node):
         if isinstance(action, JointTargetsAction):
             self._apply_joint_targets(action)
             return False
+        if isinstance(action, MultiArmJointTargetsAction):
+            self._apply_multi_arm_joint_targets(action)
+            return False
         self.get_logger().warn(f"알 수 없는 action: {action!r}")
         return False
+
+    def _apply_multi_arm_joint_targets(self, action: MultiArmJointTargetsAction) -> None:
+        """양팔(또는 N팔) 동시 publish. 각 sub-action 을 해당 arm publisher 로 분할."""
+        for sub in action.per_arm:
+            self._apply_joint_targets(sub)
 
     def _apply_replay(self, action: ReplayTrajectoryAction) -> None:
         arm = self._select_arm(getattr(action, "arm_id", None))

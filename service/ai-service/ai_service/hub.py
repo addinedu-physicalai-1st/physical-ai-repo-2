@@ -90,6 +90,13 @@ class GotoVertex(BaseModel):
     name: str
 
 
+class StoreItem(BaseModel):
+    """가게놀이 — 아이가 요청한 음식. noriarm 전용. robot-web 이 가게놀이 모드일 때
+    serve 로 연결. item 은 영어 id (strawberry/broccoli/grape/kiwi/pineapple)."""
+    kind: Literal["store_item"] = "store_item"
+    item: str
+
+
 class Chat(BaseModel):
     kind: Literal["chat"] = "chat"
     reply: str
@@ -151,6 +158,9 @@ async def voice_intent(req: IntentRequest) -> dict:
     if not is_known_robot(req.robot):
         return {"kind": "ignored"}
 
+    logger.info("voice.intent.in robot=%s text=%r", req.robot, req.text)
+    print(f"[voice.intent] robot={req.robot} text={req.text!r}", flush=True)
+
     # Inline import: hub.py defines the Pydantic models (IntentRequest, Chat, ...)
     # that intents/* modules import. Module-level import here would cycle.
     from ai_service.intents import IntentContext, get_pipeline, now_kst
@@ -160,8 +170,8 @@ async def voice_intent(req: IntentRequest) -> dict:
         result = await handler.try_handle(req, ctx)
         if result is not None:
             logger.info(
-                "intent.matched",
-                extra={"robot": req.robot, "handler": handler.name},
+                "intent.matched robot=%s handler=%s text=%r",
+                req.robot, handler.name, req.text,
             )
             return result.model_dump()
     # 매치된 핸들러 없음 — ChatFallback 가 없는 제한된 mode 파이프라인 (예:

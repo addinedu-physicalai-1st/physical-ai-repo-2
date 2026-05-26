@@ -4,3 +4,6 @@ dist-admin/
 *.tsbuildinfo
 .vite/
 .DS_Store
+
+# store_play 로컬 음원 (대용량, 각자 로컬 배치 — 커밋 안 함). lullaby.mp3 는 별개로 트래킹됨.
+public/audio/storeplay_*.mp3

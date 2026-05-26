@@ -79,7 +79,26 @@ class JointTargetsAction:
     kind: Literal["joint_targets"] = "joint_targets"
 
 
-Action = IdleAction | ReplayTrajectoryAction | JointTargetsAction
+@dataclass(frozen=True)
+class MultiArmJointTargetsAction:
+    """양팔(또는 N팔) 동시 절대 joint 목표.
+
+    bimanual SmolVLA/ACT 처럼 한 추론 step 의 출력이 여러 팔의 joint 차원을 합쳐서
+    들어오는 경우, 단일 timestep 에 모든 팔로 분할 publish 하기 위해 사용.
+    `_apply` 가 per_arm 의 각 항목을 해당 arm 의 publisher 로 전달.
+    """
+
+    per_arm: tuple[JointTargetsAction, ...]
+    duration_s: float = 1.0
+    kind: Literal["multi_arm_joint_targets"] = "multi_arm_joint_targets"
+
+
+Action = (
+    IdleAction
+    | ReplayTrajectoryAction
+    | JointTargetsAction
+    | MultiArmJointTargetsAction
+)
 
 
 # 편의 생성자 — 정책 코드가 짧아진다.
@@ -103,6 +122,16 @@ class _ActionFactory:
             arm_id=arm_id,
             joint_names=tuple(joint_names),
             positions=np.asarray(positions, dtype=np.float64),
+            duration_s=duration_s,
+        )
+
+    @staticmethod
+    def multi_arm_joint_targets(
+        per_arm: list[JointTargetsAction] | tuple[JointTargetsAction, ...],
+        duration_s: float = 1.0,
+    ) -> MultiArmJointTargetsAction:
+        return MultiArmJointTargetsAction(
+            per_arm=tuple(per_arm),
             duration_s=duration_s,
         )
 

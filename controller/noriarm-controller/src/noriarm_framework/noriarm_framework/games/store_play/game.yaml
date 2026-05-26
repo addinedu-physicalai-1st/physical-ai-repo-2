@@ -1,0 +1,170 @@
+name: store_play
+display: "가게놀이"
+
+# ACT phase5_roi preset — in-process LeRobot ACTPolicy + YOLO R11 ROI masking.
+# game.yaml (디폴트, SmolVLA HTTP) 과 별도 manifest. NORIARM_STOREPLAY_GAME_YAML
+# env 로 선택. 학습 코드 gen_roi_masked_videos_phase5.py 와 1:1 일치.
+
+hardware:
+  cameras:
+    - id: camera1
+      role: top_overhead
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 0
+      real:
+        source: usb
+        device: /dev/cam_top
+    - id: camera2
+      role: wrist_left
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 1
+      real:
+        source: usb
+        device: /dev/cam_wrist_left
+    - id: camera3
+      role: wrist_right
+      resolution: [640, 480]
+      fps: 30
+      sim:
+        source: webcam
+        index: 2
+      real:
+        source: usb
+        device: /dev/cam_wrist_right
+
+  arms:
+    - id: left
+      model: omx_f
+      ros_namespace: /noriarm/left
+      role: bimanual_left
+      controller_topic: /noriarm/left/arm_controller/joint_trajectory
+      controller_joint_names:
+        - left_shoulder_pan
+        - left_shoulder_lift
+        - left_elbow_flex
+        - left_wrist_flex
+        - left_wrist_roll
+        - left_gripper
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names:
+          - left_shoulder_pan
+          - left_shoulder_lift
+          - left_elbow_flex
+          - left_wrist_flex
+          - left_wrist_roll
+          - left_gripper
+      real:
+        backend: lerobot_bi_omx
+        port: /dev/omx_left_follower
+        baudrate: 1000000
+    - id: right
+      model: omx_f
+      ros_namespace: /noriarm/right
+      role: bimanual_right
+      controller_topic: /noriarm/right/arm_controller/joint_trajectory
+      controller_joint_names:
+        - right_shoulder_pan
+        - right_shoulder_lift
+        - right_elbow_flex
+        - right_wrist_flex
+        - right_wrist_roll
+        - right_gripper
+      sim:
+        backend: joint_state_only
+        joint_state_topic: /joint_states
+        joint_state_names:
+          - right_shoulder_pan
+          - right_shoulder_lift
+          - right_elbow_flex
+          - right_wrist_flex
+          - right_wrist_roll
+          - right_gripper
+      real:
+        backend: lerobot_bi_omx
+        port: /dev/omx_right_follower
+        baudrate: 1000000
+
+policy:
+  kind: act_local
+  module: noriarm_framework.games.store_play
+  # HF Hub 최신 — phase6 (v2_en_phase6_roi, 1M step 학습본의 step400k checkpoint).
+  # 첫 로드 시 자동 다운로드(캐싱). 로컬 경로로 쓰려면 그 경로로 교체.
+  repo_id: minssuung/store_play_act_v2_en_phase6_roi_step400k
+  device: cuda:0
+  # closed-loop 재추론 주기 — chunk(100) 중 30 frame(1초 @30Hz) 소비 후 재추론.
+  # roi_inference.py 와 동일. 효과: ROI/obs 1초마다 갱신 → target 이동·환경 변화에 적응
+  # (stale chunk 100개를 끝까지 밀지 않음). 단 긴급정지(abort)는 별개로 per-frame(~33ms)
+  # 처리됨 — n_action_steps 와 무관.
+  n_action_steps: 30
+  # hw udev symlink → 학습 모델 input feature key
+  image_key_map:
+    camera1: top
+    camera2: wrist_left
+    camera3: wrist_right
+  # phase5_roi 학습본은 inference 시에도 ROI mask 필수 (학습 분포 일치).
+  roi:
+    yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r13_v2/weights/best.pt
+    conf: 0.25
+    iou: 0.5
+    pad: 20
+  # 홈 복귀 감지 — 서빙 후 시작 pose 로 돌아오면 task 자동 종료 (TASK_DONE).
+  # ⚠️ per-joint L∞ 기준 (관절별 절대편차의 최댓값). L2(전체거리)는 큰 관절이 지배해
+  # 손목/그리퍼가 안 돌아와도 종료되던 버그가 있어 L∞ 로 바꿈 — "모든 관절이 각자 임계 이내".
+  #   move_thresh: 어느 한 관절이라도 이만큼 벗어나야 "서빙하러 나감" 인정 (서빙 중 어깨·
+  #                그리퍼는 50~100+ 움직이므로 40 이면 충분).
+  #   home_thresh: 모든 관절이 시작 pose 와 이 편차 이내여야 "홈". 학습 teleop 전 관절
+  #                p95≈4.2/p99≈7.5 로 복귀 → 추론 마진 포함 14. 손목 20~25 어긋나면 미감지(정상).
+  #   stable_frames: 홈을 이 frame 수 연속 유지해야 완료 (스쳐 지나감 무시).
+  home_detect:
+    enabled: true
+    move_thresh: 40.0
+    home_thresh: 14.0
+    stable_frames: 5
+  # 벨 누름 감지 — 로봇이 bell_button 누르는 pose 근접 시 "주문 나왔습니다" 멘트 트리거.
+  # pose 는 학습 데이터(v2_en) 375 ep 의 wrist_right bell bbox peak frame joint 평균
+  # (std 2.9 로 일관). thresh 이내 근접 시 EVENT bell_rung (task 당 1회).
+  bell_detect:
+    enabled: true
+    pose: [-12.3, 27.9, -34.6, -2.5, 48.2, 59.6, 0.8, -16.2, 14.8, 36.2, -1.4, 54.8]
+    thresh: 14.0
+  paraphrases:
+    broccoli:
+      - "give me broccoli"
+      - "pass me the broccoli"
+      - "bring me broccoli"
+      - "I want broccoli"
+    grape:
+      - "give me grape"
+      - "pass me the grape"
+      - "bring me grape"
+      - "I want grape"
+    kiwi:
+      - "give me kiwi"
+      - "pass me the kiwi"
+      - "bring me kiwi"
+      - "I want kiwi"
+    strawberry:
+      - "give me strawberry"
+      - "pass me the strawberry"
+      - "bring me strawberry"
+      - "I want strawberry"
+    pineapple:
+      - "give me pineapple"
+      - "pass me the pineapple"
+      - "bring me pineapple"
+      - "I want pineapple"
+
+runtime:
+  rate_hz: 30
+  # task 1회 최대 시간 (s). 홈 복귀 감지/abort 가 먼저 끝내는 게 정상이고, 이건 안전 cut.
+  # runner_entry 가 이 값을 직접 읽음(--episode_s 미지정 시). control 의 TASK_TIMEOUT_S 는
+  # 이 값 + sub-realtime 오버헤드(추론 ~40ms/frame → ~25Hz)보다 커야 mid-task abort 안 됨.
+  episode_timeout_s: 1000

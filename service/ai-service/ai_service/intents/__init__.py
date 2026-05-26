@@ -16,6 +16,7 @@ from ai_service.intents.common.report import ReportHandler
 from ai_service.intents.common.schedule import ScheduleHandler
 from ai_service.intents.common.start import StartHandler
 from ai_service.intents.common.stop import StopHandler
+from ai_service.intents.common.store_item import StoreItemHandler
 from ai_service.intents.common.whereabouts import WhereaboutsHandler
 from ai_service.intents.eduping.confirm import ConfirmHandler
 from ai_service.intents.eduping.rhythm import RhythmPlayHandler, RhythmStopHandler
@@ -70,6 +71,7 @@ PIPELINES: dict[str, list[IntentHandler]] = {
     "noriarm": [
         StopHandler(),
         StartHandler(),
+        StoreItemHandler(),  # 가게놀이 음식 요청 — mode_change/chat 보다 우선 (keyword)
         MenuHandler(),
         HelloHandler(),
         GenderHandler(),
