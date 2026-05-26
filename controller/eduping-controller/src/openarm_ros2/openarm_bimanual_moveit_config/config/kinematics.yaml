@@ -1,0 +1,26 @@
+# Copyright 2025 Enactic, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# 7-DoF 양팔 IK. RViz MotionPlanning 의 interactive marker 가 사용.
+# leader teleop 은 joint 1:1 passthrough (IK 안 거침) 라 여기 설정은 RViz 디버깅 용도.
+left_arm:
+  kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
+  kinematics_solver_timeout: 0.02
+  solve_type: Distance
+
+right_arm:
+  kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
+  kinematics_solver_timeout: 0.02
+  solve_type: Distance

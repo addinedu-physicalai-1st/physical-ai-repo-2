@@ -24,6 +24,7 @@ log
 .vscode
 CLAUDE.local.md
 docs/superpowers/
+.run/
 
 # 모델 가중치 — ultralytics 가 첫 실행 시 자동 다운로드
 service/ai-service/ai_service/models/*.pt
@@ -31,3 +32,7 @@ service/ai-service/ai_service/models/*.onnx
 # repo root 의 ultralytics 자동 다운로드 (perception 등 첫 실행 시)
 /yolov8*.pt
 /yolo11*.pt
+
+# OpenArm URDF mesh 자산 — xacro 에서 생성 (scripts/sync_openarm_assets.sh)
+# 72MB 라 repo 에 안 넣음. portal-web 띄우기 전 한 번 sync 필요.
+service/web-service/portal-web/public/openarm/meshes/

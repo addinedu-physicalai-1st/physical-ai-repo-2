@@ -162,7 +162,32 @@ async def lifespan(app: FastAPI):
     except ImportError as e:
         logger.warning(f"eduping 모듈 import 실패: {e}")
 
+    # --- Doctor teleop bridge + 30Hz state push loop ----------------------
+    _doctor_state_task: asyncio.Task | None = None
+    try:
+        doctor_bridge.start()
+
+        async def _doctor_push_loop() -> None:
+            while True:
+                await asyncio.sleep(1.0 / 30)
+                state = doctor_bridge.latest_state()
+                for eid in doctor_hub.active_eduping_ids():
+                    doctor_hub.publish_state(eid, state)
+
+        _doctor_state_task = asyncio.create_task(_doctor_push_loop())
+        app.state.doctor_state_task = _doctor_state_task
+        logger.info("Doctor ROS bridge + push loop 시작됨")
+    except Exception as e:
+        logger.warning(f"Doctor ROS bridge 시작 실패: {e}")
+
     yield
+
+    if _doctor_state_task is not None:
+        _doctor_state_task.cancel()
+    try:
+        doctor_bridge.shutdown()
+    except Exception:
+        pass
 
     if eduping_hubs_started:
         from control_service.eduping.router import stop_hubs as stop_eduping_hubs
@@ -293,6 +318,66 @@ try:
     register_eduping_router(app)
 except ImportError as e:
     logger.warning(f"eduping router 등록 실패 — endpoint 비활성: {e}")
+
+# Doctor teleop WSS — /ws/doctor/teleop?eduping_id=<id>
+from control_service.doctor.teleop_ws import DoctorTeleopHub, build_router as build_doctor_router  # noqa: E402
+from control_service.doctor.ros_bridge import DoctorRosBridge  # noqa: E402
+from control_service.doctor.pointcloud_relay import (  # noqa: E402
+    PointCloudHub,
+    build_router as build_doctor_pointcloud_router,
+)
+from control_service.doctor.eduping_rgb_relay import (  # noqa: E402
+    EdupingRgbHub,
+    build_router as build_eduping_rgb_router,
+)
+from control_service.doctor.webrtc_signaling import (  # noqa: E402
+    SignalingHub,
+    build_router as build_doctor_signal_router,
+)
+
+_DOCTOR_LEFT_JOINTS = [f"openarm_left_joint{i+1}" for i in range(7)]
+_DOCTOR_RIGHT_JOINTS = [f"openarm_right_joint{i+1}" for i in range(7)]
+
+doctor_hub = DoctorTeleopHub()
+doctor_bridge = DoctorRosBridge(left_joints=_DOCTOR_LEFT_JOINTS, right_joints=_DOCTOR_RIGHT_JOINTS)
+
+# doctor_hub → bridge: 타겟 프레임을 ROS 로 publish
+doctor_hub.on_target(lambda eid, frame: doctor_bridge.publish_target(frame))
+
+# doctor_hub → bridge: 이벤트 처리
+def _on_doctor_event(eid: str, msg: dict) -> None:
+    msg_type = msg.get("type")
+    if msg_type == "emergency_stop":
+        logger.warning("doctor emergency_stop from %s — stop_servo service not yet wired (future task)", eid)
+    elif msg_type == "teleop":
+        action = msg.get("action")
+        active = action == "start"
+        ok = doctor_bridge.set_leader_active(active)
+        logger.info("doctor teleop %s from %s → leader_passthrough active=%s (ok=%s)",
+                    action, eid, active, ok)
+    # 기타 메시지는 무시.
+
+doctor_hub.on_event(_on_doctor_event)
+
+app.state.doctor_hub = doctor_hub
+app.state.doctor_bridge = doctor_bridge
+app.include_router(build_doctor_router(doctor_hub))
+
+# D435 RGB fan-out. producer 는 eduarm d435_rgb_uploader (WS client).
+eduping_rgb_hub = EdupingRgbHub()
+app.state.eduping_rgb_hub = eduping_rgb_hub
+app.include_router(build_eduping_rgb_router(eduping_rgb_hub))
+
+# Doctor ↔ EduPing WebRTC signaling — SDP/ICE 만 relay (미디어는 P2P 직접).
+doctor_signal_hub = SignalingHub()
+app.state.doctor_signal_hub = doctor_signal_hub
+app.include_router(build_doctor_signal_router(doctor_signal_hub))
+
+# PointCloud fan-out — producer 는 eduarm d435_pointcloud_uploader (WS client).
+# D435 depth → 1m 필터 + decimate + optical→world 변환은 uploader 측에서 처리.
+doctor_pointcloud_hub = PointCloudHub()
+app.state.doctor_pointcloud_hub = doctor_pointcloud_hub
+app.include_router(build_doctor_pointcloud_router(doctor_pointcloud_hub))
 
 # 얼굴 이미지 정적 노출 — DB 의 photo_url 은 /api/face-images/{child_id}/{idx}.jpg 형태로 저장된다.
 os.makedirs(settings.face_image_dir, exist_ok=True)

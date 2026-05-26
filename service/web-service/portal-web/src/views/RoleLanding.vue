@@ -4,7 +4,12 @@ import Icon from '@/components/common/Icon.vue'
 
 const router = useRouter()
 
-function go(role: 'teacher' | 'parent') {
+function go(role: 'teacher' | 'parent' | 'doctor') {
+  if (role === 'doctor') {
+    // MVP — auth 우회, eduping_id 기본 ed-01.
+    router.push('/doctor/teleop?eduping_id=ed-01')
+    return
+  }
   router.push(`/${role}/login`)
 }
 </script>
@@ -44,6 +49,20 @@ function go(role: 'teacher' | 'parent') {
           </span>
           <span class="role__cta">
             학부모로 시작 <Icon name="arrow-right" :size="16" />
+          </span>
+        </button>
+
+        <button class="role role--doctor" @click="go('doctor')">
+          <span class="role__icon role__icon--doctor"><Icon name="stethoscope" :size="32" /></span>
+          <span class="role__title">의사</span>
+          <span class="role__desc">EduPing 의 양팔을 원격 조작해 아이를 진찰합니다. 카메라 영상과 깊이 정보를 보며 안전하게 움직입니다.</span>
+          <span class="role__chips">
+            <span class="chip">원격진찰</span>
+            <span class="chip">양팔 텔레옵</span>
+            <span class="chip">충돌 회피</span>
+          </span>
+          <span class="role__cta">
+            의사로 시작 <Icon name="arrow-right" :size="16" />
           </span>
         </button>
       </div>
@@ -88,7 +107,7 @@ function go(role: 'teacher' | 'parent') {
 
 .roles {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--space-6);
   width: 100%;
 }
@@ -123,6 +142,7 @@ function go(role: 'teacher' | 'parent') {
 }
 .role__icon--brand { background: var(--color-brand-primary-soft); color: var(--color-brand-primary); }
 .role__icon--secondary { background: var(--color-brand-secondary-soft); color: var(--color-brand-secondary); }
+.role__icon--doctor { background: var(--color-status-success-soft); color: var(--color-status-success); }
 
 .role__title { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
 .role__desc {
@@ -153,6 +173,7 @@ function go(role: 'teacher' | 'parent') {
 }
 
 .role--secondary .role__cta { color: var(--color-brand-secondary); }
+.role--doctor .role__cta { color: var(--color-status-success); }
 
 .landing__footer {
   font-size: var(--font-size-xs);

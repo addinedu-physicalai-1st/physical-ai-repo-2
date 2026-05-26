@@ -1,0 +1,16 @@
+# This file is used to configure the 3D sensors for the robot.
+# octomap voxel size (m). 기본 0.1m 너무 크면 손가락 못 봄. 0.02 = 2cm.
+octomap_resolution: 0.04
+octomap_frame: world
+sensors:
+  - d435_pointcloud
+d435_pointcloud:
+  sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+  # d435_camera.launch.py 가 camera_name=d435, namespace="" → /d435/...
+  point_cloud_topic: /d435/depth/color/points
+  max_range: 1.0   # 1m 이내 voxel 만 — doctor pointcloud 표시 범위와 동일.
+  point_subsample: 1
+  padding_offset: 0.02
+  padding_scale: 1.0
+  max_update_rate: 10.0
+  filtered_cloud_topic: filtered_cloud

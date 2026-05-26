@@ -16,6 +16,7 @@ import DanceManager from '@/eduping/DanceManager.vue';
 import DancePlayPopup from '@/eduping/DancePlayPopup.vue';
 import DepthViewer from '@/eduping/DepthViewer.vue';
 import GreetingManager from '@/eduping/GreetingManager.vue';
+import HealthCheckCamera from '@/eduping/HealthCheckCamera.vue';
 import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
 import MugunghwaGame from '@/eduping/MugunghwaGame.vue';
 import OXQuiz from '@/noriarm/OXQuiz.vue';
@@ -73,6 +74,8 @@ const showDancePopup = computed(() => robot.value.id === 'eduping' && currentMod
 const showGreetingManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '등하원 인사 설정');
 const showMugunghwaArm = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화 율동 등록');
 const showMugunghwa = computed(() => robot.value.id === 'eduping' && currentMode.value === '무궁화꽃이 피었습니다');
+// 건강검진 — OpenArm body 의 D435 RGB 영상을 의사 / 환자 양쪽에 표시. 같은 /ws/depth-stream WS 공유.
+const showHealthCheck = computed(() => robot.value.id === 'eduping' && currentMode.value === '건강검진');
 // 뎁스카메라 뷰 — D435 depth view + palm tracker + 하이파이브 IK 트리거.
 // DepthViewer 내부에서 useDepthStream + useHandTracker + postHighfiveHandTarget 처리.
 // 4b98dc6 에서 컴포넌트는 추가됐는데 App.vue 마운트가 빠져있어 UI 에서 못 보였다.
@@ -251,6 +254,7 @@ function handleStart(): void {
     <GreetingManager v-if="showGreetingManager" />
     <MugunghwaArmManager v-if="showMugunghwaArm" />
     <MugunghwaGame v-if="showMugunghwa" />
+    <HealthCheckCamera v-if="showHealthCheck" />
     <DepthViewer v-if="showHighfive" />
     <CameraView v-if="showGogopingManual" />
     <PanTiltControl v-if="showGogopingManual" />
