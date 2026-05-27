@@ -137,7 +137,7 @@
 <!-- ⑤ AI Service → DB  (TCP: down to y=305 corridor, left to DB, up into DB)
      y=305 is below all components (end y=275) but above ROS2 bus (y=310).
      Horizontal x=576→254 stays entirely right of CS trunk (x=140). No cross. -->
-<path d="M 576 277 V 300 H 254 V 260" fill="none" stroke="#A32D2D" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(163, 45, 45);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 576 277 V 292 H 254 V 260" fill="none" stroke="#A32D2D" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(163, 45, 45);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 <!-- ⑥ Control Service ↔ AI Service  (HTTP/WS bridge above components, y=185) -->
 <path d="M 140 195 V 185 H 576 V 195" fill="none" stroke="#185FA5" stroke-width="2.5" marker-start="url(#a)" marker-end="url(#a)" style="fill:none;stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
@@ -148,14 +148,14 @@
      The three paths share x=140 at y=310 as the bus junction. No true overlap —
      EduPing + NoriArm horizontals form the visual bus line. -->
 <path d="M 140 277 V 336" fill="none" stroke="#D85A30" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(216, 90, 48);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<path d="M 140 312 H 360 V 336" fill="none" stroke="#D85A30" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(216, 90, 48);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<path d="M 140 312 H 580 V 336" fill="none" stroke="#D85A30" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(216, 90, 48);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 140 315 H 360 V 336" fill="none" stroke="#D85A30" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(216, 90, 48);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 140 315 H 580 V 336" fill="none" stroke="#D85A30" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(216, 90, 48);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 <!-- ⑩ GogoPing camera → AI Service  (UDP)
      Rises from camera pkg right edge (x=206) at y=452 up to y=317 corridor.
      y=317 is above equip cards (y=320) and 7 px below ROS2 bus (y=310).
      Horizontal x=206→574 stays clear of all ROS2 segments.
      Vertical at x=574 (not x=576 to avoid coinciding with AI→DB vertical). -->
-<path d="M 206 452 V 324 H 574 V 277" fill="none" stroke="#534AB7" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(83, 74, 183);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 206 452 V 308 H 600 V 277" fill="none" stroke="#534AB7" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(83, 74, 183);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 </svg>
