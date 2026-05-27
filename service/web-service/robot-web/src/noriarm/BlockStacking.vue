@@ -3,6 +3,7 @@ import { computed, inject, onUnmounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
+import { useModeIntents } from '@/composables/useModeIntents';
 
 type Phase = 'intro' | 'rps' | 'announce' | 'playing' | 'done';
 
@@ -25,6 +26,15 @@ let phaseTimer: number | null = null;
 
 function exitToIdle(): void {
   mode.setMode('대기');
+}
+
+function playCelebration(): void {
+  try {
+    const audio = new Audio('/sounds/fanfare.mp3');
+    void audio.play();
+  } catch {
+    /* 재생 실패 무시 */
+  }
 }
 
 function closeEventSource(): void {
@@ -68,7 +78,8 @@ function subscribeEvents(sid: string): void {
         }
       } else if (payload.type === 'done') {
         phase.value = 'done';
-        void tts.speak('잘했어! 다 쌓았어!');
+        void tts.speak('잘했어! 완벽해!');
+        playCelebration();
         closeEventSource();
       }
     } catch {
@@ -139,6 +150,14 @@ async function endSession(): Promise<void> {
   closeEventSource();
 }
 
+useModeIntents('블럭쌓기', {
+  onStart: () => {
+    if (phase.value === 'intro') void startSession();
+    else if (phase.value === 'done') void restartSession();
+  },
+  onModeExit: () => exitToIdle(),
+});
+
 watch(isActive, async (active, prev) => {
   if (!active && prev) {
     await endSession();
@@ -146,6 +165,7 @@ watch(isActive, async (active, prev) => {
   }
   if (active && !prev) {
     phase.value = 'intro';
+    void startSession();
   }
 });
 
@@ -159,39 +179,50 @@ onUnmounted(() => {
   <Teleport to="body">
     <Transition name="bs-fade">
       <div v-if="isActive" class="bs-overlay" :data-phase="phase">
-        <div v-if="phase === 'intro'" class="card">
-          <h1>블럭쌓기</h1>
-          <p>가위바위보로 누가 먼저 쌓을지 정해볼까?</p>
-          <button class="primary" @click="startSession">시작하기</button>
-          <button class="ghost" @click="exitToIdle">취소</button>
-        </div>
-
-        <div v-else-if="phase === 'rps'" class="card">
-          <h2>가위바위보!</h2>
-          <p class="hint">로봇 팔이 모양을 보여줍니다…</p>
+        <div v-if="phase === 'rps'" class="card">
+          <div class="card-body">
+            <p class="hint">가위바위보로 누가 먼저 쌓을지 정해볼까?</p>
+            <h2>가위바위보!</h2>
+          </div>
+          <div class="card-actions">
+            <button class="ghost" @click="exitToIdle">그만하기</button>
+          </div>
         </div>
 
         <div v-else-if="phase === 'announce'" class="card">
-          <h2>네가 이겼어! 🎉</h2>
-          <p>먼저 블럭을 쌓아!</p>
+          <div class="card-body">
+            <h2>네가 이겼어! 🎉</h2>
+            <p>먼저 블럭을 쌓아!</p>
+          </div>
+          <div class="card-actions">
+            <button class="ghost" @click="exitToIdle">그만하기</button>
+          </div>
         </div>
 
         <div v-else-if="phase === 'playing'" class="card">
-          <h2>블럭을 쌓고 있어요</h2>
-          <div v-if="homeEventCount === 0" class="notice" style="color:#1d4ed8;background:#eff6ff;border-color:#93c5fd;">
-            🟦 파란색 블록을 쌓아봐!
+          <div class="card-body">
+            <h2>블럭을 쌓고 있어요</h2>
+            <div v-if="homeEventCount === 0" class="notice" style="color:#1d4ed8;background:#eff6ff;border-color:#93c5fd;">
+              🟦 파란색 블록을 쌓아봐!
+            </div>
+            <div v-else-if="homeEventCount === 1" class="notice" style="color:#166534;background:#f0fdf4;border-color:#86efac;">
+              🟩 초록색 블록을 쌓아봐!
+            </div>
+            <div class="counter">로봇이 블럭을 쌓은 횟수: <strong>{{ homeEventCount }}</strong> / 2</div>
           </div>
-          <div v-else-if="homeEventCount === 1" class="notice" style="color:#166534;background:#f0fdf4;border-color:#86efac;">
-            🟩 초록색 블록을 쌓아봐!
+          <div class="card-actions">
+            <button class="ghost" @click="exitToIdle">그만하기</button>
           </div>
-          <div class="counter">로봇이 블럭을 쌓은 횟수: <strong>{{ homeEventCount }}</strong> / 2</div>
-          <button class="ghost" @click="exitToIdle">그만</button>
         </div>
 
         <div v-else-if="phase === 'done'" class="card">
-          <h2>다 쌓았어요! 🎉</h2>
-          <button class="primary" @click="restartSession">다시하기</button>
-          <button class="ghost" @click="exitToIdle">그만하기</button>
+          <div class="card-body">
+            <h2>다 쌓았어요! 🎉</h2>
+          </div>
+          <div class="card-actions">
+            <button class="primary" @click="restartSession">다시하기</button>
+            <button class="ghost" @click="exitToIdle">그만하기</button>
+          </div>
         </div>
 
         <div v-if="error" class="error">{{ error }}</div>
@@ -214,11 +245,25 @@ onUnmounted(() => {
   background: white;
   padding: 32px;
   border-radius: 16px;
-  min-width: 320px;
+  width: 360px;
+  height: 300px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  justify-content: space-between;
+}
+.card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: center;
+}
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .primary {
   padding: 12px 32px;

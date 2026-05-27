@@ -37,6 +37,7 @@ _START_KEYWORDS: tuple[str, ...] = (
     # 다시 시작 (end stage 등) — '다시' 단독은 false positive 위험으로 제외.
     "다시하기",
     "다시해",
+    "다시할래",
     "다시시작",
     "재시작",
     "한번더",
