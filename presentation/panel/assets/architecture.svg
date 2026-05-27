@@ -126,10 +126,10 @@
 <line x1="140" y1="127" x2="140" y2="193" stroke="#A32D2D" stroke-width="2.5" marker-end="url(#a)" style="fill:rgb(0, 0, 0);stroke:rgb(163, 45, 45);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 <!-- ② Portal Browser → Web Service  (HTTP: tiny H then V) -->
-<path d="M 383 127 H 365 V 193" fill="none" stroke="#185FA5" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 383 127 H 348 V 193" fill="none" stroke="#185FA5" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 <!-- ③ Robot UI → Web Service  (HTTP: L-bend, y=158 corridor) -->
-<path d="M 563 127 V 158 H 365 V 193" fill="none" stroke="#185FA5" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 563 127 V 158 H 382 V 193" fill="none" stroke="#185FA5" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(24, 95, 165);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 <!-- ④ Control Service ↔ DB  (TCP bidirectional, short horizontal y=232) -->
 <line x1="200" y1="232" x2="220" y2="232" stroke="#A32D2D" stroke-width="2.5" marker-start="url(#a)" marker-end="url(#a)" style="fill:rgb(0, 0, 0);stroke:rgb(163, 45, 45);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
@@ -156,6 +156,6 @@
      y=317 is above equip cards (y=320) and 7 px below ROS2 bus (y=310).
      Horizontal x=206→574 stays clear of all ROS2 segments.
      Vertical at x=574 (not x=576 to avoid coinciding with AI→DB vertical). -->
-<path d="M 206 452 V 308 H 600 V 277" fill="none" stroke="#534AB7" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(83, 74, 183);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<path d="M 200 485 H 206 V 308 H 600 V 277" fill="none" stroke="#534AB7" stroke-width="2.5" marker-end="url(#a)" style="fill:none;stroke:rgb(83, 74, 183);color:rgb(0, 0, 0);stroke-width:2.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
 
 </svg>
