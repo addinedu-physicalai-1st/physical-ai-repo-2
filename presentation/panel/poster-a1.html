@@ -15,7 +15,7 @@
     --butter:#D49A1C; --butterS:#FBEFCD;
     --lav:#8A6CB0; --lavS:#EADFF6;
     --sky:#4E97D6; --skyS:#D7EAFA;
-    --ink:#4A352B; --inkSoft:#86695C; --faint:#B6A399;
+    --ink:#4A352B; --inkSoft:#7C6055; --faint:#B6A399;
     --border:#EFD6DC;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -23,65 +23,76 @@
   html,body{ background:#cfc7c0; font-family:'Pretendard Variable',system-ui,sans-serif; color:var(--ink); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 
   .poster{ width:594mm; height:841mm; background:var(--cream); position:relative; overflow:hidden; padding:13mm 13mm 9mm; display:flex; flex-direction:column; gap:7mm;
-    background-image: radial-gradient(circle at 6% 2%, #FCE0E7 0, transparent 20%), radial-gradient(circle at 95% 1%, #D7EAFA 0, transparent 18%); }
+    background-image: radial-gradient(circle at 5% 1%, #FCE0E7 0, transparent 19%), radial-gradient(circle at 96% 1%, #D7EAFA 0, transparent 17%); }
 
-  .head{ display:flex; align-items:center; gap:11mm; background:var(--surface); border:1mm solid var(--border); border-radius:8mm; padding:7mm 11mm; box-shadow:0 3mm 10mm rgba(236,143,166,.16) }
-  .head .htext{ flex:1 }
-  .eyebrow{ font-family:'Jua'; letter-spacing:.3em; color:var(--lav); font-size:13pt }
-  .head h1{ font-family:'Jua'; font-size:90pt; line-height:.92; margin:2mm 0 1.5mm }
+  /* ── HEADER ── */
+  .head{ display:flex; align-items:center; gap:11mm; background:var(--surface); border:1mm solid var(--border); border-radius:9mm; padding:8mm 12mm; box-shadow:0 4mm 12mm rgba(236,143,166,.18); position:relative; overflow:hidden }
+  .head::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4mm; background:linear-gradient(180deg,var(--pink),var(--lav),var(--mint)) }
+  .head .htext{ flex:1; padding-left:3mm }
+  .eyebrow{ font-family:'Jua'; letter-spacing:.28em; color:var(--lav); font-size:15pt }
+  .head h1{ font-family:'Jua'; font-size:104pt; line-height:.9; margin:3mm 0 2mm }
   .head h1 .p{color:var(--pink)} .head h1 .d{color:var(--lav)} .head h1 .g{color:var(--mint)}
-  .head .sub{ font-family:'Jua'; font-size:22pt }
-  .head .tag{ font-size:12.5pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.5 }
+  .head .sub{ font-family:'Jua'; font-size:27pt }
+  .head .tag{ font-size:15pt; color:var(--inkSoft); margin-top:2.5mm; line-height:1.5 }
   .head .hright{ flex:0 0 auto; text-align:center }
-  .team{ font-family:'Jua'; font-size:17pt; color:#fff; background:var(--pink); border-radius:7mm; padding:3.5mm 8mm; display:inline-block; box-shadow:0 3mm 7mm rgba(236,143,166,.35) }
-  .robots{ margin-top:3mm; display:flex; gap:2.5mm; justify-content:center }
-  .rbadge{ font-family:'Jua'; font-size:10.5pt; padding:2mm 4.5mm; border-radius:6mm; color:#fff }
+  .team{ font-family:'Jua'; font-size:20pt; color:#fff; background:var(--pink); border-radius:8mm; padding:4.5mm 10mm; display:inline-block; box-shadow:0 3mm 8mm rgba(236,143,166,.4) }
+  .robots{ margin-top:4mm; display:flex; gap:3mm; justify-content:center }
+  .rbadge{ font-family:'Jua'; font-size:13pt; padding:2.6mm 6mm; border-radius:7mm; color:#fff }
 
+  /* ── COLUMNS ── */
   .cols{ flex:1; display:grid; grid-template-columns:1fr 1fr; gap:7mm; min-height:0 }
   .col{ display:flex; flex-direction:column; gap:7mm; min-height:0 }
 
-  .sec{ background:var(--surface); border:1mm solid var(--border); border-radius:7mm; overflow:hidden; box-shadow:0 3mm 9mm rgba(236,143,166,.12); display:flex; flex-direction:column }
+  /* ── SECTION CARD (custom header w/ circular icon badge) ── */
+  .sec{ background:var(--surface); border:1mm solid var(--border); border-radius:8mm; overflow:hidden; box-shadow:0 4mm 11mm rgba(236,143,166,.13); display:flex; flex-direction:column }
   .sec.grow{ flex:1 }
-  .bar{ display:flex; align-items:center; gap:3.5mm; padding:3.5mm 6mm; color:#fff }
-  .bar .material-icons-round{ font-size:21pt } .bar h2{ font-family:'Jua'; font-size:17pt }
-  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:11.5pt; opacity:.85 }
+  .bar{ display:flex; align-items:center; gap:4mm; padding:4.5mm 7mm; color:#fff; position:relative }
+  .bar .badge{ width:13mm; height:13mm; border-radius:50%; background:rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
+  .bar .badge .material-icons-round{ font-size:24pt; color:#fff }
+  .bar h2{ font-family:'Jua'; font-size:23pt; letter-spacing:.01em }
+  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:14pt; opacity:.9 }
   .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)} .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)}
-  .bd{ padding:5.5mm 6mm; flex:1; display:flex; flex-direction:column; min-height:0 }
-  b{color:var(--ink)} .lead{ font-size:12.5pt; line-height:1.58 } .small{ font-size:9.5pt; color:var(--inkSoft); line-height:1.5 }
+  .bd{ padding:6.5mm 7mm; flex:1; display:flex; flex-direction:column; min-height:0 }
+  b{color:var(--ink)} .lead{ font-size:15.5pt; line-height:1.62 } .small{ font-size:11.5pt; color:var(--inkSoft); line-height:1.5 }
 
-  .stats{ display:flex; gap:3.5mm; margin-top:auto }
-  .stat{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:4mm; padding:3.5mm 1mm }
-  .stat .n{ font-family:'Jua'; font-size:25pt; line-height:1 } .stat .u{ font-size:10pt; color:var(--inkSoft) }
-  .stat .l{ font-size:8.5pt; color:var(--inkSoft); margin-top:.8mm; line-height:1.3 }
+  .stats{ display:flex; gap:4mm; margin-top:auto; padding-top:5mm }
+  .stat{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:5mm; padding:4.5mm 1mm }
+  .stat .n{ font-family:'Jua'; font-size:33pt; line-height:1 } .stat .u{ font-size:13pt; color:var(--inkSoft) }
+  .stat .l{ font-size:11pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.3 }
 
-  /* tech */
-  .techrow{ display:flex; align-items:flex-start; gap:3.5mm; padding:2.4mm 0; border-top:.6mm solid var(--border) }
+  /* ── tech ── */
+  .techrow{ display:flex; align-items:flex-start; gap:4mm; padding:3.2mm 0; border-top:.6mm solid var(--border) }
   .techrow:first-child{ border-top:none }
-  .techrow .cat{ font-family:'Jua'; font-size:10.5pt; color:var(--inkSoft); flex:0 0 26mm; padding-top:1mm }
-  .chips{ display:flex; flex-wrap:wrap; gap:2.2mm }
-  .chip{ font-family:'Jua'; font-size:10pt; padding:1.8mm 3.8mm; border-radius:5mm; background:var(--pinkS); color:var(--ink) }
+  .techrow .cat{ font-family:'Jua'; font-size:13pt; color:var(--inkSoft); flex:0 0 30mm; padding-top:1.5mm }
+  .chips{ display:flex; flex-wrap:wrap; gap:2.6mm }
+  .chip{ font-family:'Jua'; font-size:12.5pt; padding:2.2mm 5mm; border-radius:6mm; background:var(--pinkS); color:var(--ink) }
   .chip.mint{background:var(--mintS)} .chip.lav{background:var(--lavS)} .chip.sky{background:var(--skyS)} .chip.butter{background:var(--butterS)}
 
-  /* scenario vertical */
-  .flowv{ display:flex; flex-direction:column; gap:2.5mm; flex:1; justify-content:space-between }
-  .fstep{ display:flex; align-items:center; gap:5mm; background:var(--cream); border:1mm solid var(--border); border-radius:5mm; padding:3.5mm 5mm; flex:1 }
-  .fstep .ic{ width:11mm; height:11mm; border-radius:3mm; display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
-  .fstep .ic .material-icons-round{ font-size:24pt }
-  .fstep .t{ font-family:'Jua'; font-size:13.5pt } .fstep .s{ font-size:10pt; color:var(--inkSoft); margin-top:.3mm }
+  /* ── scenario timeline (custom) ── */
+  .timeline{ position:relative; flex:1; display:flex; flex-direction:column; justify-content:space-between; padding-left:20mm }
+  .timeline::before{ content:""; position:absolute; left:8mm; top:6mm; bottom:6mm; width:2.2mm; border-radius:2mm;
+    background:linear-gradient(180deg,var(--pink),var(--mint),var(--butter),var(--lav),var(--sky)) }
+  .tstep{ position:relative; display:flex; align-items:center; gap:5mm; flex:1 }
+  .tnode{ position:absolute; left:-20mm; width:16mm; height:16mm; border-radius:50%; border:2mm solid #fff; box-shadow:0 2mm 6mm rgba(236,143,166,.3);
+    display:flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto }
+  .tnode .material-icons-round{ font-size:24pt; color:#fff }
+  .tcard{ flex:1; background:var(--cream); border:1mm solid var(--border); border-radius:6mm; padding:4mm 6mm }
+  .tcard .tt{ font-family:'Jua'; font-size:19pt; line-height:1 } .tcard .ts{ font-size:13pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.4 }
 
-  /* robot blocks (right) */
-  .rhead{ display:flex; align-items:center; gap:5mm; margin-bottom:3.5mm }
-  .pslot{ width:34mm; height:34mm; flex:0 0 auto; border:1mm dashed var(--faint); border-radius:5mm; background:var(--cream);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint); overflow:hidden }
-  .pslot .material-icons-round{ font-size:24pt } .pslot span{ font-family:'Jua'; font-size:9.5pt }
-  .rtitle{ font-family:'Jua'; font-size:27pt; line-height:1 } .rtitle .en{ font-size:14pt; color:var(--inkSoft) }
-  .rhw{ font-family:'Jua'; font-size:11pt; color:var(--inkSoft); margin-top:2mm }
-  .rfunc{ font-size:11pt; line-height:1.55; color:var(--ink); margin-bottom:3.5mm }
+  /* ── robot blocks (right) ── */
+  .rhead{ display:flex; align-items:center; gap:6mm; margin-bottom:4mm }
+  .pslot{ width:40mm; height:40mm; flex:0 0 auto; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.5mm; color:var(--faint); overflow:hidden }
+  .pslot .material-icons-round{ font-size:30pt } .pslot span{ font-family:'Jua'; font-size:12pt }
+  .rtitle{ font-family:'Jua'; font-size:34pt; line-height:1 } .rtitle .en{ font-size:18pt; color:var(--inkSoft) }
+  .rhw{ font-family:'Jua'; font-size:14pt; color:var(--inkSoft); margin-top:2.5mm }
+  .rfunc{ font-size:14.5pt; line-height:1.6; color:var(--ink); margin-bottom:4mm }
   .rfunc b{ color:var(--ink) }
-  .rblank{ flex:1; min-height:0; border:1mm dashed var(--faint); border-radius:5mm; background:var(--cream);
-    display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:11pt; gap:2mm }
+  .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
+    display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:14pt; gap:2.5mm; overflow:hidden }
+  .rblank .material-icons-round{ font-size:22pt }
 
-  .foot{ display:flex; justify-content:space-between; font-size:9pt; color:var(--faint); padding:0 3mm }
+  .foot{ display:flex; justify-content:space-between; font-size:11pt; color:var(--faint); padding:0 4mm }
 
   .screennote{ position:fixed; top:8px; left:8px; z-index:99; background:#4A352B; color:#fff; font-family:sans-serif; font-size:12px; padding:6px 12px; border-radius:8px; opacity:.92 }
   @media print{ .screennote{display:none} html,body{background:#fff} }
@@ -113,7 +124,7 @@
 
       <!-- 배경 -->
       <section class="sec">
-        <div class="bar pink"><span class="material-icons-round">lightbulb</span><h2>배경</h2></div>
+        <div class="bar pink"><span class="badge"><span class="material-icons-round">lightbulb</span></span><h2>배경</h2></div>
         <div class="bd">
           <p class="lead">교사 한 명이 다수의 아이를 동시에 돌보며 <b>놀이·운반·기록</b>까지 떠안아 만성 과부하. 안전 사각지대와 야근이 반복됩니다. pingdergarten은 이를 <b>역할 분담한 3종 로봇</b>으로 보조합니다.</p>
           <div class="stats">
@@ -126,7 +137,7 @@
 
       <!-- 기술 스택 -->
       <section class="sec">
-        <div class="bar butter"><span class="material-icons-round">build</span><h2>기술 스택</h2></div>
+        <div class="bar butter"><span class="badge"><span class="material-icons-round">build</span></span><h2>기술 스택</h2></div>
         <div class="bd">
           <div class="techrow"><span class="cat">로봇·제어</span><div class="chips"><span class="chip">ROS2 Jazzy</span><span class="chip">Nav2·SLAM</span><span class="chip">RPLiDAR C1</span><span class="chip">MoveIt2</span></div></div>
           <div class="techrow"><span class="cat">AI·비전</span><div class="chips"><span class="chip mint">lerobot ACT</span><span class="chip mint">SmolVLA</span><span class="chip mint">YOLOv8</span><span class="chip mint">ByteTrack</span><span class="chip mint">InsightFace</span><span class="chip mint">MediaPipe</span><span class="chip mint">Ollama qwen2.5</span></div></div>
@@ -137,7 +148,7 @@
 
       <!-- 시스템 구성도 -->
       <section class="sec">
-        <div class="bar sky"><span class="material-icons-round">account_tree</span><h2>시스템 구성도</h2></div>
+        <div class="bar sky"><span class="badge"><span class="material-icons-round">account_tree</span></span><h2>시스템 구성도</h2></div>
         <div class="bd" style="padding:4mm 5mm">
           <img src="assets/architecture.svg" alt="시스템 아키텍처 (bus topology)" style="width:100%;height:auto;object-fit:contain;display:block" />
         </div>
@@ -145,14 +156,29 @@
 
       <!-- 시나리오 -->
       <section class="sec grow">
-        <div class="bar mint"><span class="material-icons-round">schedule</span><h2>시나리오 — 하루 일과</h2></div>
+        <div class="bar mint"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
         <div class="bd">
-          <div class="flowv">
-            <div class="fstep"><span class="ic" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">wb_sunny</span></span><div><div class="t">등원</div><div class="s">EduPing 얼굴인식 인사 · 출석 자동 기록</div></div></div>
-            <div class="fstep"><span class="ic" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">extension</span></span><div><div class="t">놀이</div><div class="s">NoriArm 게임 · EduPing 율동 · 자연 촬영</div></div></div>
-            <div class="fstep"><span class="ic" style="background:var(--butterS)"><span class="material-icons-round" style="color:var(--butter)">restaurant</span></span><div><div class="t">점심</div><div class="s">메뉴 관리 · 식사 보조</div></div></div>
-            <div class="fstep"><span class="ic" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">local_shipping</span></span><div><div class="t">보조</div><div class="s">GogoPing 교사 추종 · 자율 운반</div></div></div>
-            <div class="fstep"><span class="ic" style="background:var(--skyS)"><span class="material-icons-round" style="color:var(--sky)">waving_hand</span></span><div><div class="t">하원</div><div class="s">작별 인사 · 일과 보고서 자동 생성</div></div></div>
+          <div class="timeline">
+            <div class="tstep">
+              <div class="tnode" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></div>
+              <div class="tcard"><div class="tt">등원</div><div class="ts">EduPing이 얼굴인식으로 인사하고 출석을 자동 기록</div></div>
+            </div>
+            <div class="tstep">
+              <div class="tnode" style="background:var(--mint)"><span class="material-icons-round">extension</span></div>
+              <div class="tcard"><div class="tt">놀이</div><div class="ts">NoriArm 게임 · EduPing 율동 · 자연 촬영으로 활동 기록</div></div>
+            </div>
+            <div class="tstep">
+              <div class="tnode" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></div>
+              <div class="tcard"><div class="tt">점심</div><div class="ts">메뉴 관리와 식사 보조</div></div>
+            </div>
+            <div class="tstep">
+              <div class="tnode" style="background:var(--lav)"><span class="material-icons-round">local_shipping</span></div>
+              <div class="tcard"><div class="tt">보조</div><div class="ts">GogoPing이 교사를 추종하고 교구를 자율 운반</div></div>
+            </div>
+            <div class="tstep">
+              <div class="tnode" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></div>
+              <div class="tcard"><div class="tt">하원</div><div class="ts">작별 인사와 함께 하루 일과 보고서를 자동 생성</div></div>
+            </div>
           </div>
         </div>
       </section>
@@ -164,11 +190,12 @@
 
       <!-- EduPing -->
       <section class="sec grow">
+        <div class="bar pink"><span class="badge"><span class="material-icons-round">accessibility_new</span></span><h2>에듀핑 — 기능</h2><span class="num">EduPing</span></div>
         <div class="bd">
           <div class="rhead">
             <div class="pslot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
             <div>
-              <div class="rtitle" style="color:var(--pink)">에듀핑 <span class="en">EduPing</span></div>
+              <div class="rtitle" style="color:var(--pink)">에듀핑</div>
               <div class="rhw">OpenArm · 정문 상주</div>
             </div>
           </div>
@@ -179,11 +206,12 @@
 
       <!-- GogoPing -->
       <section class="sec grow">
+        <div class="bar mint"><span class="badge"><span class="material-icons-round">directions_car</span></span><h2>고고핑 — 기능</h2><span class="num">GogoPing</span></div>
         <div class="bd">
           <div class="rhead">
             <div class="pslot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
             <div>
-              <div class="rtitle" style="color:var(--mint)">고고핑 <span class="en">GogoPing</span></div>
+              <div class="rtitle" style="color:var(--mint)">고고핑</div>
               <div class="rhw">Vic Pinky · 모바일 베이스</div>
             </div>
           </div>
@@ -194,11 +222,12 @@
 
       <!-- NoriArm -->
       <section class="sec grow">
+        <div class="bar lav"><span class="badge"><span class="material-icons-round">precision_manufacturing</span></span><h2>노리암 — 기능</h2><span class="num">NoriArm</span></div>
         <div class="bd">
           <div class="rhead">
             <div class="pslot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
             <div>
-              <div class="rtitle" style="color:var(--lav)">노리암 <span class="en">NoriArm</span></div>
+              <div class="rtitle" style="color:var(--lav)">노리암</div>
               <div class="rhw">OMX ×3 · 교실 비치</div>
             </div>
           </div>
