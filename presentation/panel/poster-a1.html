@@ -58,19 +58,22 @@
   .diagram{ background:#fff; border-radius:3mm; border:1mm solid var(--border); object-fit:contain; width:100%; display:block; padding:2mm }
 
   /* architecture diagram (accurate, clean) */
-  .arch{ display:flex; flex-direction:column; gap:2.5mm; flex:1; justify-content:center }
-  .lyr{ display:flex; align-items:stretch; gap:3mm }
-  .lyrlabel{ flex:0 0 17mm; display:flex; align-items:center; justify-content:center; font-family:'Jua'; font-size:9.5pt; color:#fff; border-radius:3mm; writing-mode:horizontal-tb; text-align:center; line-height:1.1 }
+  .arch{ display:flex; flex-direction:column; gap:3mm; flex:1; justify-content:space-between }
+  .lyr{ display:flex; align-items:stretch; gap:3mm; flex:1 }
+  .lyrlabel{ flex:0 0 18mm; display:flex; align-items:center; justify-content:center; font-family:'Jua'; font-size:11pt; color:#fff; border-radius:3.5mm; text-align:center; line-height:1.1 }
   .lyrboxes{ flex:1; display:flex; gap:2.5mm }
-  .nb{ flex:1; border-radius:3.5mm; padding:3mm 2mm; text-align:center; border:1mm solid rgba(0,0,0,.04) }
-  .nb .t{ font-family:'Jua'; font-size:11pt; line-height:1.1 } .nb .s{ font-size:8pt; color:var(--inkSoft); margin-top:.6mm; line-height:1.25 }
-  .conn{ text-align:center; font-size:9pt; color:var(--faint); font-family:'Jua'; padding:.3mm 0 }
+  .nb{ flex:1; border-radius:4mm; padding:0 3mm; text-align:center; border:1mm solid rgba(0,0,0,.04); display:flex; flex-direction:column; align-items:center; justify-content:center }
+  .nb .t{ font-family:'Jua'; font-size:13pt; line-height:1.15 } .nb .s{ font-size:9pt; color:var(--inkSoft); margin-top:1.2mm; line-height:1.3 }
+  .conn{ text-align:center; font-size:10pt; color:var(--faint); font-family:'Jua'; padding:.3mm 0; flex:0 0 auto }
+  .legend{ display:flex; gap:5mm; justify-content:flex-end; margin-bottom:2.5mm; font-family:'Jua'; font-size:9pt; color:var(--inkSoft) }
+  .legend span{ display:flex; align-items:center; gap:1.5mm }
+  .legend i{ width:6mm; height:1.6mm; border-radius:1mm; display:inline-block }
 
   /* robot stacked cards */
   .robot{ display:flex; gap:4.5mm; align-items:center; padding:3.5mm 0; border-top:.6mm solid var(--border) }
   .robot:first-child{ border-top:none }
   .rmedia{ width:34mm; height:30mm; border-radius:4mm; border:1mm solid var(--border); object-fit:cover; flex:0 0 auto; box-shadow:0 2mm 5mm rgba(236,143,166,.16) }
-  .rtile{ width:34mm; height:30mm; border-radius:4mm; flex:0 0 auto; display:flex; align-items:center; justify-content:center }
+  .rtile{ width:34mm; height:30mm; border-radius:4mm; flex:0 0 auto; display:flex; align-items:center; justify-content:center; overflow:hidden }
   .rtile .material-icons-round{ font-size:30pt }
   .rname{ font-family:'Jua'; font-size:13.5pt; display:flex; align-items:baseline; gap:2mm } .rname .hw{ font-size:9pt; color:var(--inkSoft) }
   .rfn{ font-size:10pt; color:var(--inkSoft); line-height:1.5; margin-top:1mm } .rfn b{ color:var(--ink) }
@@ -136,36 +139,41 @@
       <section class="sec grow">
         <div class="bar sky"><span class="material-icons-round">account_tree</span><h2>시스템 구성</h2></div>
         <div class="bd">
+          <div class="legend">
+            <span><i style="background:var(--sky)"></i>HTTP</span>
+            <span><i style="background:#B0413E"></i>TCP</span>
+            <span><i style="background:var(--butter)"></i>ROS2</span>
+            <span><i style="background:var(--lav)"></i>UDP</span>
+          </div>
           <div class="arch">
             <div class="lyr">
-              <div class="lyrlabel" style="background:var(--pink)">CLIENT</div>
+              <div class="lyrlabel" style="background:var(--pink)">APP</div>
               <div class="lyrboxes">
-                <div class="nb" style="background:var(--pinkS)"><div class="t">Robot UI ×3</div><div class="s">Vue3 · STT/TTS · 셰이더 표정</div></div>
-                <div class="nb" style="background:var(--pinkS)"><div class="t">Portal Web</div><div class="s">Vue3 · 학부모·교사</div></div>
-                <div class="nb" style="background:var(--pinkS)"><div class="t">Admin UI</div><div class="s">PyQt5 관제</div></div>
+                <div class="nb" style="background:var(--pinkS)"><div class="t">Portal Browser</div><div class="s">학부모·교사·의사</div></div>
+                <div class="nb" style="background:var(--pinkS);flex:1.3"><div class="t">Robot UI ×3</div><div class="s">EduPing·NoriArm·GogoPing Browser</div></div>
+                <div class="nb" style="background:var(--pinkS)"><div class="t">Admin App</div><div class="s">PyQt5 관제</div></div>
               </div>
             </div>
-            <div class="conn">▼  REST · WebSocket · SSE  (Vite proxy)</div>
+            <div class="conn">▼ &nbsp;<b style="color:var(--sky)">HTTP</b> &nbsp;·&nbsp; Admin App <b style="color:#B0413E">TCP</b></div>
             <div class="lyr">
-              <div class="lyrlabel" style="background:var(--sky)">SERVER</div>
+              <div class="lyrlabel" style="background:var(--butter)">SERVICES</div>
               <div class="lyrboxes">
-                <div class="nb" style="background:var(--skyS);flex:1.5"><div class="t">Control Server · FastAPI</div><div class="s">rclpy · ROS2 게이트웨이 · 인증/세션 · StaticFiles</div></div>
-                <div class="nb" style="background:var(--butterS)"><div class="t">AI Server</div><div class="s">Intent · Vision · 작업 큐</div></div>
-                <div class="nb" style="background:var(--butterS)"><div class="t">Ollama</div><div class="s">qwen2.5 · bge-m3</div></div>
+                <div class="nb" style="background:var(--butterS)"><div class="t">Web Service</div><div class="s">Portal · Robot</div></div>
+                <div class="nb" style="background:var(--butterS);flex:1.5"><div class="t">Control Service</div><div class="s">Orchestration · Control DB</div></div>
+                <div class="nb" style="background:var(--butterS)"><div class="t">AI Service</div><div class="s">Vision · LLM</div></div>
               </div>
             </div>
-            <div class="conn">PostgreSQL 15 · 로컬 Storage  ⟷  Control · AI 공유</div>
-            <div class="conn">▼  ROS2 Topic · Service · Action  (latched mode)</div>
+            <div class="conn">▼ &nbsp;<b style="color:var(--butter)">ROS2</b> &nbsp;·&nbsp; 카메라 <b style="color:var(--lav)">UDP</b></div>
             <div class="lyr">
-              <div class="lyrlabel" style="background:var(--lav)">ROBOT</div>
+              <div class="lyrlabel" style="background:var(--lav)">EQUIP</div>
               <div class="lyrboxes">
-                <div class="nb" style="background:var(--pinkS)"><div class="t">EduPing</div><div class="s">OpenArm</div></div>
-                <div class="nb" style="background:var(--mintS)"><div class="t">GogoPing</div><div class="s">Vic Pinky</div></div>
-                <div class="nb" style="background:var(--lavS)"><div class="t">NoriArm ×3</div><div class="s">OMX</div></div>
+                <div class="nb" style="background:var(--pinkS)"><div class="t">EduPing</div><div class="s">open arm · DAMIAO</div></div>
+                <div class="nb" style="background:var(--mintS)"><div class="t">GogoPing</div><div class="s">vicpinky · camera · LiDAR</div></div>
+                <div class="nb" style="background:var(--lavS)"><div class="t">NoriArm ×3</div><div class="s">omx · Dynamixel</div></div>
               </div>
             </div>
           </div>
-          <p class="small" style="margin-top:3mm">· rosbridge 미사용 — Control Server가 직접 중계 · Robot UI는 sim/real 동일 코드베이스, 로봇별 namespace로 모드 독립</p>
+          <p class="small" style="margin-top:3mm">· 브라우저 → <b>HTTP</b> → Web Service → Control Service · Control ⟷ AI <b>HTTP/WS</b>, Control ⟷ DB <b>TCP</b> · 로봇 <b>ROS2</b> + 카메라 <b>UDP</b></p>
         </div>
       </section>
 
