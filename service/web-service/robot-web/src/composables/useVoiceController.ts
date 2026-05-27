@@ -286,6 +286,18 @@ export function useVoiceController(robot: RobotConfig): {
   }
 
   function onIntent(intent: IntentResponse): void {
+    // STT 오인식 가드 — 가게놀이 중엔 다른 모드로의 mode_change 무시 (예: 'OX퀴즈' 오인식으로
+    // 가게놀이에서 튕겨나가는 것 방지). 의도적 종료는 '그만'/'취소'(sub_command stop) 또는
+    // mode_change('대기') 로 가능 — 그것만 허용. applyIntent 가 setMode 하기 전에 가로챔.
+    if (
+      intent.kind === 'mode_change' &&
+      mode.currentMode === '가게놀이' &&
+      intent.mode !== '대기'
+    ) {
+      console.log(`[voice] 가게놀이 중 mode_change('${intent.mode}') 무시 — STT 오인식 가드`);
+      enterCooldown();
+      return;
+    }
     mode.applyIntent(intent);
     const handlers = getActiveModeHandlers(mode.currentMode);
 

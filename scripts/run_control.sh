@@ -53,6 +53,9 @@ case "$ACTION" in
     # ROS workspace sourcing — run_server.sh 의 control window 와 동일 정책:
     # root install 이 있으면 그것만 source, 없으면 per-workspace 폴백.
     NORIARM_FRAMEWORK_PATH="$REPO_ROOT/controller/noriarm-controller/src/noriarm_framework"
+    # 가게놀이(store_play) runner subprocess 가 lerobot/ultralytics 있는 venv 로 뜨게 — control
+    # venv 와 분리. 이거 없으면 runner 가 control venv(no lerobot)로 떠서 추론 실패. env override 가능.
+    STOREPLAY_PYTHON="${NORIARM_STOREPLAY_PYTHON:-/home/kyle/venv/store_play/bin/python}"
     ROS_SETUP="/opt/ros/jazzy/setup.bash"
     ROOT_WS_SETUP="$REPO_ROOT/install/setup.bash"
     EDUPING_WS_SETUP="$REPO_ROOT/controller/eduping-controller/install/setup.bash"
@@ -76,7 +79,7 @@ case "$ACTION" in
     CONTROL_CMD="$(_runlib::wrap_cmd uvicorn control_service.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
 
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n control -c "$REPO_ROOT" \
-      "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; [ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
+      "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; export NORIARM_STOREPLAY_PYTHON=\"$STOREPLAY_PYTHON\"; export NORIARM_STOREPLAY_PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH\"; [ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
     tmux set-option -t "$SESSION" -g remain-on-exit on
 
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \

@@ -28,10 +28,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import AsyncIterator
 
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from control_service.noriarm.block_stacking_process import RunnerProcess
@@ -51,11 +49,6 @@ TASK_TIMEOUT_S = 1300.0   # 한 task 최대 시간. game.yaml episode_timeout_s(
 _ENV_PYTHON = "NORIARM_STOREPLAY_PYTHON"
 _ENV_PYTHONPATH_EXTRA = "NORIARM_STOREPLAY_PYTHONPATH"
 
-# UI 미리보기 — runner 가 ROI masked 프레임을 여기 JPEG 로 저장 (runner_entry._save_preview).
-# cam 키는 학습 모델 key. whitelist 로 path traversal 차단.
-_PREVIEW_DIR = Path("/tmp")
-_PREVIEW_PREFIX = "storeplay_preview"
-_PREVIEW_CAMS = frozenset({"top", "wrist_left", "wrist_right"})
 
 
 class CreateSessionRequest(BaseModel):
@@ -280,25 +273,6 @@ async def end_session(sid: str) -> dict:
     session.push_done()
     _store.remove(sid)
     return {"ok": True}
-
-
-@router.get("/sessions/{sid}/preview/{cam}")
-async def preview(sid: str, cam: str) -> Response:
-    """runner 가 저장한 최신 ROI masked JPEG 서빙 (UI 미리보기).
-
-    cam ∈ {top, wrist_left, wrist_right}. session 무관하게 최신 프레임 (단일 로봇 가정).
-    파일 없으면 (추론 시작 전) 204 — UI 가 placeholder 표시.
-    """
-    if cam not in _PREVIEW_CAMS:
-        raise HTTPException(404, f"unknown cam {cam!r}")
-    path = _PREVIEW_DIR / f"{_PREVIEW_PREFIX}_{cam}.jpg"
-    if not path.is_file():
-        return Response(status_code=204)
-    return FileResponse(
-        path,
-        media_type="image/jpeg",
-        headers={"Cache-Control": "no-store"},
-    )
 
 
 @router.get("/sessions/{sid}/events")

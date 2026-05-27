@@ -52,19 +52,14 @@ const error = ref<string | null>(null);
 let eventSource: EventSource | null = null;
 
 // 카메라 미리보기 — runner 가 ROI masked 프레임을 /tmp JPEG 로 저장, control_service 가 서빙.
-// 5fps 로 img cache-bust 해서 polling. cam 키는 학습 모델 key.
-const PREVIEW_CAMS = [
-  { key: 'top', label: '탑뷰' },
-  { key: 'wrist_left', label: '왼손목' },
-  { key: 'wrist_right', label: '오른손목' },
-];
-const previewTick = ref(0);
-let previewTimer: number | null = null;
+// 서빙 시작 게이트 — runner 가 접시/target 미검출 시 gate_waiting(미검출 라벨), 검출 시 gate_ready.
+// 카메라 미리보기는 UI 에서 제거하고 runner 의 rerun 네이티브 창으로 대체.
+const gateMissing = ref<string[]>([]);  // 빈 배열 = 게이트 통과 / 해당없음
 
 // 서빙 BGM — serving phase 동안 loop 재생. public/audio/storeplay_bgm.mp3 (사용자 제공).
 // 멘트(서버 WebRTC TTS)는 BGM(브라우저 로컬 오디오)과 별개 스트림이라 BGM 음량이 크면
 // 묻힘. 로봇이 말하는 동안(voice.state==='speaking') BGM 을 BGM_DUCK 으로 낮추고 복구.
-const BGM_VOLUME = 0.45;
+const BGM_VOLUME = 0.7;
 const BGM_DUCK = 0.0;  // 멘트 중엔 완전 음소거 — 0.1 로는 센 BGM 에 "주문 나왔습니다" 가 묻혀서.
 let bgm: HTMLAudioElement | null = null;
 function startBgm(): void {
@@ -100,21 +95,6 @@ function playBellSfx(): void {
   if (bgm) bgm.volume = 0.0;  // 효과음 안 묻히게 BGM 음소거
   bellSfx.currentTime = 0;
   void bellSfx.play().catch(() => { restoreServingBgm(); });  // 음원 없음/차단 시 BGM 복구
-}
-
-function previewUrl(cam: string): string {
-  if (!sessionId.value) return '';
-  return `/api/noriarm/games/store-play/sessions/${sessionId.value}/preview/${cam}?t=${previewTick.value}`;
-}
-function startPreview(): void {
-  stopPreview();
-  previewTimer = window.setInterval(() => { previewTick.value++; }, 200);
-}
-function stopPreview(): void {
-  if (previewTimer !== null) {
-    window.clearInterval(previewTimer);
-    previewTimer = null;
-  }
 }
 
 function exitToIdle(): void {
@@ -206,7 +186,9 @@ function subscribeEvents(sid: string): void {
   eventSource = new EventSource(`/api/noriarm/games/store-play/sessions/${sid}/events`);
   eventSource.onmessage = (ev) => {
     try {
-      const payload = JSON.parse(ev.data) as { type: string; prompt?: string; what?: string };
+      const payload = JSON.parse(ev.data) as {
+        type: string; prompt?: string; what?: string; missing?: string[];
+      };
       switch (payload.type) {
         case 'ready':
           // start 완료 — bootSession 에서 phase 처리하지만 보강.
@@ -219,14 +201,22 @@ function subscribeEvents(sid: string): void {
           // 로봇이 벨 누른 시점 — 효과음만 재생 (음성 멘트 생략, 사용자 선택). task 당 1회.
           playBellSfx();
           break;
-        case 'missing': {
-          // serve 시작 시 target/plate 미검출 — 멘트만 (serve 는 그대로 진행).
-          const ko = payload.what === 'plate'
-            ? '접시'
-            : (ITEMS.find((it) => it.id === payload.what)?.label ?? payload.what ?? '물건');
-          speak(`${ko}가 없어요. ${ko}를 놓아주세요`);
+        case 'gate_waiting': {
+          // 접시/target 미검출 → robot 정지(hold) 중. UI 배너 + 멘트 (runner 가 변할 때만 emit).
+          const labels = (payload.missing ?? []).map((c) =>
+            c === 'plate' ? '접시' : (ITEMS.find((it) => it.id === c)?.label ?? c));
+          gateMissing.value = labels;
+          if (labels.length) speak(`${labels.join(', ')}가 없어요. 놓아주세요`);
           break;
         }
+        case 'gate_ready':
+          gateMissing.value = [];  // 접시+물건 검출 완료 → 배너 해제, 로봇 서빙 시작
+          break;
+        case 'gate_timeout':
+          gateMissing.value = [];
+          phase.value = 'ready';
+          error.value = '접시랑 물건을 못 찾았어 — 다시 해줘';
+          break;
         case 'task_done':
           // 홈 복귀 = 완료 → done 화면. 멘트는 bell_rung 에서 이미 함.
           phase.value = 'done';
@@ -270,8 +260,8 @@ async function endSession(): Promise<void> {
 watch(isActive, async (active, prev) => {
   if (!active && prev) {
     voice.setSttHints([]);  // 가게놀이 나가면 음식 힌트 제거
-    stopPreview();
     stopBgm();
+    gateMissing.value = [];
     await endSession();
     phase.value = 'intro';
     selectedItem.value = null;
@@ -283,14 +273,14 @@ watch(isActive, async (active, prev) => {
   }
 }, { immediate: true });
 
-// 서빙 중에만 카메라 미리보기 polling + BGM. 그 외 정지.
+// 서빙 중에만 BGM. 카메라 미리보기는 제거(runner rerun 창으로 대체).
 watch(phase, (p) => {
   if (p === 'serving') {
-    startPreview();
+    gateMissing.value = [];  // 새 서빙 시작 — 이전 게이트 배너 초기화
     startBgm();
   } else {
-    stopPreview();
     stopBgm();
+    gateMissing.value = [];
   }
 });
 
@@ -326,7 +316,6 @@ useModeIntents('가게놀이', {
 });
 
 onUnmounted(() => {
-  stopPreview();
   stopBgm();
   void endSession();
 });
@@ -368,20 +357,11 @@ onUnmounted(() => {
         <div v-else-if="phase === 'serving'" class="card playing">
           <h2>서빙 중!</h2>
           <p class="item-name">{{ selectedItem?.label }}</p>
-          <p class="hint">로봇 팔이 물건을 가져가고 있어…</p>
-          <div class="cam-grid">
-            <div v-for="cam in PREVIEW_CAMS" :key="cam.key" class="cam-cell">
-              <img
-                class="cam-img"
-                :src="previewUrl(cam.key)"
-                :alt="cam.label"
-                @error="(e) => ((e.target as HTMLImageElement).style.visibility = 'hidden')"
-                @load="(e) => ((e.target as HTMLImageElement).style.visibility = 'visible')"
-              />
-              <span class="cam-label">{{ cam.label }}</span>
-            </div>
+          <div v-if="gateMissing.length" class="gate-banner">
+            <p class="gate-title">⚠️ {{ gateMissing.join(', ') }}가 없어요!</p>
+            <p class="gate-sub">{{ gateMissing.join(', ') }}를 놓아주세요 — 놓을 때까지 로봇이 기다려요</p>
           </div>
-          <p class="cam-note">로봇이 보는 화면 (ROI)</p>
+          <p v-else class="hint">로봇 팔이 물건을 가져가고 있어…</p>
           <button class="ghost" @click="abortServe">그만</button>
         </div>
 
@@ -419,37 +399,24 @@ onUnmounted(() => {
   gap: 16px;
 }
 .card.playing { min-width: 360px; }
-.cam-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin: 4px 0;
+/* 서빙 시작 게이트 배너 — 접시/물건 미검출 시 (로봇 정지 중) */
+.gate-banner {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 8px 0;
 }
-.cam-cell {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  background: #111;
-  border-radius: 6px;
-  overflow: hidden;
+.gate-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #b8860b;
 }
-.cam-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.cam-label {
-  position: absolute;
-  bottom: 2px;
-  left: 4px;
-  font-size: 10px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-.cam-note {
-  font-size: 11px;
-  color: #999;
+.gate-sub {
   margin: 0;
+  font-size: 13px;
+  color: #8a6d3b;
 }
 .item-grid {
   display: grid;
