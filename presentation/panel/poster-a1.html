@@ -136,52 +136,18 @@
       </section>
 
       <!-- 시스템 구성 (실제 아키텍처) -->
-      <section class="sec grow">
+      <section class="sec">
         <div class="bar sky"><span class="material-icons-round">account_tree</span><h2>시스템 구성</h2></div>
-        <div class="bd">
-          <div class="legend">
-            <span><i style="background:var(--sky)"></i>HTTP</span>
-            <span><i style="background:#B0413E"></i>TCP</span>
-            <span><i style="background:var(--butter)"></i>ROS2</span>
-            <span><i style="background:var(--lav)"></i>UDP</span>
-          </div>
-          <div class="arch">
-            <div class="lyr">
-              <div class="lyrlabel" style="background:var(--pink)">APP</div>
-              <div class="lyrboxes">
-                <div class="nb" style="background:var(--pinkS)"><div class="t">Portal Browser</div><div class="s">학부모·교사·의사</div></div>
-                <div class="nb" style="background:var(--pinkS);flex:1.3"><div class="t">Robot UI ×3</div><div class="s">EduPing·NoriArm·GogoPing Browser</div></div>
-                <div class="nb" style="background:var(--pinkS)"><div class="t">Admin App</div><div class="s">PyQt5 관제</div></div>
-              </div>
-            </div>
-            <div class="conn">▼ &nbsp;<b style="color:var(--sky)">HTTP</b> &nbsp;·&nbsp; Admin App <b style="color:#B0413E">TCP</b></div>
-            <div class="lyr">
-              <div class="lyrlabel" style="background:var(--butter)">SERVICES</div>
-              <div class="lyrboxes">
-                <div class="nb" style="background:var(--butterS)"><div class="t">Web Service</div><div class="s">Portal · Robot</div></div>
-                <div class="nb" style="background:var(--butterS);flex:1.5"><div class="t">Control Service</div><div class="s">Orchestration · Control DB</div></div>
-                <div class="nb" style="background:var(--butterS)"><div class="t">AI Service</div><div class="s">Vision · LLM</div></div>
-              </div>
-            </div>
-            <div class="conn">▼ &nbsp;<b style="color:var(--butter)">ROS2</b> &nbsp;·&nbsp; 카메라 <b style="color:var(--lav)">UDP</b></div>
-            <div class="lyr">
-              <div class="lyrlabel" style="background:var(--lav)">EQUIP</div>
-              <div class="lyrboxes">
-                <div class="nb" style="background:var(--pinkS)"><div class="t">EduPing</div><div class="s">open arm · DAMIAO</div></div>
-                <div class="nb" style="background:var(--mintS)"><div class="t">GogoPing</div><div class="s">vicpinky · camera · LiDAR</div></div>
-                <div class="nb" style="background:var(--lavS)"><div class="t">NoriArm ×3</div><div class="s">omx · Dynamixel</div></div>
-              </div>
-            </div>
-          </div>
-          <p class="small" style="margin-top:3mm">· 브라우저 → <b>HTTP</b> → Web Service → Control Service · Control ⟷ AI <b>HTTP/WS</b>, Control ⟷ DB <b>TCP</b> · 로봇 <b>ROS2</b> + 카메라 <b>UDP</b></p>
+        <div class="bd" style="padding:4mm 5mm">
+          <img src="assets/architecture.svg" alt="시스템 아키텍처 (bus topology)" style="width:100%;height:auto;object-fit:contain;display:block" />
         </div>
       </section>
 
       <!-- 유치원 맵 -->
-      <section class="sec">
+      <section class="sec grow">
         <div class="bar mint"><span class="material-icons-round">map</span><h2>유치원 공간 &amp; 로봇 배치</h2><span class="num">실제 SLAM 맵</span></div>
         <div class="bd">
-          <img class="diagram" src="assets/floormap.png" alt="유치원 공간 도면" style="height:96mm" />
+          <img class="diagram" src="assets/floormap.png" alt="유치원 공간 도면" style="flex:1;min-height:0;width:100%;object-fit:contain" />
           <div class="dep">
             <div class="depi"><span class="dot" style="background:var(--pink)"></span><div class="t"><b>출입구</b> · EduPing 등하원</div></div>
             <div class="depi"><span class="dot" style="background:var(--lav)"></span><div class="t"><b>놀이방</b> · NoriArm 놀이</div></div>
