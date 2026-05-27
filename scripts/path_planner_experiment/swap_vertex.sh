@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Dense ↔ Sparse vertex 설정 swap.
+# Dense / Mid-Sparse / Sparse vertex 설정 swap.
 #
-# Dense  : 35 vertex (원본 waypoints.yaml / lanes.yaml)
-# Sparse : 7 vertex (waypoints/sparse_waypoints.yaml / sparse_lanes.yaml)
+# Dense      : 35 vertex (waypoints/dense_*.yaml)
+# Mid-Sparse : 17 vertex (waypoints/mid_sparse_*.yaml)
+# Sparse     : 14 vertex (waypoints/sparse_*.yaml)
 #
 # 사용 :
-#   bash swap_vertex.sh sparse    # Sparse 로 전환
-#   bash swap_vertex.sh dense     # Dense (원본) 복원
+#   bash swap_vertex.sh dense     # Dense 적용
+#   bash swap_vertex.sh mid       # Mid-Sparse 적용
+#   bash swap_vertex.sh sparse    # Sparse 적용
 #   bash swap_vertex.sh status    # 현재 상태 확인
 #
 # 동작 :
-#   - controller/.../config/{waypoints,lanes}.yaml 을 백업 후 교체
-#   - 백업 위치 : /tmp/vertex_backup/{waypoints,lanes}.yaml
+#   - controller/.../config/{waypoints,lanes}.yaml 을 source 파일로 교체
 #   - graph_router 가 재시작될 때 새 graph 로드 (sim 재시작 필요)
 
 set -euo pipefail
@@ -21,58 +22,54 @@ REPO="$(cd "$HERE/../.." && pwd)"
 CONFIG_DIR="$REPO/controller/gogoping-controller/src/gogoping/gogoping_navigation/config"
 WP_DEST="$CONFIG_DIR/waypoints.yaml"
 LN_DEST="$CONFIG_DIR/lanes.yaml"
+
+DENSE_WP="$HERE/waypoints/dense_waypoints.yaml"
+DENSE_LN="$HERE/waypoints/dense_lanes.yaml"
+MID_WP="$HERE/waypoints/mid_sparse_waypoints.yaml"
+MID_LN="$HERE/waypoints/mid_sparse_lanes.yaml"
 SPARSE_WP="$HERE/waypoints/sparse_waypoints.yaml"
 SPARSE_LN="$HERE/waypoints/sparse_lanes.yaml"
-BACKUP_DIR="/tmp/vertex_backup"
-WP_BACKUP="$BACKUP_DIR/waypoints.yaml"
-LN_BACKUP="$BACKUP_DIR/lanes.yaml"
-STATE_FILE="$BACKUP_DIR/state"
 
-mode="${1:-status}"
-
-mkdir -p "$BACKUP_DIR"
+STATE_FILE="/tmp/vertex_backup/state"
+mkdir -p "$(dirname "$STATE_FILE")"
 
 count_vertices() {
     local f="$1"
     grep -c "^- name:" "$f" 2>/dev/null || echo 0
 }
 
+apply() {
+    local label="$1" wp="$2" ln="$3"
+    if [[ ! -f "$wp" ]] || [[ ! -f "$ln" ]]; then
+        echo "❌ 소스 누락: $wp / $ln"
+        exit 1
+    fi
+    cp "$wp" "$WP_DEST"
+    cp "$ln" "$LN_DEST"
+    echo "$label" > "$STATE_FILE"
+    echo "✅ $label 적용 — $(count_vertices "$WP_DEST") vertex / $(grep -c '^- from:' "$LN_DEST") lane"
+    echo "   다음 sim 재시작부터 적용됨."
+}
+
+mode="${1:-status}"
+
 case "$mode" in
-    sparse)
-        if [[ ! -f "$WP_BACKUP" ]]; then
-            cp "$WP_DEST" "$WP_BACKUP"
-            cp "$LN_DEST" "$LN_BACKUP"
-            echo "백업 → $BACKUP_DIR/"
-        fi
-        cp "$SPARSE_WP" "$WP_DEST"
-        cp "$SPARSE_LN" "$LN_DEST"
-        echo "sparse" > "$STATE_FILE"
-        echo "✅ Sparse 적용 — $(count_vertices "$WP_DEST") vertices"
-        echo "   다음 sim 재시작부터 적용됨."
-        ;;
-    dense)
-        if [[ ! -f "$WP_BACKUP" ]]; then
-            echo "❌ 백업 없음 — 이미 dense 일 가능성. git checkout 으로 복원."
-            exit 1
-        fi
-        cp "$WP_BACKUP" "$WP_DEST"
-        cp "$LN_BACKUP" "$LN_DEST"
-        echo "dense" > "$STATE_FILE"
-        echo "✅ Dense 복원 — $(count_vertices "$WP_DEST") vertices"
-        echo "   다음 sim 재시작부터 적용됨."
-        ;;
+    dense)  apply dense  "$DENSE_WP"  "$DENSE_LN"  ;;
+    mid)    apply mid    "$MID_WP"    "$MID_LN"    ;;
+    sparse) apply sparse "$SPARSE_WP" "$SPARSE_LN" ;;
     status)
         n=$(count_vertices "$WP_DEST")
+        l=$(grep -c '^- from:' "$LN_DEST" 2>/dev/null || echo 0)
         state=$(cat "$STATE_FILE" 2>/dev/null || echo "unknown")
-        echo "현재 waypoints.yaml : ${n} vertices (state=${state})"
-        if [[ -f "$WP_BACKUP" ]]; then
-            echo "백업 존재    : $WP_BACKUP ($(count_vertices "$WP_BACKUP") vertices)"
-        else
-            echo "백업 없음 — sparse 적용된 적 없음"
-        fi
+        echo "현재 waypoints.yaml : ${n} vertex / ${l} lane (state=${state})"
+        echo ""
+        echo "사용 가능 set :"
+        printf "  %-8s %s vertex / %s lane\n" dense  "$(count_vertices "$DENSE_WP")"  "$(grep -c '^- from:' "$DENSE_LN")"
+        printf "  %-8s %s vertex / %s lane\n" mid    "$(count_vertices "$MID_WP")"    "$(grep -c '^- from:' "$MID_LN")"
+        printf "  %-8s %s vertex / %s lane\n" sparse "$(count_vertices "$SPARSE_WP")" "$(grep -c '^- from:' "$SPARSE_LN")"
         ;;
     *)
-        echo "usage: $0 {sparse|dense|status}" >&2
+        echo "usage: $0 {dense|mid|sparse|status}" >&2
         exit 1
         ;;
 esac

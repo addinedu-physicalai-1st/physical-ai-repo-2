@@ -1,46 +1,40 @@
-# Sparse lanes — sparse_waypoints.yaml 의 7 vertex 간 직접 연결.
-#
-# 각 lane = graph_router 의 Dijkstra edge. Edge cost = Euclidean 거리.
-# nav2 가 두 vertex 사이의 실제 경로를 NavigateThroughPoses 로 그림.
-#
-# 연결 토폴로지 :
-#
-#          운동장
-#            │
-#          출입구  ────────  충전소입구  ─── 충전소
-#            │                   │
-#          놀이방5 ───── 놀이방 ──┤
-#                                │
-#                              수면실
-#
-# 시나리오 "충전소 → 수면실 → 충전소" 경로 :
-#   충전소 ──> 충전소입구 ──> 수면실
-#   수면실 ──> 충전소입구 ──> 충전소
-
 lanes:
-# main 척추 (운동장 ─ 출입구 ─ 충전소입구 ─ 충전소)
-- from: 운동장
-  to: 출입구
+- from: 수면실
+  to: 수면실_하
+  bidirectional: true
+- from: 복도_상
+  to: 충전소입구
   bidirectional: true
 - from: 출입구
-  to: 충전소입구
+  to: 복도입구
+  bidirectional: true
+- from: 운동장입구
+  to: 운동장단상
+  bidirectional: true
+- from: 운동장단상
+  to: 운동장
   bidirectional: true
 - from: 충전소입구
   to: 충전소
   bidirectional: true
-
-# 수면실 분기 (충전소입구 ─ 수면실)
-- from: 충전소입구
-  to: 수면실
+- from: 복도_중
+  to: 복도_상
   bidirectional: true
-
-# 놀이방 분기 (출입구 ─ 놀이방5 ─ 놀이방 ─ 충전소입구)
+- from: 복도_하
+  to: 복도입구
+  bidirectional: true
+- from: 복도_중
+  to: 복도_하
+  bidirectional: true
 - from: 출입구
-  to: 놀이방5
+  to: 운동장입구
   bidirectional: true
-- from: 놀이방5
-  to: 놀이방
+- from: 수면실_하
+  to: 복도_상
   bidirectional: true
-- from: 놀이방
-  to: 충전소입구
+- from: 놀이방_상
+  to: 복도_중
+  bidirectional: true
+- from: 놀이방_하
+  to: 복도_하
   bidirectional: true

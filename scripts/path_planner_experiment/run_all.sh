@@ -40,12 +40,33 @@
 
 set -uo pipefail
 
+# ───────────── 워크스페이스 install 자동 소싱 ─────────────
+# 사용자 셸에서 source 안 됐을 경우 대비 — gogoping_msgs import 보장.
+# ros setup.bash 가 unbound var 참조 → set -u 잠시 끄고 source.
+if ! python3 -c "from gogoping_msgs.srv import SetGoal" 2>/dev/null; then
+    set +u
+    if [[ -f /opt/ros/jazzy/setup.bash ]]; then
+        # shellcheck disable=SC1091
+        source /opt/ros/jazzy/setup.bash
+    fi
+    if [[ -f "$HOME/pingdergarten/install/local_setup.bash" ]]; then
+        # shellcheck disable=SC1091
+        source "$HOME/pingdergarten/install/local_setup.bash"
+    fi
+    set -u
+    if ! python3 -c "from gogoping_msgs.srv import SetGoal" 2>/dev/null; then
+        echo "❌ gogoping_msgs import 실패 — 워크스페이스 build 필요 또는 PYTHONPATH 문제" >&2
+        echo "   cd ~/pingdergarten && colcon build --symlink-install" >&2
+        exit 1
+    fi
+fi
+
 # ───────────────────────────── 인자 ─────────────────────────────
 REPS=3
 LABEL="dense"
 DESTINATION="수면실"
-SIM_BOOT_WAIT=30           # device-gogoping-sim.sh up 후 tmux 세션 + nav2 부팅 대기
-NAV2_READY_TIMEOUT=120
+SIM_BOOT_WAIT=20           # device-gogoping-sim.sh up 후 tmux 세션 + nav2 부팅 대기
+NAV2_READY_TIMEOUT=240
 PLANNER_FILTER=""
 CONTROLLER_FILTER=""
 
@@ -138,8 +159,34 @@ start_sc_sim() {
 
 stop_sc_sim() {
     log "sc_sim down 실행…"
-    bash "$SIM_SCRIPT" down >>"${OUT_BASE}/sc_sim_down.log" 2>&1 || true
-    sleep 3
+    timeout 30 bash "$SIM_SCRIPT" down >>"${OUT_BASE}/sc_sim_down.log" 2>&1 || true
+    sleep 2
+
+    # DDS participant slot 누적 방지 — 좀비 / orphan KILL.
+    # "Failed to find a free participant index" 에러 예방.
+    pkill -KILL -f "ros2 run topic_tools" 2>/dev/null || true
+    pkill -KILL -f "topic_tools/relay" 2>/dev/null || true
+    pkill -KILL -f "rosbag2_recorder" 2>/dev/null || true
+    pkill -KILL -f "ros2 launch gogoping" 2>/dev/null || true
+    pkill -KILL -f "ros2 run gogoping" 2>/dev/null || true
+    pkill -KILL -f "amcl" 2>/dev/null || true
+    pkill -KILL -f "controller_server" 2>/dev/null || true
+    pkill -KILL -f "planner_server" 2>/dev/null || true
+    pkill -KILL -f "behavior_server" 2>/dev/null || true
+    pkill -KILL -f "bt_navigator" 2>/dev/null || true
+    pkill -KILL -f "lifecycle_manager" 2>/dev/null || true
+    pkill -KILL -f "map_server" 2>/dev/null || true
+    pkill -KILL -f "waypoint_follower" 2>/dev/null || true
+    pkill -KILL -f "velocity_smoother" 2>/dev/null || true
+    pkill -KILL -f "robot_state_publisher" 2>/dev/null || true
+    pkill -KILL -f "parameter_bridge" 2>/dev/null || true
+    pkill -KILL -f "scan_to_scan_filter" 2>/dev/null || true
+
+    # ros2 daemon 도 재시작 — 좀비 participant 의 stale 정보 제거.
+    timeout 10 ros2 daemon stop 2>/dev/null || true
+    sleep 1
+    timeout 10 ros2 daemon start 2>/dev/null || true
+    sleep 2
 }
 
 # ───────────────────────────── relay ─────────────────────────────
@@ -155,12 +202,13 @@ start_relay() {
 
 stop_relay() {
     if [[ -n "$RELAY_PID" ]]; then
-        kill -INT "$RELAY_PID" 2>/dev/null || true
-        sleep 1
         kill -KILL "$RELAY_PID" 2>/dev/null || true
         RELAY_PID=""
     fi
-    pkill -INT -f "ros2 run topic_tools relay" 2>/dev/null || true
+    # 누적 방지 — relay 의 python wrapper + C++ 바이너리 둘 다 KILL.
+    pkill -KILL -f "ros2 run topic_tools relay" 2>/dev/null || true
+    pkill -KILL -f "topic_tools/relay" 2>/dev/null || true
+    sleep 0.5
 }
 
 # ───────────────────────────── nav2 ready ─────────────────────────────
@@ -219,7 +267,7 @@ for P in "${PLANNERS[@]}"; do
         log "  cell ${CELL_IDX}/${TOTAL_CELLS} — Planner=${P}, Controller=${C}"
         log "═══════════════════════════════════════════════════"
 
-        # 1. yaml swap
+        # yaml swap (cell 1회만 — 같은 plugin 으로 N reps)
         SRC_YAML="${PARAMS_DIR}/nav2_${P}_${C}.yaml"
         if [[ ! -f "$SRC_YAML" ]]; then
             log "❌ yaml 없음: $SRC_YAML — cell skip"
@@ -228,37 +276,44 @@ for P in "${PLANNERS[@]}"; do
         cp "$SRC_YAML" "$NAV2_DEST"
         log "yaml swap → ${P}_${C}"
 
-        # 2. sc_sim 재시작
-        stop_relay
-        stop_sc_sim
-        if ! start_sc_sim; then
-            log "❌ ${P}_${C}: sc_sim 시작 실패 — cell skip"
-            continue
-        fi
-        if ! wait_for_nav2_active; then
-            log "❌ ${P}_${C}: nav2 not ready — cell skip"
-            continue
-        fi
-        start_relay
-
-        # 3. plugin verify
         EXPECTED_HINT=""
         case "$C" in
             RPP)  EXPECTED_HINT="regulated_pure_pursuit" ;;
             DWB)  EXPECTED_HINT="DWBLocalPlanner" ;;
             MPPI) EXPECTED_HINT="MPPIController" ;;
         esac
-        if [[ -n "$EXPECTED_HINT" ]]; then
-            if ! verify_plugin "$EXPECTED_HINT"; then
-                log "❌ ${P}_${C}: plugin verify 실패 — cell skip"
-                continue
-            fi
-        fi
 
-        # 4. reps
+        # reps 마다 sim 재시작 — 깨끗한 환경 보장
         for ((R=1; R<=REPS; R++)); do
             RUN_ID="${P}_${C}_rep${R}"
-            log "──────  run ${RUN_ID}  ──────"
+            log ""
+            log "──── rep ${R}/${REPS} : ${RUN_ID} ────"
+
+            # 1. sim 재시작 (매 rep)
+            stop_relay
+            stop_sc_sim
+            if ! start_sc_sim; then
+                log "❌ ${RUN_ID}: sc_sim 시작 실패 — rep skip"
+                echo "${P},${C},${R},99,0,${RUN_ID}" >> "$SUMMARY"
+                continue
+            fi
+            if ! wait_for_nav2_active; then
+                log "❌ ${RUN_ID}: nav2 not ready — rep skip"
+                echo "${P},${C},${R},99,0,${RUN_ID}" >> "$SUMMARY"
+                continue
+            fi
+            start_relay
+
+            # 2. plugin verify (매 rep)
+            if [[ -n "$EXPECTED_HINT" ]]; then
+                if ! verify_plugin "$EXPECTED_HINT"; then
+                    log "❌ ${RUN_ID}: plugin verify 실패 — rep skip"
+                    echo "${P},${C},${R},98,0,${RUN_ID}" >> "$SUMMARY"
+                    continue
+                fi
+            fi
+
+            # 3. 1 run
             START=$(date +%s)
             python3 "$RUN_ONE" \
                 --run-id "$RUN_ID" \
