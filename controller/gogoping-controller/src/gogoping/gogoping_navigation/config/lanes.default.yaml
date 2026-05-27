@@ -107,3 +107,12 @@ lanes:
 - from: 복도6
   to: 복도7
   bidirectional: true
+- from: 놀이방5
+  to: qwe1
+  bidirectional: true
+- from: qwe1
+  to: qwe
+  bidirectional: true
+- from: qwe
+  to: 놀이방
+  bidirectional: true
