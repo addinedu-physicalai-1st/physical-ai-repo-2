@@ -3,6 +3,10 @@
 # 실물 노트북용 nav2 params (풀스택 — map_server + AMCL + planner + controller +
 # bt_navigator + behavior + waypoint_follower + velocity_smoother + costmap).
 #
+# planner=Smac2D, controller=RPP — sim 실험 (dense 35 vertex) 에서 dense 환경
+# best (좁은통로 가중) 로 선정. SW 튜닝만 sim 과 동기화, HW 스펙 (footprint,
+# raytrace_min_range, AMCL 노이즈) 은 real 값 유지.
+#
 # nav2_params_sim.yaml 과의 차이:
 #   * use_sim_time: False           (실 시계 사용 — gazebo /clock 불필요)
 #   * AMCL 모션모델 alpha: 0.2      (실 휠 encoder 노이즈 반영, sim 의 0.05 와 다름)
@@ -267,11 +271,20 @@ planner_server:
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     costmap_update_timeout: 1.0
+    # Smac2D — sim 실험 (dense 35 vertex) 에서 좁은 통로 clearance NavFn 대비 +0.12m
+    # (obs_min 0.367 vs 0.248). RPP 와 짝지어 jerk 도 낮음.
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
+      plugin: "nav2_smac_planner::SmacPlanner2D"
       tolerance: 0.5
-      use_astar: false
+      downsample_costmap: false
+      downsampling_factor: 1
       allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 2.0
+      motion_model_for_search: "MOORE"
+      cost_travel_multiplier: 2.0
+      use_final_approach_orientation: false
 
 smoother_server:
   ros__parameters:
