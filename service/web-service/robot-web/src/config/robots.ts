@@ -8,6 +8,7 @@ export interface ModeTreeGroup {
   id: string;
   children: ModeTreeNode[];
   selfSelectable?: boolean; // false 로 명시하면 드롭다운 안에 자기 자신 항목을 표시하지 않음
+  voiceExcluded?: boolean; // true 면 백엔드(ai-service)가 이 그룹 자손 mode 들을 음성 명령 매칭에서 제외
 }
 
 export type ModeTreeNode = string | ModeTreeGroup;

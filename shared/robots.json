@@ -14,7 +14,7 @@
         "율동",
         "무궁화꽃이 피었습니다",
         {
-          "id": "관리", "selfSelectable": false,
+          "id": "관리", "selfSelectable": false, "voiceExcluded": true,
           "children": ["율동 등록", "등하원 인사 설정", "무궁화 율동 등록", "뎁스카메라 뷰"]
         }
       ],

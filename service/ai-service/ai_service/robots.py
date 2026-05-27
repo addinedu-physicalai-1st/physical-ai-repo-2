@@ -43,19 +43,44 @@ def modes_for(robot: str) -> list[str]:
     return list(entry["modes"]) if entry else []
 
 
+def _voice_excluded_modes(entry: _RobotEntry) -> set[str]:
+    """modeTree 에서 `voiceExcluded: true` 그룹의 모든 자손 mode id 를 모은다.
+    음성 명령으로 진입을 차단할 모드 (예: 관리 메뉴 하위) 식별용."""
+    excluded: set[str] = set()
+
+    def walk(node, inside_excluded: bool) -> None:
+        if isinstance(node, str):
+            if inside_excluded:
+                excluded.add(node)
+            return
+        if isinstance(node, dict):
+            group_excluded = inside_excluded or bool(node.get("voiceExcluded"))
+            for child in node.get("children", []):
+                walk(child, group_excluded)
+
+    for top in entry.get("modeTree", []) or []:
+        walk(top, False)
+    return excluded
+
+
 def mode_matchers_for(robot: str) -> list[tuple[str, str]]:
     """[(키워드, 대상 mode), ...] — modes 의 정식 이름 + modeAliases 의 별칭.
 
     길이 내림차순 정렬. ModeChangeHandler 가 substring 매치 시
     '율동 등록' (긴 mode) 이 '율동' (짧은 mode) 보다 먼저 시도되어
     부분-키워드 충돌을 피한다.
+
+    modeTree 에서 `voiceExcluded: true` 로 표시된 그룹의 자손 mode 는 제외.
     """
     entry = _ROBOTS_BY_ID.get(robot)
     if not entry:
         return []
     aliases: dict[str, list[str]] = entry.get("modeAliases", {}) or {}  # type: ignore[assignment]
+    excluded = _voice_excluded_modes(entry)
     out: list[tuple[str, str]] = []
     for mode in entry["modes"]:
+        if mode in excluded:
+            continue
         out.append((mode, mode))
         for alias in aliases.get(mode, []):
             if alias:
