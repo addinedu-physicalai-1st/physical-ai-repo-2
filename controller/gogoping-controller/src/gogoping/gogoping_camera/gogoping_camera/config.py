@@ -22,9 +22,11 @@ PERCEPTION_PRESETS = {
 ACTIVE_PRESET = "fast"
 
 # ── NVENC H.264 ──────────────────────────────────────────────────────────────
-H264_BITRATE = 4_000_000          # 4 Mbps
-H264_BITRATE_MAX = 6_000_000
-H264_GOP_SIZE = 10                # 키프레임 0.33초 (30fps) — video element mount 시 latency ↓
+# robot-web (LAN P2P, MediaRelay smoothing 없음) 깜빡임 방지 — bitrate burst 줄이고
+# 키프레임 주기 짧게 (loss 발생해도 다음 keyframe 까지 회복 시간 단축).
+H264_BITRATE = 2_000_000          # 2 Mbps
+H264_BITRATE_MAX = 3_000_000
+H264_GOP_SIZE = 5                 # 키프레임 0.17초 (30fps) — 손실 회복 빠르게
 H264_PRESET = "p4"                # NVENC preset (p1 fastest .. p7 quality)
 H264_TUNE = "ll"                  # low latency
 H264_RC = "cbr"
