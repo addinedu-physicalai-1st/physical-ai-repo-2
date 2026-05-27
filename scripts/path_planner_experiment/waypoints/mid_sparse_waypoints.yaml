@@ -69,7 +69,7 @@ waypoints:
   x: -3.5821659912
   y: 11.062299728393555
   yaw: 0.0
-  id: 35
+  id: 36
   group: null
 - name: 충전소
   x: 0.53
@@ -81,6 +81,24 @@ waypoints:
   x: 5.6789482079
   y: 2.815
   yaw: -3.141592653589793
+  id: null
+  group: null
+- name: 놀이방입구_상
+  x: -0.2981038742928348
+  y: 9.91319274902343
+  yaw: 0.0
+  id: null
+  group: null
+- name: 수면실입구
+  x: -0.31239581084395596
+  y: 11.062299728393555
+  yaw: 0.0
+  id: null
+  group: null
+- name: 놀이방입구_하
+  x: -0.259363975302934
+  y: 3.3549065589904785
+  yaw: 0.0
   id: null
   group: null
 patrols: {}
