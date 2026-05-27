@@ -9,104 +9,82 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 <style>
   :root{
-    --cream:#FFF8F2; --surface:#FFFFFF; --soft:#FFFDFB;
+    --cream:#FFF8F2; --surface:#FFFFFF;
     --pink:#EC8FA6; --pinkS:#FCE0E7;
     --mint:#3FB594; --mintS:#D6F1E9;
     --butter:#D49A1C; --butterS:#FBEFCD;
     --lav:#8A6CB0; --lavS:#EADFF6;
     --sky:#4E97D6; --skyS:#D7EAFA;
     --ink:#4A352B; --inkSoft:#86695C; --faint:#B6A399;
-    --border:#F0D7DD;
+    --border:#EFD6DC;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   @page{ size:594mm 841mm; margin:0; }
   html,body{ background:#cfc7c0; font-family:'Pretendard Variable',system-ui,sans-serif; color:var(--ink); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 
-  .poster{ width:594mm; height:841mm; background:var(--cream); position:relative; overflow:hidden; padding:14mm 14mm 11mm;
-    background-image: radial-gradient(circle at 8% 3%, #FCE0E7 0, transparent 24%), radial-gradient(circle at 94% 2%, #D7EAFA 0, transparent 22%); }
+  .poster{ width:594mm; height:841mm; background:var(--cream); position:relative; overflow:hidden; padding:13mm 13mm 10mm; display:flex; flex-direction:column; gap:7mm;
+    background-image: radial-gradient(circle at 6% 2%, #FCE0E7 0, transparent 22%), radial-gradient(circle at 95% 1%, #D7EAFA 0, transparent 20%); }
 
   /* HEADER */
-  .head{ display:flex; align-items:center; gap:12mm; background:var(--surface); border:1mm solid var(--border);
-    border-radius:8mm; padding:8mm 11mm; box-shadow:0 3mm 10mm rgba(236,143,166,.18); margin-bottom:8mm; }
-  .head .htext{ flex:1; }
-  .head .eyebrow{ font-family:'Jua'; letter-spacing:.3em; color:var(--lav); font-size:13pt; }
-  .head h1{ font-family:'Jua'; font-size:96pt; line-height:.92; margin:3mm 0 2mm; }
+  .head{ display:flex; align-items:center; gap:11mm; background:var(--surface); border:1mm solid var(--border); border-radius:8mm; padding:7mm 11mm; box-shadow:0 3mm 10mm rgba(236,143,166,.16); }
+  .head .htext{ flex:1 }
+  .eyebrow{ font-family:'Jua'; letter-spacing:.3em; color:var(--lav); font-size:13pt }
+  .head h1{ font-family:'Jua'; font-size:92pt; line-height:.92; margin:2mm 0 1.5mm }
   .head h1 .p{color:var(--pink)} .head h1 .d{color:var(--lav)} .head h1 .g{color:var(--mint)}
-  .head .sub{ font-family:'Jua'; font-size:24pt; color:var(--ink); }
-  .head .tag{ font-size:13.5pt; color:var(--inkSoft); margin-top:2mm; line-height:1.5; max-width:330mm; }
-  .head .hright{ flex:0 0 auto; text-align:center; }
-  .head .team{ font-family:'Jua'; font-size:18pt; color:#fff; background:var(--pink); border-radius:7mm; padding:4mm 9mm; display:inline-block; box-shadow:0 3mm 7mm rgba(236,143,166,.35); }
-  .head .robots{ margin-top:4mm; display:flex; gap:2.5mm; justify-content:center; }
-  .rbadge{ font-family:'Jua'; font-size:11pt; padding:2.4mm 5mm; border-radius:6mm; color:#fff; }
+  .head .sub{ font-family:'Jua'; font-size:23pt }
+  .head .tag{ font-size:13pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.5 }
+  .head .hright{ flex:0 0 auto; text-align:center }
+  .team{ font-family:'Jua'; font-size:18pt; color:#fff; background:var(--pink); border-radius:7mm; padding:4mm 9mm; display:inline-block; box-shadow:0 3mm 7mm rgba(236,143,166,.35) }
+  .robots{ margin-top:3.5mm; display:flex; gap:2.5mm; justify-content:center }
+  .rbadge{ font-family:'Jua'; font-size:11pt; padding:2.2mm 5mm; border-radius:6mm; color:#fff }
 
-  /* COLUMNS */
-  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:9mm; height:712mm; }
-  .col{ display:flex; flex-direction:column; gap:8mm; }
+  /* generic band card */
+  .sec{ background:var(--surface); border:1mm solid var(--border); border-radius:7mm; overflow:hidden; box-shadow:0 3mm 9mm rgba(236,143,166,.12); display:flex; flex-direction:column }
+  .bar{ display:flex; align-items:center; gap:3.5mm; padding:3.5mm 7mm; color:#fff }
+  .bar .material-icons-round{ font-size:22pt } .bar h2{ font-family:'Jua'; font-size:18pt }
+  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:12.5pt; opacity:.85 }
+  .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)} .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)}
+  .bd{ padding:6mm 7mm; flex:1 }
+  b{color:var(--ink)} p.lead{ font-size:13pt; line-height:1.6 } .small{ font-size:10pt; color:var(--inkSoft); line-height:1.5 }
 
-  /* SECTION CARD with colored header bar */
-  .sec{ background:var(--surface); border:1mm solid var(--border); border-radius:7mm; overflow:hidden;
-    box-shadow:0 3mm 9mm rgba(236,143,166,.13); display:flex; flex-direction:column; }
-  .sec.grow{ flex:1; }
-  .bar{ display:flex; align-items:center; gap:3.5mm; padding:4mm 7mm; color:#fff; }
-  .bar .material-icons-round{ font-size:24pt; }
-  .bar h2{ font-family:'Jua'; font-size:19pt; letter-spacing:.01em; }
-  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:14pt; opacity:.8; }
-  .bd{ padding:6mm 7mm; flex:1; }
-  .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)}
-  .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)}
+  .row2{ display:grid; gap:7mm } /* set columns inline */
 
-  p.lead{ font-size:13pt; line-height:1.6; } b{ color:var(--ink); }
-  .small{ font-size:10.5pt; line-height:1.55; color:var(--inkSoft); }
+  .stats{ display:flex; gap:4mm; margin:4mm 0 0 }
+  .stat{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:5mm; padding:3.5mm 1mm }
+  .stat .n{ font-family:'Jua'; font-size:27pt; line-height:1 } .stat .u{ font-size:11pt; color:var(--inkSoft) }
+  .stat .l{ font-size:9pt; color:var(--inkSoft); margin-top:1mm; line-height:1.3 }
 
-  /* stats */
-  .stats{ display:flex; gap:4mm; margin:5mm 0; }
-  .stat{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:5mm; padding:4mm 1mm; }
-  .stat .n{ font-family:'Jua'; font-size:29pt; line-height:1; } .stat .u{ font-size:12pt; color:var(--inkSoft); }
-  .stat .l{ font-size:9.5pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.35; }
+  .photo{ border-radius:5mm; border:1mm solid var(--border); object-fit:cover; box-shadow:0 2mm 7mm rgba(236,143,166,.2); width:100%; display:block }
+  .diagram{ background:#fff; border-radius:4mm; border:1mm solid var(--border); object-fit:contain; width:100%; display:block; padding:3mm }
 
-  /* tech stack categorized */
-  .techrow{ display:flex; align-items:center; gap:4mm; padding:2.5mm 0; border-top:.6mm solid var(--border); }
-  .techrow:first-child{ border-top:none; }
-  .techrow .cat{ font-family:'Jua'; font-size:11pt; color:var(--inkSoft); flex:0 0 34mm; }
-  .chips{ display:flex; flex-wrap:wrap; gap:2.2mm; }
-  .chip{ font-family:'Jua'; font-size:10.5pt; padding:1.8mm 4mm; border-radius:5mm; background:var(--pinkS); color:var(--ink); }
+  /* deployment list */
+  .dep{ display:flex; flex-direction:column; gap:3mm; justify-content:center }
+  .depi{ display:flex; gap:3.5mm; align-items:flex-start }
+  .dot{ width:5mm; height:5mm; border-radius:50%; flex:0 0 auto; margin-top:1.5mm }
+  .depi .t{ font-family:'Jua'; font-size:12.5pt } .depi .s{ font-size:10pt; color:var(--inkSoft); line-height:1.4 }
+
+  /* robot cards */
+  .rgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6mm }
+  .rcard{ display:flex; flex-direction:column; }
+  .rmedia{ width:100%; height:54mm; border-radius:5mm; border:1mm solid var(--border); object-fit:cover; box-shadow:0 2mm 7mm rgba(236,143,166,.18) }
+  .rtile{ width:100%; height:54mm; border-radius:5mm; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:2mm }
+  .rtile .material-icons-round{ font-size:46pt }
+  .rname{ font-family:'Jua'; font-size:15pt; margin-top:3mm; display:flex; align-items:baseline; gap:2mm }
+  .rname .hw{ font-size:10pt; color:var(--inkSoft) }
+  .rfn{ font-size:10.5pt; color:var(--inkSoft); line-height:1.55; margin-top:1.5mm }
+  .rfn b{ color:var(--ink) }
+
+  /* tech chips */
+  .techrow{ display:flex; align-items:flex-start; gap:4mm; padding:2.2mm 0; border-top:.6mm solid var(--border) }
+  .techrow:first-child{ border-top:none }
+  .techrow .cat{ font-family:'Jua'; font-size:10.5pt; color:var(--inkSoft); flex:0 0 28mm; padding-top:1mm }
+  .chips{ display:flex; flex-wrap:wrap; gap:2mm }
+  .chip{ font-family:'Jua'; font-size:10pt; padding:1.6mm 3.6mm; border-radius:5mm; background:var(--pinkS); color:var(--ink) }
   .chip.mint{background:var(--mintS)} .chip.lav{background:var(--lavS)} .chip.sky{background:var(--skyS)} .chip.butter{background:var(--butterS)}
 
-  /* architecture */
-  .arch{ display:flex; flex-direction:column; gap:2.5mm; }
-  .arow{ display:flex; gap:2.5mm; }
-  .abox{ flex:1; text-align:center; border-radius:3.5mm; padding:3mm 1mm; }
-  .abox .t{ font-family:'Jua'; font-size:11.5pt; } .abox .s{ font-size:8.5pt; color:var(--inkSoft); margin-top:.5mm; }
-  .conn{ text-align:center; font-family:'Jua'; font-size:10pt; color:var(--faint); }
+  .foot{ display:flex; justify-content:space-between; font-size:9.5pt; color:var(--faint); padding:0 3mm; margin-top:auto }
 
-  /* scenario flow */
-  .flow{ display:flex; align-items:stretch; gap:1.5mm; }
-  .fstep{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:4mm; padding:3.5mm 1mm; }
-  .fstep .material-icons-round{ font-size:21pt; } .fstep .t{ font-family:'Jua'; font-size:10.5pt; margin-top:.5mm; }
-  .fstep .s{ font-size:8pt; color:var(--inkSoft); line-height:1.25; margin-top:.5mm; }
-  .farrow{ align-self:center; color:var(--butter); font-size:12pt; }
-
-  /* feature row */
-  .feat{ display:flex; gap:3.5mm; align-items:flex-start; padding:3mm 0; border-top:.6mm solid var(--border); }
-  .feat:first-child{ border-top:none; }
-  .feat .fi{ width:9mm; height:9mm; border-radius:2.6mm; flex:0 0 auto; display:flex; align-items:center; justify-content:center; }
-  .feat .fi .material-icons-round{ font-size:18pt; }
-  .feat .ft{ font-family:'Jua'; font-size:12.5pt; } .feat .fp{ font-size:10.5pt; color:var(--inkSoft); line-height:1.5; margin-top:.5mm; }
-
-  /* mini-diagram boxes */
-  .mini{ display:flex; gap:2.5mm; align-items:stretch; margin:3mm 0; }
-  .mbox{ flex:1; background:var(--cream); border:1mm solid var(--border); border-radius:4mm; padding:3mm 3.5mm; }
-  .mbox .h{ font-family:'Jua'; font-size:11pt; display:flex; align-items:center; gap:1.5mm; }
-  .mbox .h .material-icons-round{ font-size:14pt; }
-  .mbox p{ font-size:9.5pt; color:var(--inkSoft); line-height:1.45; margin-top:1mm; }
-  .marrow{ align-self:center; font-family:'Jua'; color:var(--faint); font-size:11pt; }
-
-  .photo{ border-radius:4mm; border:1mm solid var(--border); object-fit:cover; box-shadow:0 2mm 7mm rgba(236,143,166,.2); }
-
-  .foot{ position:absolute; left:14mm; right:14mm; bottom:5mm; display:flex; justify-content:space-between;
-    font-size:10pt; color:var(--faint); border-top:.6mm solid var(--border); padding-top:2.5mm; }
-
-  .screennote{ position:fixed; top:8px; left:8px; z-index:99; background:#4A352B; color:#fff; font-family:sans-serif; font-size:12px; padding:6px 12px; border-radius:8px; opacity:.92; }
+  .screennote{ position:fixed; top:8px; left:8px; z-index:99; background:#4A352B; color:#fff; font-family:sans-serif; font-size:12px; padding:6px 12px; border-radius:8px; opacity:.92 }
   @media print{ .screennote{display:none} html,body{background:#fff} }
 </style>
 </head>
@@ -133,160 +111,93 @@
     </div>
   </header>
 
-  <div class="cols">
-
-    <!-- ══ LEFT ══ -->
-    <div class="col">
-
-      <!-- 개요 -->
-      <section class="sec">
-        <div class="bar pink"><span class="material-icons-round">lightbulb</span><h2>프로젝트 개요</h2></div>
-        <div class="bd">
-          <p class="lead"><b>배경</b> — 교사 한 명이 다수의 아이를 동시에 돌보며 <b>놀이·운반·기록</b>까지 떠안아 만성 과부하. 안전 사각지대와 야근이 반복됩니다.</p>
-          <div class="stats">
-            <div class="stat"><div class="n" style="color:var(--pink)">15<span class="u">명</span></div><div class="l">교사 1명당 아동<br>(만3세 법정)</div></div>
-            <div class="stat"><div class="n" style="color:var(--lav)">8<span class="u">h</span>52<span class="u">m</span></div><div class="l">하루 평균 근로<br>(2021)</div></div>
-            <div class="stat"><div class="n" style="color:var(--mint)">12.1<span class="u">%</span></div><div class="l">전직 의향<br>(2023)</div></div>
-          </div>
-          <p class="lead"><b>솔루션</b> — 등하원 인사·놀이·자율 운반·자동 기록을 <b>역할 분담한 3종 로봇</b>이 하나의 시스템으로 보조합니다.</p>
-          <p class="small" style="margin-top:3mm">출처 · 영유아보육법 시행규칙 §10 · 보건복지부 2021 전국보육실태조사 · 육아정책연구소 2023</p>
+  <!-- 개요 + 사진 -->
+  <section class="sec">
+    <div class="bar pink"><span class="material-icons-round">lightbulb</span><h2>프로젝트 개요</h2></div>
+    <div class="bd row2" style="grid-template-columns:1.45fr 1fr;align-items:center">
+      <div>
+        <p class="lead"><b>배경</b> — 교사 한 명이 다수의 아이를 동시에 돌보며 놀이·운반·기록까지 떠안아 만성 과부하. 안전 사각지대와 야근이 반복됩니다.</p>
+        <div class="stats">
+          <div class="stat"><div class="n" style="color:var(--pink)">15<span class="u">명</span></div><div class="l">교사 1명당 아동<br>(만3세 법정)</div></div>
+          <div class="stat"><div class="n" style="color:var(--lav)">8<span class="u">h</span>52<span class="u">m</span></div><div class="l">하루 평균 근로<br>(2021)</div></div>
+          <div class="stat"><div class="n" style="color:var(--mint)">12.1<span class="u">%</span></div><div class="l">전직 의향<br>(2023)</div></div>
         </div>
-      </section>
-
-      <!-- 기술 스택 -->
-      <section class="sec">
-        <div class="bar butter"><span class="material-icons-round">build</span><h2>기술 스택</h2></div>
-        <div class="bd">
-          <div class="techrow"><span class="cat">로봇 · 제어</span><div class="chips"><span class="chip">ROS2 Jazzy</span><span class="chip">Nav2 · SLAM</span><span class="chip">RPLiDAR C1</span><span class="chip">ros2_control</span></div></div>
-          <div class="techrow"><span class="cat">AI · 비전</span><div class="chips"><span class="chip mint">lerobot · ACT</span><span class="chip mint">SmolVLA</span><span class="chip mint">YOLOv8 · Pose</span><span class="chip mint">ByteTrack</span><span class="chip mint">InsightFace</span><span class="chip mint">MediaPipe</span><span class="chip mint">Ollama qwen2.5</span></div></div>
-          <div class="techrow"><span class="cat">백엔드 · DB</span><div class="chips"><span class="chip sky">FastAPI</span><span class="chip sky">PostgreSQL</span><span class="chip sky">WebSocket · SSE</span></div></div>
-          <div class="techrow"><span class="cat">프론트 · UI</span><div class="chips"><span class="chip lav">Vue 3 · Vite</span><span class="chip lav">PyQt5</span><span class="chip lav">three.js</span><span class="chip lav">Web Speech API</span></div></div>
-        </div>
-      </section>
-
-      <!-- 시스템 구성 -->
-      <section class="sec grow">
-        <div class="bar sky"><span class="material-icons-round">account_tree</span><h2>시스템 구성</h2></div>
-        <div class="bd">
-          <div class="arch">
-            <div class="arow">
-              <div class="abox" style="background:var(--pinkS)"><div class="t">Robot UI</div><div class="s">Vue3 · STT/TTS · 표정</div></div>
-              <div class="abox" style="background:var(--mintS)"><div class="t">Portal Web</div><div class="s">학부모 · 교사</div></div>
-              <div class="abox" style="background:var(--lavS)"><div class="t">Admin UI</div><div class="s">PyQt5 관제</div></div>
-            </div>
-            <div class="conn">▼  REST · WebSocket · SSE</div>
-            <div class="arow">
-              <div class="abox" style="background:var(--skyS);flex:1.7"><div class="t">Control Server · FastAPI</div><div class="s">세션 · 스트리밍 게이트웨이 · ROS2 브리지</div></div>
-              <div class="abox" style="background:var(--butterS)"><div class="t">AI Server</div><div class="s">Ollama · 작업 큐</div></div>
-            </div>
-            <div class="conn">▼  ROS2 Topic · Service · Action</div>
-            <div class="arow">
-              <div class="abox" style="background:var(--pinkS)"><div class="t">EduPing</div><div class="s">/eduping/*</div></div>
-              <div class="abox" style="background:var(--mintS)"><div class="t">GogoPing</div><div class="s">/gogoping/*</div></div>
-              <div class="abox" style="background:var(--lavS)"><div class="t">NoriArm ×3</div><div class="s">/noriarm/*</div></div>
-              <div class="abox" style="background:var(--skyS)"><div class="t">PostgreSQL</div><div class="s">출결·사진·보고서</div></div>
-            </div>
-          </div>
-          <p class="small" style="margin-top:4mm">· 로봇별 namespace로 모드 독립 운영 · Robot UI는 sim/real 동일 코드베이스 공유 · rosbridge 미사용, Control Server가 직접 중계</p>
-        </div>
-      </section>
-
-      <!-- 시나리오 -->
-      <section class="sec">
-        <div class="bar mint"><span class="material-icons-round">schedule</span><h2>시나리오 — 하루 일과</h2></div>
-        <div class="bd">
-          <div class="flow">
-            <div class="fstep"><span class="material-icons-round" style="color:var(--pink)">wb_sunny</span><div class="t">등원</div><div class="s">얼굴인식<br>인사·출석</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--mint)">extension</span><div class="t">놀이</div><div class="s">게임·율동<br>자연촬영</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--butter)">restaurant</span><div class="t">점심</div><div class="s">메뉴<br>관리</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--lav)">local_shipping</span><div class="t">보조</div><div class="s">추종<br>운반</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--sky)">waving_hand</span><div class="t">하원</div><div class="s">일일<br>보고서</div></div>
-          </div>
-        </div>
-      </section>
-
+        <p class="lead" style="margin-top:4mm"><b>솔루션</b> — 등하원·놀이·자율 운반·자동 기록을 <b>역할 분담한 3종 로봇</b>이 하나의 시스템으로 보조.</p>
+        <p class="small" style="margin-top:2.5mm">출처 · 영유아보육법 시행규칙 §10 · 보건복지부 2021 전국보육실태조사 · 육아정책연구소 2023</p>
+      </div>
+      <img class="photo" src="assets/teacher.jpg" alt="교실에서 아이들과 교사" style="height:62mm" />
     </div>
+  </section>
 
-    <!-- ══ RIGHT ══ -->
-    <div class="col">
+  <!-- 유치원 공간 & 로봇 배치 (실제 맵) -->
+  <section class="sec">
+    <div class="bar sky"><span class="material-icons-round">map</span><h2>유치원 공간 &amp; 로봇 배치</h2><span class="num">실제 SLAM 맵</span></div>
+    <div class="bd row2" style="grid-template-columns:1.35fr 1fr;align-items:center">
+      <img class="diagram" src="assets/floormap.png" alt="유치원 공간 도면 (수면실·놀이방·통로·출입구·운동장)" style="height:118mm" />
+      <div class="dep">
+        <div class="depi"><span class="dot" style="background:var(--pink)"></span><div><div class="t">출입구 — EduPing</div><div class="s">정문 상주, 등·하원 얼굴인식 인사</div></div></div>
+        <div class="depi"><span class="dot" style="background:var(--mint)"></span><div><div class="t">놀이방 — NoriArm ×3</div><div class="s">교실 비치, 블럭쌓기·OX·가게놀이</div></div></div>
+        <div class="depi"><span class="dot" style="background:var(--lav)"></span><div><div class="t">통로·운동장 — GogoPing</div><div class="s">교사 추종·운반, 운동장2에서 숨바꼭질</div></div></div>
+        <div class="depi"><span class="dot" style="background:var(--sky)"></span><div><div class="t">수면실</div><div class="s">낮잠·자장가, 낮잠 시각 자동 기록</div></div></div>
+      </div>
+    </div>
+  </section>
 
-      <!-- EduPing -->
-      <section class="sec">
-        <div class="bar pink"><span class="material-icons-round">accessibility_new</span><h2>EduPing — 등하원 · 율동 · 무궁화꽃</h2><span class="num">OpenArm</span></div>
-        <div class="bd" style="display:flex;gap:6mm">
-          <img class="photo" src="assets/eduping-real.jpg" alt="실제 제작한 EduPing" style="flex:0 0 38mm;width:38mm;height:78mm" />
-          <div style="flex:1">
-            <div class="feat"><span class="fi" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">face</span></span><div><div class="ft">얼굴인식 등하원</div><div class="fp">InsightFace 매칭 → child_id 확정 → 이름 인사 + 양팔 환영 모션 + 출결 자동 기록</div></div></div>
-            <div class="feat"><span class="fi" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">music_note</span></span><div><div class="ft">율동</div><div class="fp">음악·모션 50Hz 동기 스트리밍, Web Audio sample-accurate 재생으로 곡·3D·실물 팔 일치</div></div></div>
-            <div class="feat"><span class="fi" style="background:var(--butterS)"><span class="material-icons-round" style="color:var(--butter)">local_florist</span></span><div><div class="ft">무궁화꽃이 피었습니다</div><div class="fp">YOLOv8-Pose + ByteTrack로 참가자 5명 동시 추적, 움직임 임계 초과 자동 탈락</div></div></div>
-          </div>
+  <!-- 3대 로봇 (실제 사진/렌더) -->
+  <section class="sec">
+    <div class="bar mint"><span class="material-icons-round">smart_toy</span><h2>3대 로봇</h2></div>
+    <div class="bd">
+      <div class="rgrid">
+        <div class="rcard">
+          <img class="rmedia" src="assets/eduping-real.jpg" alt="EduPing 실물" />
+          <div class="rname">에듀핑 <span class="hw">EduPing · OpenArm</span></div>
+          <div class="rfn"><b>등하원</b> 얼굴인식 인사 · <b>율동</b> 음악/모션 동기 · <b>무궁화꽃</b> 다중 자세 추적</div>
         </div>
-      </section>
-
-      <!-- GogoPing -->
-      <section class="sec grow">
-        <div class="bar mint"><span class="material-icons-round">directions_car</span><h2>GogoPing — 추종 · 운반 · 놀이</h2><span class="num">Vic Pinky</span></div>
-        <div class="bd">
-          <div class="ft" style="font-family:'Jua';font-size:12.5pt;margin-bottom:1mm">교사 추종 — 두 센서의 책임 분담</div>
-          <div class="mini">
-            <div class="mbox"><div class="h"><span class="material-icons-round" style="color:var(--pink)">videocam</span> 카메라</div><p>DeepSORT + OSNet ReID로 <b>누구를</b> 따라갈지 식별·잠금</p></div>
-            <span class="marrow">+</span>
-            <div class="mbox"><div class="h"><span class="material-icons-round" style="color:var(--sky)">radar</span> LiDAR</div><p>잠근 방위의 <b>거리</b>를 측정해 속도 제어 · 임계 진입 즉시 정지</p></div>
-          </div>
-          <div class="feat"><span class="fi" style="background:var(--skyS)"><span class="material-icons-round" style="color:var(--sky)">explore</span></span><div><div class="ft">자율 운반</div><div class="fp">Admin UI 지도 클릭 → SLAM 맵 + nav graph로 자율 주행, 동적 장애물 회피 후 도착 음성 알림</div></div></div>
-          <div class="feat"><span class="fi" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">search</span></span><div><div class="ft">숨바꼭질 · 자장가</div><div class="fp">patrol 노드 순찰 + 카메라 PT 스윕으로 술래잡기 / 자장가 재생 + 낮잠 시각 자동 기록</div></div></div>
+        <div class="rcard">
+          <img class="rmedia" src="assets/gogoping.png" alt="GogoPing (Vic Pinky)" style="background:#F4F1EE" />
+          <div class="rname">고고핑 <span class="hw">GogoPing · Vic Pinky</span></div>
+          <div class="rfn"><b>추종</b> 카메라 ReID + LiDAR 거리 · <b>운반</b> Nav2 자율주행 · 숨바꼭질 · 자장가</div>
         </div>
-      </section>
-
-      <!-- NoriArm -->
-      <section class="sec grow">
-        <div class="bar lav"><span class="material-icons-round">precision_manufacturing</span><h2>NoriArm — 모방학습 놀이</h2><span class="num">OMX ×3</span></div>
-        <div class="bd">
-          <div class="ft" style="font-family:'Jua';font-size:12.5pt;margin-bottom:1mm">블럭쌓기 — ACT 모방학습 루프</div>
-          <div class="mini">
-            <div class="mbox"><div class="h">① 가위바위보</div><p>보 trajectory 재생 + 백그라운드 ACT 모델 로드</p></div>
-            <span class="marrow">→</span>
-            <div class="mbox"><div class="h">② 번갈아 쌓기</div><p>사람·로봇 1개씩, ACT 정책이 픽업·스택</p></div>
-            <span class="marrow">→</span>
-            <div class="mbox"><div class="h">③ 홈 복귀 종료</div><p>HOME_POSE 2회 감지 시 자동 종료</p></div>
-          </div>
-          <div class="feat"><span class="fi" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">quiz</span></span><div><div class="ft">OX 퀴즈</div><div class="fp">overhead 카메라 + MediaPipe Hands로 O/X 손 검출 판정, OMX 팔이 정답 지시</div></div></div>
-          <div class="feat"><span class="fi" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">storefront</span></span><div><div class="ft">가게놀이</div><div class="fp">"사과 주세요" 음성 → 의도 분류 LLM → Top·그리퍼 카메라 검증 후 모형 픽업·전달</div></div></div>
+        <div class="rcard">
+          <div class="rtile" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">precision_manufacturing</span><span style="font-family:'Jua';color:var(--lav);font-size:13pt">OMX ×3</span></div>
+          <div class="rname">노리암 <span class="hw">NoriArm · OMX</span></div>
+          <div class="rfn"><b>블럭쌓기</b> ACT 모방학습 · <b>OX 퀴즈</b> 손 검출 · <b>가게놀이</b> 음성 픽업·전달</div>
         </div>
-      </section>
+      </div>
+    </div>
+  </section>
 
-      <!-- 데이터 & 결과 -->
-      <section class="sec">
-        <div class="bar butter"><span class="material-icons-round">insights</span><h2>데이터 파이프라인 &amp; 결과</h2></div>
-        <div class="bd">
-          <div class="flow" style="margin-bottom:4mm">
-            <div class="fstep"><span class="material-icons-round" style="color:var(--pink)">photo_camera</span><div class="t">자연촬영</div><div class="s">감정 임계<br>초과 캡처</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--mint)">face_retouching_natural</span><div class="t">분류</div><div class="s">얼굴인식<br>아이 매핑</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--butter)">auto_stories</span><div class="t">보고서</div><div class="s">Ollama<br>LLM 요약</div></div>
-            <span class="farrow material-icons-round">chevron_right</span>
-            <div class="fstep"><span class="material-icons-round" style="color:var(--sky)">family_restroom</span><div class="t">학부모</div><div class="s">앱 자동<br>전달</div></div>
-          </div>
+  <!-- 데이터 모델 ERD + 기술/결과 -->
+  <section class="sec" style="flex:1">
+    <div class="bar lav"><span class="material-icons-round">schema</span><h2>데이터 모델 &amp; 기술 스택</h2></div>
+    <div class="bd row2" style="grid-template-columns:1.15fr 1fr;align-items:stretch">
+      <div style="display:flex;flex-direction:column">
+        <div class="small" style="font-family:'Jua';font-size:11.5pt;color:var(--ink);margin-bottom:2mm">PostgreSQL ERD — child·attendance·photo·report·robot·ai_job 등</div>
+        <img class="diagram" src="assets/erd.png" alt="pingdergarten ERD" style="flex:1;min-height:0;height:auto;max-height:150mm" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5mm">
+        <div>
+          <div class="techrow"><span class="cat">로봇·제어</span><div class="chips"><span class="chip">ROS2 Jazzy</span><span class="chip">Nav2·SLAM</span><span class="chip">RPLiDAR C1</span></div></div>
+          <div class="techrow"><span class="cat">AI·비전</span><div class="chips"><span class="chip mint">lerobot ACT</span><span class="chip mint">SmolVLA</span><span class="chip mint">YOLOv8</span><span class="chip mint">ByteTrack</span><span class="chip mint">InsightFace</span><span class="chip mint">MediaPipe</span><span class="chip mint">Ollama</span></div></div>
+          <div class="techrow"><span class="cat">백엔드</span><div class="chips"><span class="chip sky">FastAPI</span><span class="chip sky">PostgreSQL</span><span class="chip sky">WS·SSE</span></div></div>
+          <div class="techrow"><span class="cat">프론트</span><div class="chips"><span class="chip lav">Vue 3</span><span class="chip lav">PyQt5</span><span class="chip lav">three.js</span><span class="chip lav">Web Speech</span></div></div>
+        </div>
+        <div style="margin-top:auto">
+          <div class="small" style="font-family:'Jua';font-size:11.5pt;color:var(--ink);margin-bottom:2mm">결과</div>
           <div class="stats" style="margin:0">
-            <div class="stat"><div class="n" style="color:var(--pink)">3<span class="u">종</span></div><div class="l">로봇 역할 분담</div></div>
-            <div class="stat"><div class="n" style="color:var(--mint)">9<span class="u">개</span></div><div class="l">놀이·기능 모드</div></div>
-            <div class="stat"><div class="n" style="color:var(--lav);font-size:18pt">Sim→Real</div><div class="l">시뮬 검증 후 실물 이전</div></div>
+            <div class="stat"><div class="n" style="color:var(--pink)">3<span class="u">종</span></div><div class="l">로봇 분담</div></div>
+            <div class="stat"><div class="n" style="color:var(--mint)">9<span class="u">개</span></div><div class="l">놀이·기능</div></div>
+            <div class="stat"><div class="n" style="color:var(--lav);font-size:16pt">Sim→Real</div><div class="l">실물 이전</div></div>
           </div>
         </div>
-      </section>
-
+      </div>
     </div>
-  </div>
+  </section>
 
   <div class="foot">
     <span><b style="color:var(--inkSoft)">pingdergarten</b> · 사랑의 에듀핑</span>
     <span>호출어 · STT/TTS · 의도 분류 LLM · 셰이더 표정 — 단일 Robot UI 코드베이스 공유</span>
-    <span>ADDINEDU Physical AI · 2026.04 – 06</span>
+    <span>ADDINEDU Physical AI · 2026</span>
   </div>
 
 </div>
