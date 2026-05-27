@@ -44,7 +44,7 @@ hardware:
 policy:
   kind: act
   module: noriarm_framework.games.block_stacking.policy_act
-  repo_id: jisoo3/act_game_block_stacking_0521
+  repo_id: /home/s/il_ws/src/lerobot/outputs/train/act_game_block_stacking_0521_augmented_v2/checkpoints/240000/pretrained_model
   joint_names: [joint1, joint2, joint3, joint4, joint5]
   camera_keys: [front, wrist]
   # device: cuda:0    # 명시 안 하면 lerobot 가 자동 선택.

@@ -119,6 +119,12 @@ async function startPlaying(): Promise<void> {
   }
 }
 
+async function restartSession(): Promise<void> {
+  await endSession();
+  phase.value = 'intro';
+  await startSession();
+}
+
 async function endSession(): Promise<void> {
   clearTimers();
   if (!sessionId.value) return;
@@ -184,7 +190,8 @@ onUnmounted(() => {
 
         <div v-else-if="phase === 'done'" class="card">
           <h2>다 쌓았어요! 🎉</h2>
-          <button class="primary" @click="exitToIdle">끝내기</button>
+          <button class="primary" @click="restartSession">다시하기</button>
+          <button class="ghost" @click="exitToIdle">그만하기</button>
         </div>
 
         <div v-if="error" class="error">{{ error }}</div>
@@ -223,7 +230,8 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .ghost {
-  padding: 8px 16px;
+  padding: 12px 32px;
+  font-size: 1.2rem;
   background: transparent;
   border: 1px solid #ccc;
   border-radius: 8px;

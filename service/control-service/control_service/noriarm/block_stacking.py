@@ -4,9 +4,9 @@
   POST .../sessions          → BlockStackingSession (status=created)
   POST .../sessions/{id}/rps → bringup 종료 → rps_player.py (lerobot 직접, ROS 없음).
   POST .../sessions/{id}/start → rps_proc 종료 대기 → camera_tuner.py --apply →
-                                  /dev/shm/eval_stacking 정리 → lerobot-record (gnome-terminal).
-  GET  .../sessions/{id}/events → SSE — home_event (에피소드 완료 parquet 수) + keepalive.
-  DELETE .../sessions/{id}   → lerobot-record SIGINT → bringup 재기동.
+                                  runner_entry.py (ACT 추론 + 홈 복귀 자동 감지).
+  GET  .../sessions/{id}/events → SSE — home_event (홈 복귀 횟수) + keepalive.
+  DELETE .../sessions/{id}   → runner_entry SIGTERM → bringup 재기동.
 
 """
 from __future__ import annotations
@@ -15,8 +15,6 @@ import asyncio
 import json
 import logging
 import os
-import shlex
-import signal
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -25,6 +23,8 @@ from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
+from .block_stacking_process import RunnerProcess
 
 # block_stacking 게임 자산 디렉토리.
 _REPO_ROOT = Path(__file__).resolve().parents[4]  # /home/s/pingdergarten
@@ -40,85 +40,25 @@ _GAME_DIR = (
 )
 _CAMERA_TUNER = _GAME_DIR / "camera_tuner.py"
 _RPS_PLAYER = _GAME_DIR / "rps_player.py"
+_RUNNER_ENTRY = _GAME_DIR / "runner_entry.py"
 _DEVICE_NORIARM_SH = _REPO_ROOT / "scripts" / "device-noriarm.sh"
-_RAM_DISK_DIR = "/dev/shm/eval_stacking"
 _BRINGUP_TMUX_SESSION = "noriarm-device"
 
-# 카메라 by-id (원본 run_inference.sh 기준 — by-path보다 안정적).
-_FRONT_CAM = "/dev/v4l/by-id/usb-Alcorlink_Corp._USB_2.0_Camera-video-index0"
-_WRIST_CAM = "/dev/v4l/by-id/usb-Sonix_Technology_Co.__Ltd._USB_2.0_Camera_SN0001-video-index0"
+# noriarm_framework 이 pingdergarten venv 에 설치되지 않으므로 PYTHONPATH 주입.
+_NORIARM_SRC = str(
+    _REPO_ROOT / "controller" / "noriarm-controller" / "src" / "noriarm_framework"
+)
 
 
-def _lerobot_record_argv() -> list[str]:
-    cameras = {
-        "front": {
-            "type": "opencv",
-            "index_or_path": _FRONT_CAM,
-            "width": 640, "height": 480, "fps": 30, "fourcc": "MJPG",
-        },
-        "wrist": {
-            "type": "opencv",
-            "index_or_path": _WRIST_CAM,
-            "width": 640, "height": 480, "fps": 30, "fourcc": "MJPG",
-        },
-    }
-    return [
-        "lerobot-record",
-        "--robot.type=omx_follower",
-        "--robot.port=/dev/omx_follower",
-        "--robot.id=omx_follower_arm",
-        f"--robot.cameras={json.dumps(cameras)}",
-        "--display_data=true",
-        "--play_sounds=false",
-        "--policy.path=jisoo3/act_game_block_stacking_0520",
-        "--policy.temporal_ensemble_coeff=0.01",
-        "--policy.n_action_steps=1",
-        "--dataset.repo_id=jisoo3/eval_stacking_0520",
-        f"--dataset.root={_RAM_DISK_DIR}",
-        "--dataset.single_task=Game Block Stacking",
-        "--dataset.episode_time_s=500",
-        "--dataset.reset_time_s=15",
-        "--dataset.push_to_hub=false",
-    ]
+def _runner_env_extra() -> dict[str, str]:
+    existing = os.environ.get("PYTHONPATH", "")
+    pp = f"{_NORIARM_SRC}:{existing}" if existing else _NORIARM_SRC
+    return {"PYTHONPATH": pp}
 
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/games/block-stacking", tags=["noriarm"])
-
-
-class _LerobotProxy:
-    """gnome-terminal 안에서 도는 lerobot-record PID proxy."""
-
-    def __init__(self, pid: int | None) -> None:
-        self.pid = pid
-        self.returncode: int | None = None
-
-    def send_signal(self, sig: int) -> None:
-        if self.pid is None:
-            return
-        try:
-            os.kill(self.pid, sig)
-        except ProcessLookupError:
-            self.returncode = 0
-
-    def terminate(self) -> None:
-        self.send_signal(signal.SIGTERM)
-
-    def kill(self) -> None:
-        self.send_signal(signal.SIGKILL)
-
-    async def wait(self) -> int:
-        if self.pid is None:
-            self.returncode = 0
-            return 0
-        while True:
-            try:
-                os.kill(self.pid, 0)
-            except (ProcessLookupError, PermissionError):
-                self.returncode = 0
-                return 0
-            await asyncio.sleep(0.2)
 
 
 @dataclass
@@ -127,7 +67,7 @@ class BlockStackingSession:
     status: str = "created"  # created / rps / playing / done / error
     events: list[dict] = field(default_factory=list)
     _queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=64))
-    process: Any = None   # lerobot-record _LerobotProxy
+    process: Any = None   # RunnerProcess (runner_entry.py)
     rps_proc: Any = None  # rps_player.py asyncio.subprocess.Process
 
     async def next_event(self, *, timeout_s: float) -> dict | None:
@@ -182,8 +122,40 @@ async def _kill_bringup() -> None:
         pass
 
 
+async def _kill_stale_processes() -> None:
+    """runner_entry / rps_player 잔여 프로세스 강제 종료 + 스토어 세션 정리."""
+    # 스토어에 남은 세션 종료
+    for sid, session in list(_store._sessions.items()):
+        runner: RunnerProcess | None = session.process
+        if runner is not None:
+            try:
+                await runner.terminate()
+            except Exception:
+                pass
+        if session.rps_proc is not None:
+            try:
+                session.rps_proc.kill()
+            except Exception:
+                pass
+        _store.remove(sid)
+
+    # pkill 로 OS 레벨 잔여 프로세스 제거
+    for script in ("runner_entry.py", "rps_player.py"):
+        try:
+            p = await asyncio.create_subprocess_exec(
+                "pkill", "-9", "-f", script,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await p.wait()
+        except Exception:
+            pass
+    await asyncio.sleep(0.5)
+
+
 @router.post("/sessions")
 async def create_session() -> dict:
+    await _kill_stale_processes()
     s = _store.create()
     return {"session_id": s.session_id, "status": s.status}
 
@@ -197,7 +169,7 @@ async def play_rps(sid: str) -> dict:
     await _kill_bringup()
     await asyncio.sleep(1.5)
 
-    # rps_player.py fire-and-forget — UI timer 6s 후 /start 가 호출되므로 그때쯤 완료됨.
+    # rps_player.py fire-and-forget
     if _RPS_PLAYER.exists():
         try:
             rps_proc = await asyncio.create_subprocess_exec(
@@ -248,54 +220,37 @@ async def start_play(sid: str) -> dict:
     else:
         logger.warning("[block-stacking] %s 없음 — 카메라 세팅 skip", _CAMERA_TUNER)
 
-    # RAM disk 정리.
-    logger.warning("[block-stacking] %s 정리", _RAM_DISK_DIR)
-    rm = await asyncio.create_subprocess_exec(
-        "rm", "-rf", _RAM_DISK_DIR,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    await rm.wait()
-
-    # lerobot-record — gnome-terminal 새 창 (ROS env 완전 격리).
-    argv = _lerobot_record_argv()
-    inner_cmd = " ".join(shlex.quote(a) for a in argv)
-    pid_file = "/tmp/lerobot.pid"
-    log_path = "/tmp/lerobot.log"
-    bash_script = (
-        f"rm -f {pid_file}; "
-        f"({inner_cmd} & echo $! > {pid_file}; wait) 2>&1 | tee {log_path}; "
-        f"echo; echo '[lerobot-record 종료 — 창 닫기: Ctrl+D]'; exec bash"
-    )
-    logger.warning("[block-stacking] gnome-terminal 에서 lerobot-record 시작")
-    try:
-        term_proc = await asyncio.create_subprocess_exec(
-            "gnome-terminal", "--title=NoriArm 블럭쌓기 추론", "--",
-            "bash", "-c", bash_script,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except FileNotFoundError as e:
+    # runner_entry.py 시작 — ACT 추론 + 홈 복귀 자동 감지.
+    if not _RUNNER_ENTRY.exists():
         session.status = "error"
-        raise HTTPException(500, f"gnome-terminal 실행 불가: {e}") from e
+        raise HTTPException(500, f"runner_entry.py 없음: {_RUNNER_ENTRY}")
 
-    # lerobot PID 파일 대기.
-    lerobot_pid: int | None = None
-    for _ in range(30):
-        await asyncio.sleep(0.1)
-        try:
-            with open(pid_file) as f:
-                lerobot_pid = int(f.read().strip())
-            break
-        except (FileNotFoundError, ValueError):
-            continue
-    logger.warning("[block-stacking] gnome-terminal PID=%s  lerobot PID=%s",
-                   term_proc.pid, lerobot_pid)
-    session.process = _LerobotProxy(lerobot_pid)
+    def _on_event(ev: dict) -> None:
+        session.push_event(ev)
+
+    runner = RunnerProcess(
+        [sys.executable, str(_RUNNER_ENTRY)],
+        env_extra=_runner_env_extra(),
+        on_event=_on_event,
+    )
+    try:
+        await runner.start()
+    except Exception as e:
+        session.status = "error"
+        raise HTTPException(500, f"runner_entry 시작 실패: {e}") from e
+
+    logger.warning("[block-stacking] runner_entry 시작 — ACT 모델 로드 대기 (최대 120s)...")
+    if not await runner.wait_ready(timeout_s=120.0):
+        session.status = "error"
+        await runner.terminate()
+        raise HTTPException(500, "runner_entry READY timeout — ACT 모델 로드 실패")
+
+    await runner.send_start()
+    session.process = runner
     session.status = "playing"
+    logger.warning("[block-stacking] runner_entry START 전송 — 추론 루프 시작")
 
-    # lerobot가 카메라를 열 때 v4l2 설정이 리셋될 수 있어 3s 후 재적용.
+    # 카메라 오픈 후 v4l2 설정이 리셋될 수 있어 3s 후 재적용.
     async def _reapply_v4l2() -> None:
         await asyncio.sleep(3.0)
         if _CAMERA_TUNER.exists():
@@ -312,22 +267,7 @@ async def start_play(sid: str) -> dict:
             except Exception as e:
                 logger.warning("[block-stacking] v4l2 재적용 실패: %s", e)
 
-    # 에피소드 완료(parquet 파일 생성) 감지 → home_event SSE 발행.
-    async def _watch_episodes() -> None:
-        data_dir = Path(_RAM_DISK_DIR) / "data" / "chunk-000"
-        prev_count = 0
-        while session.status == "playing":
-            await asyncio.sleep(5.0)
-            try:
-                count = len(list(data_dir.glob("episode_*.parquet")))
-                if count > prev_count:
-                    prev_count = count
-                    session.push_event({"type": "home_event", "count": count})
-            except Exception:
-                pass
-
     asyncio.create_task(_reapply_v4l2())
-    asyncio.create_task(_watch_episodes())
 
     return {"session_id": sid, "status": session.status}
 
@@ -346,28 +286,21 @@ async def end_session(sid: str) -> dict:
         except Exception:
             pass
 
-    # lerobot-record SIGINT — disable_torque_on_disconnect 정상 동작.
-    proc: Any = session.process
-    if proc is not None:
+    # runner_entry SIGTERM → robot.disconnect() 후 종료.
+    runner: RunnerProcess | None = session.process
+    if runner is not None:
         try:
-            if hasattr(proc, "send_signal"):
-                proc.send_signal(signal.SIGINT)
-            else:
-                proc.terminate()
-            if hasattr(proc, "wait"):
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=10.0)
-                except asyncio.TimeoutError:
-                    logger.warning("[block-stacking] SIGINT 10s timeout — SIGTERM")
-                    if hasattr(proc, "terminate"):
-                        proc.terminate()
+            await runner.terminate()
+            code = await runner.wait_exit(timeout_s=10.0)
+            if code is None:
+                logger.warning("[block-stacking] SIGTERM 10s timeout — SIGKILL")
+                if runner._proc is not None:
                     try:
-                        await asyncio.wait_for(proc.wait(), timeout=3.0)
-                    except asyncio.TimeoutError:
-                        if hasattr(proc, "kill"):
-                            proc.kill()
+                        runner._proc.kill()
+                    except Exception:
+                        pass
         except Exception:
-            logger.warning("[block-stacking] lerobot 종료 중 예외 (무시)")
+            logger.warning("[block-stacking] runner 종료 중 예외 (무시)")
 
     # bringup 재기동.
     if _DEVICE_NORIARM_SH.exists():
