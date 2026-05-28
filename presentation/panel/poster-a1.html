@@ -77,19 +77,16 @@
   .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:17pt; color:var(--inkSoft); line-height:1.6 }
   .aimods b{ color:var(--ink); font-family:'Jua' }
 
-  /* ── hardware spec (left) — per-robot columns (vertical) ── */
-  .specgrid{ display:flex; gap:5mm; flex:1; min-height:0 }
-  .speccol{ flex:1; display:flex; flex-direction:column; gap:3mm; min-height:0 }
-  .speccol .ph{ width:100%; flex:1; min-height:0; display:flex; align-items:center; justify-content:center }
-  .speccol .ph img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:1mm solid var(--border); box-shadow:0 2mm 6mm rgba(236,143,166,.18); display:block }
-  .speccol .ph.slot{ width:100%; flex:1; border:1.4mm dashed var(--faint); border-radius:5mm; background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint) }
-  .speccol .ph.slot .material-icons-round{ font-size:28pt } .speccol .ph.slot span{ font-family:'Jua'; font-size:12pt }
-  .speccol .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:baseline; gap:3mm; flex-wrap:wrap }
-  .speccol .sn small{ font-size:16pt; color:var(--inkSoft); font-family:'Jua' }
-  .speccol .sl{ font-size:19pt; line-height:1.45; color:var(--inkSoft); display:flex; flex-direction:column }
-  .speccol .sl .li{ padding:1.4mm 0 1.4mm 5.5mm; position:relative }
-  .speccol .sl .li::before{ content:""; position:absolute; left:0; top:.7em; width:1.8mm; height:1.8mm; border-radius:50%; background:currentColor; opacity:.55 }
-  .speccol .sl b{ color:var(--ink); font-family:'Jua' }
+  /* ── hardware spec (left) — 3-col × 3-row grid for aligned layout ── */
+  .specgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr auto 1fr; gap:3mm 5mm; flex:1; min-height:0 }
+  .specgrid .ph{ width:100%; min-height:0; display:flex; align-items:center; justify-content:center }
+  .specgrid .ph img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:1mm solid var(--border); box-shadow:0 2mm 6mm rgba(236,143,166,.18); display:block }
+  .specgrid .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:baseline; gap:3mm; flex-wrap:wrap; align-self:end }
+  .specgrid .sn small{ font-size:16pt; color:var(--inkSoft); font-family:'Jua' }
+  .specgrid .sl{ font-size:19pt; line-height:1.45; color:var(--inkSoft); display:flex; flex-direction:column; align-self:start }
+  .specgrid .sl .li{ padding:1.4mm 0 1.4mm 5.5mm; position:relative }
+  .specgrid .sl .li::before{ content:""; position:absolute; left:0; top:.7em; width:1.8mm; height:1.8mm; border-radius:50%; background:currentColor; opacity:.55 }
+  .specgrid .sl b{ color:var(--ink); font-family:'Jua' }
 
   /* ── scenario horizontal (right, compact) ── */
   .flowh{ display:flex; align-items:flex-start; gap:1mm; padding:1mm 0 }
@@ -174,37 +171,34 @@
         <div class="bar lav"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
         <div class="bd">
           <div class="specgrid">
-            <div class="speccol">
-              <div class="ph"><img src="assets/hw-eduping.png" alt="EduPing 실물" /></div>
-              <div class="sn" style="color:var(--pink)">에듀핑 <small>OpenArm</small></div>
-              <div class="sl">
-                <div class="li"><b>양팔 매니퓰레이터</b></div>
-                <div class="li">DAMIAO BLDC ×8</div>
-                <div class="li">Top · Gripper · Web 카메라</div>
-                <div class="li">디스플레이</div>
-                <div class="li">마이크 · 스피커</div>
-              </div>
+            <!-- ── Row 1: photos ── -->
+            <div class="ph"><img src="assets/hw-eduping.png" alt="EduPing 실물" /></div>
+            <div class="ph"><img src="assets/hw-gogoping.png" alt="GogoPing 실물" /></div>
+            <div class="ph"><img src="assets/hw-noriarm.png" alt="NoriArm 실물" /></div>
+            <!-- ── Row 2: names ── -->
+            <div class="sn" style="color:var(--pink)">에듀핑 <small>OpenArm</small></div>
+            <div class="sn" style="color:var(--mint)">고고핑 <small>Vic Pinky</small></div>
+            <div class="sn" style="color:var(--lav)">노리암 <small>OMX × 3</small></div>
+            <!-- ── Row 3: spec lists ── -->
+            <div class="sl">
+              <div class="li"><b>양팔 매니퓰레이터</b></div>
+              <div class="li">DAMIAO BLDC ×8</div>
+              <div class="li">Top · Gripper · Web 카메라</div>
+              <div class="li">디스플레이</div>
+              <div class="li">마이크 · 스피커</div>
             </div>
-            <div class="speccol">
-              <div class="ph"><img src="assets/hw-gogoping.png" alt="GogoPing 실물" /></div>
-              <div class="sn" style="color:var(--mint)">고고핑 <small>Vic Pinky</small></div>
-              <div class="sl">
-                <div class="li"><b>차동구동 베이스</b></div>
-                <div class="li">RPLiDAR C1</div>
-                <div class="li">DC 모터 ×2</div>
-                <div class="li">배터리</div>
-                <div class="li">pan/tilt 카메라 (서보 ×2)</div>
-              </div>
+            <div class="sl">
+              <div class="li"><b>차동구동 베이스</b></div>
+              <div class="li">RPLiDAR C1</div>
+              <div class="li">DC 모터 ×2</div>
+              <div class="li">배터리</div>
+              <div class="li">pan/tilt 카메라 (서보 ×2)</div>
             </div>
-            <div class="speccol">
-              <div class="ph"><img src="assets/hw-noriarm.png" alt="NoriArm 실물" /></div>
-              <div class="sn" style="color:var(--lav)">노리암 <small>OMX × 3</small></div>
-              <div class="sl">
-                <div class="li"><b>4-DoF + 그리퍼</b></div>
-                <div class="li">Dynamixel ×6</div>
-                <div class="li">Top · Gripper 카메라</div>
-                <div class="li">마이크 · 스피커</div>
-              </div>
+            <div class="sl">
+              <div class="li"><b>4-DoF + 그리퍼</b></div>
+              <div class="li">Dynamixel ×6</div>
+              <div class="li">Top · Gripper 카메라</div>
+              <div class="li">마이크 · 스피커</div>
             </div>
           </div>
         </div>
