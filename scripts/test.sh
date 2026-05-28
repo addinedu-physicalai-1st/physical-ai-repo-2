@@ -195,6 +195,18 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[eduping] 무궁화 device-local 판정 순수 로직 + relay"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest \
+    controller/eduping-controller/src/eduarm/tests/test_mugunghwa_motion.py \
+    service/control-service/control_service/tests/test_mugunghwa_relay.py -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[noriarm-controller/noriarm_framework] 매니페스트 + 정책 + trajectory + 블럭쌓기 단위 테스트"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
