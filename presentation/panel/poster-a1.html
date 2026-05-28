@@ -77,15 +77,21 @@
   .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:12pt; color:var(--inkSoft); line-height:1.6 }
   .aimods b{ color:var(--ink); font-family:'Jua' }
 
-  /* ── scenario timeline (clean) ── */
-  .timeline{ position:relative; flex:1; display:flex; flex-direction:column; justify-content:space-around; padding-left:25mm }
-  .timeline::before{ content:""; position:absolute; left:9mm; top:9mm; bottom:9mm; width:2.4mm; border-radius:2mm;
-    background:linear-gradient(180deg,var(--pink),var(--mint),var(--butter),var(--lav),var(--sky)) }
-  .tstep{ position:relative; display:flex; flex-direction:column; justify-content:center }
-  .tnode{ position:absolute; left:-25mm; top:50%; transform:translateY(-50%); width:18mm; height:18mm; border-radius:50%; border:2.4mm solid #fff; box-shadow:0 2mm 7mm rgba(236,143,166,.32);
-    display:flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto }
-  .tnode .material-icons-round{ font-size:27pt; color:#fff }
-  .tt{ font-family:'Jua'; font-size:21pt; line-height:1 } .ts{ font-size:13.5pt; color:var(--inkSoft); margin-top:2mm; line-height:1.45 }
+  /* ── hardware spec (left) ── */
+  .spec{ display:flex; gap:5mm; align-items:center; flex:1; border-top:.8mm solid var(--border) }
+  .spec:first-child{ border-top:none }
+  .spec .si{ width:15mm; height:15mm; border-radius:4.5mm; display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
+  .spec .si .material-icons-round{ font-size:28pt }
+  .spec .sn{ font-family:'Jua'; font-size:17pt; flex:0 0 26mm; line-height:1.1 }
+  .spec .sl{ font-size:12.5pt; color:var(--inkSoft); line-height:1.5 } .spec .sl b{ color:var(--ink) }
+
+  /* ── scenario horizontal (right, compact) ── */
+  .flowh{ display:flex; align-items:flex-start; gap:1mm; padding:1mm 0 }
+  .fh{ flex:1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:1.5mm }
+  .fh .fhi{ width:14mm; height:14mm; border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2mm 5mm rgba(236,143,166,.28) }
+  .fh .fhi .material-icons-round{ font-size:23pt; color:#fff }
+  .fh .fht{ font-family:'Jua'; font-size:14pt; line-height:1 } .fh .fhs{ font-size:10pt; color:var(--inkSoft); line-height:1.2 }
+  .fharrow{ align-self:flex-start; margin-top:3mm; color:var(--faint); font-size:18pt; font-family:'Jua' }
 
   /* ── robot blocks (right) ── */
   .rhead{ display:flex; align-items:center; gap:6mm; margin-bottom:4mm }
@@ -173,31 +179,24 @@
         </div>
       </section>
 
-      <!-- 시나리오 -->
+      <!-- 하드웨어 제원 -->
       <section class="sec grow">
-        <div class="bar mint"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
+        <div class="bar lav"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
         <div class="bd">
-          <div class="timeline">
-            <div class="tstep">
-              <div class="tnode" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></div>
-              <div class="tt">등원</div><div class="ts">EduPing이 얼굴인식으로 인사하고 출석을 자동 기록</div>
-            </div>
-            <div class="tstep">
-              <div class="tnode" style="background:var(--mint)"><span class="material-icons-round">extension</span></div>
-              <div class="tt">놀이</div><div class="ts">NoriArm 게임 · EduPing 율동 · 자연 촬영으로 활동 기록</div>
-            </div>
-            <div class="tstep">
-              <div class="tnode" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></div>
-              <div class="tt">점심</div><div class="ts">메뉴 관리와 식사 보조</div>
-            </div>
-            <div class="tstep">
-              <div class="tnode" style="background:var(--lav)"><span class="material-icons-round">local_shipping</span></div>
-              <div class="tt">보조</div><div class="ts">GogoPing이 교사를 추종하고 교구를 자율 운반</div>
-            </div>
-            <div class="tstep">
-              <div class="tnode" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></div>
-              <div class="tt">하원</div><div class="ts">작별 인사와 함께 하루 일과 보고서를 자동 생성</div>
-            </div>
+          <div class="spec">
+            <span class="si" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">accessibility_new</span></span>
+            <span class="sn" style="color:var(--pink)">에듀핑<br><span style="font-size:9pt;color:var(--inkSoft)">OpenArm</span></span>
+            <span class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC 모터 ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</span>
+          </div>
+          <div class="spec">
+            <span class="si" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">directions_car</span></span>
+            <span class="sn" style="color:var(--mint)">고고핑<br><span style="font-size:9pt;color:var(--inkSoft)">Vic Pinky</span></span>
+            <span class="sl"><b>차동구동 모바일 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</span>
+          </div>
+          <div class="spec">
+            <span class="si" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">precision_manufacturing</span></span>
+            <span class="sn" style="color:var(--lav)">노리암 ×3<br><span style="font-size:9pt;color:var(--inkSoft)">OMX</span></span>
+            <span class="sl"><b>OpenMANIPULATOR-X 4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</span>
           </div>
         </div>
       </section>
@@ -252,6 +251,24 @@
           </div>
           <div class="rfunc"><b>블럭쌓기</b> ACT 모방학습 · <b>OX 퀴즈</b> 손 검출 · <b>가게놀이</b> 음성 픽업·전달</div>
           <div class="rblank"><span class="material-icons-round">image</span> 사진 · 설명 공간</div>
+        </div>
+      </section>
+
+      <!-- 시나리오 (compact) -->
+      <section class="sec">
+        <div class="bar sky"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
+        <div class="bd">
+          <div class="flowh">
+            <div class="fh"><span class="fhi" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></span><span class="fht">등원</span><span class="fhs">얼굴인식 인사</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--mint)"><span class="material-icons-round">extension</span></span><span class="fht">놀이</span><span class="fhs">게임·율동·촬영</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></span><span class="fht">점심</span><span class="fhs">메뉴·식사</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--lav)"><span class="material-icons-round">local_shipping</span></span><span class="fht">보조</span><span class="fhs">추종·운반</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></span><span class="fht">하원</span><span class="fhs">보고서 생성</span></div>
+          </div>
         </div>
       </section>
 
