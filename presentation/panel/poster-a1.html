@@ -68,16 +68,24 @@
   .chip{ font-family:'Jua'; font-size:12.5pt; padding:2.2mm 5mm; border-radius:6mm; background:var(--pinkS); color:var(--ink) }
   .chip.mint{background:var(--mintS)} .chip.lav{background:var(--lavS)} .chip.sky{background:var(--skyS)} .chip.butter{background:var(--butterS)}
 
-  /* ── scenario timeline (custom) ── */
-  .timeline{ position:relative; flex:1; display:flex; flex-direction:column; justify-content:space-between; padding-left:20mm }
-  .timeline::before{ content:""; position:absolute; left:8mm; top:6mm; bottom:6mm; width:2.2mm; border-radius:2mm;
+  /* ── tech logo grid ── */
+  .logos{ display:flex; flex-wrap:wrap; gap:5mm 3mm; align-content:flex-start }
+  .logo{ width:calc(16.66% - 2.5mm); display:flex; flex-direction:column; align-items:center; gap:1.8mm }
+  .logo .lw{ height:15mm; display:flex; align-items:center; justify-content:center }
+  .logo img{ max-height:15mm; max-width:22mm; object-fit:contain; display:block }
+  .logo span{ font-family:'Jua'; font-size:10pt; color:var(--inkSoft); text-align:center; line-height:1.05 }
+  .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:12pt; color:var(--inkSoft); line-height:1.6 }
+  .aimods b{ color:var(--ink); font-family:'Jua' }
+
+  /* ── scenario timeline (clean) ── */
+  .timeline{ position:relative; flex:1; display:flex; flex-direction:column; justify-content:space-around; padding-left:25mm }
+  .timeline::before{ content:""; position:absolute; left:9mm; top:9mm; bottom:9mm; width:2.4mm; border-radius:2mm;
     background:linear-gradient(180deg,var(--pink),var(--mint),var(--butter),var(--lav),var(--sky)) }
-  .tstep{ position:relative; display:flex; align-items:center; gap:5mm; flex:1 }
-  .tnode{ position:absolute; left:-20mm; width:16mm; height:16mm; border-radius:50%; border:2mm solid #fff; box-shadow:0 2mm 6mm rgba(236,143,166,.3);
+  .tstep{ position:relative; display:flex; flex-direction:column; justify-content:center }
+  .tnode{ position:absolute; left:-25mm; top:50%; transform:translateY(-50%); width:18mm; height:18mm; border-radius:50%; border:2.4mm solid #fff; box-shadow:0 2mm 7mm rgba(236,143,166,.32);
     display:flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto }
-  .tnode .material-icons-round{ font-size:24pt; color:#fff }
-  .tcard{ flex:1; background:var(--cream); border:1mm solid var(--border); border-radius:6mm; padding:4mm 6mm }
-  .tcard .tt{ font-family:'Jua'; font-size:19pt; line-height:1 } .tcard .ts{ font-size:13pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.4 }
+  .tnode .material-icons-round{ font-size:27pt; color:#fff }
+  .tt{ font-family:'Jua'; font-size:21pt; line-height:1 } .ts{ font-size:13.5pt; color:var(--inkSoft); margin-top:2mm; line-height:1.45 }
 
   /* ── robot blocks (right) ── */
   .rhead{ display:flex; align-items:center; gap:6mm; margin-bottom:4mm }
@@ -126,7 +134,7 @@
       <section class="sec">
         <div class="bar pink"><span class="badge"><span class="material-icons-round">lightbulb</span></span><h2>배경</h2></div>
         <div class="bd">
-          <p class="lead">교사 한 명이 다수의 아이를 동시에 돌보며 <b>놀이·운반·기록</b>까지 떠안아 만성 과부하. 안전 사각지대와 야근이 반복됩니다. pingdergarten은 이를 <b>역할 분담한 3종 로봇</b>으로 보조합니다.</p>
+          <p class="lead">아이는 <b>놀이로 배우지만</b>, 교사 한 명이 여러 아이의 놀이·안전·운반·기록을 동시에 감당하기는 벅찹니다. <b>pingdergarten</b>은 등원부터 하원까지 함께하는 <b>3종 로봇</b>으로, 아이에겐 놀이 친구를 · 교사에겐 여유를 만듭니다.</p>
           <div class="stats">
             <div class="stat"><div class="n" style="color:var(--pink)">15<span class="u">명</span></div><div class="l">교사 1명당 아동<br>(만3세 법정)</div></div>
             <div class="stat"><div class="n" style="color:var(--lav)">8<span class="u">h</span>52<span class="u">m</span></div><div class="l">하루 평균 근로<br>(2021)</div></div>
@@ -139,10 +147,21 @@
       <section class="sec">
         <div class="bar butter"><span class="badge"><span class="material-icons-round">build</span></span><h2>기술 스택</h2></div>
         <div class="bd">
-          <div class="techrow"><span class="cat">로봇·제어</span><div class="chips"><span class="chip">ROS2 Jazzy</span><span class="chip">Nav2·SLAM</span><span class="chip">RPLiDAR C1</span><span class="chip">MoveIt2</span></div></div>
-          <div class="techrow"><span class="cat">AI·비전</span><div class="chips"><span class="chip mint">lerobot ACT</span><span class="chip mint">SmolVLA</span><span class="chip mint">YOLOv8</span><span class="chip mint">ByteTrack</span><span class="chip mint">InsightFace</span><span class="chip mint">MediaPipe</span><span class="chip mint">Ollama qwen2.5</span></div></div>
-          <div class="techrow"><span class="cat">백엔드</span><div class="chips"><span class="chip sky">FastAPI</span><span class="chip sky">PostgreSQL</span><span class="chip sky">SQLAlchemy</span><span class="chip sky">WS·SSE</span></div></div>
-          <div class="techrow"><span class="cat">프론트</span><div class="chips"><span class="chip lav">Vue 3·Vite</span><span class="chip lav">PyQt5</span><span class="chip lav">three.js</span><span class="chip lav">Web Speech API</span></div></div>
+          <div class="logos">
+            <div class="logo"><div class="lw"><img src="assets/logos/ros.svg"></div><span>ROS2</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/python.svg"></div><span>Python</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/pytorch.svg"></div><span>PyTorch</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/ollama.svg"></div><span>Ollama</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/opencv.svg"></div><span>OpenCV</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/fastapi.svg"></div><span>FastAPI</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/postgresql.svg"></div><span>PostgreSQL</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/vuejs.svg"></div><span>Vue 3</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/vitejs.svg"></div><span>Vite</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/threejs.svg"></div><span>three.js</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/qt.svg"></div><span>PyQt5</span></div>
+            <div class="logo"><div class="lw"><img src="assets/logos/docker.svg"></div><span>Docker</span></div>
+          </div>
+          <div class="aimods"><b>AI 모델</b> &nbsp;lerobot ACT · SmolVLA · YOLOv8 · ByteTrack · InsightFace · MediaPipe · Nav2 · RPLiDAR C1</div>
         </div>
       </section>
 
@@ -161,23 +180,23 @@
           <div class="timeline">
             <div class="tstep">
               <div class="tnode" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></div>
-              <div class="tcard"><div class="tt">등원</div><div class="ts">EduPing이 얼굴인식으로 인사하고 출석을 자동 기록</div></div>
+              <div class="tt">등원</div><div class="ts">EduPing이 얼굴인식으로 인사하고 출석을 자동 기록</div>
             </div>
             <div class="tstep">
               <div class="tnode" style="background:var(--mint)"><span class="material-icons-round">extension</span></div>
-              <div class="tcard"><div class="tt">놀이</div><div class="ts">NoriArm 게임 · EduPing 율동 · 자연 촬영으로 활동 기록</div></div>
+              <div class="tt">놀이</div><div class="ts">NoriArm 게임 · EduPing 율동 · 자연 촬영으로 활동 기록</div>
             </div>
             <div class="tstep">
               <div class="tnode" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></div>
-              <div class="tcard"><div class="tt">점심</div><div class="ts">메뉴 관리와 식사 보조</div></div>
+              <div class="tt">점심</div><div class="ts">메뉴 관리와 식사 보조</div>
             </div>
             <div class="tstep">
               <div class="tnode" style="background:var(--lav)"><span class="material-icons-round">local_shipping</span></div>
-              <div class="tcard"><div class="tt">보조</div><div class="ts">GogoPing이 교사를 추종하고 교구를 자율 운반</div></div>
+              <div class="tt">보조</div><div class="ts">GogoPing이 교사를 추종하고 교구를 자율 운반</div>
             </div>
             <div class="tstep">
               <div class="tnode" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></div>
-              <div class="tcard"><div class="tt">하원</div><div class="ts">작별 인사와 함께 하루 일과 보고서를 자동 생성</div></div>
+              <div class="tt">하원</div><div class="ts">작별 인사와 함께 하루 일과 보고서를 자동 생성</div>
             </div>
           </div>
         </div>
