@@ -19,7 +19,7 @@ OneShot (policy=ON_COMPLETION, name="BT_return_sub")
 
 ## 사용 behavior
 
-- [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) — graph_router 액션 (다익스트라 + nav2 NavigateThroughPoses 위임)
+- [navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex) — graph_router 액션 (다익스트라 + nav2 `NavigateToPose` vertex 단위 chain 위임)
 - [align_to_dock](../behaviors/navigation.md#align_to_dock) — `ROBOT_POSE.yaw` ↔ `CHARGING_DOCK_TARGET_YAW` 비교, `cmd_vel.angular.z` 회전
 - [reverse_into_dock](../behaviors/navigation.md#reverse_into_dock) — N초 동안 `cmd_vel.linear.x` 후진 publish
 - [verify_docking_contact](../behaviors/navigation.md#verify_docking_contact) — `docked` trigger 1회 발사 → CHARGING 자동 전이
@@ -74,14 +74,14 @@ RETURNING 또는 LOW_BATTERY_RETURNING 중에 사용자가 다른 state 로 전�
 
 - `BT NavigateToVertex.terminate(INVALID)` 가 `graph_router` 의 action goal cancel 호출 ✅
 - `graph_router_node.py` 에 cancel handler 추가 완료 (ActionServer 의 `cancel_callback` + `_act_navigate` 의 polling) ✅
-- **그러나 nav2 의 NavigateThroughPoses goal 까지 cancel 이 forward 안 됨** — 의심:
+- **그러나 nav2 의 현재 segment goal 까지 cancel 이 forward 안 됨** — 의심:
   - graph_router 노드 재시작 안 된 채로 검증 (옛 코드 실행)
   - 또는 `asyncio.sleep(0.05)` 가 rclpy 의 `MultiThreadedExecutor` 환경에서 정상 동작 안 함 — polling loop 가 `gh.is_cancel_requested` 검출 못 함
 
 ### 다음 디버그 step
 
 1. `graph_router` 노드 명시적 재시작 후 cancel 로그 확인:
-   - `"navigate_to_vertex: client cancel → nav2 NavigateThroughPoses cancel"` 출력 여부
+   - `"navigate_to_vertex: client cancel @ segment N → nav2 NavigateToPose cancel"` 출력 여부 (2026-05-28 NavigateToPose chain 변경 이후 메시지 포맷)
 2. 재시작 후에도 같으면 → `asyncio.sleep` 대신 `rclpy.spin_once` 기반 polling 또는 별도 cancel handler 에서 nav_gh 를 직접 cancel 시키는 디자인으로 변경
 3. `control-service main.py` 의 `_cancel_waypoints_on_state_change` 가 호출되는지 로그 (`[state-change] ... → ... — waypoints cancel + plan clear`) 확인 — control-service 재시작 필수
 

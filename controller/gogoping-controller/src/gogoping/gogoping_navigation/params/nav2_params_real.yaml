@@ -95,8 +95,6 @@ bt_navigator:
     default_server_timeout: 20
     wait_for_service_timeout: 1000
     action_server_result_timeout: 900.0
-    # 커스텀 BT — ComputePathToPose 뒤에 SmoothPath 추가 (Smac2D jagged path 평탄화).
-    # 경로는 launch xml 에서 param substitution 으로 주입 (yaml 은 substitution 미지원).
     navigators: ["navigate_to_pose", "navigate_through_poses"]
     navigate_to_pose:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
@@ -120,7 +118,7 @@ controller_server:
     general_goal_checker:
       stateful: true
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.20
+      xy_goal_tolerance: 0.30  # 0.20 → 0.30 (vertex 사이 정지 폭 ↓ — chain 중간 지점은 30cm 통과만 해도 OK)
       # yaw 무시 — 도착 후 회전 안 함 (sim 과 동일 정책)
       yaw_goal_tolerance: 3.14
     # 추종 전용 — 정밀 도착 불필요, robot 가 좌우 흔들 안 함이 우선.
@@ -133,7 +131,7 @@ controller_server:
     # RPP — Regulated Pure Pursuit. 좁은 통로 추종 안정성 > DWB sampling.
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.20
+      desired_linear_vel: 0.20  # default — preempt next-goal 로 drift 자동 해결
       lookahead_dist: 1.2
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
@@ -141,8 +139,8 @@ controller_server:
       rotate_to_heading_angular_vel: 0.5
       transform_tolerance: 0.1
       use_velocity_scaled_lookahead_dist: true
-      min_approach_linear_velocity: 0.05
-      approach_velocity_scaling_dist: 0.6
+      min_approach_linear_velocity: 0.10   # 0.05 → 0.10 (vertex 근처에서 기어가는 느낌 ↓)
+      approach_velocity_scaling_dist: 0.3   # 0.6 → 0.3 (vertex 사이 정지 시간 ↓)
       # 충돌 예측 비활성화 — map 의 wall 노이즈로 자꾸 멈춤 방지
       use_collision_detection: false
       max_allowed_time_to_collision_up_to_carrot: 3.0
@@ -343,10 +341,12 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "CLOSED_LOOP"
-    max_velocity: [0.25, 0.0, 1.0]
-    min_velocity: [-0.25, 0.0, -1.0]
-    max_accel: [1.8, 0.0, 2.0]
-    max_decel: [-1.8, 0.0, -2.0]
+    # angular max — 1.0 → 0.6 rad/s (~34°/s, 부드러운 회전)
+    max_velocity: [0.25, 0.0, 0.6]
+    min_velocity: [-0.25, 0.0, -0.6]
+    # angular accel/decel (3번째) — RPP 의 과한 각속도 변화 댐핑 (2.0 → 1.0)
+    max_accel: [1.8, 0.0, 1.0]
+    max_decel: [-1.8, 0.0, -1.0]
     odom_topic: "/gogoping/odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]

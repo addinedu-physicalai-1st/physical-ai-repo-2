@@ -8,7 +8,7 @@ nav2 / graph_router 호출 + 정지/도킹. 모두 `bt/behaviors/navigation/` �
 
 [bt/behaviors/navigation/navigate_to_vertex.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/navigation/navigate_to_vertex.py)
 
-다익스트라로 lane 따라 vertex 까지 이동. graph_router 가 다익스트라 + nav2 `NavigateThroughPoses` 위임. graph routing 시스템 전체는 [../../graph-routing.md](../../graph-routing.md) 참조.
+다익스트라로 lane 따라 vertex 까지 이동. graph_router 가 다익스트라로 vertex sequence 결정 + nav2 `NavigateToPose` 를 vertex 단위 chain 호출. graph routing 시스템 전체는 [../../graph-routing.md](../../graph-routing.md) 참조.
 
 | 항목 | 값 |
 |---|---|

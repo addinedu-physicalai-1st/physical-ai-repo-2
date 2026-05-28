@@ -13,7 +13,7 @@
        default="$(find-pkg-share gogoping_navigation)/config/waypoints.yaml"/>
   <arg name="lanes_yaml"
        default="$(find-pkg-share gogoping_navigation)/config/lanes.yaml"/>
-  <arg name="follow_action" default="/navigate_through_poses"/>
+  <arg name="follow_action" default="/navigate_to_pose"/>
   <arg name="frame_id" default="map"/>
   <arg name="base_frame" default="gogoping/base_link"/>
 

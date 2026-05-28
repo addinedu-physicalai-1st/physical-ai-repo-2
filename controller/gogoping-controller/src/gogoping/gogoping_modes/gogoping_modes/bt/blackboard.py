@@ -53,7 +53,7 @@ class Keys:
     CHARGING_DOCK_TARGET_YAW = "charging_dock_target_yaw"  # float (rad) — AlignToDock 의 target yaw, SubTree 빌더가 graph 에서 vertex.yaw 로 채움
 
     # 숨바꼭질 (SR-PLAY-007) — UI / control-service / BT 협업
-    HIDESEEK_PLAY_AREA_KEY = "hideseek_play_area_key"   # str — named pose key (= 운동장2)
+    HIDESEEK_PLAY_AREA_KEY = "hideseek_play_area_key"   # str — named pose key (= 운동장-단상)
     HIDESEEK_REGISTERED_IDS = "hideseek_registered_ids" # list[int] — 모집 종료 시 control-service 가 W
     HIDESEEK_CAUGHT_IDS = "hideseek_caught_ids"         # list[int] — 발견 시 control-service 가 W
     HIDESEEK_PHASE = "hideseek_phase"                   # str — "move_to_play"/"recruit"/"countdown"/"patrol"/"return"/"end"/""

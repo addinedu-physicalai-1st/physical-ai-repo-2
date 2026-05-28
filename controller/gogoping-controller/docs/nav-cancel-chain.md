@@ -63,6 +63,8 @@
 3. **graph_router 의 polling 이 `gh.is_cancel_requested` 검출 → `nav_gh.cancel_goal_async()` forward** — nav2 가 controller stop.
 4. **finally 의 safety net** — 위 3개가 다 정상 작동하면 도달 안 함. 그러나 예외 / 외부 cancel 등 비정상 종료 시 nav_gh orphan 방지.
 
+> **NavigateToPose chain 변경 (2026-05-28)**: graph_router 가 vertex 단위로 nav2 NavigateToPose 를 순차 호출 (이전 NavigateThroughPoses 1-shot 에서 변경). 위 invariant 3, 4 는 **각 segment iteration 마다** 동일하게 적용 — `_act_navigate` 의 `for i in range(1, len(seq))` 안의 `try/finally` 가 매 segment 의 `nav_gh` orphan 을 보장. cancel 시에는 현재 segment 의 nav2 goal 만 cancel + sequence loop 탈출 (다음 segment 진입 안 함).
+
 ## 과거 함정 3개 (다 fix 됨)
 
 ### 함정 1 — NavTo race (goal_handle 미수신 상태에서 terminate)

@@ -1289,12 +1289,25 @@ class WaypointMapCard(QFrame):
         QMessageBox.warning(self, "삭제 실패", msg)
 
     def _on_goal_pose_requested(self, x: float, y: float, yaw: float) -> None:
-        """MapView 의 클릭-드래그 → /waypoints/goto-pose 호출 (RViz Nav2 Goal)."""
+        """MapView 의 클릭-드래그 → 가장 가까운 vertex 를 찾아 graph_router 로 위임.
+
+        운영 정책 (2026-05-28): vertex 안 거치는 자유 Nav2 goal 비활성화 — 실 환경의
+        admin UI 사용 패턴과 일치시키기 위해 임의 (x,y) 좌표 직접 navigation 금지.
+        클릭-드래그하면 가장 가까운 vertex 로 graph_router NavigateToVertex chain 호출.
+        """
         import httpx
+        import math
+        # 등록된 waypoints 중 가장 가까운 vertex 선택
+        if not self._map._waypoints:
+            return
+        nearest = min(
+            self._map._waypoints,
+            key=lambda w: math.hypot(w["x"] - x, w["y"] - y),
+        )
         try:
             httpx.post(
-                f"{self._control_url}/waypoints/goto-pose",
-                json={"x": x, "y": y, "yaw": yaw}, timeout=2.0,
+                f"{self._control_url}/waypoints/navigate",
+                json={"name": nearest["name"]}, timeout=2.0,
             )
         except httpx.HTTPError:
             pass  # 사용자 액션 — 실패해도 silent (SSE goal_status 가 결과 알림)

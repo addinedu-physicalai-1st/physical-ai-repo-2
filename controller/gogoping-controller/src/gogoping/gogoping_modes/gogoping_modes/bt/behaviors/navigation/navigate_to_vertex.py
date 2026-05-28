@@ -1,6 +1,6 @@
 """BT behavior — graph_router 의 NavigateToVertex action 호출.
 
-다익스트라로 lane 따라 이동 (NavigateThroughPoses 위임).
+다익스트라로 vertex sequence 결정, vertex 단위로 nav2 NavigateToPose chain 위임.
 
 Blackboard:
   read:  target_vertex_name (str)  — 목적지 vertex name (waypoints.yaml 의 name)
