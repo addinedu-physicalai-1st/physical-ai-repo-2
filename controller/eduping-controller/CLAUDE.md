@@ -27,9 +27,12 @@ OpenArm 양팔 7DOF + gripper 매니퓰레이터 ROS2 워크스페이스 (edupin
   - `routines_player_node` : YAML 한 개를 `/eduping/joint_trajectory` 로 단발 publish
   - `launch/sim_only.launch.py` : fake_leader + sim_twin
 
+구현됨:
+- **`src/eduping_stethoscope/`** — FSR402 청진기 raw 관찰. `fsr_bridge_node` (시리얼 `F<raw>\n` 또는 `fake:=true` → `/eduping/stethoscope/fsr_raw`, std_msgs/Int32), Arduino 스케치 `firmware/stethoscope_bridge/stethoscope_bridge.ino` (A0 analogRead). control-service doctor bridge 가 구독해 doctor UI footer 에 현재값/peak 표시.
+
 추후 추가:
-- `eduarm` 안 — feetech_leader_node (실물 openarm_mini), admittance_node, ee_teleop_node, arduino_bridge_node (TOF/FSR)
-- `firmware/openarm_sensors/` — Arduino 스케치
+- `eduarm` 안 — feetech_leader_node (실물 openarm_mini), admittance_node, ee_teleop_node
+- TOF 센서 arduino bridge (FSR 는 위 `eduping_stethoscope` 로 구현됨)
 
 ## 빌드
 
