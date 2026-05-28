@@ -79,10 +79,12 @@ class MugunghwaVideoHub:
             except Exception:
                 pass
         self._producer = ws
+        log.info("mugunghwa video producer registered")
 
     async def unregister_producer(self, ws: WebSocket) -> None:
         if self._producer is ws:
             self._producer = None
+            log.info("mugunghwa video producer gone")
 
     async def register_consumer(self, ws: WebSocket) -> None:
         self._consumers.add(ws)
