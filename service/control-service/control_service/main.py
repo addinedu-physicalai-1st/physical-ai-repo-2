@@ -379,6 +379,19 @@ eduping_rgb_hub = EdupingRgbHub()
 app.state.eduping_rgb_hub = eduping_rgb_hub
 app.include_router(build_eduping_rgb_router(eduping_rgb_hub))
 
+# 무궁화 device-local perception relay — JSON 이벤트(robot↔ui) + JPEG 영상(producer→consumers).
+from control_service.eduping.mugunghwa_relay import (  # noqa: E402
+    MugunghwaEventHub,
+    MugunghwaVideoHub,
+    build_router as build_mugunghwa_router,
+)
+
+mugunghwa_event_hub = MugunghwaEventHub()
+mugunghwa_video_hub = MugunghwaVideoHub()
+app.state.mugunghwa_event_hub = mugunghwa_event_hub
+app.state.mugunghwa_video_hub = mugunghwa_video_hub
+app.include_router(build_mugunghwa_router(mugunghwa_event_hub, mugunghwa_video_hub))
+
 # Doctor ↔ EduPing WebRTC signaling — SDP/ICE 만 relay (미디어는 P2P 직접).
 doctor_signal_hub = SignalingHub()
 app.state.doctor_signal_hub = doctor_signal_hub
