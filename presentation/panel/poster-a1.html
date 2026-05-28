@@ -104,9 +104,10 @@
   .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1; display:flex; align-items:baseline; gap:4mm; flex-wrap:wrap }
   .rtitle .en{ font-size:20pt; color:var(--inkSoft); font-family:'Jua' }
   .rfunc{ margin-bottom:4mm; color:var(--ink); display:flex; flex-direction:column }
-  .rfunc .ff{ padding:3.5mm 0; border-top:.6mm solid var(--border); font-size:18pt; line-height:1.55; display:flex; align-items:baseline; gap:5mm }
+  .rfunc .ff{ padding:3.5mm 0; border-top:.6mm solid var(--border); font-size:18pt; line-height:1.55; display:grid; grid-template-columns:62mm 1fr; align-items:baseline; gap:5mm }
   .rfunc .ff:first-child{ border-top:none; padding-top:0 }
-  .rfunc .ff b{ font-family:'Jua'; font-size:22pt; flex:0 0 auto; min-width:38mm; line-height:1.15; white-space:nowrap }
+  .rfunc .ff b{ font-family:'Jua'; font-size:22pt; line-height:1.15; white-space:nowrap }
+  .rfunc .ff span{ line-height:1.4 }
   .rfunc.pink .ff b{ color:var(--pink) }
   .rfunc.mint .ff b{ color:var(--mint) }
   .rfunc.lav  .ff b{ color:var(--lav) }
@@ -209,12 +210,30 @@
 
     </div>
 
-    <!-- ═══ RIGHT : 하드웨어별 기능 ═══ -->
+    <!-- ═══ RIGHT : 하드웨어별 활동 ═══ -->
     <div class="col">
+
+      <!-- 시나리오 (compact) — 맨 위로 이동 -->
+      <section class="sec">
+        <div class="bar sky"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
+        <div class="bd">
+          <div class="flowh">
+            <div class="fh"><span class="fhi" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></span><span class="fht">등원</span><span class="fhs">얼굴인식 인사</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--mint)"><span class="material-icons-round">extension</span></span><span class="fht">놀이</span><span class="fhs">게임·율동·촬영</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></span><span class="fht">점심</span><span class="fhs">메뉴·식사</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--lav)"><span class="material-icons-round">local_shipping</span></span><span class="fht">보조</span><span class="fhs">추종·운반</span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fhi" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></span><span class="fht">하원</span><span class="fhs">보고서 생성</span></div>
+          </div>
+        </div>
+      </section>
 
       <!-- EduPing -->
       <section class="sec grow">
-        <div class="bar pink"><span class="badge"><span class="material-icons-round">accessibility_new</span></span><h2>에듀핑 — 기능</h2><span class="num">EduPing</span></div>
+        <div class="bar pink"><span class="badge"><span class="material-icons-round">accessibility_new</span></span><h2>에듀핑 — 활동</h2><span class="num">EduPing</span></div>
         <div class="bd">
           <div class="rhead">
             <div>
@@ -235,7 +254,7 @@
 
       <!-- GogoPing -->
       <section class="sec grow">
-        <div class="bar mint"><span class="badge"><span class="material-icons-round">directions_car</span></span><h2>고고핑 — 기능</h2><span class="num">GogoPing</span></div>
+        <div class="bar mint"><span class="badge"><span class="material-icons-round">directions_car</span></span><h2>고고핑 — 활동</h2><span class="num">GogoPing</span></div>
         <div class="bd">
           <div class="rhead">
             <div>
@@ -254,7 +273,7 @@
 
       <!-- NoriArm -->
       <section class="sec grow">
-        <div class="bar lav"><span class="badge"><span class="material-icons-round">precision_manufacturing</span></span><h2>노리암 — 기능</h2><span class="num">NoriArm</span></div>
+        <div class="bar lav"><span class="badge"><span class="material-icons-round">precision_manufacturing</span></span><h2>노리암 — 활동</h2><span class="num">NoriArm</span></div>
         <div class="bd">
           <div class="rhead">
             <div>
@@ -267,24 +286,6 @@
             <div class="ff"><b>가게놀이</b><span>SmolVLA 모방학습 + 음성 의도 분류 LLM</span></div>
           </div>
           <div class="rshot"><img src="assets/noriarm-demo.png" alt="NoriArm 데모 — 가게놀이 · 블럭쌓기" /></div>
-        </div>
-      </section>
-
-      <!-- 시나리오 (compact) -->
-      <section class="sec">
-        <div class="bar sky"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
-        <div class="bd">
-          <div class="flowh">
-            <div class="fh"><span class="fhi" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></span><span class="fht">등원</span><span class="fhs">얼굴인식 인사</span></div>
-            <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--mint)"><span class="material-icons-round">extension</span></span><span class="fht">놀이</span><span class="fhs">게임·율동·촬영</span></div>
-            <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></span><span class="fht">점심</span><span class="fhs">메뉴·식사</span></div>
-            <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--lav)"><span class="material-icons-round">local_shipping</span></span><span class="fht">보조</span><span class="fhs">추종·운반</span></div>
-            <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></span><span class="fht">하원</span><span class="fhs">보고서 생성</span></div>
-          </div>
         </div>
       </section>
 
