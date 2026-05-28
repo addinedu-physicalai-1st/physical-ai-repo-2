@@ -63,6 +63,16 @@ def test_json_session_messages_are_relayed() -> None:
     assert seen == [{"type": "session", "action": "end"}]
 
 
+def test_publish_event_sends_text_to_client() -> None:
+    import json
+    hub = DoctorTeleopHub()
+    client = TestClient(_app(hub))
+    with client.websocket_connect("/ws/doctor/teleop?eduping_id=ed-01") as ws:
+        hub.publish_event("ed-01", {"type": "fsr", "raw": 512, "ts_ms": 7})
+        msg = json.loads(ws.receive_text())
+        assert msg == {"type": "fsr", "raw": 512, "ts_ms": 7}
+
+
 def test_missing_eduping_id_rejected() -> None:
     hub = DoctorTeleopHub()
     client = TestClient(_app(hub))
