@@ -79,6 +79,25 @@ class DoctorTeleopHub:
                     log.warning("publish_state send failed for %s: %s", _ws, e)
             fut.add_done_callback(_log_error)
 
+    def publish_event(self, eduping_id: str, msg: dict) -> None:
+        """서버→UI 텍스트(JSON) 프레임. publish_state 와 동일한 thread-safe 패턴.
+
+        ros_bridge thread 등 비-asyncio thread 에서 호출 가능 — 각 연결에 저장된
+        event loop 로 ws.send_text 를 schedule (fire-and-forget, 에러는 로그만).
+        """
+        text = json.dumps(msg)
+        with self._conns_lock:
+            entries = list(self._conns.get(eduping_id, ()))
+        for loop, ws in entries:
+            fut = asyncio.run_coroutine_threadsafe(ws.send_text(text), loop)
+
+            def _log_error(f: asyncio.Future, _ws: WebSocket = ws) -> None:
+                try:
+                    f.result()
+                except Exception as e:
+                    log.warning("publish_event send failed for %s: %s", _ws, e)
+            fut.add_done_callback(_log_error)
+
     def active_eduping_ids(self) -> list[str]:
         """현재 연결된 eduping_id 목록 (복사본 반환 — thread-safe)."""
         with self._conns_lock:
