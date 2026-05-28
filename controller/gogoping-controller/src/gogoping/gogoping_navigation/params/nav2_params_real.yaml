@@ -118,7 +118,7 @@ controller_server:
     general_goal_checker:
       stateful: true
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.30
+      xy_goal_tolerance: 0.20
       # yaw 무시 — 도착 후 회전 안 함 (sim 과 동일 정책)
       yaw_goal_tolerance: 3.14
     # 추종 전용 — 정밀 도착 불필요, robot 가 좌우 흔들 안 함이 우선.
