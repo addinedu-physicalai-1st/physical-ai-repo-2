@@ -67,14 +67,14 @@ def _post_recognize_multi(url: str, jpeg: bytes, token: str, timeout: float = 2.
 class _WsProducer:
     """control-service 로 붙는 WS producer + 재접속 데몬 (d435_rgb_uploader 패턴)."""
 
-    def __init__(self, url: str, logger, *, on_message=None) -> None:
+    def __init__(self, url: str, logger, *, name: str = "mugunghwa-ws", on_message=None) -> None:
         self._url = url
         self._log = logger
         self._on_message = on_message
         self._ws = None
         self._lock = threading.Lock()
         self._stop = threading.Event()
-        threading.Thread(target=self._loop, name="mugunghwa-ws", daemon=True).start()
+        threading.Thread(target=self._loop, name=name, daemon=True).start()
 
     def _loop(self) -> None:
         backoff = 1.0
@@ -166,6 +166,8 @@ class MugunghwaPerception(Node):
         self._yolo = YOLO(gp("yolo_model").get_parameter_value().string_value)
 
         self._bridge = CvBridge()
+        # 아래 timestamp/inflight 플래그는 단일 스레드 executor(rclpy.spin) 전제 — _on_image
+        # 가 한 스레드에서만 호출되므로 lock 없이 안전. MultiThreadedExecutor 로 바꾸면 race.
         self._last_send = 0.0
         self._last_entry = 0.0
         self._last_elim = 0.0
@@ -175,13 +177,13 @@ class MugunghwaPerception(Node):
         self._tracks: list[dict] = []       # 최신 yolo.track 결과
         self._bindings: dict[int, int] = {}  # track_id → child_id
         self._baseline: dict[int, tuple[float, float]] = {}
-        self._latest_bgr = None
         self._state_lock = threading.Lock()
         self._recognize_inflight = False
 
         self._events = _WsProducer(base + EVENT_PATH, self.get_logger(),
-                                   on_message=self._on_command)
-        self._video = _WsProducer(base + VIDEO_PATH, self.get_logger())
+                                   name="mugunghwa-ws-events", on_message=self._on_command)
+        self._video = _WsProducer(base + VIDEO_PATH, self.get_logger(),
+                                  name="mugunghwa-ws-video")
 
         self.create_subscription(Image, "/d435/color/image_raw", self._on_image, 1)
         self.get_logger().info("mugunghwa_perception up")
@@ -225,7 +227,6 @@ class MugunghwaPerception(Node):
             self.get_logger().warn(f"cv_bridge failed: {exc}")
             return
         with self._state_lock:
-            self._latest_bgr = bgr
             mode = self._mode
 
         # YOLO + ByteTrack (hot loop).
@@ -291,11 +292,14 @@ class MugunghwaPerception(Node):
         if not matches:
             return
         new_bind = match_recognize_to_tracks(matches, tracks)
+        newly_registered: list[int] = []
         with self._state_lock:
             for tid, cid in new_bind.items():
                 if self._bindings.get(tid) != cid:
                     self._bindings[tid] = cid
-                    self._emit({"type": "registered", "child_id": cid})
+                    newly_registered.append(cid)
+        for cid in newly_registered:
+            self._emit({"type": "registered", "child_id": cid})
 
     # ---- observation: 변위 판정 ----
     def _judge_movers(self, tracks: list[dict]) -> None:
