@@ -77,16 +77,15 @@
   .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:17pt; color:var(--inkSoft); line-height:1.6 }
   .aimods b{ color:var(--ink); font-family:'Jua' }
 
-  /* ── hardware spec (left) — per-robot rows w/ photo ── */
-  .spec{ display:flex; gap:5mm; align-items:center; flex:1; border-top:.8mm solid var(--border); padding:3mm 0 }
-  .spec:first-child{ border-top:none; padding-top:0 }
-  .spec:last-child{ padding-bottom:0 }
-  .specphoto{ width:32mm; align-self:stretch; border-radius:5mm; overflow:hidden; border:1mm solid var(--border); flex:0 0 auto }
-  .specphoto img{ width:100%; height:100%; object-fit:cover; display:block }
-  .specphoto.slot{ border:1.4mm dashed var(--faint); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint) }
-  .specphoto.slot .material-icons-round{ font-size:26pt } .specphoto.slot span{ font-family:'Jua'; font-size:11pt }
-  .spec .sn{ font-family:'Jua'; font-size:21pt; flex:0 0 24mm; line-height:1.1 }
-  .spec .sl{ font-size:16pt; color:var(--inkSoft); line-height:1.5 } .spec .sl b{ color:var(--ink) }
+  /* ── hardware spec (left) — per-robot columns (vertical) ── */
+  .specgrid{ display:flex; gap:5mm; flex:1; min-height:0 }
+  .speccol{ flex:1; display:flex; flex-direction:column; gap:3mm; min-height:0 }
+  .speccol .ph{ width:100%; flex:1; min-height:0; border-radius:5mm; overflow:hidden; border:1mm solid var(--border) }
+  .speccol .ph img{ width:100%; height:100%; object-fit:cover; display:block }
+  .speccol .ph.slot{ border:1.4mm dashed var(--faint); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint) }
+  .speccol .ph.slot .material-icons-round{ font-size:28pt } .speccol .ph.slot span{ font-family:'Jua'; font-size:12pt }
+  .speccol .sn{ font-family:'Jua'; font-size:20pt; line-height:1.1 } .speccol .sn small{ font-size:12pt; color:var(--inkSoft) }
+  .speccol .sl{ font-size:14pt; color:var(--inkSoft); line-height:1.45 } .speccol .sl b{ color:var(--ink) }
 
   /* ── scenario horizontal (right, compact) ── */
   .flowh{ display:flex; align-items:flex-start; gap:1mm; padding:1mm 0 }
@@ -186,20 +185,22 @@
       <section class="sec grow">
         <div class="bar lav"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
         <div class="bd">
-          <div class="spec">
-            <div class="specphoto"><img src="assets/eduping-real.jpg" alt="EduPing 실물" /></div>
-            <span class="sn" style="color:var(--pink)">에듀핑<br><span style="font-size:13pt;color:var(--inkSoft)">OpenArm</span></span>
-            <span class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC 모터 ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</span>
-          </div>
-          <div class="spec">
-            <div class="specphoto slot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
-            <span class="sn" style="color:var(--mint)">고고핑<br><span style="font-size:13pt;color:var(--inkSoft)">Vic Pinky</span></span>
-            <span class="sl"><b>차동구동 모바일 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</span>
-          </div>
-          <div class="spec">
-            <div class="specphoto slot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
-            <span class="sn" style="color:var(--lav)">노리암 ×3<br><span style="font-size:13pt;color:var(--inkSoft)">OMX</span></span>
-            <span class="sl"><b>OpenMANIPULATOR-X 4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</span>
+          <div class="specgrid">
+            <div class="speccol">
+              <div class="ph"><img src="assets/eduping-real.jpg" alt="EduPing 실물" /></div>
+              <div class="sn" style="color:var(--pink)">에듀핑 <small>OpenArm</small></div>
+              <div class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</div>
+            </div>
+            <div class="speccol">
+              <div class="ph slot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
+              <div class="sn" style="color:var(--mint)">고고핑 <small>Vic Pinky</small></div>
+              <div class="sl"><b>차동구동 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</div>
+            </div>
+            <div class="speccol">
+              <div class="ph slot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
+              <div class="sn" style="color:var(--lav)">노리암 ×3 <small>OMX</small></div>
+              <div class="sl"><b>OMX 4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</div>
+            </div>
           </div>
         </div>
       </section>
