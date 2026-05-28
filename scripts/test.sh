@@ -172,6 +172,16 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[eduping_stethoscope] FSR 시리얼 프로토콜 헬퍼 (parse_line)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy pytest tests/test_eduping_stethoscope_protocol.py -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[control-service] camera_pan (router + bridge mock) — ROS 불필요"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
