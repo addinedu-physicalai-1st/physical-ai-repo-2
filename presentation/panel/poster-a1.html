@@ -102,7 +102,10 @@
   .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
   .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1 } .rtitle .en{ font-size:23pt; color:var(--inkSoft) }
   .rhw{ font-family:'Jua'; font-size:23pt; color:var(--ink); margin-top:3mm }
-  .rfunc{ font-size:21pt; line-height:1.6; color:var(--ink); margin-bottom:4mm }
+  .rfunc{ margin-bottom:4mm; color:var(--ink); display:flex; flex-direction:column }
+  .rfunc .ff{ padding:2.8mm 0; border-top:.6mm solid var(--border); font-size:16pt; line-height:1.5 }
+  .rfunc .ff:first-child{ border-top:none; padding-top:0 }
+  .rfunc .ff b{ font-family:'Jua'; color:var(--ink); font-size:20pt; display:inline-block; min-width:34mm; margin-right:3mm }
   .rfunc b{ color:var(--ink) }
   .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
     display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:19pt; gap:2.5mm; overflow:hidden }
@@ -120,8 +123,6 @@
 </style>
 </head>
 <body>
-<div class="screennote">A1 세로 · 인쇄: Ctrl+P → 용지 A1 → <b>배경 그래픽 켜기</b> → PDF · 점선칸은 사진/글 채우는 자리</div>
-
 <div class="poster">
 
   <!-- HEADER -->
@@ -204,7 +205,11 @@
               <div class="rhw">OpenArm</div>
             </div>
           </div>
-          <div class="rfunc"><b>등하원</b> InsightFace 얼굴 임베딩 매칭 + 양팔 환영 trajectory · <b>율동</b> 50Hz 모션 / 16kHz PCM 동기 WS 스트리밍 · <b>무궁화꽃</b> YOLOv8-Pose + ByteTrack 다중 자세 추적</div>
+          <div class="rfunc">
+            <div class="ff"><b>등하원</b>InsightFace 얼굴 임베딩 매칭 + 양팔 환영 trajectory</div>
+            <div class="ff"><b>율동</b>동기 스트리밍</div>
+            <div class="ff"><b>무궁화꽃</b>YOLOv8-Pose + ByteTrack 다중 자세 추적</div>
+          </div>
           <div class="demohalf">
             <div class="d"><img src="assets/eduping-demo1.jpg" alt="EduPing 데모" /></div>
             <div class="d"><img src="assets/eduping-demo2.png" alt="EduPing 데모" /></div>
@@ -222,7 +227,12 @@
               <div class="rhw">Vic Pinky</div>
             </div>
           </div>
-          <div class="rfunc"><b>교사 추종</b> DeepSORT + OSNet ReID + RPLiDAR C1 거리제어 · <b>자율 운반</b> SLAM 맵 + nav graph + Nav2 · <b>숨바꼭질</b> 순찰 + 얼굴 매칭 · <b>자장가</b> 모드 전환 + 낮잠 시각 기록</div>
+          <div class="rfunc">
+            <div class="ff"><b>교사 추종</b>DeepSORT + OSNet ReID + RPLiDAR C1 거리제어</div>
+            <div class="ff"><b>자율 운반</b>SLAM 맵 + nav graph + Nav2</div>
+            <div class="ff"><b>숨바꼭질</b>웨이포인트 순찰 + 얼굴 매칭</div>
+            <div class="ff"><b>자장가</b>모드 전환 + 낮잠 시각 기록</div>
+          </div>
           <div class="rshot"><img src="assets/gogoping-dashboard.png" alt="GogoPing 대시보드 — Gazebo Sim · nav graph · LiDAR 스캔" /></div>
         </div>
       </section>
@@ -237,7 +247,11 @@
               <div class="rhw">OMX ×3</div>
             </div>
           </div>
-          <div class="rfunc"><b>블럭쌓기</b> lerobot ACT 모방학습 + HOME pose 도달 감지 종료 · <b>OX 퀴즈</b> MediaPipe Hands 손 검출 + 룰베이스 trajectory · <b>가게놀이</b> SmolVLA 모방학습 + 음성 의도 분류 LLM 으로 픽업·전달</div>
+          <div class="rfunc">
+            <div class="ff"><b>블럭쌓기</b>lerobot ACT 모방학습 + HOME pose 종료 감지</div>
+            <div class="ff"><b>OX 퀴즈</b>MediaPipe Hands 손 검출 + 룰베이스 trajectory</div>
+            <div class="ff"><b>가게놀이</b>SmolVLA 모방학습 + 음성 의도 분류 LLM</div>
+          </div>
           <div class="rshot"><img src="assets/noriarm-demo.png" alt="NoriArm 데모 — 가게놀이 · 블럭쌓기" /></div>
         </div>
       </section>
