@@ -95,6 +95,8 @@ bt_navigator:
     default_server_timeout: 20
     wait_for_service_timeout: 1000
     action_server_result_timeout: 900.0
+    # 커스텀 BT — ComputePathToPose 뒤에 SmoothPath 추가 (Smac2D jagged path 평탄화).
+    # 경로는 launch xml 에서 param substitution 으로 주입 (yaml 은 substitution 미지원).
     navigators: ["navigate_to_pose", "navigate_through_poses"]
     navigate_to_pose:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
