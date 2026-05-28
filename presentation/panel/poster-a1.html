@@ -86,7 +86,9 @@
   .speccol .ph.slot .material-icons-round{ font-size:28pt } .speccol .ph.slot span{ font-family:'Jua'; font-size:12pt }
   .speccol .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:baseline; gap:3mm; flex-wrap:wrap }
   .speccol .sn small{ font-size:16pt; color:var(--inkSoft); font-family:'Jua' }
-  .speccol .sl{ font-size:17pt; line-height:1.55; color:var(--inkSoft) }
+  .speccol .sl{ font-size:19pt; line-height:1.45; color:var(--inkSoft); display:flex; flex-direction:column }
+  .speccol .sl .li{ padding:1.4mm 0 1.4mm 5.5mm; position:relative }
+  .speccol .sl .li::before{ content:""; position:absolute; left:0; top:.7em; width:1.8mm; height:1.8mm; border-radius:50%; background:currentColor; opacity:.55 }
   .speccol .sl b{ color:var(--ink); font-family:'Jua' }
 
   /* ── scenario horizontal (right, compact) ── */
@@ -102,8 +104,8 @@
   .pslot{ width:40mm; height:40mm; flex:0 0 auto; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.5mm; color:var(--faint); overflow:hidden }
   .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
-  .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1 } .rtitle .en{ font-size:23pt; color:var(--inkSoft) }
-  .rhw{ font-family:'Jua'; font-size:23pt; color:var(--ink); margin-top:3mm }
+  .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1; display:flex; align-items:baseline; gap:4mm; flex-wrap:wrap }
+  .rtitle .en{ font-size:20pt; color:var(--inkSoft); font-family:'Jua' }
   .rfunc{ margin-bottom:4mm; color:var(--ink); display:flex; flex-direction:column }
   .rfunc .ff{ padding:3.2mm 0; border-top:.6mm solid var(--border); font-size:19pt; line-height:1.5 }
   .rfunc .ff:first-child{ border-top:none; padding-top:0 }
@@ -176,17 +178,34 @@
             <div class="speccol">
               <div class="ph"><img src="assets/hw-eduping.png" alt="EduPing 실물" /></div>
               <div class="sn" style="color:var(--pink)">에듀핑 <small>OpenArm</small></div>
-              <div class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</div>
+              <div class="sl">
+                <div class="li"><b>양팔 매니퓰레이터</b></div>
+                <div class="li">DAMIAO BLDC ×8</div>
+                <div class="li">Top · Gripper · Web 카메라</div>
+                <div class="li">디스플레이</div>
+                <div class="li">마이크 · 스피커</div>
+              </div>
             </div>
             <div class="speccol">
               <div class="ph"><img src="assets/hw-gogoping.png" alt="GogoPing 실물" /></div>
               <div class="sn" style="color:var(--mint)">고고핑 <small>Vic Pinky</small></div>
-              <div class="sl"><b>차동구동 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</div>
+              <div class="sl">
+                <div class="li"><b>차동구동 베이스</b></div>
+                <div class="li">RPLiDAR C1</div>
+                <div class="li">DC 모터 ×2</div>
+                <div class="li">배터리</div>
+                <div class="li">pan/tilt 카메라 (서보 ×2)</div>
+              </div>
             </div>
             <div class="speccol">
               <div class="ph"><img src="assets/hw-noriarm.png" alt="NoriArm 실물" /></div>
               <div class="sn" style="color:var(--lav)">노리암 <small>OMX × 3</small></div>
-              <div class="sl"><b>4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</div>
+              <div class="sl">
+                <div class="li"><b>4-DoF + 그리퍼</b></div>
+                <div class="li">Dynamixel ×6</div>
+                <div class="li">Top · Gripper 카메라</div>
+                <div class="li">마이크 · 스피커</div>
+              </div>
             </div>
           </div>
         </div>
@@ -203,8 +222,7 @@
         <div class="bd">
           <div class="rhead">
             <div>
-              <div class="rtitle" style="color:var(--pink)">에듀핑</div>
-              <div class="rhw">OpenArm</div>
+              <div class="rtitle" style="color:var(--pink)">에듀핑 <span class="en">OpenArm</span></div>
             </div>
           </div>
           <div class="rfunc">
@@ -225,8 +243,7 @@
         <div class="bd">
           <div class="rhead">
             <div>
-              <div class="rtitle" style="color:var(--mint)">고고핑</div>
-              <div class="rhw">Vic Pinky</div>
+              <div class="rtitle" style="color:var(--mint)">고고핑 <span class="en">Vic Pinky</span></div>
             </div>
           </div>
           <div class="rfunc">
@@ -245,8 +262,7 @@
         <div class="bd">
           <div class="rhead">
             <div>
-              <div class="rtitle" style="color:var(--lav)">노리암</div>
-              <div class="rhw">OMX ×3</div>
+              <div class="rtitle" style="color:var(--lav)">노리암 <span class="en">OMX × 3</span></div>
             </div>
           </div>
           <div class="rfunc">
