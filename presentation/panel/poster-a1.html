@@ -88,10 +88,14 @@
   .specgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr auto auto; gap:3mm 5mm; flex:1; min-height:0 }
   .specgrid .ph{ width:100%; min-height:0; display:flex; align-items:center; justify-content:center }
   .specgrid .ph img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:1mm solid var(--border); box-shadow:0 2mm 6mm rgba(236,143,166,.18); display:block }
-  .specgrid .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:center; gap:3mm; flex-wrap:wrap; align-self:end }
+  .specgrid .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:baseline; gap:3mm; flex-wrap:wrap; align-self:end }
   .specgrid .sn small{ font-size:16pt; color:var(--inkSoft); font-family:'Jua' }
-  .specgrid .sn .icn{ width:10mm; height:10mm; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center }
-  .specgrid .sn .icn img{ width:100%; height:100%; object-fit:contain; display:block }
+  .specgrid .ph{ position:relative }
+  .specgrid .ph .icn{ position:absolute; top:3mm; right:3mm; width:18mm; height:18mm; border-radius:50%; background:#fff; box-shadow:0 2mm 5mm rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; padding:2mm; box-sizing:border-box; z-index:2 }
+  .specgrid .ph .icn.pink { box-shadow:0 0 0 1.2mm var(--pink),  0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn.mint { box-shadow:0 0 0 1.2mm var(--mint),  0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn.lav  { box-shadow:0 0 0 1.2mm var(--lav),   0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn img{ width:100%; height:100%; object-fit:contain; display:block }
   .specgrid .sl{ font-size:19pt; line-height:1.45; color:var(--inkSoft); display:flex; flex-direction:column; align-self:start }
   .specgrid .sl .li{ padding:1.4mm 0 1.4mm 5.5mm; position:relative }
   .specgrid .sl .li::before{ content:""; position:absolute; left:0; top:.7em; width:1.8mm; height:1.8mm; border-radius:50%; background:currentColor; opacity:.55 }
@@ -189,13 +193,13 @@
         <div class="bd">
           <div class="specgrid">
             <!-- ── Row 1: photos ── -->
-            <div class="ph"><img src="assets/hw-eduping.png" alt="EduPing 실물" /></div>
-            <div class="ph"><img src="assets/hw-gogoping.png" alt="GogoPing 실물" /></div>
-            <div class="ph"><img src="assets/hw-noriarm.png" alt="NoriArm 실물" /></div>
+            <div class="ph"><img src="assets/hw-eduping.png" alt="EduPing 실물" /><span class="icn pink"><img src="assets/icon-eduping.png" alt="" /></span></div>
+            <div class="ph"><img src="assets/hw-gogoping.png" alt="GogoPing 실물" /><span class="icn mint"><img src="assets/icon-gogoping.png" alt="" /></span></div>
+            <div class="ph"><img src="assets/hw-noriarm.png" alt="NoriArm 실물" /><span class="icn lav"><img src="assets/icon-noriarm.png" alt="" /></span></div>
             <!-- ── Row 2: names ── -->
-            <div class="sn" style="color:var(--pink)"><span class="icn"><img src="assets/icon-eduping.png" alt="" /></span>에듀핑 <small>OpenArm</small></div>
-            <div class="sn" style="color:var(--mint)"><span class="icn"><img src="assets/icon-gogoping.png" alt="" /></span>고고핑 <small>VicPinky</small></div>
-            <div class="sn" style="color:var(--lav)"><span class="icn"><img src="assets/icon-noriarm.png" alt="" /></span>노리암 <small>OMX × 3</small></div>
+            <div class="sn" style="color:var(--pink)">에듀핑 <small>OpenArm</small></div>
+            <div class="sn" style="color:var(--mint)">고고핑 <small>VicPinky</small></div>
+            <div class="sn" style="color:var(--lav)">노리암 <small>OMX × 3</small></div>
             <!-- ── Row 3: spec lists ── -->
             <div class="sl">
               <div class="li"><b>양팔 로봇</b></div>
