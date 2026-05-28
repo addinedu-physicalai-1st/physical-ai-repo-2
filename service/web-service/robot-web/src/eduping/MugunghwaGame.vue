@@ -20,11 +20,7 @@ import { useModeIntents } from '@/composables/useModeIntents';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
-import { pickExternalCamera } from '@/composables/selectExternalCamera';
-import { useFaceDetector } from '@/composables/useFaceDetector';
-import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
-import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
-import { mapMatchesToTracks, postRecognizeMulti } from '@/composables/identifyTracksFromFrame';
+import { useMugunghwaPerception } from './useMugunghwaPerception';
 import OpenarmViewer from './OpenarmViewer.vue';
 import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 
@@ -569,26 +565,14 @@ const simMinimized = ref(true);
 const simEverOpened = ref(false);
 watch(simMinimized, (m) => { if (!m) simEverOpened.value = true; });
 
-// ---- camera (메인 화면 중앙) ------------------------------------------------
-// 시뮬레이션 패널이 좌하단 플로팅으로 분리되면서 .arm-wrap 중앙이 비었음 → 사용자가
-// 카메라 미리보기로 채우길 원함. videoRef 는 이제 중앙 영역의 video 엘리먼트를 가리키며,
-// face detection/motion detection/emotion capture 가 모두 같은 엘리먼트를 공유.
-const videoRef = ref<HTMLVideoElement | null>(null);
-const cameraReady = ref(false);
-const cameraError = ref('');
-let cameraStream: MediaStream | null = null;
+// ---- perception (camera PIP + person/motion judgment via ROS2 node) ---------
+// 브라우저는 카메라를 직접 취득하지 않는다. useMugunghwaPerception 이 WS 로
+// JPEG 프레임을 수신해 pipCanvas 에 그리고, 노드로부터 등록/탈락/모션 이벤트를 수신.
+const emotionVideoRef = ref<HTMLVideoElement | null>(null);
+const motionFlash = ref(false);
 
-// 카메라 선택 — AttendanceCamera/IntegratedCameraPreview 와 동일 패턴.
-// 기본은 외장 USB (회의실 카메라 등) 가 있으면 그 첫 후보를, 없으면 첫 video device.
-// 사용자가 dropdown 으로 직접 바꿀 수 있다 — 기본 선택이 실패한 경우 (다른 앱이 점유,
-// 권한 거부 등) 사용자가 다른 카메라로 즉시 전환 가능.
-const cameras = ref<MediaDeviceInfo[]>([]);
-const selectedDeviceId = ref<string>('');
-const hasCameras = computed(() => cameras.value.length > 0);
-
-// 자연 촬영 — 진행 단계(노래/관찰/탈락 대기)에서 PIP 비디오 위에 5fps 추론을 얹어
-// happy/sad 표정 캡처 → /api/photos/natural 업로드. 보고서는 같은 child_id+date 의
-// 모든 photo 를 모아 AI 가 합성하므로 별도 서버 변경 불필요. OXQuiz 와 동일한 흐름.
+// 자연 촬영 — 진행 단계(노래/관찰/탈락 대기)에서 PIP canvas 위에 5fps 추론을 얹어
+// happy/sad 표정 캡처 → /api/photos/natural 업로드.
 const captureArmed = computed(
   () =>
     stage.value === 'song'
@@ -603,380 +587,43 @@ const emotionCapture = useEmotionCapture({
   onCaptured: () => { naturalShotCount.value += 1; },
 });
 
-async function listCameras(): Promise<void> {
-  try {
-    let devs = await navigator.mediaDevices.enumerateDevices();
-    if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
-      // 라벨이 비어 있으면 권한 트리거 후 다시 enumerate.
-      try {
-        const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
-        tmp.getTracks().forEach((t) => t.stop());
-      } catch {
-        /* 권한 거부해도 enumerate 는 가능 (라벨 빈 채로) */
-      }
-      devs = await navigator.mediaDevices.enumerateDevices();
-    }
-    cameras.value = devs.filter((d) => d.kind === 'videoinput');
-    const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
-    if (!selectedDeviceId.value || !stillValid) {
-      // 기본은 외장 USB — 무궁화 놀이에선 노트북 내장 카메라보다 큰 외장이 보통 더 적합.
-      const ext = await pickExternalCamera();
-      selectedDeviceId.value = ext?.deviceId ?? cameras.value[0]?.deviceId ?? '';
-    }
-  } catch (e) {
-    cameraError.value = `카메라 목록 실패: ${e instanceof Error ? e.message : String(e)}`;
-  }
-}
-
-async function setupCamera(): Promise<void> {
-  cameraError.value = '';
-  if (!selectedDeviceId.value) {
-    await listCameras();
-  }
-  if (!selectedDeviceId.value) {
-    cameraError.value = '사용 가능한 카메라가 없어요';
-    return;
-  }
-  try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      // 얼굴 인식이 작은 얼굴도 잡을 수 있도록 640x480 로. PIP CSS 가 축소 표시.
-      video: {
-        deviceId: { exact: selectedDeviceId.value },
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-      },
-      audio: false,
-    });
-    if (videoRef.value) {
-      videoRef.value.srcObject = cameraStream;
-      await videoRef.value.play();
-      cameraReady.value = true;
-      emotionCapture.attach(videoRef.value);
-    }
-  } catch (e) {
-    cameraError.value = (e as Error).message || '카메라 접근 실패';
-  }
-}
-
-async function restartStream(): Promise<void> {
-  // device 변경 시 — emotion capture detach + 기존 track stop → 새 device 로 재시작.
-  emotionCapture.detach();
-  if (cameraStream) {
-    cameraStream.getTracks().forEach((t) => t.stop());
-    cameraStream = null;
-  }
-  cameraReady.value = false;
-  await setupCamera();
-}
-
-async function onCameraChange(): Promise<void> {
-  await restartStream();
-}
-
-async function rescanCameras(): Promise<void> {
-  await listCameras();
-}
-
-let deviceChangeDebounce: number | null = null;
-function scheduleListCamerasOnDeviceChange(): void {
-  if (deviceChangeDebounce !== null) {
-    window.clearTimeout(deviceChangeDebounce);
-  }
-  deviceChangeDebounce = window.setTimeout(() => {
-    deviceChangeDebounce = null;
-    void listCameras();
-  }, 400);
-}
-
-function teardownCamera(): void {
-  emotionCapture.detach();
-  if (cameraStream) {
-    cameraStream.getTracks().forEach((t) => t.stop());
-    cameraStream = null;
-  }
-  cameraReady.value = false;
-}
-
-// ---- face recognition (tracker + identity cache) ---------------------------
-// 모든 단계 (entry / observation / eliminationWait) 가 동일한 detector + tracker +
-// identity cache 파이프라인을 공유한다. detector loop 는 entry 진입 시 시작돼
-// end 단계에서 종료되며, 그 사이에는 latestTracks 와 identityCache 가 항상 최신.
-const recognitionActive = ref(false);
-
-const tracker = useFaceTracker();
-let latestTracks: TrackedFace[] = [];
-
-const identityCache = useFaceIdentityCache({
-  // 등원 (한 명씩) 대비 무궁화 (최대 6명 동시) 가 다수 얼굴을 한 번에 들고 식별하느라 첫
-  // identify 까지 wait 가 길게 느껴짐. 트래커 연속성이 이미 노이즈를 컷오프하므로 3 프레임으로.
-  stableFramesRequired: 3,
-  identify: async (tracks): Promise<IdentityResult[]> => identifyTracks(tracks),
-});
-
-const detector = useFaceDetector({
-  onDetections: (faces) => {
-    latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
-    void identityCache.feed(latestTracks).then(() => {
-      if (stage.value === 'entry') applyEntryBindings();
-    });
-  },
-});
-
-// /recognize-multi 로 보내기 전 max 640w 로 다운스케일. 서버 InsightFace 가 어차피 det_size
-// 640 으로 resize 하므로 정확도 영향은 거의 없는데, 디텍션 비용은 입력 해상도에 비례 →
-// 1280×720 → 640×360 로 줄면 detection 만 2~3배 빨라짐. 업로드 페이로드도 1/4 감소.
-const SEND_MAX_WIDTH = 640;
-
-async function captureFullFrame(): Promise<Blob | null> {
-  const v = videoRef.value;
-  if (!v || v.readyState < 2) return null;
-  const srcW = v.videoWidth;
-  const srcH = v.videoHeight;
-  const scale = srcW > SEND_MAX_WIDTH ? SEND_MAX_WIDTH / srcW : 1;
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(srcW * scale);
-  canvas.height = Math.round(srcH * scale);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
-}
-
-async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
-  const video = videoRef.value;
-  if (!video || video.readyState < 2) return [];
-  const fullBlob = await captureFullFrame();
-  if (!fullBlob) return [];
-  const matches = await postRecognizeMulti(fullBlob, DEVICE_TOKEN);
-  return mapMatchesToTracks(tracks, matches).map((p) => p.result);
-}
-
-function applyEntryBindings(): void {
-  for (const t of latestTracks) {
-    const childId = identityCache.getChildId(t.trackId);
-    if (childId == null) continue;
+const perception = useMugunghwaPerception({
+  onRegistered: (childId) => {
     const p = participants.value.find((x) => x.id === childId);
-    if (!p || p.registered) continue;
+    if (!p || p.registered) return;
     p.registered = true;
     pushToast(`${p.name} 등록!`, p.faceUrl);
     void tts.speak(`${p.name} 등록 완료`).catch(() => { /* TTS off */ });
-  }
-}
-
-let detectorRafId: number | null = null;
-
-function startDetectorLoop(): void {
-  if (detectorRafId !== null) return;
-  detector.start();
-  recognitionActive.value = true;
-  const tick = async (): Promise<void> => {
-    if (videoRef.value && videoRef.value.readyState >= 2) {
-      try { await detector.send(videoRef.value); } catch { /* noop */ }
-    }
-    detectorRafId = requestAnimationFrame(() => void tick());
-  };
-  detectorRafId = requestAnimationFrame(() => void tick());
-}
-
-function stopDetectorLoop(): void {
-  if (detectorRafId !== null) {
-    cancelAnimationFrame(detectorRafId);
-    detectorRafId = null;
-  }
-  detector.close();
-  tracker.reset();
-  identityCache.reset();
-  latestTracks = [];
-  recognitionActive.value = false;
-}
-
-watch(stage, (s, prev) => {
-  // detector 루프는 entry 부터 시작, end 시 정지. observation 에선 entry 의 캐시를
-  // 그대로 사용해야 하므로 루프 유지.
-  if (s === 'entry' && prev !== 'entry') startDetectorLoop();
-  if (s === 'end') stopDetectorLoop();
-});
-
-// ---- motion detection during 관찰 ------------------------------------------
-// 가벼운 binary 알람: 관찰 진입 시점 프레임을 baseline 으로 캡처 → 8Hz 로 현재 프레임과의
-// SAD (Sum of Absolute Differences, 그레이스케일 다운샘플 160x90) 비교 → 임계 초과 시
-// 카메라 PIP 빨강 플래시 + "움직였어요!" TTS (쿨다운). 누가 움직였는지는 식별하지 않고
-// 교사가 카드의 ✕ 버튼으로 직접 탈락 처리. 추후 YOLO-Pose + ByteTrack 으로 per-kid 자동화 예정.
-// 별도 1.5s 주기 probe 는 제거 — 식별이 캐시 기반이라 주기적 재호출이 불필요하고, 천천히
-// 움직이는 케이스도 8Hz motion-diff 가 누적 SAD 로 잡아내는 것을 신뢰. 잡지 못한 케이스는
-// 교사가 ✕ 로 직접 탈락 처리.
-const MOTION_DOWNSAMPLE_W = 160;
-const MOTION_DOWNSAMPLE_H = 90;
-// 평균 픽셀 변화율 임계 — 0..1 범위 (255 정규화 후 평균). 작을수록 민감.
-const MOTION_THRESHOLD = 0.015;
-const MOTION_TICK_MS = 125;          // 8 Hz
-const MOTION_TTS_COOLDOWN_MS = 2000;
-
-const motionDetected = ref(false);
-let motionTimer: number | null = null;
-let motionBaseline: ImageData | null = null;
-let motionCanvas: HTMLCanvasElement | null = null;
-let motionCtx: CanvasRenderingContext2D | null = null;
-let lastMotionAnnouncementAt = 0;
-// 관찰 진입 시 캡처한 각 등록 아이의 bbox 중심점 — 이후 motion 이벤트마다 비교.
-const observationBasePositions = new Map<number, { x: number; y: number }>();
-// 연속 motion 이벤트로 인한 setStage 중복 실행 차단. 서버 호출은 더 이상 없음.
-let moverProbeInflight = false;
-// 픽셀 단위 변위 임계. 640x480 기준 ~1.6%. strict 이상이면 즉시 탈락.
-const MOVER_DISPLACEMENT_PX = 10;
-// loose fallback — strict 미만이지만 motion 이 분명히 발생했을 때 "가장 많이 움직인 한 명"을
-// 탈락시키기 위한 최소 변위. 노이즈와 진짜 움직임을 구분.
-const MOVER_DISPLACEMENT_LOOSE_PX = 4;
-
-function ensureMotionCanvas(): void {
-  if (motionCanvas) return;
-  motionCanvas = document.createElement('canvas');
-  motionCanvas.width = MOTION_DOWNSAMPLE_W;
-  motionCanvas.height = MOTION_DOWNSAMPLE_H;
-  motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
-}
-
-function captureMotionFrame(): ImageData | null {
-  if (!videoRef.value || videoRef.value.readyState < 2) return null;
-  ensureMotionCanvas();
-  if (!motionCtx) return null;
-  motionCtx.drawImage(videoRef.value, 0, 0, MOTION_DOWNSAMPLE_W, MOTION_DOWNSAMPLE_H);
-  return motionCtx.getImageData(0, 0, MOTION_DOWNSAMPLE_W, MOTION_DOWNSAMPLE_H);
-}
-
-function frameDiffNormalized(a: ImageData, b: ImageData): number {
-  const aData = a.data;
-  const bData = b.data;
-  // RGBA 4-byte stride → 그레이스케일은 (R+G+B)/3 평균
-  let sad = 0;
-  const n = aData.length;
-  for (let i = 0; i < n; i += 4) {
-    const ga = (aData[i] + aData[i + 1] + aData[i + 2]) / 3;
-    const gb = (bData[i] + bData[i + 1] + bData[i + 2]) / 3;
-    sad += Math.abs(ga - gb);
-  }
-  return sad / ((n / 4) * 255);
-}
-
-function captureObservationBaseline(): void {
-  // 관찰 진입 순간의 tracker bbox 중심을 child_id 별로 기록. 식별된 트랙만 baseline 으로
-  // 쓰고, 누락된 child 는 probeMoversAndMaybeEliminate 가 다음 frame 에서 지연 채움.
-  observationBasePositions.clear();
-  for (const t of latestTracks) {
-    const childId = identityCache.getChildId(t.trackId);
-    if (childId == null) continue;
-    const [x1, y1, x2, y2] = t.bbox;
-    observationBasePositions.set(childId, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
-  }
-}
-
-function probeMoversAndMaybeEliminate(): void {
-  if (moverProbeInflight) return;  // 연속 motion 이벤트 중복 차단
-  if (stage.value !== 'observation') return;
-  moverProbeInflight = true;
-  try {
-    // 등록된 아이 중 baseline 누락된 것이 있으면 지연 baseline (이번 frame 의 bbox 로).
-    for (const t of latestTracks) {
-      const childId = identityCache.getChildId(t.trackId);
-      if (childId == null) continue;
-      if (observationBasePositions.has(childId)) continue;
-      const [x1, y1, x2, y2] = t.bbox;
-      observationBasePositions.set(childId, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
-    }
-
-    type Candidate = { id: number; name: string; dist: number };
-    const candidates: Candidate[] = [];
-    for (const t of latestTracks) {
-      const childId = identityCache.getChildId(t.trackId);
-      if (childId == null) continue;
-      const base = observationBasePositions.get(childId);
-      if (!base) continue;
-      const [x1, y1, x2, y2] = t.bbox;
-      const cx = (x1 + x2) / 2;
-      const cy = (y1 + y2) / 2;
-      const dist = Math.hypot(cx - base.x, cy - base.y);
-      const p = participants.value.find((x) => x.id === childId);
-      if (!p || !p.registered || p.eliminated) continue;
-      candidates.push({ id: childId, name: p.name, dist });
-    }
-    if (candidates.length === 0) return;
-
-    let toEliminate = candidates.filter((c) => c.dist >= MOVER_DISPLACEMENT_PX);
-    if (toEliminate.length === 0) {
-      const maxDist = Math.max(...candidates.map((c) => c.dist));
-      if (maxDist >= MOVER_DISPLACEMENT_LOOSE_PX) {
-        toEliminate = candidates.filter((c) => c.dist === maxDist);
-      }
-    }
-    if (toEliminate.length === 0) {
-      const maxDist = candidates.length
-        ? Math.max(...candidates.map((c) => c.dist))
-        : 0;
-      pushToast(`움직임 감지 — 식별 실패 (최대 ${maxDist.toFixed(0)}px)`);
-      return;
-    }
-
-    for (const { id } of toEliminate) {
+  },
+  onEliminated: (childIds) => {
+    const names: string[] = [];
+    for (const id of childIds) {
       const p = participants.value.find((x) => x.id === id);
-      if (!p) continue;
+      if (!p || p.eliminated) continue;
       p.eliminated = true;
       if (p.reached) p.reached = false;
+      names.push(p.name);
     }
-    const names = toEliminate.map((m) => m.name).join(', ');
-    pushToast(`${names} 어린이 탈락했습니다`);
-    void tts.speak(`${names} 어린이 탈락했습니다`).catch(() => { /* noop */ });
+    if (names.length === 0) return;
+    const joined = names.join(', ');
+    pushToast(`${joined} 어린이 탈락했습니다`);
+    void tts.speak(`${joined} 어린이 탈락했습니다`).catch(() => { /* noop */ });
     setStage('eliminationWait');
-  } finally {
-    moverProbeInflight = false;
-  }
-}
-
-function startMotionDetection(): void {
-  stopMotionDetection();
-  // baseline 즉시 캡처. 비디오 readyState 가 아직 낮을 수 있으니 첫 tick 에서 재시도.
-  motionBaseline = captureMotionFrame();
-  motionDetected.value = false;
-  // 등록 아이들의 bbox 중심 baseline — tracker 캐시에서 즉시 동기로 채움.
-  captureObservationBaseline();
-  motionTimer = window.setInterval(() => {
-    if (stage.value !== 'observation') return;
-    if (!motionBaseline) {
-      motionBaseline = captureMotionFrame();
-      return;
-    }
-    const cur = captureMotionFrame();
-    if (!cur) return;
-    const diff = frameDiffNormalized(motionBaseline, cur);
-    if (diff > MOTION_THRESHOLD) {
-      motionDetected.value = true;
-      const now = performance.now();
-      if (now - lastMotionAnnouncementAt > MOTION_TTS_COOLDOWN_MS) {
-        lastMotionAnnouncementAt = now;
-        // tracker bbox + identity cache 로 누가 움직였는지 식별 → 자동 탈락 + 전이 시도.
-        // 식별 실패하면 카메라 flash 만 남고 교사가 직접 ✕ 로 처리.
-        probeMoversAndMaybeEliminate();
-      }
-    } else {
-      motionDetected.value = false;
-    }
-  }, MOTION_TICK_MS);
-}
-
-function stopMotionDetection(): void {
-  if (motionTimer !== null) {
-    window.clearInterval(motionTimer);
-    motionTimer = null;
-  }
-  motionBaseline = null;
-  motionDetected.value = false;
-  observationBasePositions.clear();
-  moverProbeInflight = false;
-}
-
-watch(stage, (s, prev) => {
-  if (s === 'observation') startMotionDetection();
-  else if (prev === 'observation') stopMotionDetection();
+  },
+  onMotion: () => {
+    motionFlash.value = true;
+    window.setTimeout(() => { motionFlash.value = false; }, 400);
+  },
 });
+
+// ---- perception stage signals -----------------------------------------------
+// observation 진입/이탈 및 end 단계에서 노드에 신호를 보낸다.
+watch(stage, (s, prev) => {
+  if (s === 'observation') perception.observeStart();
+  else if (prev === 'observation') perception.observeStop();
+  if (s === 'end') perception.reset();
+});
+
 
 const observationLike = computed(
   () => stage.value === 'observation' || stage.value === 'eliminationWait',
@@ -1072,77 +719,32 @@ watch(stage, (s, prev) => {
   else if (prev === 'observation') stopObservationCountdown();
 });
 
-// ---- 탈락 대기 — 탈락한 친구가 시야 밖으로 나가면 자동으로 노래 단계 재개 -------
-// 식별 (recognize) 은 자세·조명·거리 영향으로 같은 사람을 잠깐 놓치기도 한다. 그래서
-// "탈락 ID 가 안 보임" 한 신호만으로 advance 하면, 실제 탈락자가 여전히 화면에 있어도
-// 가끔 게임이 재개되는 false negative 가 발생. 이를 보완하기 위해 신호를 두 개 OR:
-//   (a) 매칭된 face 중 eliminationWaitIds 에 포함된 ID 가 발견됨 (강한 신호)
-//   (b) detect 된 총 face 개수가 남아있어야 할 인원 (registered AND !eliminated) 을
-//       초과 → 식별 실패하더라도 추가 사람이 화면에 있음 (= 탈락자 미퇴장)
-// 또한 연속 absent 카운트를 2→3 으로 늘려 통계적 안정성 확보.
-const ELIM_WAIT_POLL_MS = 1500;
-const ELIM_WAIT_REQUIRED_ABSENT_CHECKS = 3;
-const eliminationWaitIds = new Set<number>();
+// ---- 탈락 대기 — 탈락 확인 후 교사가 직접 ✕ 또는 다음 라운드로 이동 --------
+// 브라우저 face-tracking 이 제거되어 "탈락자가 시야 밖으로 나갔는지" 를 자동 판단할 수
+// 없다. 탈락 대기는 교사가 드로어의 DEV 패널이나 setStage 로 수동 전환하거나,
+// 4초 후 자동으로 노래 단계로 복귀한다.
+const ELIM_WAIT_AUTO_RESUME_MS = 4000;
 let eliminationWaitTimer: number | null = null;
-let elimAbsentStreak = 0;
-
-function eliminationWaitTick(): void {
-  if (stage.value !== 'eliminationWait') return;
-  if (eliminationWaitIds.size === 0) {
-    // 안전망 — 새로 탈락한 아이가 없는 상태로 진입했으면 즉시 노래로 복귀
-    setStage('song');
-    return;
-  }
-  // tracker + identity cache 로 탈락자의 잔존 여부 판단. recognize 호출 없이 매 tick 즉시.
-  const totalFacesDetected = latestTracks.length;
-  const presentIds = new Set<number>();
-  for (const t of latestTracks) {
-    const cid = identityCache.getChildId(t.trackId);
-    if (cid != null) presentIds.add(cid);
-  }
-  const matchedEliminatedVisible = Array.from(eliminationWaitIds).some(
-    (id) => presentIds.has(id),
-  );
-  // 화면에 남아있어야 정상인 인원 — 등록됐고 탈락 안 한 아이들.
-  const expectedRemaining = participants.value.filter(
-    (p) => p.registered && !p.eliminated,
-  ).length;
-  const tooManyFaces = totalFacesDetected > expectedRemaining;
-  const stillVisible = matchedEliminatedVisible || tooManyFaces;
-  if (stillVisible) {
-    elimAbsentStreak = 0;
-  } else {
-    elimAbsentStreak += 1;
-    if (elimAbsentStreak >= ELIM_WAIT_REQUIRED_ABSENT_CHECKS) {
-      // 모든 탈락자가 시야 밖 (식별 + face count 둘 다 만족) → 게임 계속
-      setStage('song');
-    }
-  }
-}
 
 function startEliminationWait(): void {
   stopEliminationWait();
-  eliminationWaitIds.clear();
-  for (const p of participants.value) {
-    if (p.registered && p.eliminated) eliminationWaitIds.add(p.id);
-  }
-  if (eliminationWaitIds.size === 0) {
-    // 탈락 대기로 들어왔지만 사실 탈락자가 없는 케이스 — 곧장 노래 복귀
+  const hasPending = participants.value.some((p) => p.registered && p.eliminated);
+  if (!hasPending) {
     setStage('song');
     return;
   }
-  elimAbsentStreak = 0;
   pushToast('탈락한 친구는 자리에서 벗어나주세요');
-  eliminationWaitTimer = window.setInterval(eliminationWaitTick, ELIM_WAIT_POLL_MS);
+  eliminationWaitTimer = window.setTimeout(() => {
+    eliminationWaitTimer = null;
+    if (stage.value === 'eliminationWait') setStage('song');
+  }, ELIM_WAIT_AUTO_RESUME_MS);
 }
 
 function stopEliminationWait(): void {
   if (eliminationWaitTimer !== null) {
-    window.clearInterval(eliminationWaitTimer);
+    window.clearTimeout(eliminationWaitTimer);
     eliminationWaitTimer = null;
   }
-  eliminationWaitIds.clear();
-  elimAbsentStreak = 0;
 }
 
 watch(stage, (s, prev) => {
@@ -1171,10 +773,16 @@ onMounted(() => {
   void loadMotion();
   // 첫 mount 단계가 entry 면 stage watch 가 한 번 안 돌므로 직접 rest pose 적용.
   armSnapshot.value = makeRestSnapshot();
-  void setupCamera();
-  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
-  // 첫 mount 가 entry 면 stage watch 가 한 번 안 돌므로 detector loop 직접 시작.
-  if (stage.value === 'entry') startDetectorLoop();
+  // perception WS 연결 + emotion capture 를 PIP canvas 스트림에 연결.
+  perception.connect();
+  const stream = perception.captureStream(5);
+  if (stream && emotionVideoRef.value) {
+    emotionVideoRef.value.srcObject = stream;
+    void emotionVideoRef.value.play();
+    // TODO: captureStream 이 canvas 에 첫 프레임이 그려지기 전에 호출되면 감정 캡처
+    // 추론 루프가 빈 프레임을 볼 수 있다. 실 운용 시 timing 을 확인할 것.
+    emotionCapture.attach(emotionVideoRef.value);
+  }
 });
 
 // STT prompt hint — stage 별 expected 단어들.
@@ -1202,8 +810,6 @@ onUnmounted(() => {
     songAudio.src = '';
     songAudio = null;
   }
-  stopDetectorLoop();
-  stopMotionDetection();
   stopObservationCountdown();
   stopEliminationWait();
   stopReadyCountdown();
@@ -1211,12 +817,8 @@ onUnmounted(() => {
     try { void audioContext.close(); } catch { /* noop */ }
     audioContext = null;
   }
-  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
-  if (deviceChangeDebounce !== null) {
-    window.clearTimeout(deviceChangeDebounce);
-    deviceChangeDebounce = null;
-  }
-  teardownCamera();
+  emotionCapture.detach();
+  // perception WS 는 useMugunghwaPerception 의 onUnmounted 훅이 disconnect() 를 호출.
   stateWs.stop();
 });
 </script>
@@ -1260,38 +862,20 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="camera-picker" @click.stop>
-              <select
-                v-model="selectedDeviceId"
-                :disabled="!hasCameras"
-                class="camera-picker__select"
-                aria-label="카메라 선택"
-                @change="onCameraChange"
-              >
-                <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
-                <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
-                  {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
-                </option>
-              </select>
-              <button
-                type="button"
-                class="camera-picker__rescan"
-                aria-label="카메라 다시 스캔"
-                title="카메라 다시 스캔"
-                @click="rescanCameras"
-              >↻</button>
-            </div>
 
             <button type="button" class="btn-icon close-btn" aria-label="닫기" @click="close">×</button>
           </header>
 
           <!-- 메인: 카메라가 중앙을 채움. 게임 단계별 오버레이는 카메라 위에 렌더링. -->
           <main class="main-area">
-            <div class="arm-wrap" :class="{ 'motion-flash': motionDetected }">
-              <!-- 카메라 비디오 — 중앙 전체 채움 -->
-              <video ref="videoRef" class="center-cam" muted playsinline />
-              <div v-if="!cameraReady && !cameraError" class="cam-overlay">카메라 준비 중…</div>
-              <div v-if="cameraError" class="cam-overlay err">⚠ {{ cameraError }}</div>
+            <div class="arm-wrap" :class="{ 'motion-flash': motionFlash }">
+              <!-- PIP canvas — JPEG 프레임이 perception composable 에 의해 그려진다 -->
+              <canvas
+                :ref="(el) => (perception.pipCanvas.value = el as HTMLCanvasElement | null)"
+                class="center-cam"
+              />
+              <!-- 감정 캡처용 hidden video — PIP canvas stream 을 srcObject 로 사용 -->
+              <video ref="emotionVideoRef" class="emotion-hidden" muted playsinline />
 
               <!-- 셔터 플래시 -->
               <div
@@ -1309,7 +893,7 @@ onUnmounted(() => {
               </div>
               <!-- 라이브 HUD -->
               <div
-                v-if="captureArmed && cameraReady && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
+                v-if="captureArmed && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
                 class="cam-live-hud"
                 :class="{ 'has-face': emotionCapture.faceDetected.value }"
               >
@@ -1327,12 +911,9 @@ onUnmounted(() => {
               <!-- 참가자 확인 단계 하단 컨트롤 -->
               <footer v-if="stage === 'entry'" class="cam-stage-foot">
                 <div class="entry-info">
-                  <div class="entry-line">
-                    참가자 확인 중
-                    <span v-if="recognitionActive" class="reco-dot" title="얼굴 인식 중" />
-                  </div>
+                  <div class="entry-line">참가자 확인 중</div>
                   <div class="entry-sub">
-                    카메라에 보이는 친구는 자동으로 등록돼요.
+                    로봇 카메라가 인식한 친구는 자동으로 등록돼요.
                     <strong>{{ registeredCount }}</strong> / {{ participants.length }} 명 등록됨
                   </div>
                 </div>
@@ -1636,8 +1217,8 @@ onUnmounted(() => {
 /* ---------------- top bar ---------------- */
 .top-bar {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  /* [hamburger] [stage] [camera-picker] [close] */
+  grid-template-columns: auto 1fr auto;
+  /* [hamburger] [stage] [close] */
   align-items: center;
   gap: 16px;
   padding: 14px 20px;
@@ -1762,15 +1343,22 @@ onUnmounted(() => {
 }
 .camera-picker__rescan:hover { background: #f1f5f9; }
 
-/* 중앙 카메라 */
+/* 중앙 카메라 (PIP canvas) */
 .center-cam {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1);
   display: block;
+}
+/* 감정 캡처용 hidden video — PIP canvas 스트림의 화면 외 처리용 */
+.emotion-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 .arm-wrap.motion-flash {
   animation: motion-flash 0.55s ease-in-out infinite;
