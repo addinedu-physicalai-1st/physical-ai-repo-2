@@ -106,11 +106,10 @@
   .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
   .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1; display:flex; align-items:baseline; gap:4mm; flex-wrap:wrap }
   .rtitle .en{ font-size:20pt; color:var(--inkSoft); font-family:'Jua' }
-  .rfunc{ margin-bottom:4mm; display:flex; flex-wrap:wrap; gap:3mm }
-  .rfunc .ff{ font-family:'Jua'; font-size:20pt; padding:2.5mm 6mm; border-radius:7mm; color:var(--ink); line-height:1 }
-  .rfunc.pink .ff{ background:var(--pinkS) }
-  .rfunc.mint .ff{ background:var(--mintS) }
-  .rfunc.lav  .ff{ background:var(--lavS) }
+  .rfunc{ margin-bottom:4mm; color:var(--ink); display:flex; flex-direction:column }
+  .rfunc .ff{ padding:3.2mm 0; border-top:.6mm solid var(--border); font-size:19pt; line-height:1.5 }
+  .rfunc .ff:first-child{ border-top:none; padding-top:0 }
+  .rfunc .ff b{ font-family:'Jua'; color:var(--ink); font-size:23pt; display:inline-block; min-width:40mm; margin-right:4mm }
   .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
     display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:19pt; gap:2.5mm; overflow:hidden }
   .rblank .material-icons-round{ font-size:28pt }
@@ -225,10 +224,10 @@
               <div class="rtitle" style="color:var(--pink)">에듀핑 <span class="en">OpenArm</span></div>
             </div>
           </div>
-          <div class="rfunc pink">
-            <span class="ff">등하원</span>
-            <span class="ff">율동</span>
-            <span class="ff">무궁화꽃</span>
+          <div class="rfunc">
+            <div class="ff"><b>등하원</b>InsightFace 얼굴 임베딩 매칭 + 양팔 환영 trajectory</div>
+            <div class="ff"><b>율동</b>동기 스트리밍</div>
+            <div class="ff"><b>무궁화꽃</b>YOLOv8-Pose + ByteTrack 다중 자세 추적</div>
           </div>
           <div class="demohalf">
             <div class="d"><img src="assets/eduping-demo1.jpg" alt="EduPing 데모" /></div>
@@ -246,11 +245,11 @@
               <div class="rtitle" style="color:var(--mint)">고고핑 <span class="en">Vic Pinky</span></div>
             </div>
           </div>
-          <div class="rfunc mint">
-            <span class="ff">교사 추종</span>
-            <span class="ff">자율 운반</span>
-            <span class="ff">숨바꼭질</span>
-            <span class="ff">자장가</span>
+          <div class="rfunc">
+            <div class="ff"><b>교사 추종</b>DeepSORT + OSNet ReID + RPLiDAR C1 거리제어</div>
+            <div class="ff"><b>자율 운반</b>SLAM 맵 + nav graph + Nav2</div>
+            <div class="ff"><b>숨바꼭질</b>웨이포인트 순찰 + 얼굴 매칭</div>
+            <div class="ff"><b>자장가</b>모드 전환 + 낮잠 시각 기록</div>
           </div>
           <div class="rshot"><img src="assets/gogoping-dashboard.png" alt="GogoPing 대시보드 — Gazebo Sim · nav graph · LiDAR 스캔" /></div>
         </div>
@@ -265,10 +264,10 @@
               <div class="rtitle" style="color:var(--lav)">노리암 <span class="en">OMX × 3</span></div>
             </div>
           </div>
-          <div class="rfunc lav">
-            <span class="ff">블럭쌓기</span>
-            <span class="ff">OX 퀴즈</span>
-            <span class="ff">가게놀이</span>
+          <div class="rfunc">
+            <div class="ff"><b>블럭쌓기</b>lerobot ACT 모방학습 + HOME pose 종료 감지</div>
+            <div class="ff"><b>OX 퀴즈</b>MediaPipe Hands 손 검출 + 룰베이스 trajectory</div>
+            <div class="ff"><b>가게놀이</b>SmolVLA 모방학습 + 음성 의도 분류 LLM</div>
           </div>
           <div class="rshot"><img src="assets/noriarm-demo.png" alt="NoriArm 데모 — 가게놀이 · 블럭쌓기" /></div>
         </div>
