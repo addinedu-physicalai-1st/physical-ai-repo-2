@@ -80,9 +80,9 @@
   /* ── hardware spec (left) — per-robot columns (vertical) ── */
   .specgrid{ display:flex; gap:5mm; flex:1; min-height:0 }
   .speccol{ flex:1; display:flex; flex-direction:column; gap:3mm; min-height:0 }
-  .speccol .ph{ width:100%; flex:1; min-height:0; border-radius:5mm; overflow:hidden; border:1mm solid var(--border); background:#fff; display:flex; align-items:center; justify-content:center }
-  .speccol .ph img{ width:100%; height:100%; object-fit:contain; display:block }
-  .speccol .ph.slot{ border:1.4mm dashed var(--faint); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint) }
+  .speccol .ph{ width:100%; flex:1; min-height:0; display:flex; align-items:center; justify-content:center }
+  .speccol .ph img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:1mm solid var(--border); box-shadow:0 2mm 6mm rgba(236,143,166,.18); display:block }
+  .speccol .ph.slot{ width:100%; flex:1; border:1.4mm dashed var(--faint); border-radius:5mm; background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint) }
   .speccol .ph.slot .material-icons-round{ font-size:28pt } .speccol .ph.slot span{ font-family:'Jua'; font-size:12pt }
   .speccol .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1 } .speccol .sn small{ font-size:16pt; color:var(--inkSoft) }
   .speccol .sl{ font-size:18pt; color:var(--inkSoft); line-height:1.5 } .speccol .sl b{ color:var(--ink) }
@@ -101,7 +101,7 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.5mm; color:var(--faint); overflow:hidden }
   .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
   .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1 } .rtitle .en{ font-size:23pt; color:var(--inkSoft) }
-  .rhw{ font-family:'Jua'; font-size:18pt; color:var(--inkSoft); margin-top:2.5mm }
+  .rhw{ font-family:'Jua'; font-size:23pt; color:var(--ink); margin-top:3mm }
   .rfunc{ font-size:21pt; line-height:1.6; color:var(--ink); margin-bottom:4mm }
   .rfunc b{ color:var(--ink) }
   .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
@@ -201,10 +201,10 @@
           <div class="rhead">
             <div>
               <div class="rtitle" style="color:var(--pink)">에듀핑</div>
-              <div class="rhw">OpenArm · 정문 상주</div>
+              <div class="rhw">OpenArm</div>
             </div>
           </div>
-          <div class="rfunc"><b>등하원</b> 얼굴인식 인사 · <b>율동</b> 음악·모션 동기 · <b>무궁화꽃이 피었습니다</b> 다중 자세 추적</div>
+          <div class="rfunc"><b>등하원</b> InsightFace 얼굴 임베딩 매칭 + 양팔 환영 trajectory · <b>율동</b> 50Hz 모션 / 16kHz PCM 동기 WS 스트리밍 · <b>무궁화꽃</b> YOLOv8-Pose + ByteTrack 다중 자세 추적</div>
           <div class="demohalf">
             <div class="d"><img src="assets/eduping-demo1.jpg" alt="EduPing 데모" /></div>
             <div class="d"><img src="assets/eduping-demo2.png" alt="EduPing 데모" /></div>
@@ -219,10 +219,10 @@
           <div class="rhead">
             <div>
               <div class="rtitle" style="color:var(--mint)">고고핑</div>
-              <div class="rhw">Vic Pinky · 모바일 베이스</div>
+              <div class="rhw">Vic Pinky</div>
             </div>
           </div>
-          <div class="rfunc"><b>교사 추종</b> ReID + LiDAR · <b>자율 운반</b> Nav2 · <b>숨바꼭질</b> · <b>자장가</b></div>
+          <div class="rfunc"><b>교사 추종</b> DeepSORT + OSNet ReID + RPLiDAR C1 거리제어 · <b>자율 운반</b> SLAM 맵 + nav graph + Nav2 · <b>숨바꼭질</b> 순찰 + 얼굴 매칭 · <b>자장가</b> 모드 전환 + 낮잠 시각 기록</div>
           <div class="rshot"><img src="assets/gogoping-dashboard.png" alt="GogoPing 대시보드 — Gazebo Sim · nav graph · LiDAR 스캔" /></div>
         </div>
       </section>
@@ -234,10 +234,10 @@
           <div class="rhead">
             <div>
               <div class="rtitle" style="color:var(--lav)">노리암</div>
-              <div class="rhw">OMX ×3 · 교실 비치</div>
+              <div class="rhw">OMX ×3</div>
             </div>
           </div>
-          <div class="rfunc"><b>블럭쌓기</b> ACT 모방학습 · <b>OX 퀴즈</b> 손 검출 · <b>가게놀이</b> 음성 픽업·전달</div>
+          <div class="rfunc"><b>블럭쌓기</b> lerobot ACT 모방학습 + HOME pose 도달 감지 종료 · <b>OX 퀴즈</b> MediaPipe Hands 손 검출 + 룰베이스 trajectory · <b>가게놀이</b> SmolVLA 모방학습 + 음성 의도 분류 LLM 으로 픽업·전달</div>
           <div class="rshot"><img src="assets/noriarm-demo.png" alt="NoriArm 데모 — 가게놀이 · 블럭쌓기" /></div>
         </div>
       </section>
