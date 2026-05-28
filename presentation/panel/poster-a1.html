@@ -80,8 +80,8 @@
   /* ── hardware spec (left) — per-robot columns (vertical) ── */
   .specgrid{ display:flex; gap:5mm; flex:1; min-height:0 }
   .speccol{ flex:1; display:flex; flex-direction:column; gap:3mm; min-height:0 }
-  .speccol .ph{ width:100%; flex:1; min-height:0; border-radius:5mm; overflow:hidden; border:1mm solid var(--border) }
-  .speccol .ph img{ width:100%; height:100%; object-fit:cover; display:block }
+  .speccol .ph{ width:100%; flex:1; min-height:0; border-radius:5mm; overflow:hidden; border:1mm solid var(--border); background:#fff; display:flex; align-items:center; justify-content:center }
+  .speccol .ph img{ width:100%; height:100%; object-fit:contain; display:block }
   .speccol .ph.slot{ border:1.4mm dashed var(--faint); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1mm; color:var(--faint) }
   .speccol .ph.slot .material-icons-round{ font-size:28pt } .speccol .ph.slot span{ font-family:'Jua'; font-size:12pt }
   .speccol .sn{ font-family:'Jua'; font-size:20pt; line-height:1.1 } .speccol .sn small{ font-size:12pt; color:var(--inkSoft) }
