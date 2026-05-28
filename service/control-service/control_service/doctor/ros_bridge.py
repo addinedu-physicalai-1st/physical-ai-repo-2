@@ -57,6 +57,7 @@ class DoctorRosBridge:
         self._stop = threading.Event()
         self._node = None
         self._pubs: dict[str, object] = {}
+        self._latest_fsr_raw: int | None = None
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._spin, name="DoctorRosBridge", daemon=True)
@@ -80,7 +81,7 @@ class DoctorRosBridge:
         from rclpy.node import Node
         from geometry_msgs.msg import PoseStamped
         from sensor_msgs.msg import JointState
-        from std_msgs.msg import Float32, Int8
+        from std_msgs.msg import Float32, Int8, Int32
 
         if not rclpy.ok():
             rclpy.init()
@@ -139,6 +140,12 @@ class DoctorRosBridge:
 
         node.create_subscription(Int8, "/servo_node/left/status", make_status_cb("left"), 10)
         node.create_subscription(Int8, "/servo_node/right/status", make_status_cb("right"), 10)
+
+        def on_fsr_raw(msg: "Int32") -> None:
+            with self._lock:
+                self._latest_fsr_raw = int(msg.data)
+
+        node.create_subscription(Int32, "/eduping/stethoscope/fsr_raw", on_fsr_raw, 10)
 
         # D435 영상/포인트클라우드는 eduarm 의 uploader 노드가 WebSocket 으로 직접
         # 푸시. control-service 는 이제 ROS image/pointcloud sub 하지 않음.
@@ -307,6 +314,10 @@ class DoctorRosBridge:
                 left=self._latest_left,
                 right=self._latest_right,
             )
+
+    def latest_fsr_raw(self) -> int | None:
+        with self._lock:
+            return self._latest_fsr_raw
 
     def set_leader_active(self, active: bool) -> bool:
         """leader_passthrough_node 의 ~/set_active 호출.

@@ -168,11 +168,22 @@ async def lifespan(app: FastAPI):
         doctor_bridge.start()
 
         async def _doctor_push_loop() -> None:
+            import time as _time
             while True:
                 await asyncio.sleep(1.0 / 30)
                 state = doctor_bridge.latest_state()
-                for eid in doctor_hub.active_eduping_ids():
+                fsr_raw = doctor_bridge.latest_fsr_raw()
+                ids = doctor_hub.active_eduping_ids()
+                for eid in ids:
                     doctor_hub.publish_state(eid, state)
+                if fsr_raw is not None:
+                    fsr_evt = {
+                        "type": "fsr",
+                        "raw": fsr_raw,
+                        "ts_ms": int(_time.time() * 1000) & 0xFFFFFFFF,
+                    }
+                    for eid in ids:
+                        doctor_hub.publish_event(eid, fsr_evt)
 
         _doctor_state_task = asyncio.create_task(_doctor_push_loop())
         app.state.doctor_state_task = _doctor_state_task
