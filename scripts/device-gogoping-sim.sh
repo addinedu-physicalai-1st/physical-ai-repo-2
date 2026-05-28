@@ -215,9 +215,11 @@ case "$ACTION" in
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
     # window 7: rviz (map / TF / AMCL / costmap / plan 시각화)
+    # Gazebo GUI 와 RViz 두 창이 같이 떠서 거슬릴 때 비활성화 — Gazebo 만 사용.
+    # 필요하면 아래 두 줄 주석 해제 (또는 별도 터미널에서 `rviz2 -d $RVIZ_CONFIG` 수동 실행).
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
-    tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
+    # tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
+    #   "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
 
     # 마우스 + status bar 설정
     tmux set-option -t "$SESSION" -g mouse on
@@ -240,6 +242,7 @@ case "$ACTION" in
       echo "[device-gogoping-sim] 세션 '$SESSION' 없음"
     fi
     # gz sim 의 server·gui 자식은 tmux SIGHUP 으로 회수되지 않아 명시 정리. SIGTERM → SIGKILL.
+    # rviz2 는 제외 — laptop.sh 가 별도로 관리. sim down 이 laptop 의 rviz 까지 죽이지 않도록.
     _patterns=(
       "ros2 launch gogoping_bringup sim"
       "ros2 launch gogoping_navigation graph_router"
@@ -254,7 +257,6 @@ case "$ACTION" in
       "sim_status_publisher"
       "sim_battery_node"
       "sim_teleport_node"
-      "rviz2"
     )
     for p in "${_patterns[@]}"; do
       pkill -TERM -f "$p" 2>/dev/null || true

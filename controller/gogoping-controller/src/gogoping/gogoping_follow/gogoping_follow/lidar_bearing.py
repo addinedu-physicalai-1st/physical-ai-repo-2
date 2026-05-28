@@ -30,15 +30,17 @@ def distance_at_bearing(
     if n == 0:
         return None
 
-    lo = bearing_rad - window_rad / 2.0
-    hi = bearing_rad + window_rad / 2.0
+    half = window_rad / 2.0
 
     valid: list[float] = []
     for i, r in enumerate(ranges):
         if not math.isfinite(r) or r <= 0.05 or r > max_m:
             continue
         a = angle_min + i * angle_increment
-        if lo <= a <= hi:
+        # 각도 차이를 [-π, π] 로 wrap 해서 비교 — bearing 이 ±180° 경계 근처여도
+        # (LIDAR_YAW_OFFSET 적용 시) window 가 끊기지 않음.
+        diff = (a - bearing_rad + math.pi) % (2.0 * math.pi) - math.pi
+        if abs(diff) <= half:
             valid.append(r)
 
     if not valid:

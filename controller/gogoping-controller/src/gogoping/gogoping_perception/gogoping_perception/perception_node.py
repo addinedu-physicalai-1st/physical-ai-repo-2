@@ -122,6 +122,9 @@ class PerceptionNode(Node):
         self._last_track: Track | None = None
         self._last_track_ts: float = 0.0
         self._last_track_distance_mm: int = 0  # D435 depth median (mm), 0 = invalid
+        # [debug] sim 분포 로그 throttle — 5Hz (0.2s 간격) 로 ALL candidate sim 출력.
+        # threshold 결정용 — 분포 데이터 충분히 모이면 이 로그 제거.
+        self._sim_log_last_ts: float = 0.0
         self._teacher_id: str = ""
         self._image_width: int = 0
 
@@ -385,11 +388,31 @@ class PerceptionNode(Node):
             self._tracker.finalize_enrollment(force=True)
 
         # ── 일반 매칭 (ACTIVE) — bbox_meta 를 Track 리스트로 변환 후 update ──
+        # d_med 도 함께 — drift 재매칭 시 거리 연속성 검사에 사용.
         tracks: list[Track] = []
-        for bbox, _d, emb, track_id, conf in bbox_meta:
-            tracks.append(Track(track_id=track_id, bbox=bbox, embedding=emb, conf=conf))
+        for bbox, d_med, emb, track_id, conf in bbox_meta:
+            tracks.append(Track(
+                track_id=track_id, bbox=bbox, embedding=emb, conf=conf,
+                distance_mm=int(d_med),
+            ))
 
         target = self._tracker.update(tracks)
+
+        # [debug] sim 분포 로그 — 5Hz throttle. threshold 결정용 데이터 수집.
+        # 형식: [sim-dist] target=<tid|none> n=<count> sims={id=A:0.74, id=B:0.12, ...}
+        # 데이터 충분히 모이면 이 블록 제거.
+        now_ts = time.time()
+        if (now_ts - self._sim_log_last_ts) >= 0.2 and self._tracker.all_sims:
+            self._sim_log_last_ts = now_ts
+            tgt_id = target.track_id if target is not None else None
+            sims_str = ", ".join(
+                f"id={tid}:{s:.2f}" for tid, s in self._tracker.all_sims
+            )
+            self.get_logger().info(
+                f"[sim-dist] target={tgt_id} n={len(self._tracker.all_sims)} "
+                f"sims={{{sims_str}}}"
+            )
+
         if target is not None:
             d_med = self._bbox_depth_median(depth, target.bbox)
             with self._lock:

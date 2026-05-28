@@ -16,7 +16,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from gogoping_perception.config import REID_SIM_THRESHOLD
+from gogoping_perception.config import (
+    REID_MAX_DISTANCE_JUMP_MM,
+    REID_SIM_THRESHOLD,
+    REID_SIM_UNLOCK_THRESHOLD,
+)
 from gogoping_perception.reid_engine import ReIDEngine
 from gogoping_perception.track import Track
 
@@ -32,6 +36,12 @@ class TargetTracker:
         self._target_emb: np.ndarray | None = None
         self._target_track_id: int | None = None
         self._last_sim: float | None = None
+        # [debug] 매 update() 의 ALL candidate sim — threshold 분포 측정용.
+        # [(track_id, sim), ...] 형태. update() 마다 갱신, perception_node 가 로그.
+        self._all_sims: list[tuple[int, float]] = []
+        # drift 재매칭 시 거리 연속성 검사용 — lock 유지/갱신 시마다 업데이트.
+        # 0 = 아직 valid distance 본 적 없음 (필터 비활성).
+        self._last_target_distance_mm: int = 0
         # enrollment FSM.
         self._state: str = "IDLE"  # IDLE | ENROLLING | ACTIVE
         self._enroll_target_n: int = 0
@@ -127,32 +137,64 @@ class TargetTracker:
     def last_sim(self) -> float | None:
         return self._last_sim
 
+    @property
+    def all_sims(self) -> list[tuple[int, float]]:
+        """[debug] 마지막 update() 에서 측정한 모든 candidate (track_id, sim)."""
+        return self._all_sims
+
     def update(self, tracks: list[Track]) -> Track | None:
         """현재 target 의 best 후보 Track 을 반환 (없으면 None)."""
         if self._target_emb is None or not tracks:
             self._last_sim = None
+            self._all_sims = []
             return None
 
-        # 1. track_id 유지 — ByteTrack 신뢰
+        # 모든 candidate 의 sim 한 번에 계산 — branch 따라 일부만 보는 문제 회피 +
+        # threshold 결정용 분포 측정 (perception_node 가 _all_sims 로 로그).
+        all_sims_with_t: list[tuple[Track, float]] = [
+            (t, float(self._reid.compute_similarity(t.embedding, self._target_emb)))
+            for t in tracks
+        ]
+        self._all_sims = [(t.track_id, s) for t, s in all_sims_with_t]
+
+        # 1. track_id 유지 — ByteTrack 신뢰. 단 asymmetric hysteresis:
+        #    sim 이 UNLOCK 임계 아래면 잘못 lock 된 것으로 간주 → 해제 후 drift 분기.
         if self._target_track_id is not None:
-            for t in tracks:
+            for t, s in all_sims_with_t:
                 if t.track_id == self._target_track_id:
-                    self._last_sim = float(
-                        self._reid.compute_similarity(t.embedding, self._target_emb)
-                    )
+                    if s < REID_SIM_UNLOCK_THRESHOLD:
+                        # lock 해제 — drift 분기에서 LOCK 임계로 재매칭.
+                        self._target_track_id = None
+                        break
+                    # 유지 — distance 갱신 (drift 시 거리 연속성 기준)
+                    if t.distance_mm > 0:
+                        self._last_target_distance_mm = t.distance_mm
+                    self._last_sim = s
                     return t
 
-        # 2. drift — ReID 로 best 찾기
+        # 2. drift — sim + 거리 연속성 둘 다 만족하는 candidate 만.
+        #    last_target_distance_mm 가 알려져 있으면 ±MAX_DISTANCE_JUMP 안만 후보.
+        eligible: list[tuple[Track, float]] = []
+        for t, s in all_sims_with_t:
+            if (
+                self._last_target_distance_mm > 0
+                and t.distance_mm > 0
+                and abs(t.distance_mm - self._last_target_distance_mm) > REID_MAX_DISTANCE_JUMP_MM
+            ):
+                continue  # 거리 점프 — 다른 사람일 가능성, drift 후보에서 제외
+            eligible.append((t, s))
+
         best: Track | None = None
         best_sim = -1.0
-        for t in tracks:
-            sim = float(self._reid.compute_similarity(t.embedding, self._target_emb))
-            if sim > best_sim:
-                best_sim = sim
+        for t, s in eligible:
+            if s > best_sim:
+                best_sim = s
                 best = t
 
         if best is not None and best_sim >= REID_SIM_THRESHOLD:
             self._target_track_id = best.track_id
+            if best.distance_mm > 0:
+                self._last_target_distance_mm = best.distance_mm
             self._last_sim = best_sim
             return best
 

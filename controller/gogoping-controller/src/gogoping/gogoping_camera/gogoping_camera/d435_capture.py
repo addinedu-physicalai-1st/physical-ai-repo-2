@@ -122,6 +122,19 @@ class D435Capture:
                 _log.warning("wait_for_frames timeout/error: %s", exc)
                 continue
 
+            # pyrealsense2 internal queue 에 더 새로운 frame 이 있으면 모두 drain.
+            # wait_for_frames 는 oldest 부터 반환 → 그동안 쌓인 frame 으로 인해
+            # perception 이 "과거" frame 처리. poll_for_frames 는 non-blocking,
+            # frame 없으면 falsy 반환. 매 cycle 마다 latest frameset 으로 align/encode.
+            while True:
+                try:
+                    newer = self._pipeline.poll_for_frames()
+                except RuntimeError:
+                    break
+                if not newer:
+                    break
+                frames = newer
+
             aligned = self._align.process(frames)
             color_frame = aligned.get_color_frame()
             depth_frame = aligned.get_depth_frame()
