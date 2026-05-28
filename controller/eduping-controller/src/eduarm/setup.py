@@ -51,6 +51,8 @@ setup(
             'd435_rgb_uploader_node = eduarm.d435_rgb_uploader_node:main',
             # D435 depth pointcloud → 1m filter + decimate + world transform → control-service WS.
             'd435_pointcloud_uploader_node = eduarm.d435_pointcloud_uploader_node:main',
+            # 무궁화 device-local perception — D435 YOLO/ByteTrack + WS producer.
+            'mugunghwa_perception_node = eduarm.mugunghwa_perception_node:main',
         ],
     },
 )
