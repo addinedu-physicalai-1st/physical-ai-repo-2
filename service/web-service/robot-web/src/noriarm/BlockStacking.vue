@@ -160,37 +160,37 @@ async function playRps(): Promise<void> {
 
   humanWon.value = result === 'human';
 
-  // 텍스트와 동시에 TTS 즉시 발화
   const prefix = robotGesture.value && humanGesture ? `나는 ${robotGesture.value}, 니가 ${humanGesture}를 냈네! ` : '';
   const resultMsg = humanWon.value ? `${prefix}니가 이겼어! 니가 먼저야!` : `${prefix}내가 이겼어! 니가 먼저해!`;
   void tts.speak(resultMsg);
 
-  // 4초 대기 (로봇 홈 복귀) → announceWinner
-  phaseTimer = window.setTimeout(() => { phaseTimer = null; void announceWinner(); }, 4000);
+  // 로봇이 홈으로 돌아가는 시간 + 모델 로드 시간을 단축하기 위해
+  // UI 애니메이션이 진행되는 동안 백그라운드에서 추론(runner_entry)을 미리 시작시킵니다.
+  const startPromise = fetch(`/api/noriarm/games/block-stacking/sessions/${sessionId.value}/start`, {
+    method: 'POST',
+  });
+
+  // 4초 대기 (로봇 홈 복귀 시각적 효과) → announceWinner
+  phaseTimer = window.setTimeout(() => { phaseTimer = null; void announceWinner(startPromise); }, 4000);
 }
 
-async function announceWinner(): Promise<void> {
+async function announceWinner(startPromise: Promise<Response>): Promise<void> {
   phase.value = 'announce';
   clearTimers();
-  phaseTimer = window.setTimeout(() => {
+  
+  // 2.5초간 카드를 보여준 뒤, 미리 시작해둔 start API가 끝났는지 확인하고 넘어갑니다.
+  phaseTimer = window.setTimeout(async () => {
     phaseTimer = null;
-    void startPlaying();
+    try {
+      const r = await startPromise;
+      if (!r.ok) throw new Error(`start 실패 (${r.status})`);
+      phase.value = 'playing';
+      void tts.speak('파란색 블록을 쌓아봐!');
+    } catch (e) {
+      error.value = String(e);
+      phase.value = 'intro';
+    }
   }, 2500);
-}
-
-async function startPlaying(): Promise<void> {
-  if (!sessionId.value) return;
-  try {
-    const r = await fetch(`/api/noriarm/games/block-stacking/sessions/${sessionId.value}/start`, {
-      method: 'POST',
-    });
-    if (!r.ok) throw new Error(`start 실패 (${r.status})`);
-    phase.value = 'playing';
-    void tts.speak('파란색 블록을 쌓아봐!');
-  } catch (e) {
-    error.value = String(e);
-    phase.value = 'intro';
-  }
 }
 
 async function restartSession(): Promise<void> {

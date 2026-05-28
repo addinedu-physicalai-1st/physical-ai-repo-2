@@ -160,10 +160,49 @@ async def _kill_stale_processes() -> None:
     await asyncio.sleep(0.5)
 
 
+async def _prefetch_model_in_background() -> None:
+    try:
+        from noriarm_framework.games.block_stacking import load_block_stacking_config
+        config = load_block_stacking_config()
+        repo_id = config.policy.extra.get("repo_id")
+        if not repo_id or not ("/" in repo_id):
+            return
+
+        logger.info("[block-stacking] 백그라운드 모델 다운로드/캐시 확인 시작: %s", repo_id)
+        
+        # 환경 변수 추가: 허깅페이스 멀티스레드 다운로드 제한 (CPU 폭주 방지)
+        env = _runner_env_extra()
+        env["HF_HUB_DOWNLOAD_THREADS"] = "1"
+        
+        # 캐시에 이미 모델이 있다면 네트워크/해시 검사를 생략(local_files_only=True)하여 
+        # 파일 잠금(Lock)을 빨리 풀고 추론 프로세스(runner_entry)의 로딩이 지연되지 않게 합니다.
+        code = f"""
+from huggingface_hub import snapshot_download
+try:
+    snapshot_download('{repo_id}', local_files_only=True)
+except Exception:
+    snapshot_download('{repo_id}')
+"""
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-c", code,
+            env=env,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            logger.info("[block-stacking] 백그라운드 다운로드 완료 (캐싱됨)")
+        else:
+            logger.warning("[block-stacking] 백그라운드 다운로드 실패: %s", stderr.decode(errors="replace"))
+    except Exception as e:
+        logger.warning("[block-stacking] 백그라운드 모델 프리페치 예외: %s", e)
+
+
 @router.post("/sessions")
 async def create_session() -> dict:
     await _kill_stale_processes()
     s = _store.create()
+    asyncio.create_task(_prefetch_model_in_background())
     return {"session_id": s.session_id, "status": s.status}
 
 
@@ -171,10 +210,20 @@ async def create_session() -> dict:
 async def play_rps(sid: str) -> dict:
     session = _session_or_404(sid)
 
-    # bringup 종료 — rps_player 가 /dev/omx_follower 단독 점유.
-    logger.warning("[block-stacking] bringup 종료 (rps 전)")
-    await _kill_bringup()
-    await asyncio.sleep(1.5)
+    # 이미 실행 중인 rps_player가 있다면 (즉, 비겨서 다시 시작하는 경우)
+    # 즉시 강제 종료(kill)하여 홈 포즈로 복귀하는 동작을 생략한다.
+    fast_restart = False
+    if session.rps_proc is not None and session.rps_proc.returncode is None:
+        logger.warning("[block-stacking] 기존 rps_player 즉시 강제 종료 (비김 재시작)")
+        session.rps_proc.kill()
+        session.rps_proc = None
+        fast_restart = True
+
+    if not fast_restart:
+        # bringup 종료 — rps_player 가 /dev/omx_follower 단독 점유.
+        logger.warning("[block-stacking] bringup 종료 (rps 전)")
+        await _kill_bringup()
+        await asyncio.sleep(1.5)
 
     # 랜덤 제스처 선택 (파일 없는 제스처 제외)
     available = [g for g, p in _RPS_TRAJS.items() if p.exists()]
@@ -249,12 +298,19 @@ async def detect_rps(sid: str) -> dict:
         await asyncio.gather(_detect_loop(), _wait_ready())
 
         if detected[0] is not None:
-            try:
-                session.rps_proc.terminate()
-            except Exception:
-                pass
-            logger.info("[block-stacking] rps-detect 결과: %s", detected[0])
-            return {"gesture": detected[0]}
+            human_gesture = detected[0]
+            is_draw = (human_gesture == session.robot_gesture)
+
+            # 비긴 경우: 자세를 유지해서 빠른 재시작(fast retry)이 가능하게 함.
+            # 승패가 난 경우: 프론트엔드가 결과를 말하는 동안 로봇이 미리 홈으로 돌아가도록 즉시 종료(terminate)시킴.
+            if not is_draw:
+                try:
+                    session.rps_proc.terminate()
+                except Exception:
+                    pass
+                
+            logger.info("[block-stacking] rps-detect 결과: %s (is_draw=%s)", human_gesture, is_draw)
+            return {"gesture": human_gesture}
         return {"gesture": None}
 
     except Exception as e:
@@ -266,9 +322,10 @@ async def detect_rps(sid: str) -> dict:
 async def start_play(sid: str) -> dict:
     session = _session_or_404(sid)
 
-    # rps_player 가 아직 실행 중이면 최대 10s 대기.
+    # rps_player 가 아직 실행 중이면 SIGTERM 을 보내 홈 포즈로 복귀하게 한 뒤 종료 대기.
     if session.rps_proc is not None and session.rps_proc.returncode is None:
-        logger.warning("[block-stacking] rps_player 종료 대기...")
+        logger.warning("[block-stacking] rps_player 종료(SIGTERM) 대기...")
+        session.rps_proc.terminate()
         try:
             await asyncio.wait_for(session.rps_proc.wait(), timeout=10.0)
         except asyncio.TimeoutError:

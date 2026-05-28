@@ -82,6 +82,7 @@ def _build_act_provider(config):
     if not repo_id:
         raise RuntimeError("game.yaml policy.repo_id 누락")
     n_steps_override = extra.get("n_action_steps")
+    temporal_coeff = extra.get("temporal_ensemble_coeff")
     task = str(extra.get("task") or "Game Block Stacking")
 
     device_str = str(extra.get("device") or "cuda")
@@ -99,8 +100,12 @@ def _build_act_provider(config):
     policy = ACTPolicy.from_pretrained(str(repo_id)).to(device).eval()
     if n_steps_override is not None:
         policy.config.n_action_steps = int(n_steps_override)
-    logger.info("ACT 로드 완료 (%.1fs, n_action_steps=%d)",
-                time.perf_counter() - t0, policy.config.n_action_steps)
+    if temporal_coeff is not None:
+        policy.config.temporal_ensemble_coeff = float(temporal_coeff)
+    
+    logger.info("ACT 로드 완료 (%.1fs, n_action_steps=%d, temporal_coeff=%s)",
+                time.perf_counter() - t0, policy.config.n_action_steps,
+                policy.config.temporal_ensemble_coeff)
 
     preprocessor, postprocessor = make_pre_post_processors(
         policy_cfg=policy.config,
