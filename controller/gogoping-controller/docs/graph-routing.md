@@ -160,3 +160,46 @@ g = Graph.from_yaml(Path('controller/gogoping-controller/src/gogoping/gogoping_n
 print(g.route('출입구1', '운동장22'))
 "
 ```
+
+
+## Heading-aware Dijkstra (2026-05-28 추가)
+
+기본 Dijkstra 는 모든 vertex 에서 자유 회전 가능한 holonomic 로봇 가정. vic_pinky (디퍼런셜 드라이브) 는 좁은 통로에서 제자리 180° 회전이 위험 — heading-aware 다익스트라로 보강.
+
+### 알고리즘
+
+State 공간 = `(vertex_name, heading_yaw_bucket)` (8 bucket × 45°). 시작 상태 = `(src_vertex, robot_current_yaw)`.
+
+전이 (V → W) 허용 조건:
+- lane (V, W) 존재
+- `θ_VW = atan2(W.y - V.y, W.x - V.x)` 계산
+- `|angle_diff(current_heading, θ_VW)| ≤ 135°` (역주행 거부)
+- **V.can_rotate == True 면 위 조건 무시** (제자리 회전 허용)
+
+Cost = lane 길이만. 회전 페널티 없음.
+
+### `can_rotate=true` vertex (8 개)
+
+- 수-회 / 놀-상-회 / 놀-하-회 / 충전소 / 출-회 (좁은 통로 끝의 회전 공간)
+- 운동장 / 운동장-단상 / 운동장입구 (넓은 야외)
+
+### 평행 vertex 우회 (자연 U-턴)
+
+명시적 회전 vertex 없이도 그래프 구조로 방향 전환 가능. 예: `복-4 ↔ 복-4-1` 같은 평행 vertex 쌍 — robot 이 메인 라인 (복-N) 을 따라 가다가 옆 라인 (복-N-1) 으로 90° 빠지고 다시 90° 빠져서 결과적으로 180° 전환. 다익스트라가 자동 발견.
+
+### 예시 시나리오
+
+1. **출입구 → 충전소 → 다시 출입구** (충전소 도착 직후): 충전소.can_rotate=true 라 in-place 180° 회전 → 직선 복귀.
+2. **복-4 (heading=북) 에서 출입구 명령**: 복-4.can_rotate=false 라 직진 (남쪽) 거부. 옆 라인 활용 → 복-4 → 복-4-1 → 복-3-1 → 복-3 → … → 출입구.
+3. **놀이방 일자 라인 reverse 요청**: 평행 vertex 없음 + can_rotate 없음 → `GraphError("no heading-aware path …")`.
+
+### API
+
+```python
+Graph.route(
+    src: str,
+    dst: str,
+    start_yaw: float | None = None,  # None 이면 기존 단순 다익스트라
+    blocked: set[str] | None = None,  # 통과 금지 vertex
+) -> list[str]
+```

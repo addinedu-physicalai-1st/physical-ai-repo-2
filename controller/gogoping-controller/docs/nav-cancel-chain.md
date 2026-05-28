@@ -130,3 +130,56 @@ ros2 topic info /gogoping/cmd_vel -v
 # graph_router 자체 stderr — RuntimeError 등 traceback 확인
 tmux capture-pane -t gogoping-sim:graph-router -p -S -200 | grep -iE "error|exception"
 ```
+
+
+## 함정 #4 — pause / resume / reroute (2026-05-28 추가)
+
+graph_router 가 segment 진행 중 `/gogoping/proximity_event` 을 polling 하며:
+- `person_close` → 현재 nav2 NavigateToPose goal cancel + pause loop. 사라지면 (`ok`) 재발사. 60s sustain → blocked set 추가 + `_restart_with_reroute`.
+- `wall_close` → cancel + LiDAR 후방 clearance check (`≥ 0.25m`) → 15cm backup → 재시도. 3 회 실패 → blocked + reroute. backup 중 odom 변화 < 3cm 면 stuck → abort.
+
+### 시퀀스 (사람 정지·재개)
+
+```
+graph_router_node            nav2
+─────────────────            ─────
+send_goal(seg_target)  ──→ EXECUTING
+proximity=person_close ←── (사람 등장)
+   ↓
+cancel_goal_async()    ──→ CANCELED
+pause_start_ts = now
+loop:
+   if level==ok and elapsed<60s:
+       send_goal(seg_target) ──→ EXECUTING (재시도)
+   if elapsed >= 60s:
+       blocked.add(seg_target) → _restart_with_reroute
+```
+
+### 시퀀스 (벽 backup)
+
+```
+graph_router_node           nav2 / motor
+─────────────────           ───────────
+send_goal(seg_target) ──→ EXECUTING
+proximity=wall_close  ←── (벽 근처)
+   ↓
+cancel_goal_async()   ──→ CANCELED
+rear_clearance < 0.25m? ── yes ── reroute
+   │ no
+   ↓
+publish cmd_vel(-0.05) × 3s  ──→ 15cm backup
+odom 변화 < 3cm? ── yes ── gh.abort("stuck_during_backup")
+   │ no
+   ↓
+retry++ — retry >= 3? ── yes ── reroute
+   │ no
+   ↓
+send_goal(seg_target) (재시도)
+```
+
+### 새 토픽
+
+- `/gogoping/proximity_event` (std_msgs/String JSON)
+- `/odom` 구독 (stuck 감지)
+- `/scan` 구독 (후방 clearance)
+- `/cmd_vel` publish (backup 직접 송출 — nav2 cancel 후에만)

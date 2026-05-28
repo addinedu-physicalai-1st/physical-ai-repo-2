@@ -5,12 +5,14 @@ waypoints:
     yaw: 0.0
     id: 5
     group: 야외
+    can_rotate: true
   - name: 운동장입구
     x: 3.46
     y: 0.03668039426028358
     yaw: 0.0
     id: 13
     group: 야외
+    can_rotate: true
   - name: 유치원입구
     x: 2.1988922918098535
     y: 0.044116385185939855
@@ -101,6 +103,7 @@ waypoints:
     yaw: 0.0
     id: 30
     group: null
+    can_rotate: true
   - name: 놀이방
     x: -3.75
     y: 9.91319274902343
@@ -167,12 +170,14 @@ waypoints:
     yaw: -1.5502512727614963
     id: 41
     group: 복도
+    can_rotate: true
   - name: 운동장
     x: 5.6789482079
     y: 2.815
     yaw: -3.141592653589793
     id: 42
     group: 야외
+    can_rotate: true
   - name: 수면실입구
     x: 0.025310031
     y: 11.062299728393555
@@ -227,16 +232,19 @@ waypoints:
     yaw: 0.0
     id: 51
     group: null
+    can_rotate: true
   - name: 수-회
     x: -5.59
     y: 11.062299728393555
     yaw: 0.0
     id: 52
     group: null
+    can_rotate: true
   - name: 출-회
     x: 0.5746856331825256
     y: -0.6322707471817823
     yaw: 1.5400368007244274
     id: null
     group: null
+    can_rotate: true
 patrols: {}

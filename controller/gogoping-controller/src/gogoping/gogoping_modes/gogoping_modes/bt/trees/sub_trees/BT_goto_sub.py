@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import py_trees
+from py_trees.common import Access
 
 from ....context import Context
 from ...behaviors.common.ui_publish import UIPublish
@@ -16,10 +17,28 @@ from ...blackboard import Keys
 
 
 _ARRIVAL_MSG = {"event": "announce", "text": "도착했습니다"}
+_DEFAULT_DESTINATION = "운동장-단상"   # force_state(GOTO) fallback (2026-05-28)
 
 
 def build_goto_subtree(ctx: Context) -> py_trees.behaviour.Behaviour:
-    """name="BT_goto_sub" — tree_inspector 의 BT_*_sub 패턴 매칭 → admin UI BT SUB 영역 표시."""
+    """name="BT_goto_sub" — tree_inspector 의 BT_*_sub 패턴 매칭 → admin UI BT SUB 영역 표시.
+
+    2026-05-28: DESTINATION_KEY 가 비었으면 _DEFAULT_DESTINATION 으로 fallback
+    (force_state debug 진입 시 즉시 Failure → return_request 자동 도피 방지).
+    """
+    # build 시점에 fallback — blackboard 가 비었거나 키 없으면 default 채움
+    try:
+        bb = py_trees.blackboard.Client(name="BT_goto_sub/builder")
+        bb.register_key(key=Keys.DESTINATION_KEY, access=Access.WRITE)
+        try:
+            cur = bb.get(Keys.DESTINATION_KEY)
+        except KeyError:
+            cur = ""
+        if not cur:
+            bb.set(Keys.DESTINATION_KEY, _DEFAULT_DESTINATION)
+    except Exception:
+        pass
+
     return py_trees.composites.Sequence(
         name="BT_goto_sub",
         memory=True,

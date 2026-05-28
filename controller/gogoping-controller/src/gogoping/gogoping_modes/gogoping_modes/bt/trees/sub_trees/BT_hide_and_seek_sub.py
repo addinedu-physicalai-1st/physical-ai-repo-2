@@ -50,6 +50,28 @@ from .BT_patrol_sub import build_patrol_sub
 _COUNTDOWN_SECONDS = 30.0
 
 
+def _load_grouped_vertices_from_yaml() -> list[str]:
+    """yaml 에서 group 이 채워진 vertex 이름만 list 로 반환. fallback 용.
+
+    control-service 의 _build_group_patrol_order 와 유사하지만 shuffle / NN 없음.
+    BT 가 search_waypoints blackboard 없이 진입했을 때 (force_state 디버그) 즉시
+    Failure 하지 않고 yaml 직접 로드해 동작 보장.
+    """
+    try:
+        import yaml
+        from pathlib import Path
+        from ament_index_python.packages import get_package_share_directory
+        share = Path(get_package_share_directory("gogoping_navigation"))
+        wp_path = share / "config" / "waypoints.yaml"
+        data = yaml.safe_load(wp_path.read_text(encoding="utf-8")) or {}
+        return [
+            w["name"] for w in (data.get("waypoints") or [])
+            if w.get("group")
+        ]
+    except Exception:
+        return []
+
+
 def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     """6 step Sequence 빌더.
 
@@ -84,8 +106,13 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
         patrol_only = False
     wps = list(wps_raw or [])
 
+    # fallback (2026-05-28) — force_state 등으로 search_waypoints 가 비어있는
+    # 경우 yaml 의 group 채워진 vertex 를 직접 로드. control-service Goal flow 우회
+    # 진입을 허용 (debug 편의 + BT 가 즉시 죽지 않게 안전망).
     if not wps:
-        return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_waypoints")
+        wps = _load_grouped_vertices_from_yaml()
+        if not wps:
+            return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_waypoints")
 
     # ─── patrol_only 분기 ─────────────────────────────────────────────────
     # admin UI [순찰] 버튼이 set — 모집/카운트다운/이동/복귀 없이 patrol_sub 만
@@ -103,7 +130,9 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
 
     # ─── 술래잡기 6-step Sequence ─────────────────────────────────────────
     if not play_area:
-        return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_play_area")
+        # fallback (2026-05-28) — force_state 등으로 play_area 비었으면
+        # state_to_goal 의 default "운동장-단상" 사용.
+        play_area = "운동장-단상"
 
     # Step 1: move_to_play — destination 셋 → phase 마커 → 실제 goto subtree → 오른쪽(yaw=0) 정렬.
     step_move = py_trees.composites.Sequence(
