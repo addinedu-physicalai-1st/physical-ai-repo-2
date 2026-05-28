@@ -84,6 +84,10 @@
   .spec .si .material-icons-round{ font-size:34pt }
   .spec .sn{ font-family:'Jua'; font-size:23pt; flex:0 0 26mm; line-height:1.1 }
   .spec .sl{ font-size:17pt; color:var(--inkSoft); line-height:1.5 } .spec .sl b{ color:var(--ink) }
+  .hwphoto{ flex:0 0 46mm; display:flex; flex-direction:column; align-items:center; gap:2.5mm }
+  .hwphoto img{ width:46mm; flex:1; min-height:0; object-fit:cover; border-radius:5mm; border:1mm solid var(--border); box-shadow:0 2mm 8mm rgba(236,143,166,.22) }
+  .hwphoto .cap{ font-family:'Jua'; font-size:13pt; color:var(--inkSoft) }
+  .specs{ flex:1; display:flex; flex-direction:column; min-height:0 }
 
   /* ── scenario horizontal (right, compact) ── */
   .flowh{ display:flex; align-items:flex-start; gap:1mm; padding:1mm 0 }
@@ -182,21 +186,27 @@
       <!-- 하드웨어 제원 -->
       <section class="sec grow">
         <div class="bar lav"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
-        <div class="bd">
-          <div class="spec">
-            <span class="si" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">accessibility_new</span></span>
-            <span class="sn" style="color:var(--pink)">에듀핑<br><span style="font-size:13pt;color:var(--inkSoft)">OpenArm</span></span>
-            <span class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC 모터 ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</span>
+        <div class="bd" style="flex-direction:row;gap:6mm;padding:5.5mm 6mm">
+          <div class="hwphoto">
+            <img src="assets/eduping-real.jpg" alt="EduPing 실물" />
+            <span class="cap">EduPing 실물</span>
           </div>
-          <div class="spec">
-            <span class="si" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">directions_car</span></span>
-            <span class="sn" style="color:var(--mint)">고고핑<br><span style="font-size:13pt;color:var(--inkSoft)">Vic Pinky</span></span>
-            <span class="sl"><b>차동구동 모바일 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</span>
-          </div>
-          <div class="spec">
-            <span class="si" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">precision_manufacturing</span></span>
-            <span class="sn" style="color:var(--lav)">노리암 ×3<br><span style="font-size:13pt;color:var(--inkSoft)">OMX</span></span>
-            <span class="sl"><b>OpenMANIPULATOR-X 4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</span>
+          <div class="specs">
+            <div class="spec">
+              <span class="si" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">accessibility_new</span></span>
+              <span class="sn" style="color:var(--pink)">에듀핑<br><span style="font-size:13pt;color:var(--inkSoft)">OpenArm</span></span>
+              <span class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC 모터 ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</span>
+            </div>
+            <div class="spec">
+              <span class="si" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">directions_car</span></span>
+              <span class="sn" style="color:var(--mint)">고고핑<br><span style="font-size:13pt;color:var(--inkSoft)">Vic Pinky</span></span>
+              <span class="sl"><b>차동구동 모바일 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</span>
+            </div>
+            <div class="spec">
+              <span class="si" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">precision_manufacturing</span></span>
+              <span class="sn" style="color:var(--lav)">노리암 ×3<br><span style="font-size:13pt;color:var(--inkSoft)">OMX</span></span>
+              <span class="sl"><b>OpenMANIPULATOR-X 4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</span>
+            </div>
           </div>
         </div>
       </section>
