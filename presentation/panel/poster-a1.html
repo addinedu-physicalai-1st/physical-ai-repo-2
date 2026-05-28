@@ -15,8 +15,9 @@
     --butter:#D49A1C; --butterS:#FBEFCD;
     --lav:#3D6BC4; --lavS:#D8E1F4;     /* 노리암 — 블루 */
     --sky:#4E97D6; --skyS:#D7EAFA;
-    --teal:#2E9A86; --tealS:#CCEAE2;   /* 시나리오 놀이 — 라임과 분리 */
-    --coral:#E26C4F; --coralS:#FAD9CE; /* 시나리오 보조 — 블루와 분리 */
+    --teal:#2E9A86; --tealS:#CCEAE2;   /* 카테고리 + 시나리오 놀이 */
+    --coral:#E26C4F; --coralS:#FAD9CE; /* 카테고리 + 시나리오 보조 */
+    --plum:#9A4FB8; --plumS:#E7D3F0;   /* 카테고리 — 하드웨어 제원 */
     --ink:#4A352B; --inkSoft:#7C6055; --faint:#B6A399;
     --border:#EFD6DC;
   }
@@ -53,9 +54,11 @@
   .bar{ display:flex; align-items:center; gap:4mm; padding:4.5mm 7mm; color:#fff; position:relative }
   .bar .badge{ width:13mm; height:13mm; border-radius:50%; background:rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
   .bar .badge .material-icons-round{ font-size:30pt; color:#fff }
+  .bar .badge.icon{ background:#fff; padding:1.2mm; box-sizing:border-box }
+  .bar .badge.icon img{ width:100%; height:100%; object-fit:contain; display:block }
   .bar h2{ font-family:'Jua'; font-size:31pt; letter-spacing:.01em }
   .bar .num{ margin-left:auto; font-family:'Jua'; font-size:18pt; opacity:.9 }
-  .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)} .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)}
+  .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)} .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)} .bar.teal{background:var(--teal)} .bar.coral{background:var(--coral)} .bar.plum{background:var(--plum)}
   .bd{ padding:6.5mm 7mm; flex:1; display:flex; flex-direction:column; min-height:0 }
   b{color:var(--ink)} .lead{ font-size:22pt; line-height:1.6 } .small{ font-size:16pt; color:var(--inkSoft); line-height:1.5 }
 
@@ -155,7 +158,7 @@
 
       <!-- 프로젝트 개요 -->
       <section class="sec">
-        <div class="bar pink"><span class="badge"><span class="material-icons-round">lightbulb</span></span><h2>프로젝트 개요</h2></div>
+        <div class="bar coral"><span class="badge"><span class="material-icons-round">lightbulb</span></span><h2>프로젝트 개요</h2></div>
         <div class="bd">
           <p class="lead">본 프로젝트는 <b>매니퓰레이터·자율주행 로봇</b>과 <b>AI 비전·음성 기술</b>을 융합하여, 유치원에서 <b>아이와 놀아주고 교사의 업무 부담을 경감해주는</b> 교육보조로봇 서비스를 구현한다.</p>
           <p class="lead" style="margin-top:3mm">등원부터 하원까지 <b>EduPing·GogoPing·NoriArm</b> 3종 로봇이 하루 일과를 함께하며, 아이에게는 즐거운 놀이 친구가 되고 교사에게는 업무 여유를 제공한다.</p>
@@ -172,7 +175,7 @@
 
       <!-- 시스템 구성도 -->
       <section class="sec">
-        <div class="bar sky"><span class="badge"><span class="material-icons-round">account_tree</span></span><h2>시스템 구성도</h2></div>
+        <div class="bar teal"><span class="badge"><span class="material-icons-round">account_tree</span></span><h2>시스템 구성도</h2></div>
         <div class="bd" style="padding:4mm 5mm">
           <img src="assets/architecture.png" alt="시스템 아키텍처 — APP / SERVICES / EQUIP" style="width:100%;height:auto;object-fit:contain;display:block" />
         </div>
@@ -180,7 +183,7 @@
 
       <!-- 하드웨어 제원 -->
       <section class="sec grow">
-        <div class="bar lav"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
+        <div class="bar plum"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
         <div class="bd">
           <div class="specgrid">
             <!-- ── Row 1: photos ── -->
@@ -241,7 +244,7 @@
 
       <!-- EduPing -->
       <section class="sec grow">
-        <div class="bar pink"><span class="badge"><span class="material-icons-round">accessibility_new</span></span><h2>에듀핑 — 활동</h2><span class="num">EduPing</span></div>
+        <div class="bar pink"><span class="badge icon"><img src="assets/icon-eduping.png" alt="" /></span><h2>에듀핑 — 활동</h2><span class="num">EduPing</span></div>
         <div class="bd">
           <div class="rhead">
             <div>
@@ -262,7 +265,7 @@
 
       <!-- GogoPing -->
       <section class="sec grow">
-        <div class="bar mint"><span class="badge"><span class="material-icons-round">directions_car</span></span><h2>고고핑 — 활동</h2><span class="num">GogoPing</span></div>
+        <div class="bar mint"><span class="badge icon"><img src="assets/icon-gogoping.png" alt="" /></span><h2>고고핑 — 활동</h2><span class="num">GogoPing</span></div>
         <div class="bd">
           <div class="rhead">
             <div>
@@ -281,7 +284,7 @@
 
       <!-- NoriArm -->
       <section class="sec grow">
-        <div class="bar lav"><span class="badge"><span class="material-icons-round">precision_manufacturing</span></span><h2>노리암 — 활동</h2><span class="num">NoriArm</span></div>
+        <div class="bar lav"><span class="badge icon"><img src="assets/icon-noriarm.png" alt="" /></span><h2>노리암 — 활동</h2><span class="num">NoriArm</span></div>
         <div class="bd">
           <div class="rhead">
             <div>
