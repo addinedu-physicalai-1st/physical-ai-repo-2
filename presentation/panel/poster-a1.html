@@ -29,15 +29,15 @@
   .head{ display:flex; align-items:center; gap:11mm; background:var(--surface); border:1mm solid var(--border); border-radius:9mm; padding:8mm 12mm; box-shadow:0 4mm 12mm rgba(236,143,166,.18); position:relative; overflow:hidden }
   .head::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4mm; background:linear-gradient(180deg,var(--pink),var(--lav),var(--mint)) }
   .head .htext{ flex:1; padding-left:3mm }
-  .eyebrow{ font-family:'Jua'; letter-spacing:.28em; color:var(--lav); font-size:15pt }
+  .eyebrow{ font-family:'Jua'; letter-spacing:.28em; color:var(--lav); font-size:18pt }
   .head h1{ font-family:'Jua'; font-size:104pt; line-height:.9; margin:3mm 0 2mm }
   .head h1 .p{color:var(--pink)} .head h1 .d{color:var(--lav)} .head h1 .g{color:var(--mint)}
-  .head .sub{ font-family:'Jua'; font-size:27pt }
-  .head .tag{ font-size:15pt; color:var(--inkSoft); margin-top:2.5mm; line-height:1.5 }
+  .head .sub{ font-family:'Jua'; font-size:34pt }
+  .head .tag{ font-size:19pt; color:var(--inkSoft); margin-top:2.5mm; line-height:1.5 }
   .head .hright{ flex:0 0 auto; text-align:center }
-  .team{ font-family:'Jua'; font-size:20pt; color:#fff; background:var(--pink); border-radius:8mm; padding:4.5mm 10mm; display:inline-block; box-shadow:0 3mm 8mm rgba(236,143,166,.4) }
+  .team{ font-family:'Jua'; font-size:24pt; color:#fff; background:var(--pink); border-radius:8mm; padding:4.5mm 10mm; display:inline-block; box-shadow:0 3mm 8mm rgba(236,143,166,.4) }
   .robots{ margin-top:4mm; display:flex; gap:3mm; justify-content:center }
-  .rbadge{ font-family:'Jua'; font-size:13pt; padding:2.6mm 6mm; border-radius:7mm; color:#fff }
+  .rbadge{ font-family:'Jua'; font-size:16pt; padding:2.6mm 6mm; border-radius:7mm; color:#fff }
 
   /* ── COLUMNS ── */
   .cols{ flex:1; display:grid; grid-template-columns:1fr 1fr; gap:7mm; min-height:0 }
@@ -48,17 +48,17 @@
   .sec.grow{ flex:1 }
   .bar{ display:flex; align-items:center; gap:4mm; padding:4.5mm 7mm; color:#fff; position:relative }
   .bar .badge{ width:13mm; height:13mm; border-radius:50%; background:rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
-  .bar .badge .material-icons-round{ font-size:24pt; color:#fff }
-  .bar h2{ font-family:'Jua'; font-size:23pt; letter-spacing:.01em }
-  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:14pt; opacity:.9 }
+  .bar .badge .material-icons-round{ font-size:30pt; color:#fff }
+  .bar h2{ font-family:'Jua'; font-size:31pt; letter-spacing:.01em }
+  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:18pt; opacity:.9 }
   .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)} .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)}
   .bd{ padding:6.5mm 7mm; flex:1; display:flex; flex-direction:column; min-height:0 }
-  b{color:var(--ink)} .lead{ font-size:15.5pt; line-height:1.62 } .small{ font-size:11.5pt; color:var(--inkSoft); line-height:1.5 }
+  b{color:var(--ink)} .lead{ font-size:22pt; line-height:1.6 } .small{ font-size:16pt; color:var(--inkSoft); line-height:1.5 }
 
   .stats{ display:flex; gap:4mm; margin-top:auto; padding-top:5mm }
   .stat{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:5mm; padding:4.5mm 1mm }
-  .stat .n{ font-family:'Jua'; font-size:33pt; line-height:1 } .stat .u{ font-size:13pt; color:var(--inkSoft) }
-  .stat .l{ font-size:11pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.3 }
+  .stat .n{ font-family:'Jua'; font-size:43pt; line-height:1 } .stat .u{ font-size:18pt; color:var(--inkSoft) }
+  .stat .l{ font-size:15pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.3 }
 
   /* ── tech ── */
   .techrow{ display:flex; align-items:flex-start; gap:4mm; padding:3.2mm 0; border-top:.6mm solid var(--border) }
@@ -73,40 +73,40 @@
   .logo{ width:calc(16.66% - 2.5mm); display:flex; flex-direction:column; align-items:center; gap:1.8mm }
   .logo .lw{ height:15mm; display:flex; align-items:center; justify-content:center }
   .logo img{ max-height:15mm; max-width:22mm; object-fit:contain; display:block }
-  .logo span{ font-family:'Jua'; font-size:10pt; color:var(--inkSoft); text-align:center; line-height:1.05 }
-  .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:12pt; color:var(--inkSoft); line-height:1.6 }
+  .logo span{ font-family:'Jua'; font-size:14pt; color:var(--inkSoft); text-align:center; line-height:1.05 }
+  .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:17pt; color:var(--inkSoft); line-height:1.6 }
   .aimods b{ color:var(--ink); font-family:'Jua' }
 
   /* ── hardware spec (left) ── */
   .spec{ display:flex; gap:5mm; align-items:center; flex:1; border-top:.8mm solid var(--border) }
   .spec:first-child{ border-top:none }
   .spec .si{ width:15mm; height:15mm; border-radius:4.5mm; display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
-  .spec .si .material-icons-round{ font-size:28pt }
-  .spec .sn{ font-family:'Jua'; font-size:17pt; flex:0 0 26mm; line-height:1.1 }
-  .spec .sl{ font-size:12.5pt; color:var(--inkSoft); line-height:1.5 } .spec .sl b{ color:var(--ink) }
+  .spec .si .material-icons-round{ font-size:34pt }
+  .spec .sn{ font-family:'Jua'; font-size:23pt; flex:0 0 26mm; line-height:1.1 }
+  .spec .sl{ font-size:17pt; color:var(--inkSoft); line-height:1.5 } .spec .sl b{ color:var(--ink) }
 
   /* ── scenario horizontal (right, compact) ── */
   .flowh{ display:flex; align-items:flex-start; gap:1mm; padding:1mm 0 }
   .fh{ flex:1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:1.5mm }
   .fh .fhi{ width:14mm; height:14mm; border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2mm 5mm rgba(236,143,166,.28) }
-  .fh .fhi .material-icons-round{ font-size:23pt; color:#fff }
-  .fh .fht{ font-family:'Jua'; font-size:14pt; line-height:1 } .fh .fhs{ font-size:10pt; color:var(--inkSoft); line-height:1.2 }
-  .fharrow{ align-self:flex-start; margin-top:3mm; color:var(--faint); font-size:18pt; font-family:'Jua' }
+  .fh .fhi .material-icons-round{ font-size:28pt; color:#fff }
+  .fh .fht{ font-family:'Jua'; font-size:19pt; line-height:1 } .fh .fhs{ font-size:14pt; color:var(--inkSoft); line-height:1.2 }
+  .fharrow{ align-self:flex-start; margin-top:3mm; color:var(--faint); font-size:24pt; font-family:'Jua' }
 
   /* ── robot blocks (right) ── */
   .rhead{ display:flex; align-items:center; gap:6mm; margin-bottom:4mm }
   .pslot{ width:40mm; height:40mm; flex:0 0 auto; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.5mm; color:var(--faint); overflow:hidden }
-  .pslot .material-icons-round{ font-size:30pt } .pslot span{ font-family:'Jua'; font-size:12pt }
-  .rtitle{ font-family:'Jua'; font-size:34pt; line-height:1 } .rtitle .en{ font-size:18pt; color:var(--inkSoft) }
-  .rhw{ font-family:'Jua'; font-size:14pt; color:var(--inkSoft); margin-top:2.5mm }
-  .rfunc{ font-size:14.5pt; line-height:1.6; color:var(--ink); margin-bottom:4mm }
+  .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
+  .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1 } .rtitle .en{ font-size:23pt; color:var(--inkSoft) }
+  .rhw{ font-family:'Jua'; font-size:18pt; color:var(--inkSoft); margin-top:2.5mm }
+  .rfunc{ font-size:21pt; line-height:1.6; color:var(--ink); margin-bottom:4mm }
   .rfunc b{ color:var(--ink) }
   .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
-    display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:14pt; gap:2.5mm; overflow:hidden }
-  .rblank .material-icons-round{ font-size:22pt }
+    display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:19pt; gap:2.5mm; overflow:hidden }
+  .rblank .material-icons-round{ font-size:28pt }
 
-  .foot{ display:flex; justify-content:space-between; font-size:11pt; color:var(--faint); padding:0 4mm }
+  .foot{ display:flex; justify-content:space-between; font-size:15pt; color:var(--faint); padding:0 4mm }
 
   .screennote{ position:fixed; top:8px; left:8px; z-index:99; background:#4A352B; color:#fff; font-family:sans-serif; font-size:12px; padding:6px 12px; border-radius:8px; opacity:.92 }
   @media print{ .screennote{display:none} html,body{background:#fff} }
@@ -185,17 +185,17 @@
         <div class="bd">
           <div class="spec">
             <span class="si" style="background:var(--pinkS)"><span class="material-icons-round" style="color:var(--pink)">accessibility_new</span></span>
-            <span class="sn" style="color:var(--pink)">에듀핑<br><span style="font-size:9pt;color:var(--inkSoft)">OpenArm</span></span>
+            <span class="sn" style="color:var(--pink)">에듀핑<br><span style="font-size:13pt;color:var(--inkSoft)">OpenArm</span></span>
             <span class="sl"><b>양팔 매니퓰레이터</b> · DAMIAO BLDC 모터 ×8 · Top·Gripper·Web 카메라 · 디스플레이 · 마이크·스피커</span>
           </div>
           <div class="spec">
             <span class="si" style="background:var(--mintS)"><span class="material-icons-round" style="color:var(--mint)">directions_car</span></span>
-            <span class="sn" style="color:var(--mint)">고고핑<br><span style="font-size:9pt;color:var(--inkSoft)">Vic Pinky</span></span>
+            <span class="sn" style="color:var(--mint)">고고핑<br><span style="font-size:13pt;color:var(--inkSoft)">Vic Pinky</span></span>
             <span class="sl"><b>차동구동 모바일 베이스</b> · RPLiDAR C1 · DC 모터 ×2 · 배터리 · pan/tilt 카메라(서보 ×2)</span>
           </div>
           <div class="spec">
             <span class="si" style="background:var(--lavS)"><span class="material-icons-round" style="color:var(--lav)">precision_manufacturing</span></span>
-            <span class="sn" style="color:var(--lav)">노리암 ×3<br><span style="font-size:9pt;color:var(--inkSoft)">OMX</span></span>
+            <span class="sn" style="color:var(--lav)">노리암 ×3<br><span style="font-size:13pt;color:var(--inkSoft)">OMX</span></span>
             <span class="sl"><b>OpenMANIPULATOR-X 4-DoF + 그리퍼</b> · Dynamixel ×6 · Top·Gripper 카메라 · 마이크·스피커</span>
           </div>
         </div>
