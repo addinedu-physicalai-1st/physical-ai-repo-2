@@ -336,11 +336,34 @@ class WaypointsRosBridge:
             return
         # 이전 goal cancel (best effort, 비동기). 새 goal 즉시 진행.
         self.cancel_current()
+        # 액션 즉시 발사 (send_goal_async 는 즉시 리턴) → HTTP 응답 빠르게.
         from gogoping_msgs.action import NavigateToVertex
         goal = NavigateToVertex.Goal()
         goal.target_name = target_name
         self._send_action(self._gr_nav_client, goal, goal_id, name=target_name,
                           feedback_emit=True)
+        # L1 sequence 시각화는 백그라운드 — route_to() 는 service 응답 대기로 최대 ~4s
+        # 블록 가능. HTTP path 에 포함하면 admin UI 의 2s timeout 을 넘어가 navigate 가
+        # "안 동작" 으로 보이는 버그가 생긴다. 시각화 실패해도 nav 자체는 영향 없음.
+        threading.Thread(
+            target=self._emit_route_sequence_async,
+            args=(target_name, goal_id),
+            daemon=True,
+        ).start()
+
+    def _emit_route_sequence_async(self, target_name: str, goal_id: str) -> None:
+        """백그라운드: /graph_router/route 서비스 호출 → route_sequence SSE emit."""
+        try:
+            route = self.route_to(target_name)
+            if route.get("success") and route.get("vertex_sequence"):
+                self._emit({
+                    "type": "route_sequence",
+                    "goal_id": goal_id,
+                    "sequence": list(route["vertex_sequence"]),
+                    "total_distance_m": float(route.get("total_distance_m", 0.0)),
+                })
+        except Exception:
+            pass
 
     def cancel_current(self) -> None:
         with self._lock:

@@ -825,6 +825,11 @@ class _SseDispatcher:
             cur = ev.get("current_vertex")
             if cur:
                 self.card._map.set_current(cur)
+        elif t == "route_sequence":
+            # L1 다익스트라 결과 — vertex sequence 강조선 표시
+            seq = ev.get("sequence")
+            if isinstance(seq, list) and seq:
+                self.card._map.set_route(seq)
 
 
 class _SseThread(QThread):
