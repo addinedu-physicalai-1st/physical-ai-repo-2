@@ -87,14 +87,14 @@
   /* ── hardware spec (left) — 3-col × 3-row grid for aligned layout ── */
   .specgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr auto auto; gap:3mm 5mm; flex:1; min-height:0 }
   .specgrid .ph{ width:100%; min-height:0; display:flex; align-items:center; justify-content:center }
-  .specgrid .ph img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:1mm solid var(--border); box-shadow:0 2mm 6mm rgba(236,143,166,.18); display:block }
+  .specgrid .ph img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:none; box-shadow:none; display:block }
   .specgrid .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:baseline; gap:3mm; flex-wrap:wrap; align-self:end }
   .specgrid .sn small{ font-size:16pt; color:var(--inkSoft); font-family:'Jua' }
   .specgrid .ph{ position:relative }
-  .specgrid .ph .icn{ position:absolute; top:3mm; right:3mm; width:18mm; height:18mm; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; padding:2mm; box-sizing:border-box; z-index:2 }
-  .specgrid .ph .icn.pink { box-shadow:0 0 0 0.5mm var(--pink) }
-  .specgrid .ph .icn.mint { box-shadow:0 0 0 0.5mm var(--mint) }
-  .specgrid .ph .icn.lav  { box-shadow:0 0 0 0.5mm var(--lav) }
+  .specgrid .ph .icn{ position:absolute; top:3mm; right:3mm; width:18mm; height:18mm; border-radius:50%; background:#fff; box-shadow:0 2mm 5mm rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; padding:2mm; box-sizing:border-box; z-index:2 }
+  .specgrid .ph .icn.pink { box-shadow:0 0 0 1.2mm var(--pink),  0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn.mint { box-shadow:0 0 0 1.2mm var(--mint),  0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn.lav  { box-shadow:0 0 0 1.2mm var(--lav),   0 2mm 5mm rgba(0,0,0,.18) }
   .specgrid .ph .icn img{ width:100%; height:100%; object-fit:contain; display:block }
   .specgrid .sl{ font-size:19pt; line-height:1.45; color:var(--inkSoft); display:flex; flex-direction:column; align-self:start }
   .specgrid .sl .li{ padding:1.4mm 0 1.4mm 5.5mm; position:relative }
