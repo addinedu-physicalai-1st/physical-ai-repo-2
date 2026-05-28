@@ -30,7 +30,7 @@
   .head::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4mm; background:linear-gradient(180deg,var(--pink),var(--lav),var(--mint)) }
   .head .htext{ flex:1; padding-left:3mm }
   .eyebrow{ font-family:'Jua'; letter-spacing:.28em; color:var(--lav); font-size:18pt }
-  .head h1{ font-family:'Jua'; font-size:104pt; line-height:.9; margin:3mm 0 2mm }
+  .head h1{ font-family:'Jua'; font-size:104pt; line-height:.9; margin:3mm 0 9mm }
   .head h1 .p{color:var(--pink)} .head h1 .d{color:var(--lav)} .head h1 .g{color:var(--mint)}
   .head .sub{ font-family:'Jua'; font-size:34pt }
   .head .tag{ font-size:19pt; color:var(--inkSoft); margin-top:2.5mm; line-height:1.5 }
@@ -110,8 +110,8 @@
   .rshot{ flex:1; min-height:0; border-radius:6mm; overflow:hidden; border:1mm solid var(--border); background:#fff }
   .rshot img{ width:100%; height:100%; object-fit:cover; display:block }
   .demohalf{ flex:1; min-height:0; display:flex; gap:3mm }
-  .demohalf .d{ flex:1; border-radius:6mm; overflow:hidden; border:1mm solid var(--border); background:#fff; display:flex; align-items:center; justify-content:center }
-  .demohalf .d img{ width:100%; height:100%; object-fit:contain; display:block }
+  .demohalf .d{ flex:1; display:flex; align-items:center; justify-content:center; min-width:0 }
+  .demohalf .d img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:6mm; border:1mm solid var(--border); display:block; box-shadow:0 2mm 6mm rgba(236,143,166,.2) }
 
   .foot{ display:flex; justify-content:space-between; font-size:15pt; color:var(--faint); padding:0 4mm }
 
@@ -144,8 +144,8 @@
       <section class="sec">
         <div class="bar pink"><span class="badge"><span class="material-icons-round">lightbulb</span></span><h2>프로젝트 개요</h2></div>
         <div class="bd">
-          <p class="lead">본 프로젝트는 <b>매니퓰레이터·자율주행 로봇</b>과 <b>AI 비전·음성 기술</b>을 융합하여, 유치원에서 아이와 놀아주고 교사의 놀이·운반·기록 업무를 분담하는 <b>교육보조로봇 서비스</b>를 구현한다.</p>
-          <p class="lead" style="margin-top:3mm">등원부터 하원까지 <b>EduPing·GogoPing·NoriArm</b> 3종 로봇이 하루 일과를 함께하며, 아이에게는 즐거운 놀이를, 교사에게는 업무 여유를 동시에 제공한다.</p>
+          <p class="lead">본 프로젝트는 <b>매니퓰레이터·자율주행 로봇</b>과 <b>AI 비전·음성 기술</b>을 융합하여, 유치원에서 <b>아이와 놀아주고 교사의 업무 부담을 경감해주는</b> 교육보조로봇 서비스를 구현한다.</p>
+          <p class="lead" style="margin-top:3mm">등원부터 하원까지 <b>EduPing·GogoPing·NoriArm</b> 3종 로봇이 하루 일과를 함께하며, 아이에게는 즐거운 놀이 친구가 되고 교사에게는 업무 여유를 제공한다.</p>
         </div>
       </section>
 
