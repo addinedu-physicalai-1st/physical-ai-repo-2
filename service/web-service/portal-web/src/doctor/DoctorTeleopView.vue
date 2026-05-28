@@ -33,6 +33,9 @@ const selfVideoRef = ref<HTMLVideoElement | null>(null);
 const wsStatus = ref<'connecting' | 'open' | 'closed'>('connecting');
 const armsReady = ref(false);
 const teleopActive = ref(false);
+const fsrRaw = ref<number | null>(null);
+const fsrPeak = ref<number | null>(null);
+function resetFsrPeak(): void { fsrPeak.value = fsrRaw.value; }
 
 // WebRTC — 의사 cam+mic 송신 + EduPing D435 RGB + mic 수신.
 let localStream: MediaStream | null = null;
@@ -121,7 +124,14 @@ onMounted(async () => {
   teleop = useDoctorTeleopWS({
     edupingId,
     onState,
-    onEvent: (evt) => { console.info('[doctor-teleop] event', evt); },
+    onEvent: (evt) => {
+      if (evt.type === 'fsr' && typeof evt.raw === 'number') {
+        fsrRaw.value = evt.raw;
+        if (fsrPeak.value === null || evt.raw > fsrPeak.value) fsrPeak.value = evt.raw;
+        return;
+      }
+      console.info('[doctor-teleop] event', evt);
+    },
   });
 
   // D435 pointcloud layer — control-service 가 1m 필터 + decimate 후 WS push.
@@ -204,6 +214,10 @@ function toggleTeleop(): void {
     <footer>
       <span>read-only viewer — 로봇 조작: leader arm 또는 RViz MotionPlanning</span>
       <span class="spacer" />
+      <span class="fsr-readout">
+        FSR raw: <b>{{ fsrRaw ?? '--' }}</b> / peak: <b>{{ fsrPeak ?? '--' }}</b>
+        <button class="fsr-reset" @click="resetFsrPeak">peak 리셋</button>
+      </span>
       <span v-if="!armsReady" class="warn">URDF 미로드 — 콘솔 확인</span>
     </footer>
   </div>
@@ -300,4 +314,7 @@ header, footer {
 }
 .teleop[data-active="true"] { background: #eb5757; color: #fff; }
 .teleop:disabled { opacity: 0.4; cursor: not-allowed; }
+.fsr-readout { font-variant-numeric: tabular-nums; margin-right: 8px; }
+.fsr-readout b { color: #4fd1c5; }
+.fsr-reset { margin-left: 8px; font-size: 11px; cursor: pointer; }
 </style>
