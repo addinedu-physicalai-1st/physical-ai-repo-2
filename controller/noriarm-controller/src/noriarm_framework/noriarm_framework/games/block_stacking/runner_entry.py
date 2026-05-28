@@ -145,10 +145,34 @@ def _build_act_provider(config):
 
 _SHUTDOWN = threading.Event()
 
+# 홈 포즈 (m100_100 단위) — rps_paper_trajectory.json 첫/마지막 프레임과 동일
+_HOME_POSE_M100 = [2.9785, -59.5703, 53.6621, 52.6855, 0.4395, 58.7402]
+
 
 def _handle_sig(signum, frame) -> None:  # noqa: ARG001
     logger.info("signal %s — 종료 진행", signum)
     _SHUTDOWN.set()
+
+
+def _go_home(robot, duration_s: float = 3.0) -> None:
+    """현재 위치에서 홈 포즈로 선형 보간해 3초에 걸쳐 이동."""
+    fps = 30
+    steps = int(duration_s * fps)
+    dt = 1.0 / fps
+    try:
+        obs = robot.get_observation()
+        start = [float(obs[k]) for k in MOTOR_ORDER]
+    except Exception:
+        start = list(_HOME_POSE_M100)
+    for i in range(1, steps + 1):
+        t = i / steps
+        action = {k: start[j] + (_HOME_POSE_M100[j] - start[j]) * t
+                  for j, k in enumerate(MOTOR_ORDER)}
+        try:
+            robot.send_action(action)
+        except Exception:
+            break
+        time.sleep(dt)
 
 
 def _run(robot, provider, *, fps: int, episode_s: int, home_cfg: dict) -> None:
@@ -269,7 +293,11 @@ def main() -> int:
         print(f"[block_stacking.runner] ACT 로드 실패: {e}", flush=True)
         return 3
 
-    # 2) 로봇 + 카메라 연결
+    # 2) signal handlers — connect 전에 부착해서 어느 단계에서 종료돼도 처리
+    signal.signal(signal.SIGTERM, _handle_sig)
+    signal.signal(signal.SIGINT, _handle_sig)
+
+    # 3) 로봇 + 카메라 연결
     logger.info("OmxFollower 연결 중...")
     robot = _build_robot()
     try:
@@ -279,7 +307,7 @@ def main() -> int:
         return 4
     logger.info("OmxFollower 연결됨 (6 motors + 2 cameras)")
 
-    # 3) READY → START 핸드셰이크
+    # 4) READY → START 핸드셰이크
     print("READY", flush=True)
     line = sys.stdin.readline()
     if not line or line.strip() != "START":
@@ -290,10 +318,6 @@ def main() -> int:
             pass
         return 2
 
-    # 4) signal handlers (START 이후 부착 — 그 전은 default 동작)
-    signal.signal(signal.SIGTERM, _handle_sig)
-    signal.signal(signal.SIGINT, _handle_sig)
-
     fps = args.fps if args.fps is not None else int(config.runtime.rate_hz)
     episode_s = args.episode_s if args.episode_s is not None else int(config.runtime.episode_timeout_s)
     home_cfg = config.policy.extra.get("home_detect") or {}
@@ -302,6 +326,10 @@ def main() -> int:
     # 5) 추론 루프
     try:
         _run(robot, provider, fps=fps, episode_s=episode_s, home_cfg=home_cfg)
+        # SIGTERM(중간 종료)일 때만 홈 복귀 — 자연 종료(max_home_events)는 이미 홈에 있음
+        if _SHUTDOWN.is_set():
+            logger.info("중간 종료 — 홈 포즈로 복귀 중 (3초)...")
+            _go_home(robot)
     finally:
         logger.info("disconnect 중...")
         try:

@@ -20,37 +20,6 @@ from typing import Any, Awaitable, Callable
 logger = logging.getLogger(__name__)
 
 
-def _home_pose_listener_factory(
-    *,
-    joint_names: list[str],
-    on_event: Callable[[int], None],
-) -> Callable[[dict], None]:
-    """SSE forward 콜백과 동일한 dict payload 를 받아 HomePoseDetector 를 돌리는 헬퍼.
-
-    bridge.add_joint_state_listener() 에 등록할 콜백을 만든다. 게임이 끝나고
-    detector 가 리셋되어야 할 때는 unsubscribe 한 뒤 다시 factory 를 호출한다.
-    """
-    from noriarm_framework.games.block_stacking.home_pose import HomePoseDetector  # lazy
-
-    detector = HomePoseDetector(holding_s=0.5)
-    expected = list(joint_names)
-
-    def on_payload(payload: dict) -> None:
-        names = payload.get("name") or []
-        position = payload.get("position") or []
-        idx_map = {n: i for i, n in enumerate(names)}
-        try:
-            joints = [position[idx_map[n]] for n in expected]
-        except (KeyError, IndexError):
-            return  # 우리가 원하는 5 축이 다 안 들어옴 — 무시.
-        stamp = payload.get("stamp") or {}
-        t = float(stamp.get("sec", 0)) + float(stamp.get("nanosec", 0)) * 1e-9
-        before = detector.events
-        after = detector.update(t=t, joint_positions=joints)
-        if after > before:
-            on_event(after)
-
-    return on_payload
 
 
 def _norm_to_rad(mode: str) -> Callable[[float], float]:
@@ -580,64 +549,7 @@ class NoriarmRosBridge:
                 logger.warning(f"gripper replay 에서 예외: {e}")
         logger.info("trajectory 재생 완료, 정책 reset")
 
-    # ---------------------------------------------- block_stacking 세션
-    async def start_block_stacking_session(
-        self, on_home_event: Callable[[int], None]
-    ) -> Callable[[], None]:
-        """블럭쌓기 세션 시작 — home pose 이벤트 listener 를 붙이고 unsubscribe 함수 반환.
 
-        ACT 추론은 별도 서브프로세스 (runner_entry) 가 담당. bridge 의 역할은
-        /joint_states 를 구독하면서 HOME 임계 진입 이벤트를 카운트해 콜백으로
-        흘려주는 것 한 가지.
-        """
-        cb = _home_pose_listener_factory(
-            joint_names=list(self._arm.controller_joint_names),
-            on_event=on_home_event,
-        )
-        return self.add_joint_state_listener(cb)
-
-    async def play_rps_paper(self) -> dict:
-        """RPS '보' trajectory replay 단발 호출 (서브프로세스 spawn 전에 bridge 가 직접 처리).
-
-        block_stacking 의 ACT 게임 루프와 무관 — bridge 가 가진 publisher 로 OX 퀴즈
-        replay 와 동일한 경로로 발사. block_stacking/rps_paper_trajectory.json 을
-        package resource 로 로드.
-        """
-        from importlib import resources
-
-        load_trajectory = self._fw["load_trajectory"]
-        with resources.path(
-            "noriarm_framework.games.block_stacking", "rps_paper_trajectory.json"
-        ) as rps_path:
-            traj = load_trajectory(rps_path)
-        asyncio.create_task(self._play_trajectory(traj, "rps_paper_trajectory.json"))
-        return {"ok": True, "action": "replay_trajectory", "duration_s": traj.duration_s}
-
-    async def send_home(self, *, duration_s: float = 2.0) -> None:
-        """OMX 를 HOME pose 로 천천히 복귀시키는 단일 point trajectory publish.
-
-        사용자가 '그만' 누른 후 호출 — ACT 자식 프로세스가 종료된 뒤 controller 가
-        마지막 ACT 명령 위치에 holding 하지 않도록 명시적으로 HOME 으로 보낸다.
-        """
-        if self._jt_pub is None or self._node is None:
-            return
-        from noriarm_framework.games.block_stacking.home_pose import HOME_POSE  # lazy
-        from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint  # type: ignore
-        n = len(self._controller_joint_names)
-        if n == 0:
-            return
-        msg = JointTrajectory()
-        msg.joint_names = list(self._controller_joint_names)
-        pt = JointTrajectoryPoint()
-        pt.positions = list(HOME_POSE)[:n]
-        sec = int(duration_s)
-        pt.time_from_start.sec = sec
-        pt.time_from_start.nanosec = int((duration_s - sec) * 1e9)
-        msg.points = [pt]
-        self._jt_pub.publish(msg)
-        logger.info(f"[send_home] HOME pose publish — duration={duration_s:.2f}s")
-        # 복귀 동작 끝날 때까지 약간 대기 (호출자가 await 한 후 정리 진행 가능).
-        await asyncio.sleep(duration_s + 0.2)
 
     # ---------------------------------------------- 정보 조회
 

@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -40,6 +41,11 @@ _GAME_DIR = (
 )
 _CAMERA_TUNER = _GAME_DIR / "camera_tuner.py"
 _RPS_PLAYER = _GAME_DIR / "rps_player.py"
+_RPS_TRAJS = {
+    "보":  _GAME_DIR / "rps_paper_trajectory.json",
+    "가위": _GAME_DIR / "rps_scissors_trajectory.json",
+    "바위": _GAME_DIR / "rps_rock_trajectory.json",
+}
 _RUNNER_ENTRY = _GAME_DIR / "runner_entry.py"
 _DEVICE_NORIARM_SH = _REPO_ROOT / "scripts" / "device-noriarm.sh"
 _BRINGUP_TMUX_SESSION = "noriarm-device"
@@ -69,6 +75,7 @@ class BlockStackingSession:
     _queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=64))
     process: Any = None   # RunnerProcess (runner_entry.py)
     rps_proc: Any = None  # rps_player.py asyncio.subprocess.Process
+    robot_gesture: str | None = None
 
     async def next_event(self, *, timeout_s: float) -> dict | None:
         try:
@@ -169,23 +176,90 @@ async def play_rps(sid: str) -> dict:
     await _kill_bringup()
     await asyncio.sleep(1.5)
 
+    # 랜덤 제스처 선택 (파일 없는 제스처 제외)
+    available = [g for g, p in _RPS_TRAJS.items() if p.exists()]
+    gesture = random.choice(available) if available else None
+    session.robot_gesture = gesture
+
     # rps_player.py fire-and-forget
-    if _RPS_PLAYER.exists():
+    if _RPS_PLAYER.exists() and gesture:
+        traj = _RPS_TRAJS[gesture]
         try:
             rps_proc = await asyncio.create_subprocess_exec(
-                sys.executable, str(_RPS_PLAYER), "/dev/omx_follower",
-                stdout=asyncio.subprocess.DEVNULL,
+                sys.executable, str(_RPS_PLAYER), "/dev/omx_follower", traj.name,
+                stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
             session.rps_proc = rps_proc
-            logger.warning("[block-stacking] rps_player PID=%s", rps_proc.pid)
+            logger.info("[block-stacking] rps_player PID=%s gesture=%s", rps_proc.pid, gesture)
         except Exception as e:
             logger.warning("[block-stacking] rps_player 실행 실패: %s", e)
     else:
-        logger.warning("[block-stacking] %s 없음 — RPS skip", _RPS_PLAYER)
+        logger.warning("[block-stacking] RPS skip (player=%s, gesture=%s)", _RPS_PLAYER.exists(), gesture)
 
     session.status = "rps"
-    return {"session_id": sid, "status": session.status}
+    return {"session_id": sid, "status": session.status, "robot_gesture": gesture}
+
+
+@router.post("/sessions/{sid}/rps-detect")
+async def detect_rps(sid: str) -> dict:
+    """front 카메라로 사람 손 제스처 감지.
+
+    손 감지와 rps_player READY 신호를 동시에 기다린다.
+    rps_player 가 트라젝토리를 다 재생하면 'READY' 를 stdout 으로 출력.
+    둘 다 완료된 후에만 반환 — 로봇이 제스처를 완전히 보인 뒤 결과 공개.
+    반환: {"gesture": "가위"|"바위"|"보"|null}
+    """
+    session = _session_or_404(sid)
+    loop = asyncio.get_running_loop()
+    try:
+        from noriarm_framework.games.block_stacking.rps_detector import detect_rps_gesture
+        _by_id = Path("/dev/v4l/by-id/usb-Alcorlink_Corp._USB_2.0_Camera-video-index0")
+        front_cam = str(_by_id.resolve()) if _by_id.exists() else "/dev/video4"
+
+        detected: list[str | None] = [None]
+
+        async def _detect_loop() -> None:
+            while True:
+                if session.rps_proc is None or session.rps_proc.returncode is not None:
+                    return
+                g = await loop.run_in_executor(
+                    None,
+                    lambda: detect_rps_gesture(front_cam, timeout_s=5.0, min_detections=8),
+                )
+                if g is not None:
+                    detected[0] = g
+                    return
+                await asyncio.sleep(0.1)
+
+        async def _wait_ready() -> None:
+            proc = session.rps_proc
+            if proc is None or proc.stdout is None:
+                return
+            try:
+                while True:
+                    line = await asyncio.wait_for(proc.stdout.readline(), timeout=60.0)
+                    if not line:
+                        return
+                    if line.strip() == b"READY":
+                        return
+            except asyncio.TimeoutError:
+                pass
+
+        await asyncio.gather(_detect_loop(), _wait_ready())
+
+        if detected[0] is not None:
+            try:
+                session.rps_proc.terminate()
+            except Exception:
+                pass
+            logger.info("[block-stacking] rps-detect 결과: %s", detected[0])
+            return {"gesture": detected[0]}
+        return {"gesture": None}
+
+    except Exception as e:
+        logger.warning("[block-stacking] rps-detect 실패: %s", e)
+        return {"gesture": None}
 
 
 @router.post("/sessions/{sid}/start")
@@ -279,9 +353,12 @@ async def end_session(sid: str) -> dict:
         return {"ok": True}
     session.status = "done"
 
-    # rps_player 혹시 아직 살아있으면 종료.
+    # rps_player 종료 — SIGTERM → 홈 복귀(3초) → disconnect 대기.
     if session.rps_proc is not None:
         try:
+            session.rps_proc.terminate()
+            await asyncio.wait_for(session.rps_proc.wait(), timeout=6.0)
+        except asyncio.TimeoutError:
             session.rps_proc.kill()
         except Exception:
             pass
