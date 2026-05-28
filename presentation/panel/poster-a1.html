@@ -109,6 +109,9 @@
   .rblank .material-icons-round{ font-size:28pt }
   .rshot{ flex:1; min-height:0; border-radius:6mm; overflow:hidden; border:1mm solid var(--border); background:#fff }
   .rshot img{ width:100%; height:100%; object-fit:cover; display:block }
+  .demohalf{ flex:1; min-height:0; display:flex; gap:3mm }
+  .demohalf .d{ flex:1; border-radius:6mm; overflow:hidden; border:1mm solid var(--border); background:#fff }
+  .demohalf .d img{ width:100%; height:100%; object-fit:cover; display:block }
 
   .foot{ display:flex; justify-content:space-between; font-size:15pt; color:var(--faint); padding:0 4mm }
 
@@ -152,8 +155,8 @@
       <!-- 기술 스택 -->
       <section class="sec">
         <div class="bar butter"><span class="badge"><span class="material-icons-round">build</span></span><h2>기술 스택</h2></div>
-        <div class="bd" style="padding:3mm 5mm;align-items:center;justify-content:center">
-          <img src="assets/techstack.png" alt="기술 스택 — git·Python·Raspberry Pi·Ubuntu·PyTorch·OpenCV·Jira·YOLO·Docker·Ollama·ROS·Hugging Face" style="max-height:95mm;max-width:100%;width:auto;display:block;object-fit:contain" />
+        <div class="bd" style="padding:5mm 6mm;justify-content:center">
+          <img src="assets/techstack.png" alt="기술 스택 — Jira·YOLO·Raspberry Pi·git·PyTorch·OpenCV·Docker·Ollama·ROS·Hugging Face" style="width:100%;height:auto;display:block;object-fit:contain" />
         </div>
       </section>
 
@@ -199,14 +202,16 @@
         <div class="bar pink"><span class="badge"><span class="material-icons-round">accessibility_new</span></span><h2>에듀핑 — 기능</h2><span class="num">EduPing</span></div>
         <div class="bd">
           <div class="rhead">
-            <div class="pslot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
             <div>
               <div class="rtitle" style="color:var(--pink)">에듀핑</div>
               <div class="rhw">OpenArm · 정문 상주</div>
             </div>
           </div>
           <div class="rfunc"><b>등하원</b> 얼굴인식 인사 · <b>율동</b> 음악·모션 동기 · <b>무궁화꽃이 피었습니다</b> 다중 자세 추적</div>
-          <div class="rblank"><span class="material-icons-round">image</span> 사진 · 설명 공간</div>
+          <div class="demohalf">
+            <div class="d"><img src="assets/eduping-demo1.jpg" alt="EduPing 데모" /></div>
+            <div class="d"><img src="assets/eduping-demo2.png" alt="EduPing 데모" /></div>
+          </div>
         </div>
       </section>
 
@@ -215,7 +220,6 @@
         <div class="bar mint"><span class="badge"><span class="material-icons-round">directions_car</span></span><h2>고고핑 — 기능</h2><span class="num">GogoPing</span></div>
         <div class="bd">
           <div class="rhead">
-            <div class="pslot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
             <div>
               <div class="rtitle" style="color:var(--mint)">고고핑</div>
               <div class="rhw">Vic Pinky · 모바일 베이스</div>
@@ -231,7 +235,6 @@
         <div class="bar lav"><span class="badge"><span class="material-icons-round">precision_manufacturing</span></span><h2>노리암 — 기능</h2><span class="num">NoriArm</span></div>
         <div class="bd">
           <div class="rhead">
-            <div class="pslot"><span class="material-icons-round">add_a_photo</span><span>사진</span></div>
             <div>
               <div class="rtitle" style="color:var(--lav)">노리암</div>
               <div class="rhw">OMX ×3 · 교실 비치</div>
