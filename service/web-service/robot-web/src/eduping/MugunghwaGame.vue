@@ -1309,39 +1309,6 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-.camera-picker {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.camera-picker__select {
-  flex: 1;
-  min-width: 0;
-  padding: 3px 6px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  font-size: 11px;
-  font-family: inherit;
-  background: white;
-  color: #1f3a4d;
-  cursor: pointer;
-}
-.camera-picker__select:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.camera-picker__rescan {
-  flex-shrink: 0;
-  background: white;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 2px 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: inherit;
-  color: #5b7a8c;
-}
-.camera-picker__rescan:hover { background: #f1f5f9; }
 
 /* 중앙 카메라 (PIP canvas) */
 .center-cam {
@@ -1450,49 +1417,6 @@ onUnmounted(() => {
     box-shadow: 0 0 0 12px rgba(220, 38, 38, 0), 0 4px 14px rgba(220, 38, 38, 0.5);
   }
 }
-.camera-pip video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-}
-.cam-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #cbd5e1;
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  padding: 8px;
-}
-.cam-overlay.err { color: #fecaca; background: rgba(127, 29, 29, 0.85); }
-.cam-badge {
-  position: absolute;
-  top: 4px;
-  left: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.65);
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 4px;
-  letter-spacing: 0.05em;
-}
-.rec-dot {
-  width: 6px;
-  height: 6px;
-  background: #ef4444;
-  border-radius: 50%;
-  animation: rec-blink 1s ease-in-out infinite;
-}
-@keyframes rec-blink { 50% { opacity: 0.25; } }
-
 /* ---------------- main area ---------------- */
 .main-area {
   display: grid;
@@ -2231,19 +2155,6 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-.reco-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4ade80;
-  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
-  animation: reco-pulse 1.4s ease-out infinite;
-}
-@keyframes reco-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
-  70%  { box-shadow: 0 0 0 8px rgba(74, 222, 128, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
 }
 .entry-sub {
   margin-top: 2px;
