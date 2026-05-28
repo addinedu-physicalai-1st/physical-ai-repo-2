@@ -103,13 +103,16 @@
   .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
   .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1; display:flex; align-items:baseline; gap:4mm; flex-wrap:wrap }
   .rtitle .en{ font-size:20pt; color:var(--inkSoft); font-family:'Jua' }
-  .rfunc{ margin-bottom:4mm; color:var(--ink); display:flex; flex-direction:column }
-  .rfunc .ff{ padding:3.5mm 0; border-top:.6mm solid var(--border); font-size:18pt; line-height:1.55; display:flex; align-items:baseline; gap:5mm }
-  .rfunc .ff:first-child{ border-top:none; padding-top:0 }
-  .rfunc .ff b{ font-family:'Jua'; font-size:22pt; flex:0 0 38mm; line-height:1.15 }
-  .rfunc.pink .ff b{ color:var(--pink) }
-  .rfunc.mint .ff b{ color:var(--mint) }
-  .rfunc.lav  .ff b{ color:var(--lav) }
+  .rchips{ display:flex; flex-wrap:wrap; gap:2.5mm; margin-bottom:4mm }
+  .rchips .chip{ padding:2.4mm 5mm; border-radius:50mm; background:#fff; display:flex; align-items:baseline; gap:3mm; border:.7mm solid var(--border) }
+  .rchips .chip b{ font-family:'Jua'; font-size:17pt; line-height:1.1; white-space:nowrap }
+  .rchips .chip span{ font-size:13pt; color:var(--inkSoft); line-height:1.1; white-space:nowrap }
+  .rchips.pink .chip{ background:#FDEAF0; border-color:#F4C2D2 }
+  .rchips.pink .chip b{ color:var(--pink) }
+  .rchips.mint .chip{ background:#E6F5EE; border-color:#B7E0CD }
+  .rchips.mint .chip b{ color:var(--mint) }
+  .rchips.lav  .chip{ background:#EDE6F3; border-color:#C9B6DE }
+  .rchips.lav  .chip b{ color:var(--lav) }
   .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
     display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:19pt; gap:2.5mm; overflow:hidden }
   .rblank .material-icons-round{ font-size:28pt }
@@ -198,7 +201,7 @@
               <div class="li">pan/tilt 카메라 (서보 ×2)</div>
             </div>
             <div class="sl">
-              <div class="li"><b>4-DoF + 그리퍼</b></div>
+              <div class="li"><b>5-DoF + 그리퍼</b></div>
               <div class="li">Dynamixel ×6</div>
               <div class="li">Top · Gripper 카메라</div>
               <div class="li">마이크 · 스피커</div>
@@ -221,10 +224,10 @@
               <div class="rtitle" style="color:var(--pink)">에듀핑 <span class="en">OpenArm</span></div>
             </div>
           </div>
-          <div class="rfunc pink">
-            <div class="ff"><b>등하원</b><span>InsightFace 얼굴 임베딩 매칭 + 양팔 환영 trajectory</span></div>
-            <div class="ff"><b>율동</b><span>동기 스트리밍</span></div>
-            <div class="ff"><b>무궁화꽃</b><span>YOLOv8-Pose + ByteTrack 다중 자세 추적</span></div>
+          <div class="rchips pink">
+            <div class="chip"><b>등하원</b><span>얼굴 인식 + 환영 동작</span></div>
+            <div class="chip"><b>율동</b><span>음악·모션 동기</span></div>
+            <div class="chip"><b>무궁화꽃이 피었습니다</b><span>다중 자세 추적</span></div>
           </div>
           <div class="demohalf">
             <div class="d"><img src="assets/eduping-demo1.jpg" alt="EduPing 데모" /></div>
@@ -242,11 +245,11 @@
               <div class="rtitle" style="color:var(--mint)">고고핑 <span class="en">Vic Pinky</span></div>
             </div>
           </div>
-          <div class="rfunc mint">
-            <div class="ff"><b>교사 추종</b><span>DeepSORT + OSNet ReID + RPLiDAR C1 거리제어</span></div>
-            <div class="ff"><b>자율 운반</b><span>SLAM 맵 + nav graph + Nav2</span></div>
-            <div class="ff"><b>숨바꼭질</b><span>웨이포인트 순찰 + 얼굴 매칭</span></div>
-            <div class="ff"><b>자장가</b><span>모드 전환 + 낮잠 시각 기록</span></div>
+          <div class="rchips mint">
+            <div class="chip"><b>교사 추종</b><span>ReID + LiDAR 거리제어</span></div>
+            <div class="chip"><b>자율 운반</b><span>Nav2 자율 주행</span></div>
+            <div class="chip"><b>숨바꼭질</b><span>순찰 + 얼굴 매칭</span></div>
+            <div class="chip"><b>자장가</b><span>음악 재생 + 낮잠 기록</span></div>
           </div>
           <div class="rshot"><img src="assets/gogoping-dashboard.png" alt="GogoPing 대시보드 — Gazebo Sim · nav graph · LiDAR 스캔" /></div>
         </div>
@@ -261,10 +264,10 @@
               <div class="rtitle" style="color:var(--lav)">노리암 <span class="en">OMX × 3</span></div>
             </div>
           </div>
-          <div class="rfunc lav">
-            <div class="ff"><b>블럭쌓기</b><span>lerobot ACT 모방학습 + HOME pose 종료 감지</span></div>
-            <div class="ff"><b>OX 퀴즈</b><span>MediaPipe Hands 손 검출 + 룰베이스 trajectory</span></div>
-            <div class="ff"><b>가게놀이</b><span>SmolVLA 모방학습 + 음성 의도 분류 LLM</span></div>
+          <div class="rchips lav">
+            <div class="chip"><b>블럭쌓기</b><span>ACT 모방학습</span></div>
+            <div class="chip"><b>OX 퀴즈</b><span>손 검출 + 정답 모션</span></div>
+            <div class="chip"><b>가게놀이</b><span>SmolVLA 모방학습 + 음성 인식</span></div>
           </div>
           <div class="rshot"><img src="assets/noriarm-demo.png" alt="NoriArm 데모 — 가게놀이 · 블럭쌓기" /></div>
         </div>
