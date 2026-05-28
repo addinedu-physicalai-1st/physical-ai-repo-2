@@ -179,6 +179,11 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
+    # window 4b: camera-track — tracking_state bbox → pan/tilt servo (auto centering).
+    # servo_bridge 가 먼저 떠 있어야 cmd_pan/cmd_tilt 가 수신됨.
+    tmux new-window -t "$SESSION" -n camera-track -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_tracking.launch.py"
+
     # window 5: perception — /camera/image_raw → YOLO + ByteTrack + ReID → /gogoping/tracking_state.
     # GPU lazy-load on first /gogoping/follow_target. follow_node 는 이 토픽만 subscribe.
     tmux new-window -t "$SESSION" -n perception -c "$REPO_ROOT" \

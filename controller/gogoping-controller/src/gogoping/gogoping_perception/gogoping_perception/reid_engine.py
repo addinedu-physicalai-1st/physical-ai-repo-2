@@ -1,7 +1,7 @@
 """CNN ReID feature extractor for single-target person identification.
 
 Architecture:
-    - Primary: lightweight OSNet via torchreid (osnet_x0_25)
+    - Primary: OSNet via torchreid (osnet_x0_5, 512-d features)
     - Secondary: MobileNetV3-Small embedding path (torchvision)
     - Fallback: 6-float colour statistics (mean+std per BGR channel)
 
@@ -34,7 +34,11 @@ except ImportError:
     logger.warning('ReIDEngine: torch not available — falling back to colour stats')
 
 try:
-    from torchreid.utils import FeatureExtractor as TorchreidFeatureExtractor
+    # PyPI torchreid 0.2.5 (현 환경) — torchreid.reid.utils. 옛 repo install 은 torchreid.utils.
+    try:
+        from torchreid.reid.utils import FeatureExtractor as TorchreidFeatureExtractor
+    except ImportError:
+        from torchreid.utils import FeatureExtractor as TorchreidFeatureExtractor
     _TORCHREID_AVAILABLE = True
 except ImportError:
     _TORCHREID_AVAILABLE = False
@@ -70,14 +74,17 @@ class ReIDEngine:
         # 1) Preferred: lightweight OSNet
         if _TORCHREID_AVAILABLE:
             try:
+                # x0_25 (3.2M params) — 변별력 약해서 카메라 움직임 시 다른 사람과
+                # 0.7+ sim 발생. x0_5 (4.5M, FLOPs ~4배) 로 변별 마진 확대.
+                # RTX 4070 에선 latency ~5ms 정도라 5Hz publish 에 영향 없음.
                 self._osnet_extractor = TorchreidFeatureExtractor(
-                    model_name='osnet_x0_25',
+                    model_name='osnet_x0_5',
                     model_path='',
                     device=str(self._device),
                 )
                 self._use_osnet = True
                 self._feat_dim = 512
-                logger.info('ReIDEngine: OSNet x0.25 loaded on %s', self._device)
+                logger.info('ReIDEngine: OSNet x0.5 loaded on %s', self._device)
                 return
             except Exception as e:
                 logger.warning('ReIDEngine: OSNet init failed, fallback to MobileNet: %s', e)
@@ -179,6 +186,10 @@ class ReIDEngine:
             if self._use_osnet and self._osnet_extractor is not None:
                 rgb = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2RGB)
                 feat = self._osnet_extractor([rgb])
+                # torchreid 0.2.5 의 FeatureExtractor 는 CUDA tensor 반환 — np.asarray
+                # 가 직접 변환 불가. .detach().cpu().numpy() 명시 후 ndarray 처리.
+                if isinstance(feat, torch.Tensor):
+                    feat = feat.detach().cpu().numpy()
                 feat = np.asarray(feat).reshape(-1).astype(np.float32)
                 norm = np.linalg.norm(feat)
                 if norm > 1e-8:
@@ -196,7 +207,9 @@ class ReIDEngine:
                 feat = feat / norm
             return feat
         except Exception as e:
-            logger.debug('ReIDEngine: CNN inference failed: %s', e)
+            # debug → warning: 이전 CUDA tensor 변환 실패가 silent 였어서 sim=0 원인
+            # 파악이 늦었음. 앞으로는 inference 실패 시 명확히 로그.
+            logger.warning('ReIDEngine: CNN inference failed: %s: %s', type(e).__name__, e)
             return np.zeros(self._feat_dim, dtype=np.float32)
 
     def _colour_stats(self, roi_bgr) -> np.ndarray:

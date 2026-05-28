@@ -26,6 +26,7 @@ setup(
             'servo_bridge=gogoping_camera_pan.servo_bridge:main',
             'pan_scanner=gogoping_camera_pan.pan_scanner:main',
             'keyboard_teleop=gogoping_camera_pan.keyboard_teleop:main',
+            'auto_tracker=gogoping_camera_pan.auto_tracker:main',
         ],
     },
 )

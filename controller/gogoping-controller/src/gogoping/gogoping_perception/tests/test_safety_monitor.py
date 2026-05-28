@@ -27,9 +27,11 @@ def test_no_state_no_distance_no_obstacle_returns_false():
 
 
 def test_distance_below_floor_triggers_stop():
+    # SAFE_DISTANCE_MM = 300 (hybrid follow STOP_MAX_CLOSE_M=0.25 와 정합).
+    # 200mm < 300 → person_close stop trigger.
     ctx = SafetyEvalContext(
         depth=_depth(),
-        tracking_distance_mm=800,
+        tracking_distance_mm=200,
         tracking_bbox=None,
         current_state="ASSIST",
     )

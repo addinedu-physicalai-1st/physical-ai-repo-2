@@ -32,7 +32,12 @@ class Nav2Client:
     def server_ready(self, timeout_s: float = 0.1) -> bool:
         return self._client.wait_for_server(timeout_sec=timeout_s)
 
-    def send_goal(self, pose: Pose) -> None:
+    def send_goal(self, pose: Pose, behavior_tree: str = "") -> None:
+        """NavigateToPose 액션 호출. behavior_tree="" 면 Nav2 default 사용.
+
+        추종 모드는 follow_person_bt.xml (FollowPersonPath controller) 사용해
+        잔진동 ↓. 다른 흐름 (vertex 이동, 도킹) 은 default BT 유지.
+        """
         if not self.server_ready():
             self._node.get_logger().warn("Nav2 액션 서버 미준비 — goal skip")
             return
@@ -46,6 +51,7 @@ class Nav2Client:
         ps.header.stamp = self._node.get_clock().now().to_msg()
         ps.pose = pose
         goal_msg.pose = ps
+        goal_msg.behavior_tree = behavior_tree
 
         send_future = self._client.send_goal_async(goal_msg)
         send_future.add_done_callback(self._on_goal_response)

@@ -385,6 +385,32 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[gogoping_follow] EMA state filter + hysteresis follow decision (pure logic)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy bash -c '
+  cd controller/gogoping-controller/src/gogoping/gogoping_follow && \
+  PYTHONPATH=. pytest tests/test_state_filter.py tests/test_follow_decision.py tests/test_reactive_control.py tests/test_close_follow.py tests/test_recovery.py -v "$@"
+' _ "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[gogoping_camera_pan] auto-tracker P-control + step limiter (pure logic)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+if ! conda run -n jazzy bash -c '
+  cd controller/gogoping-controller/src/gogoping/gogoping_camera_pan && \
+  PYTHONPATH=. pytest tests/test_auto_tracker_logic.py -v "$@"
+' _ "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[scripts] _run_lib.sh smoke"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS

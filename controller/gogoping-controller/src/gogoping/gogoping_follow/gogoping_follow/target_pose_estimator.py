@@ -20,6 +20,7 @@ from gogoping_follow.config import (
     FOLLOW_DISTANCE_M,
     LIDAR_BEARING_WINDOW_DEG,
     LIDAR_MAX_M,
+    LIDAR_YAW_OFFSET_RAD,
 )
 from gogoping_follow.lidar_bearing import distance_at_bearing
 from gogoping_follow.tf_helper import transform_pose_base_to_map, yaw_to_quat
@@ -46,18 +47,21 @@ def estimate_follow_goal(
         return None
 
     bearing_rad = math.radians(angle_deg)
+    # LiDAR 가 180° 회전 장착 (laser_yaw=π) → scan 0° = 물리 후면. 카메라 bearing
+    # (base_link, 0=정면) 으로 빔을 찾으려면 offset 더해서 실제 scan 각도로 조회.
+    lidar_bearing = bearing_rad + LIDAR_YAW_OFFSET_RAD
     distance_m = distance_at_bearing(
         scan.ranges,
         angle_min=scan.angle_min,
         angle_increment=scan.angle_increment,
-        bearing_rad=bearing_rad,
+        bearing_rad=lidar_bearing,
         window_rad=math.radians(LIDAR_BEARING_WINDOW_DEG),
         max_m=LIDAR_MAX_M,
     )
     if distance_m is None:
         return None
 
-    # base_link frame 의 target 위치
+    # base_link frame 의 target 위치 — 거리는 LiDAR, 방향은 카메라 bearing(물리 정면 기준).
     target_base = Pose()
     target_base.position.x = distance_m * math.cos(bearing_rad)
     target_base.position.y = distance_m * math.sin(bearing_rad)

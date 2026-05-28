@@ -5,7 +5,9 @@ control 상수 (CMD_VEL_HZ 등) 와는 분리.
 """
 
 # ---------- YOLO ----------
-YOLO_MODEL_NAME = "yolov8s.pt"
+# yolov8s (~21.5M params) → yolov8n (~3.2M params) — 추론 빠름, 단일 클래스(person)
+# 근거리 추종이라 mAP 차이 거의 무영향. 속도/지연 테스트용.
+YOLO_MODEL_NAME = "yolov8n.pt"
 # 시연 친화적 낮은 임계값 — 상반신/부분 frame 도 검출. 후속에서 카메라 환경에 맞춰 튜닝.
 YOLO_CONF_THRESHOLD = 0.20
 YOLO_PERSON_CLASS = 0  # COCO class id
@@ -21,7 +23,15 @@ TRACKER_NAME = "bytetrack.yaml"
 # track_id 유지 시 ReID skip. drift 후 재매칭 시에만 비교.
 # 단일 사용자 시연 환경 — InsightFace face embedding 과 OSNet body embedding 의 cross-modal
 # 한계 회피용 낮은 임계값. 갤러리 정책 개선 후 0.5~0.7 권장.
-REID_SIM_THRESHOLD = 0.0
+REID_SIM_THRESHOLD = 0.55
+# Asymmetric hysteresis — track_id 유지 분기에서 sim 이 이 값 아래로 떨어지면
+# 잘못 lock 된 것으로 보고 해제 → drift 분기에서 LOCK 임계값(0.7) 으로 재매칭.
+# 0.30 = 정상 자세 변동(0.4~0.5)은 통과, 다른 사람으로 ID 가 바뀐 경우(보통 < 0.3) 만 해제.
+REID_SIM_UNLOCK_THRESHOLD = 0.30
+# drift 재매칭 시 후보의 distance 가 마지막 target distance 에서 이 값 이상 떨어져
+# 있으면 거부 (다른 거리의 사람이 sim 만 우연히 높은 경우 차단). 0 = depth 비활성.
+# 5Hz publish 기준 1.0m 점프 → 5m/s — 일반 보행 1.5m/s 의 3배. 보수적 마진.
+REID_MAX_DISTANCE_JUMP_MM = 1000
 
 # ---------- Publish ----------
 TRACKING_STATE_HZ = 5
@@ -61,8 +71,9 @@ DEPTH_MASK_MIN_VALID_RATIO = 0.3
 
 # ---------- Safety monitor (depth-based) ----------
 # 사람과 최소 안전 거리. tracking_state.distance_mm 가 이 값 미만이면 stop.
-# 개발 테스트용 — 1m 는 실내에서 너무 잦게 trigger 되어 70cm 로 좁힘. 실 운영 시 1m 검토.
-SAFE_DISTANCE_MM = 700
+# 가까이 추종 (FOLLOW_DISTANCE_M=0.5m) 의 stop 임계값 — follow goal 보다 작아야
+# robot 이 사람에 도달 가능. follow=500, safety=400 으로 100mm 마진 확보.
+SAFE_DISTANCE_MM = 300   # FOLLOW_DISTANCE_MIN_M(0.35) 보다 작아야 follow STOP 이 먼저 동작.
 # 사람 외 obstacle 거리 threshold (ROI 안 pixel 의 depth).
 OBSTACLE_THRESHOLD_MM = 500
 # OBSTACLE_THRESHOLD_MM 미만 pixel 의 최소 개수 — 이상이면 stop. false positive 방지.
