@@ -31,6 +31,8 @@ blackboard 의존:
 """
 from __future__ import annotations
 
+import math
+
 import py_trees
 from py_trees.common import Access
 
@@ -39,6 +41,7 @@ from ...behaviors.common.await_recruit_complete import AwaitRecruitComplete
 from ...behaviors.common.countdown import Countdown
 from ...behaviors.common.set_destination_key import SetDestinationKey
 from ...behaviors.common.set_hideseek_phase import SetHideseekPhase
+from ...behaviors.navigation.rotate_to_yaw import RotateToYaw
 from ...behaviors.perception.hide_seek_caught_monitor import HideSeekCaughtMonitor
 from ...blackboard import Keys
 from .BT_goto_sub import build_goto_subtree
@@ -102,7 +105,7 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     if not play_area:
         return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_play_area")
 
-    # Step 1: move_to_play — destination 셋 → phase 마커 → 실제 goto subtree.
+    # Step 1: move_to_play — destination 셋 → phase 마커 → 실제 goto subtree → 오른쪽(yaw=0) 정렬.
     step_move = py_trees.composites.Sequence(
         name="step_move_to_play",
         memory=True,
@@ -110,16 +113,19 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
             SetDestinationKey(name="set_dest_play_area_move", key=play_area),
             SetHideseekPhase(name="set_phase_move_to_play", phase="move_to_play"),
             build_goto_subtree(ctx),
+            RotateToYaw(name="face_right_at_play_area", target_yaw=0.0),
         ],
     )
 
     # Step 2: recruit — UI 가 등록 종료 시 control-service 가 HIDESEEK_REGISTERED_IDS 셋팅.
+    # 등록 완료 후 180° 회전 → 왼쪽(yaw=π) 정렬.
     step_recruit = py_trees.composites.Sequence(
         name="step_recruit",
         memory=True,
         children=[
             SetHideseekPhase(name="set_phase_recruit", phase="recruit"),
             AwaitRecruitComplete(name="await_recruit"),
+            RotateToYaw(name="face_left_after_recruit", target_yaw=math.pi),
         ],
     )
 

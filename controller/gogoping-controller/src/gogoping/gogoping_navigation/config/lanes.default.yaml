@@ -134,3 +134,6 @@ lanes:
 - from: 수-회
   to: 수-3
   bidirectional: true
+- from: 출입구
+  to: 출-회
+  bidirectional: true

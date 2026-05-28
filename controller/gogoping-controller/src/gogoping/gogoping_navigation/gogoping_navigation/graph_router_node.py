@@ -25,12 +25,14 @@ import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateToPose
+from nav_msgs.msg import Path as NavPath  # pathlib.Path 와 충돌 방지
 from rclpy.action import ActionClient, ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from tf2_ros import Buffer, LookupException, TransformException, TransformListener
 
@@ -43,6 +45,7 @@ from gogoping_navigation.graph import Graph
 
 
 _DEBUG_TOPIC = "/gogoping/debug/nav_events"   # admin UI NavDebugLogCard 가 SSE 로 받음
+_ROUTE_PATH_TOPIC = "/graph_router/route_path"  # RViz Path display — L1 vertex sequence 시각화
 
 # action_msgs/GoalStatus — admin UI 에 raw int 대신 사람 말로 표시.
 # (STATUS_UNKNOWN=0 / ACCEPTED=1 / EXECUTING=2 / CANCELING=3 / SUCCEEDED=4 / CANCELED=5 / ABORTED=6)
@@ -131,6 +134,19 @@ class GraphRouterNode(Node):
         # admin UI NavDebugLogCard 가 SSE 로 받는 debug 이벤트 publisher
         self._debug_pub = self.create_publisher(String, _DEBUG_TOPIC, 20)
 
+        # L1 vertex sequence (다익스트라 결과) 를 nav_msgs/Path 로 RViz 가 볼 수 있게 publish.
+        # 액션 발사 시점에 1회만 publish — TRANSIENT_LOCAL latching 으로 RViz 가 늦게 붙어도
+        # 최신 path 즉시 수신. 종료 시 빈 Path 로 clear.
+        self._route_path_pub = self.create_publisher(
+            NavPath,
+            _ROUTE_PATH_TOPIC,
+            QoSProfile(
+                depth=1,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                reliability=ReliabilityPolicy.RELIABLE,
+            ),
+        )
+
     def _dbg(self, msg: str, level: str = "info") -> None:
         try:
             payload = {
@@ -144,6 +160,25 @@ class GraphRouterNode(Node):
             self._debug_pub.publish(out)
         except Exception:
             pass
+
+    def _publish_route_path(self, seq: list[str]) -> None:
+        """L1 vertex sequence → nav_msgs/Path publish (RViz Path display 용).
+
+        TRANSIENT_LOCAL latched — 후속 RViz 구독자도 최신 path 즉시 수신.
+        빈 list 면 빈 Path 발행 (clear).
+        """
+        try:
+            path = NavPath()
+            path.header.frame_id = self._frame_id
+            path.header.stamp = self.get_clock().now().to_msg()
+            for name in seq:
+                v = self._graph.vertices.get(name)
+                if v is None:
+                    continue
+                path.poses.append(self._make_pose(v.x, v.y, v.yaw))
+            self._route_path_pub.publish(path)
+        except Exception as e:
+            self._dbg(f"route_path publish 실패: {e}", level="warn")
 
     # ──────── TF map → base_link ────────
     def _tick_tf(self) -> None:
@@ -210,6 +245,16 @@ class GraphRouterNode(Node):
     def _act_navigate(
         self, gh: ServerGoalHandle
     ) -> NavigateToVertex.Result:
+        """thin wrapper — 도착/실패/취소 모두 RViz 의 파란 L1 path 를 비워줌."""
+        try:
+            return self._act_navigate_impl(gh)
+        finally:
+            # 빈 Path publish → TRANSIENT_LOCAL latched 상태 clear → RViz 파란선 사라짐
+            self._publish_route_path([])
+
+    def _act_navigate_impl(
+        self, gh: ServerGoalHandle
+    ) -> NavigateToVertex.Result:
         """graph_router 의 NavigateToVertex action 처리 — **sync polling chain**.
 
         L1 (다익스트라 vertex sequence) + L2 (Nav2 segment 단위 NavigateToPose).
@@ -255,6 +300,9 @@ class GraphRouterNode(Node):
             result.message = str(e)
             self._dbg(f"abort: graph error {e}", level="err")
             return result
+
+        # L1 sequence 시각화 — RViz Path display 용 (액션 1회당 1번 publish).
+        self._publish_route_path(seq)
 
         if not self._nav_ac.wait_for_server(timeout_sec=2.0):
             gh.abort()
