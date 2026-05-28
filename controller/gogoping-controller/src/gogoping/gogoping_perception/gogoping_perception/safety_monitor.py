@@ -9,9 +9,14 @@
 chatter hold + stale timeout 은 ROS node 가 담당. evaluate_safety 는 stateless.
 
 수동 모드 (MANUAL) 는 spec 대로 항상 bypass — 개발자가 상황 판단.
+
+2026-05-28 추가 (graph_router 심화):
+  evaluate_proximity_level — person_dist_m / wall_dist_m / current_state →
+  "ok" | "person_close" | "wall_close". /gogoping/proximity_event JSON publish.
 """
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -65,16 +70,38 @@ def evaluate_safety(ctx: SafetyEvalContext) -> SafetyDecision:
     return SafetyDecision(stop=False, reason="ok")
 
 
+def evaluate_proximity_level(
+    person_dist_m: float,
+    wall_dist_m: float,
+    current_state: str,
+) -> str:
+    """Pure logic — graph_router 가 구독하는 proximity_event 의 level 결정.
+
+    Returns: "ok" | "person_close" | "wall_close"
+
+    Priority: bypass > person_close > wall_close > ok.
+    """
+    if current_state in config.SAFETY_BYPASS_STATES:
+        return "ok"
+    if person_dist_m <= config.PERSON_FRONT_DIST_M:
+        return "person_close"
+    if wall_dist_m <= config.WALL_FRONT_DIST_M:
+        return "wall_close"
+    return "ok"
+
+
 def _make_ros_node():
     """ROS wrapper — lazy import so pure-logic tests work without ROS."""
     import rclpy
     from gogoping_msgs.msg import TrackingState
     from rclpy.node import Node
-    from std_msgs.msg import Bool, String
+    from std_msgs.msg import Bool, Float32, String
     from gogoping_perception.shm_reader import ShmReader
 
     class SafetyMonitorNode(Node):
-        """ROS wrapper — depth shm + tracking_state + state 구독 → /gogoping/safety_stop publish."""
+        """ROS wrapper — depth shm + tracking_state + state 구독 →
+        /gogoping/safety_stop + /gogoping/proximity_event publish.
+        """
 
         def __init__(self) -> None:
             super().__init__("gogoping_safety_monitor")
@@ -83,13 +110,22 @@ def _make_ros_node():
             self._tracking_bbox: Optional[tuple] = None
             self._current_state: str = "IDLE"
             self._last_stop_ts: float = 0.0
+            # graph_router 심화 (2026-05-28)
+            self._person_dist_m: float = float("inf")
 
             self._pub = self.create_publisher(Bool, "/gogoping/safety_stop", 10)
+            self._prox_pub = self.create_publisher(
+                String, "/gogoping/proximity_event", 10,
+            )
             self.create_subscription(
                 TrackingState, "/gogoping/tracking_state", self._on_tracking, 10,
             )
             self.create_subscription(
                 String, "/gogoping/state_str", self._on_state_str, 10,
+            )
+            self.create_subscription(
+                Float32, "/gogoping/person_proximity",
+                self._on_person_proximity, 10,
             )
             self._timer = self.create_timer(
                 1.0 / config.SAFETY_PUBLISH_HZ, self._tick,
@@ -109,6 +145,36 @@ def _make_ros_node():
 
         def _on_state_str(self, msg: String) -> None:
             self._current_state = msg.data
+
+        def _on_person_proximity(self, msg: Float32) -> None:
+            self._person_dist_m = float(msg.data)
+
+        def _compute_wall_dist_m(self, depth) -> float:
+            """depth ROI 중앙 50% × 하단 60% 의 최소 거리 (m). person bbox 영역 제외.
+
+            person 이 박스 안에 있다면 그건 사람 trigger 라 wall_close 와 별도. 여기서는
+            wall 만 — 사람 영역 0 처리.
+            """
+            if depth is None or depth.size == 0:
+                return float("inf")
+            h, w = depth.shape[:2]
+            y_start = int(h * config.OBSTACLE_ROI_TOP_RATIO)
+            x_start = int(w * 0.25)
+            x_end = int(w * 0.75)
+            roi = depth[y_start:, x_start:x_end].copy()
+            if self._tracking_bbox is not None:
+                bx1, by1, bx2, by2 = self._tracking_bbox
+                by1_roi = max(0, by1 - y_start)
+                by2_roi = max(0, by2 - y_start)
+                bx1_roi = max(0, bx1 - x_start)
+                bx2_roi = max(0, min(roi.shape[1], bx2 - x_start))
+                if by2_roi > 0 and bx2_roi > bx1_roi:
+                    roi[by1_roi:by2_roi, bx1_roi:bx2_roi] = 0
+            valid = roi[(roi > 0) & (roi < config.DEPTH_MAX_MM)]
+            if valid.size == 0:
+                return float("inf")
+            min_mm = int(valid.min())
+            return min_mm / 1000.0
 
         def _tick(self) -> None:
             depth = None
@@ -137,6 +203,23 @@ def _make_ros_node():
             self._pub.publish(Bool(data=decision.stop))
             if decision.stop:
                 self.get_logger().info(f"safety_stop=True reason={decision.reason}")
+
+            # ── graph_router 심화 — proximity_event JSON ─────────────────
+            wall_dist_m = self._compute_wall_dist_m(depth)
+            level = evaluate_proximity_level(
+                person_dist_m=self._person_dist_m,
+                wall_dist_m=wall_dist_m,
+                current_state=self._current_state,
+            )
+            payload = {
+                "ts": now,
+                "level": level,
+                "person_dist_m": float(self._person_dist_m)
+                if self._person_dist_m != float("inf") else None,
+                "wall_dist_m": float(wall_dist_m)
+                if wall_dist_m != float("inf") else None,
+            }
+            self._prox_pub.publish(String(data=json.dumps(payload)))
 
     return SafetyMonitorNode
 

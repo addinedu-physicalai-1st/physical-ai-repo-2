@@ -34,6 +34,7 @@ class Waypoint:
     yaw: float
     id: int | None = None
     group: str | None = None
+    can_rotate: bool = False   # graph_router 심화 (2026-05-28) — in-place 회전 허용 vertex
 
 
 class WaypointStoreError(Exception):

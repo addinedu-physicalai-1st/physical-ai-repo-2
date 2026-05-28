@@ -23,8 +23,9 @@ from threading import Lock
 
 import rclpy
 from ament_index_python.packages import get_package_share_directory
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from nav2_msgs.action import NavigateToPose
+from nav_msgs.msg import Odometry
 from nav_msgs.msg import Path as NavPath  # pathlib.Path 와 충돌 방지
 from rclpy.action import ActionClient, ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
@@ -34,6 +35,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
+from sensor_msgs.msg import LaserScan
 from tf2_ros import Buffer, LookupException, TransformException, TransformListener
 
 from std_msgs.msg import String
@@ -46,6 +48,20 @@ from gogoping_navigation.graph import Graph
 
 _DEBUG_TOPIC = "/gogoping/debug/nav_events"   # admin UI NavDebugLogCard 가 SSE 로 받음
 _ROUTE_PATH_TOPIC = "/graph_router/route_path"  # RViz Path display — L1 vertex sequence 시각화
+
+# graph_router 심화 (2026-05-28) — proximity 기반 pause/resume/reroute/backup 상수
+SUSTAIN_TIMEOUT_S = 60.0           # 사람 60s 유지 → reroute
+BACKUP_DISTANCE_M = 0.15           # 후진 거리
+BACKUP_MAX_RETRIES = 3             # 후진 + 재시도 한계
+BACKUP_SPEED_MPS = 0.05            # 후진 속도 (m/s)
+BACKUP_REAR_CLEARANCE_M = 0.25     # LiDAR 후방 최소 clearance (15cm + 10cm 여유)
+BACKUP_STUCK_DELTA_M = 0.03        # odom 변화 임계값 (미만이면 stuck)
+REAR_SECTOR_HALF_RAD = 0.785398    # 후방 sector 반각 (45° = π/4 rad)
+
+# can_rotate vertex 에서 다음 lane 향한 in-place 회전 파라미터
+IN_PLACE_ROTATE_TOLERANCE_RAD = 0.10   # ~5.7° 이내면 회전 skip
+IN_PLACE_ROTATE_SPEED_RAD_S = 0.5      # 회전 속도 (약 30°/s)
+IN_PLACE_ROTATE_TIMEOUT_S = 6.0        # 안전 timeout
 
 # action_msgs/GoalStatus — admin UI 에 raw int 대신 사람 말로 표시.
 # (STATUS_UNKNOWN=0 / ACCEPTED=1 / EXECUTING=2 / CANCELING=3 / SUCCEEDED=4 / CANCELED=5 / ABORTED=6)
@@ -102,6 +118,7 @@ class GraphRouterNode(Node):
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._pose_lock = Lock()
         self._cur_xy: tuple[float, float] | None = None
+        self._cur_yaw: float = 0.0
         self._last_tf_warn_ns: int = 0
 
         cb = ReentrantCallbackGroup()
@@ -147,6 +164,32 @@ class GraphRouterNode(Node):
             ),
         )
 
+        # ── graph_router 심화 (2026-05-28) — proximity 기반 pause/reroute/backup ──
+        self._proximity_level: str = "ok"
+        self._proximity_person_dist_m: float = float("inf")
+        self._proximity_wall_dist_m: float = float("inf")
+        self._latest_odom_x: float = 0.0
+        self._latest_odom_y: float = 0.0
+        self._latest_rear_clearance_m: float = float("inf")
+        self.create_subscription(
+            String, "/gogoping/proximity_event",
+            self._on_proximity_event, 10,
+            callback_group=cb,
+        )
+        self.create_subscription(
+            Odometry, "/odom",
+            self._on_odom, 10,
+            callback_group=cb,
+        )
+        self.create_subscription(
+            LaserScan, "/scan",
+            self._on_scan, 10,
+            callback_group=cb,
+        )
+        # 모터로 가는 실제 토픽 — relay 가 /gogoping/cmd_vel_raw → /gogoping/cmd_vel
+        # 로 relay 하므로 여기 publish 하면 모터까지 직접 전달.
+        self._cmd_vel_pub = self.create_publisher(Twist, "/gogoping/cmd_vel", 10)
+
     def _dbg(self, msg: str, level: str = "info") -> None:
         try:
             payload = {
@@ -160,6 +203,102 @@ class GraphRouterNode(Node):
             self._debug_pub.publish(out)
         except Exception:
             pass
+
+    # ──────── proximity / odom / scan 콜백 ────────
+    def _on_proximity_event(self, msg) -> None:
+        try:
+            payload = json.loads(msg.data)
+        except (json.JSONDecodeError, AttributeError):
+            return
+        self._proximity_level = str(payload.get("level", "ok"))
+        p = payload.get("person_dist_m")
+        w = payload.get("wall_dist_m")
+        self._proximity_person_dist_m = float(p) if p is not None else float("inf")
+        self._proximity_wall_dist_m = float(w) if w is not None else float("inf")
+
+    def _on_odom(self, msg) -> None:
+        self._latest_odom_x = float(msg.pose.pose.position.x)
+        self._latest_odom_y = float(msg.pose.pose.position.y)
+
+    def _on_scan(self, msg) -> None:
+        """LiDAR 후방 sector (±45°) 의 최소 거리 추출."""
+        ranges = msg.ranges
+        if not ranges:
+            return
+        a0 = msg.angle_min
+        da = msg.angle_increment
+        min_d = float("inf")
+        for i, r in enumerate(ranges):
+            if not (msg.range_min <= r <= msg.range_max):
+                continue
+            angle = a0 + i * da
+            # 후방 ±45° — angle 이 [π-π/4, π] ∪ [-π, -π+π/4]
+            if angle > math.pi - REAR_SECTOR_HALF_RAD or angle < -math.pi + REAR_SECTOR_HALF_RAD:
+                if r < min_d:
+                    min_d = r
+        self._latest_rear_clearance_m = min_d
+
+    def _do_rotate_in_place(self, target_yaw: float) -> bool:
+        """can_rotate vertex 에서 angular 만 publish 해 in-place 회전.
+
+        cmd_vel 의 linear=0, angular.z=±IN_PLACE_ROTATE_SPEED_RAD_S.
+        |Δyaw| < IN_PLACE_ROTATE_TOLERANCE_RAD 이내 들어오면 정지.
+        IN_PLACE_ROTATE_TIMEOUT_S 초과 시 fail (False 반환).
+        호출자가 nav2 cancel 후에 호출해야 함 (cmd_vel 충돌 방지).
+        """
+        def angle_diff(a: float, b: float) -> float:
+            d = (a - b + math.pi) % (2 * math.pi) - math.pi
+            return d
+        t0 = time.monotonic()
+        twist = Twist()
+        while time.monotonic() - t0 < IN_PLACE_ROTATE_TIMEOUT_S:
+            cur_yaw = self._current_yaw()
+            diff = angle_diff(target_yaw, cur_yaw)
+            if abs(diff) < IN_PLACE_ROTATE_TOLERANCE_RAD:
+                self._cmd_vel_pub.publish(Twist())   # 정지
+                self._dbg(
+                    f"in-place rotate done (Δ={math.degrees(diff):.1f}°)"
+                )
+                return True
+            twist.linear.x = 0.0
+            twist.angular.z = IN_PLACE_ROTATE_SPEED_RAD_S * (1.0 if diff > 0 else -1.0)
+            self._cmd_vel_pub.publish(twist)
+            time.sleep(0.05)
+        self._cmd_vel_pub.publish(Twist())
+        self._dbg(
+            f"in-place rotate TIMEOUT (target={math.degrees(target_yaw):.1f}°, "
+            f"cur={math.degrees(self._current_yaw()):.1f}°)",
+            level="warn",
+        )
+        return False
+
+    def _do_backup(self, distance_m: float) -> bool:
+        """time-based backup. Returns True 면 정상 (odom 변화 충분), False 면 stuck.
+
+        cmd_vel linear.x = -BACKUP_SPEED_MPS for (distance_m / BACKUP_SPEED_MPS) 초.
+        호출자가 nav2 cancel 후에만 호출해야 함 (cmd_vel 충돌 방지).
+        """
+        duration_s = distance_m / BACKUP_SPEED_MPS
+        start_x = self._latest_odom_x
+        start_y = self._latest_odom_y
+        t0 = time.monotonic()
+        twist = Twist()
+        twist.linear.x = -BACKUP_SPEED_MPS
+        while time.monotonic() - t0 < duration_s:
+            self._cmd_vel_pub.publish(twist)
+            time.sleep(0.1)
+        self._cmd_vel_pub.publish(Twist())   # 정지
+        dx = self._latest_odom_x - start_x
+        dy = self._latest_odom_y - start_y
+        moved = math.hypot(dx, dy)
+        if moved < BACKUP_STUCK_DELTA_M:
+            self._dbg(
+                f"STUCK backup moved {moved:.3f}m < {BACKUP_STUCK_DELTA_M}m",
+                level="err",
+            )
+            return False
+        self._dbg(f"backup moved {moved:.3f}m")
+        return True
 
     def _publish_route_path(self, seq: list[str]) -> None:
         """L1 vertex sequence → nav_msgs/Path publish (RViz Path display 용).
@@ -196,15 +335,26 @@ class GraphRouterNode(Node):
                     f"TF {self._frame_id} → {self._base_frame} 아직 없음"
                 )
             return
+        q = tf.transform.rotation
+        yaw = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z),
+        )
         with self._pose_lock:
             self._cur_xy = (
                 tf.transform.translation.x,
                 tf.transform.translation.y,
             )
+            self._cur_yaw = yaw
 
     def _current_xy(self) -> tuple[float, float] | None:
         with self._pose_lock:
             return self._cur_xy
+
+    def _current_yaw(self) -> float:
+        """현재 robot yaw (rad). TF 미수신 시 0.0."""
+        with self._pose_lock:
+            return getattr(self, "_cur_yaw", 0.0)
 
     # ──────── service: route ────────
     def _srv_route(
@@ -291,9 +441,12 @@ class GraphRouterNode(Node):
             self._dbg("abort: no tf map→base_link yet", level="warn")
             return result
 
+        # 로봇 현재 yaw (heading-aware Dijkstra 용)
+        start_yaw = self._current_yaw()
+
         try:
             src = self._graph.nearest_vertex(*cur)
-            seq = self._graph.route(src, target)
+            seq = self._graph.route(src, target, start_yaw=start_yaw)
         except Exception as e:
             gh.abort()
             result.success = False
@@ -327,7 +480,14 @@ class GraphRouterNode(Node):
         last_idx = 0
         self._publish_feedback(gh, seq, last_idx)
 
-        for i in range(1, len(seq)):
+        # graph_router 심화 (2026-05-28) — pause/reroute/backup state (per action)
+        pause_start_ts: float | None = None
+        blocked_vertices: set[str] = set()
+        backup_retry: int = 0
+
+        # for → while 로 변환 — proximity pause·resume 후 segment 재시도 가능
+        i = 1
+        while i < len(seq):
             segment_target = seq[i]
             nav_gh = None
             try:
@@ -377,9 +537,97 @@ class GraphRouterNode(Node):
                 # preempt next-goal — 마지막 segment 가 아니고 preempt 활성이면
                 # 현재 segment target 거리 검사 후 도착 직전에 미리 다음 iter 로 break.
                 is_last_segment = (i == len(seq) - 1)
-                preempt_active = (self._preempt_distance > 0.0 and not is_last_segment)
+                # can_rotate vertex 에서는 멈춰서 in-place 회전해야 하므로 preempt 비활성
+                seg_target_vertex = self._graph.vertices.get(segment_target)
+                target_can_rotate = (
+                    seg_target_vertex is not None and seg_target_vertex.can_rotate
+                )
+                preempt_active = (
+                    self._preempt_distance > 0.0
+                    and not is_last_segment
+                    and not target_can_rotate
+                )
                 preempted = False
+                # graph_router 심화 (2026-05-28) — proximity 분기 결과 신호
+                proximity_retry = False
+                proximity_reroute = False
                 while not get_result_future.done():
+                    # ── proximity 분기 (사람/벽) ──
+                    level = self._proximity_level
+                    if level == "person_close":
+                        if nav_gh is not None:
+                            try:
+                                nav_gh.cancel_goal_async()
+                            except Exception:
+                                pass
+                            nav_gh = None
+                        if pause_start_ts is None:
+                            pause_start_ts = time.monotonic()
+                            self._dbg(
+                                f"PAUSE person_close near {segment_target!r} "
+                                f"(dist={self._proximity_person_dist_m:.2f}m)",
+                                level="warn",
+                            )
+                        if time.monotonic() - pause_start_ts > SUSTAIN_TIMEOUT_S:
+                            blocked_vertices.add(segment_target)
+                            self._dbg(
+                                f"SUSTAIN {SUSTAIN_TIMEOUT_S}s — "
+                                f"blocking {segment_target!r}",
+                                level="warn",
+                            )
+                            proximity_reroute = True
+                            break
+                        time.sleep(0.1)
+                        continue
+                    # ok 또는 wall_close 복귀 시 pause 해제
+                    if pause_start_ts is not None and level == "ok":
+                        pause_start_ts = None
+                        self._dbg(
+                            f"RESUME after person clear near {segment_target!r}"
+                        )
+                        proximity_retry = True
+                        break
+
+                    if level == "wall_close":
+                        if nav_gh is not None:
+                            try:
+                                nav_gh.cancel_goal_async()
+                            except Exception:
+                                pass
+                            nav_gh = None
+                        # LiDAR 후방 clearance 체크
+                        if self._latest_rear_clearance_m < BACKUP_REAR_CLEARANCE_M:
+                            self._dbg(
+                                f"wall_close + rear blocked "
+                                f"({self._latest_rear_clearance_m:.2f}m) → reroute",
+                                level="warn",
+                            )
+                            blocked_vertices.add(segment_target)
+                            proximity_reroute = True
+                            break
+                        # backup
+                        ok = self._do_backup(BACKUP_DISTANCE_M)
+                        if not ok:
+                            gh.abort()
+                            result.success = False
+                            result.message = "stuck_during_backup"
+                            result.final_vertex = seq[last_idx]
+                            self._dbg("STUCK → abort", level="err")
+                            return result
+                        backup_retry += 1
+                        if backup_retry >= BACKUP_MAX_RETRIES:
+                            self._dbg(
+                                f"backup max retries ({BACKUP_MAX_RETRIES}) → reroute",
+                                level="warn",
+                            )
+                            blocked_vertices.add(segment_target)
+                            backup_retry = 0
+                            proximity_reroute = True
+                            break
+                        # backup 성공 → segment 재시도
+                        proximity_retry = True
+                        break
+
                     if preempt_active:
                         cur_xy = self._current_xy()
                         if cur_xy is not None:
@@ -438,6 +686,17 @@ class GraphRouterNode(Node):
                     # 이미 다음 segment 로 넘어감. nav2 가 새 goal 받으면 자동 preempt.
                     last_idx = i
                     self._publish_feedback(gh, seq, last_idx)
+                    i += 1
+                    continue
+
+                if proximity_reroute:
+                    # blocked_vertices 추가됐음 → 새 경로로 재시작
+                    return self._restart_with_reroute(
+                        gh, target, blocked_vertices,
+                    )
+
+                if proximity_retry:
+                    # 같은 segment 재시도 — i 증가 X
                     continue
 
                 wrapper = get_result_future.result()
@@ -463,6 +722,29 @@ class GraphRouterNode(Node):
                 last_idx = i
                 self._publish_feedback(gh, seq, last_idx)
                 self._dbg(f"segment {i} done ({segment_target!r})")
+                # 사람 backup retry counter — segment 성공 시 리셋
+                backup_retry = 0
+
+                # ── can_rotate vertex 도착 + 다음 segment 있음 → in-place 회전 ──
+                # linear=0, angular 만 publish 해 다음 lane 방향으로 정렬 후 진행.
+                # 좁은 통로에서 곡선 박는 문제 회피 (2026-05-28).
+                if target_can_rotate and not is_last_segment:
+                    next_v_name = seq[i + 1]
+                    next_v = self._graph.vertices.get(next_v_name)
+                    if next_v is not None and seg_target_vertex is not None:
+                        next_lane_yaw = math.atan2(
+                            next_v.y - seg_target_vertex.y,
+                            next_v.x - seg_target_vertex.x,
+                        )
+                        cur_yaw = self._current_yaw()
+                        d = (next_lane_yaw - cur_yaw + math.pi) % (2 * math.pi) - math.pi
+                        if abs(d) > IN_PLACE_ROTATE_TOLERANCE_RAD:
+                            self._dbg(
+                                f"can_rotate {segment_target!r} → "
+                                f"in-place rotate {math.degrees(d):+.1f}° "
+                                f"(next lane → {next_v_name!r})"
+                            )
+                            self._do_rotate_in_place(next_lane_yaw)
 
             except Exception as e:
                 import traceback
@@ -498,12 +780,60 @@ class GraphRouterNode(Node):
                         self.get_logger().warning(f"orphan cancel failed: {e}")
                         self._dbg(f"orphan cancel FAILED: {e}", level="err")
 
+            # while 루프 정상 진행 — 다음 segment
+            i += 1
+
         # 모든 segment 성공
         gh.succeed()
         result.success = True
         result.message = ""
         result.final_vertex = target
         self._dbg(f"SUCCESS (target={target!r}, segments={len(seq)-1})")
+        return result
+
+    def _restart_with_reroute(
+        self,
+        gh: ServerGoalHandle,
+        target: str,
+        blocked: set[str],
+    ) -> NavigateToVertex.Result:
+        """blocked vertex 제외하고 새 경로 계산 → 단순 abort + reason.
+
+        caller (BT / admin UI) 가 abort message 보고 새 액션 재발사. 액션 안에서
+        재진입은 더 큰 refactor 필요 — 현 spec 은 abort + 명시적 reason 으로 단순화.
+        """
+        result = NavigateToVertex.Result()
+        cur = self._current_xy()
+        if cur is None:
+            gh.abort()
+            result.success = False
+            result.message = "reroute: no tf"
+            self._dbg("reroute abort: no tf", level="err")
+            return result
+        yaw = self._current_yaw()
+        try:
+            src = self._graph.nearest_vertex(*cur)
+            new_seq = self._graph.route(
+                src, target, start_yaw=yaw, blocked=blocked,
+            )
+        except Exception as e:
+            gh.abort()
+            result.success = False
+            result.message = f"reroute failed: {e}"
+            self._dbg(f"reroute abort: {e}", level="err")
+            return result
+
+        self._publish_route_path(new_seq)
+        self._dbg(
+            f"REROUTE blocked={sorted(blocked)} new_seq={new_seq}"
+        )
+        # caller 재발사 권장 — message 에 새 경로 정보 포함
+        gh.abort()
+        result.success = False
+        result.message = (
+            f"rerouted: blocked={sorted(blocked)}; "
+            f"new_seq len={len(new_seq)} — caller should reissue"
+        )
         return result
 
     # ──────── service: reload_graph ────────

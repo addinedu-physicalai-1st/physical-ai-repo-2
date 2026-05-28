@@ -126,3 +126,39 @@ def test_manual_state_bypasses_safety():
     d = evaluate_safety(ctx)
     assert d.stop is False
     assert d.reason == "bypassed_manual"
+
+
+# ---- evaluate_proximity_level tests (graph_router 심화) ----
+from math import inf
+
+from gogoping_perception.safety_monitor import evaluate_proximity_level
+
+
+def test_proximity_ok_no_threats():
+    assert evaluate_proximity_level(
+        person_dist_m=inf, wall_dist_m=inf, current_state="GOTO"
+    ) == "ok"
+
+
+def test_proximity_person_close_priority_over_wall():
+    assert evaluate_proximity_level(
+        person_dist_m=1.2, wall_dist_m=0.3, current_state="GOTO"
+    ) == "person_close"
+
+
+def test_proximity_wall_close_only():
+    assert evaluate_proximity_level(
+        person_dist_m=inf, wall_dist_m=0.4, current_state="GOTO"
+    ) == "wall_close"
+
+
+def test_proximity_bypass_in_manual():
+    assert evaluate_proximity_level(
+        person_dist_m=0.5, wall_dist_m=0.3, current_state="MANUAL"
+    ) == "ok"
+
+
+def test_proximity_person_at_exact_threshold():
+    assert evaluate_proximity_level(
+        person_dist_m=1.5, wall_dist_m=inf, current_state="GOTO"
+    ) == "person_close"

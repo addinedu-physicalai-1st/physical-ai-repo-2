@@ -160,9 +160,21 @@ class PerceptionNode(Node):
             callback_group=self._publish_cbg,
         )
 
+        # graph_router 심화 (2026-05-28) — state-driven YOLO 가동 + person_proximity publish
+        from std_msgs.msg import Float32, String
+        self._yolo_nav_modes = set(config.YOLO_NAV_MODES)
+        self._current_state: str = "IDLE"
+        self._person_proximity_pub = self.create_publisher(
+            Float32, "/gogoping/person_proximity", 10,
+        )
+        self.create_subscription(
+            String, "/gogoping/state_str", self._on_state_str, 10,
+            callback_group=self._target_cbg,
+        )
+
         self.get_logger().info(
             "PerceptionNode initialized — waiting for FollowTarget "
-            "(YOLO+ReID lazy-load on first target)"
+            "(YOLO+ReID lazy-load on first target / state)"
         )
 
     # ---------- cleanup ----------
@@ -190,6 +202,26 @@ class PerceptionNode(Node):
         except Exception as e:  # noqa: BLE001
             self.get_logger().warn(f"Engine lazy-load failed: {e}")
             return False
+
+    def _on_state_str(self, msg) -> None:
+        """FSM state 변경 — nav 모드 진입 시 YOLO + frame loop 활성화.
+
+        graph_router 의 사람 감지 정지·재개 로직이 perception 의
+        /gogoping/person_proximity 토픽에 의존하므로, FOLLOW target 없이도
+        nav 진행 중에는 YOLO 가 항상 돌고 있어야 한다.
+        """
+        new_state = str(msg.data)
+        if new_state == self._current_state:
+            return
+        self._current_state = new_state
+        if new_state in self._yolo_nav_modes:
+            if self._yolo is None:
+                ok = self._ensure_engines()
+                if ok:
+                    self.get_logger().info(
+                        f"YOLO loaded (state={new_state})"
+                    )
+            self._ensure_frame_loop()
 
     def _ensure_frame_loop(self) -> None:
         """첫 FollowTarget 수신 시 shm reader attach + frame loop thread 시작."""
@@ -266,6 +298,38 @@ class PerceptionNode(Node):
                 continue
             self._process_frame(snap.color, snap.depth, snap.cap_ns)
 
+    def _publish_person_proximity(self, results, depth: np.ndarray) -> None:
+        """정면 박스 안 가장 가까운 사람 거리 publish.
+
+        graph_router_node 의 사람 감지 정지 로직 (person_close) 트리거.
+        결과 없거나 박스 밖이면 +inf publish.
+        """
+        from std_msgs.msg import Float32
+        from gogoping_perception.frontal_box import nearest_person_in_box
+        try:
+            if not results:
+                d_m = float("inf")
+            else:
+                r = results[0]
+                if r.boxes is None or len(r.boxes.xyxy) == 0:
+                    d_m = float("inf")
+                else:
+                    boxes_xyxy = r.boxes.xyxy.cpu().numpy()
+                    detections = [
+                        tuple(map(int, bbox.tolist())) for bbox in boxes_xyxy
+                    ]
+                    d_m = nearest_person_in_box(
+                        detections=detections,
+                        depth=depth,
+                        fx=config.CAMERA_FX_PX,
+                        cx=config.CAMERA_CX_PX,
+                        box_forward_m=config.PERSON_FRONT_DIST_M,
+                        box_lateral_m=config.PERSON_LATERAL_LIMIT_M,
+                    )
+            self._person_proximity_pub.publish(Float32(data=float(d_m)))
+        except Exception as e:
+            self.get_logger().warn(f"person_proximity publish failed: {e}")
+
     @staticmethod
     def _bbox_depth_median(depth, bbox, patch=5):
         """bbox 상단 1/3 지점 (얼굴 영역) patch×patch median depth (mm). invalid 시 0.
@@ -288,8 +352,11 @@ class PerceptionNode(Node):
 
         color: 640×480×3 BGR uint8 (이미 ndarray — cv2.imdecode 불필요).
         depth: 640×480 uint16 (mm).
+
+        Note: target 없어도 YOLO 추론은 수행 — graph_router 의 사람 감지용
+        /gogoping/person_proximity 발화. tracker 로직만 target 있을 때 실행.
         """
-        if self._yolo is None or self._tracker is None or not self._tracker.has_target():
+        if self._yolo is None or self._tracker is None:
             return
 
         h, w = color.shape[:2]
@@ -309,6 +376,13 @@ class PerceptionNode(Node):
             )
         except Exception as e:  # noqa: BLE001
             self.get_logger().warn(f"yolo.track failed: {e}")
+            return
+
+        # ── person_proximity publish — target 유무 무관 (graph_router 용) ──
+        self._publish_person_proximity(results, depth)
+
+        # target 없으면 tracker 로직 skip — person_proximity 만 publish 하고 종료
+        if not self._tracker.has_target():
             return
 
         if not results:

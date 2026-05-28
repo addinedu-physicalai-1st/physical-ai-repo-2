@@ -29,6 +29,7 @@ class Vertex:
     x: float
     y: float
     yaw: float = 0.0
+    can_rotate: bool = False
 
 
 class GraphError(Exception):
@@ -223,8 +224,11 @@ class Graph:
         아니면 거리 기반 자동 생성."""
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         verts = [
-            Vertex(name=w["name"], x=float(w["x"]), y=float(w["y"]),
-                   yaw=float(w.get("yaw", 0.0)))
+            Vertex(
+                name=w["name"], x=float(w["x"]), y=float(w["y"]),
+                yaw=float(w.get("yaw", 0.0)),
+                can_rotate=bool(w.get("can_rotate", False)),
+            )
             for w in (raw.get("waypoints") or [])
         ]
         manual = None
@@ -305,15 +309,45 @@ class Graph:
         assert best_name is not None
         return best_name
 
-    def route(self, src: str, dst: str) -> list[str]:
-        """다익스트라 — vertex name 시퀀스 (src 와 dst 포함). 경로 없으면 GraphError."""
+    def route(
+        self,
+        src: str,
+        dst: str,
+        start_yaw: float | None = None,
+        blocked: set[str] | None = None,
+    ) -> list[str]:
+        """다익스트라 — vertex name 시퀀스 (src 와 dst 포함). 경로 없으면 GraphError.
+
+        Args:
+            src: 출발 vertex name.
+            dst: 목적 vertex name.
+            start_yaw: 로봇 시작 heading (rad). None 이면 단순 거리 다익스트라
+                (기존 호환 동작).
+            blocked: 통과 금지 vertex set. dst 가 blocked 면 GraphError.
+
+        heading-aware 모드 (start_yaw != None):
+            state = (vertex_name, heading_yaw). 전이 거부 조건:
+              - lane (V, W) 의 방향 angle θ_VW 와 현재 heading 의 차이 |Δ| > 135°
+              - V.can_rotate=True 이면 위 조건 무시.
+        """
         if src not in self._verts:
             raise GraphError(f"src '{src}' not in graph")
         if dst not in self._verts:
             raise GraphError(f"dst '{dst}' not in graph")
+        blocked = blocked or set()
+        if dst in blocked:
+            raise GraphError(f"dst '{dst}' is blocked")
         if src == dst:
             return [src]
 
+        if start_yaw is None:
+            return self._route_simple(src, dst, blocked)
+        return self._route_heading_aware(src, dst, start_yaw, blocked)
+
+    def _route_simple(
+        self, src: str, dst: str, blocked: set[str]
+    ) -> list[str]:
+        """기존 단순 다익스트라 — heading 무시. blocked vertex 통과 금지."""
         dist: dict[str, float] = {n: inf for n in self._verts}
         prev: dict[str, str | None] = {n: None for n in self._verts}
         dist[src] = 0.0
@@ -325,15 +359,15 @@ class Graph:
             if u == dst:
                 break
             for v, w in self._adj[u]:
+                if v in blocked and v != dst:
+                    continue
                 nd = d + w
                 if nd < dist[v]:
                     dist[v] = nd
                     prev[v] = u
                     heapq.heappush(pq, (nd, v))
-
         if dist[dst] == inf:
             raise GraphError(f"no path from '{src}' to '{dst}'")
-
         path: list[str] = []
         cur: str | None = dst
         while cur is not None:
@@ -341,3 +375,77 @@ class Graph:
             cur = prev[cur]
         path.reverse()
         return path
+
+    def _route_heading_aware(
+        self,
+        src: str,
+        dst: str,
+        start_yaw: float,
+        blocked: set[str],
+    ) -> list[str]:
+        """heading-aware 다익스트라 — state = (vertex, heading_yaw_bucket)."""
+        from math import atan2, pi
+
+        # heading 이산화 — 8 bucket (45° 간격)
+        BUCKET_COUNT = 8
+        BUCKET_RAD = 2 * pi / BUCKET_COUNT
+
+        def bucket(yaw: float) -> int:
+            normalized = (yaw + pi) % (2 * pi)  # [0, 2π)
+            return int(normalized / BUCKET_RAD) % BUCKET_COUNT
+
+        def bucket_to_yaw(b: int) -> float:
+            return -pi + (b + 0.5) * BUCKET_RAD
+
+        def angle_diff(a: float, b: float) -> float:
+            d = (a - b + pi) % (2 * pi) - pi
+            return abs(d)
+
+        REVERSE_THRESHOLD = 135.0 * pi / 180.0  # 2.356 rad
+
+        State = tuple[str, int]
+        start: State = (src, bucket(start_yaw))
+        dist: dict[State, float] = {start: 0.0}
+        prev: dict[State, State | None] = {start: None}
+        pq: list[tuple[float, State]] = [(0.0, start)]
+
+        while pq:
+            d, (u_name, u_bucket) = heapq.heappop(pq)
+            if d > dist.get((u_name, u_bucket), inf):
+                continue
+            if u_name == dst:
+                # 경로 재구성
+                path: list[str] = []
+                cur: State | None = (u_name, u_bucket)
+                while cur is not None:
+                    path.append(cur[0])
+                    cur = prev[cur]
+                path.reverse()
+                dedup = [path[0]]
+                for n in path[1:]:
+                    if n != dedup[-1]:
+                        dedup.append(n)
+                return dedup
+            u_vertex = self._verts[u_name]
+            u_yaw = bucket_to_yaw(u_bucket)
+            for v_name, weight in self._adj[u_name]:
+                if v_name in blocked and v_name != dst:
+                    continue
+                v_vertex = self._verts[v_name]
+                lane_yaw = atan2(
+                    v_vertex.y - u_vertex.y, v_vertex.x - u_vertex.x
+                )
+                if not u_vertex.can_rotate:
+                    if angle_diff(u_yaw, lane_yaw) > REVERSE_THRESHOLD:
+                        continue
+                v_state: State = (v_name, bucket(lane_yaw))
+                nd = d + weight
+                if nd < dist.get(v_state, inf):
+                    dist[v_state] = nd
+                    prev[v_state] = (u_name, u_bucket)
+                    heapq.heappush(pq, (nd, v_state))
+
+        raise GraphError(
+            f"no heading-aware path from '{src}' to '{dst}' "
+            f"(start_yaw={start_yaw:.2f})"
+        )

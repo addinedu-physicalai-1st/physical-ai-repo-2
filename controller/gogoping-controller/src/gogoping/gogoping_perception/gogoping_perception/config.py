@@ -95,3 +95,18 @@ SAFETY_CHATTER_HOLD_S = 1.0
 SAFETY_STALE_TIMEOUT_S = 0.5
 # safety 가 bypass 되는 FSM state (대소문자 매칭). "MANUAL" 일 때 항상 False.
 SAFETY_BYPASS_STATES = ["MANUAL"]
+
+# ---------- graph_router 심화 (2026-05-28) ----------
+# YOLO 항상 가동시킬 nav 모드들 — IDLE/CHARGING/MANUAL/ERROR 는 OFF.
+YOLO_NAV_MODES: tuple[str, ...] = (
+    "GOTO", "FOLLOW", "HIDEANDSEEK",
+    "RETURNING", "LOW_BATTERY_RETURNING", "LULLABY",
+)
+# 정면 박스 (robot frame, m) — graph_router 의 사람 감지 영역
+PERSON_FRONT_DIST_M: float = 1.5
+PERSON_LATERAL_LIMIT_M: float = 0.5
+# 벽 close threshold (m) — proximity_event 의 wall_close 발화 기준
+WALL_FRONT_DIST_M: float = 0.5
+# 카메라 intrinsic (D435 default — 실측 후 튜닝)
+CAMERA_FX_PX: float = 615.0
+CAMERA_CX_PX: float = 320.0
