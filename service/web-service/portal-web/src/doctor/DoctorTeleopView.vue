@@ -201,6 +201,12 @@ function toggleTeleop(): void {
       <div class="pane sim-pane">
         <canvas ref="canvasRef" class="viewport" />
         <span class="pane-label">시뮬레이션</span>
+        <div class="fsr-overlay">
+          <span class="fsr-title">청진기 FSR</span>
+          <span class="fsr-val">{{ fsrRaw ?? '--' }}</span>
+          <span class="fsr-peak">peak {{ fsrPeak ?? '--' }}</span>
+          <button class="fsr-reset" @click="resetFsrPeak">리셋</button>
+        </div>
       </div>
       <!-- 우측 절반: EduPing 환경 카메라 (WebRTC remote stream — D435 RGB + 로봇 mic) -->
       <div class="pane robotcam-pane">
@@ -214,10 +220,6 @@ function toggleTeleop(): void {
     <footer>
       <span>read-only viewer — 로봇 조작: leader arm 또는 RViz MotionPlanning</span>
       <span class="spacer" />
-      <span class="fsr-readout">
-        FSR raw: <b>{{ fsrRaw ?? '--' }}</b> / peak: <b>{{ fsrPeak ?? '--' }}</b>
-        <button class="fsr-reset" @click="resetFsrPeak">peak 리셋</button>
-      </span>
       <span v-if="!armsReady" class="warn">URDF 미로드 — 콘솔 확인</span>
     </footer>
   </div>
@@ -314,7 +316,23 @@ header, footer {
 }
 .teleop[data-active="true"] { background: #eb5757; color: #fff; }
 .teleop:disabled { opacity: 0.4; cursor: not-allowed; }
-.fsr-readout { font-variant-numeric: tabular-nums; margin-right: 8px; }
-.fsr-readout b { color: #4fd1c5; }
-.fsr-reset { margin-left: 8px; font-size: 11px; cursor: pointer; }
+.fsr-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+.fsr-title { font-size: 12px; opacity: 0.8; }
+.fsr-val { font-size: 28px; font-weight: 700; color: #4fd1c5; min-width: 56px; }
+.fsr-peak { font-size: 13px; opacity: 0.85; }
+.fsr-reset { font-size: 11px; cursor: pointer; padding: 2px 8px; }
 </style>
