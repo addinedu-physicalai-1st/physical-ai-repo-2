@@ -104,11 +104,11 @@
   /* ── scenario horizontal (right, compact) ── */
   .flowh{ display:flex; align-items:flex-start; gap:1mm; padding:1mm 0 }
   .fh{ flex:1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:1.5mm }
-  .fh .fhi{ width:14mm; height:14mm; border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2mm 5mm rgba(236,143,166,.28) }
-  .fh .fhi .material-icons-round{ font-size:28pt; color:#fff }
+  .fh .fhi{ width:16mm; height:16mm; border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 2mm 5mm rgba(0,0,0,.18); padding:1.6mm; box-sizing:border-box }
+  .fh .fhi img{ width:100%; height:100%; object-fit:contain; display:block }
+  .fh .fhi.multi{ gap:0.5mm; padding:1mm }
+  .fh .fhi.multi img{ width:4.6mm; height:4.6mm; flex:0 0 auto }
   .fh .fht{ font-family:'Jua'; font-size:19pt; line-height:1 } .fh .fhs{ font-size:14pt; color:var(--inkSoft); line-height:1.2 }
-  .fh .fhrobots{ display:flex; justify-content:center; gap:1.8mm; margin-top:1.8mm }
-  .fh .fhrobots img{ width:12mm; height:12mm; object-fit:contain; display:block; background:#fff; border-radius:50%; padding:1mm; box-sizing:border-box; box-shadow:0 1mm 3mm rgba(0,0,0,.12) }
   .fharrow{ align-self:flex-start; margin-top:3mm; color:var(--faint); font-size:24pt; font-family:'Jua' }
 
   /* ── robot blocks (right) ── */
@@ -237,15 +237,15 @@
         <div class="bar sky"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
         <div class="bd">
           <div class="flowh">
-            <div class="fh"><span class="fhi" style="background:var(--pink)"><span class="material-icons-round">wb_sunny</span></span><span class="fht">등원</span><span class="fhs">얼굴인식 인사</span><span class="fhrobots"><img src="assets/icon-eduping.png" alt="EduPing" /></span></div>
+            <div class="fh"><span class="fhi" style="background:var(--pink)"><img src="assets/icon-eduping.png" alt="EduPing" /></span><span class="fht">등원</span><span class="fhs">얼굴인식 인사</span></div>
             <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--teal)"><span class="material-icons-round">extension</span></span><span class="fht">놀이</span><span class="fhs">게임·율동·촬영</span><span class="fhrobots"><img src="assets/icon-eduping.png" alt="EduPing" /><img src="assets/icon-gogoping.png" alt="GogoPing" /><img src="assets/icon-noriarm.png" alt="NoriArm" /></span></div>
+            <div class="fh"><span class="fhi multi" style="background:var(--teal)"><img src="assets/icon-eduping.png" alt="EduPing" /><img src="assets/icon-gogoping.png" alt="GogoPing" /><img src="assets/icon-noriarm.png" alt="NoriArm" /></span><span class="fht">놀이</span><span class="fhs">게임·율동·촬영</span></div>
             <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--butter)"><span class="material-icons-round">restaurant</span></span><span class="fht">점심</span><span class="fhs">메뉴·식사</span><span class="fhrobots"><img src="assets/icon-gogoping.png" alt="GogoPing" /></span></div>
+            <div class="fh"><span class="fhi" style="background:var(--butter)"><img src="assets/icon-gogoping.png" alt="GogoPing" /></span><span class="fht">오침</span><span class="fhs">자장가 · 낮잠</span></div>
             <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--coral)"><span class="material-icons-round">local_shipping</span></span><span class="fht">보조</span><span class="fhs">추종·운반</span><span class="fhrobots"><img src="assets/icon-gogoping.png" alt="GogoPing" /></span></div>
+            <div class="fh"><span class="fhi" style="background:var(--coral)"><img src="assets/icon-gogoping.png" alt="GogoPing" /></span><span class="fht">보조</span><span class="fhs">추종·운반</span></div>
             <span class="fharrow">→</span>
-            <div class="fh"><span class="fhi" style="background:var(--sky)"><span class="material-icons-round">waving_hand</span></span><span class="fht">하원</span><span class="fhs">보고서 생성</span><span class="fhrobots"><img src="assets/icon-eduping.png" alt="EduPing" /></span></div>
+            <div class="fh"><span class="fhi" style="background:var(--sky)"><img src="assets/icon-eduping.png" alt="EduPing" /></span><span class="fht">하원</span><span class="fhs">보고서 생성</span></div>
           </div>
         </div>
       </section>
