@@ -1,118 +1,136 @@
 lanes:
-- from: 수면실2
+- from: 수-1
   to: 수면실
   bidirectional: true
 - from: 수면실
-  to: 수면실3
+  to: 수-2
   bidirectional: true
-- from: 수면실4
-  to: 수면실5
+- from: 수-3
+  to: 수-4
   bidirectional: true
-- from: 수면실5
-  to: 수면실6
+- from: 수-4
+  to: 수-5
   bidirectional: true
-- from: 수면실6
-  to: 수면실7
-  bidirectional: true
-- from: 수면실2
-  to: 수면실4
+- from: 수-1
+  to: 수-3
   bidirectional: true
 - from: 수면실
-  to: 수면실5
+  to: 수-4
   bidirectional: true
-- from: 수면실3
-  to: 수면실6
+- from: 수-2
+  to: 수-5
   bidirectional: true
-- from: 놀이방2
+- from: 놀-상-회
   to: 놀이방
   bidirectional: true
 - from: 놀이방
-  to: 놀이방3
+  to: 놀-1
   bidirectional: true
-- from: 놀이방3
-  to: 놀이방4
-  bidirectional: true
-- from: 놀이방5
-  to: 놀이방6
-  bidirectional: true
-- from: 놀이방6
-  to: 놀이방7
+- from: 놀-5
+  to: 놀-6
   bidirectional: true
 - from: 복도
-  to: 복도2
+  to: 복-1
   bidirectional: true
-- from: 복도2
-  to: 복도3
+- from: 복-1
+  to: 복-2
   bidirectional: true
-- from: 복도3
-  to: 복도4
+- from: 복-2
+  to: 복-3
   bidirectional: true
-- from: 복도4
-  to: 복도5
+- from: 복-3
+  to: 복-4
   bidirectional: true
-- from: 복도5
-  to: 복도6
+- from: 복-4
+  to: 복-5
   bidirectional: true
-- from: 복도7
+- from: 복-6
   to: 충전소입구
   bidirectional: true
 - from: 출입구
-  to: 출입구2
+  to: 복도입구
   bidirectional: true
-- from: 출입구2
+- from: 복도입구
   to: 복도
   bidirectional: true
 - from: 출입구
+  to: 유치원입구
+  bidirectional: true
+- from: 유치원입구
   to: 운동장입구
   bidirectional: true
+- from: 놀이방입구-상
+  to: 복-5
+  bidirectional: true
 - from: 운동장입구
-  to: 운동장3
+  to: 운동장-단상
   bidirectional: true
-- from: 놀이방입구_하2
-  to: 놀이방7
-  bidirectional: true
-- from: 수면실입구2
-  to: 수면실7
-  bidirectional: true
-- from: 놀이방입구_상
-  to: 복도6
-  bidirectional: true
-- from: 운동장3
-  to: 운동장2
-  bidirectional: true
-- from: 운동장2
+- from: 운동장-단상
   to: 운동장
   bidirectional: true
 - from: 충전소입구
   to: 충전소
   bidirectional: true
-- from: 수면실입구2
+- from: 수-8
   to: 수면실입구
   bidirectional: true
 - from: 수면실입구
-  to: 복도7
+  to: 복-6
   bidirectional: true
-- from: 놀이방입구_하2
-  to: 놀이방입구_하
+- from: 놀-7
+  to: 놀이방입구-하
   bidirectional: true
-- from: 놀이방입구_하
-  to: 복도2
+- from: 놀이방입구-하
+  to: 복-1
   bidirectional: true
-- from: 놀이방4
-  to: 놀이방입구_상2
+- from: 놀-2
+  to: 놀이방입구-상
   bidirectional: true
-- from: 놀이방입구_상2
-  to: 놀이방입구_상
+- from: 복-5
+  to: 복-6
   bidirectional: true
-- from: 복도6
-  to: 복도7
+- from: 놀-5
+  to: 놀-4
   bidirectional: true
-- from: 놀이방5
-  to: qwe1
+- from: 놀-4
+  to: 놀-3
   bidirectional: true
-- from: qwe1
-  to: qwe
-  bidirectional: true
-- from: qwe
+- from: 놀-3
   to: 놀이방
+  bidirectional: true
+- from: 복-1
+  to: 복-2-1
+  bidirectional: true
+- from: 복-2-1
+  to: 복-2
+  bidirectional: true
+- from: 복-3-1
+  to: 복-2-1
+  bidirectional: true
+- from: 복-4
+  to: 복-4-1
+  bidirectional: true
+- from: 복-4-1
+  to: 복-5
+  bidirectional: true
+- from: 복-4-1
+  to: 복-3-1
+  bidirectional: true
+- from: 복-3
+  to: 복-3-1
+  bidirectional: true
+- from: 놀-하-회
+  to: 놀-5
+  bidirectional: true
+- from: 수-5
+  to: 수-8
+  bidirectional: true
+- from: 놀-1
+  to: 놀-2
+  bidirectional: true
+- from: 놀-6
+  to: 놀-7
+  bidirectional: true
+- from: 수-회
+  to: 수-3
   bidirectional: true

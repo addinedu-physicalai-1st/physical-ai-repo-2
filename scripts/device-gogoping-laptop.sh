@@ -160,7 +160,7 @@ case "$ACTION" in
     # window 2: nav2 navigation stack (controller + planner + bt_navigator + behavior +
     # waypoint_follower + velocity_smoother + lifecycle_manager_navigation).
     # localization 의 /amcl_pose + map → odom TF 위에서 동작.
-    # admin-ui 의 graph_router 가 /navigate_through_poses action 호출 → 실제 이동.
+    # admin-ui 의 graph_router 가 vertex 단위로 /navigate_to_pose action chain 호출 → 실제 이동.
     tmux new-window -t "$SESSION" -n nav2 -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_navigation navigation_real.launch.xml"
 

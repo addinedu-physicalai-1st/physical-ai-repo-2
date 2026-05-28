@@ -1,6 +1,7 @@
 # Graph Routing
 
-Vertex 그래프 + 다익스트라로 lane 따라 이동. nav2 의 `NavigateThroughPoses` 위에 한 층.
+Vertex 그래프 + 다익스트라로 lane 따라 이동. nav2 의 `NavigateToPose` 를
+vertex 단위 chain 호출하는 L1 (graph) + L2 (Nav2 segment) 2-계층 구조.
 
 ## 데이터 (어디 적나)
 
@@ -19,7 +20,7 @@ Vertex 그래프 + 다익스트라로 lane 따라 이동. nav2 의 `NavigateThro
 
 ```bash
 ros2 launch gogoping_navigation graph_router.launch.xml
-# 옵션: odom_topic:=/odom  follow_action:=/navigate_through_poses  frame_id:=map
+# 옵션: odom_topic:=/odom  follow_action:=/navigate_to_pose  frame_id:=map
 ```
 
 device-gogoping-pi.sh / device-gogoping-sim.sh 가 이 launch 를 tmux window 로 자동 기동.

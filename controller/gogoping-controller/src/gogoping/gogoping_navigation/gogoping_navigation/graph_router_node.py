@@ -6,11 +6,12 @@
   엉뚱한 출발 vertex 를 골라 우회 경로가 생기는 버그가 있었음.
 - service /graph_router/route (RouteToVertex) — 시각화/디버깅용
 - action  /graph_router/navigate_to_vertex (NavigateToVertex)
-   → 다익스트라로 vertex sequence 계산
-   → nav2 의 NavigateThroughPoses 액션 클라이언트로 위임
-   → feedback 중계
-   → **클라이언트 cancel** 시 nav2 goal 도 같이 cancel (BT_return_sub OneShot 의
-     terminate(INVALID) 가 호출하는 cancel_goal_async 가 여기까지 forward 됨)
+   → 다익스트라로 vertex sequence 계산 (L1)
+   → vertex 단위로 nav2 의 NavigateToPose 를 chain 호출 (L2 — segment 단위 위임)
+   → segment 끝날 때마다 feedback publish (last_idx 갱신)
+   → **클라이언트 cancel** 시 현재 segment 의 nav2 goal 을 cancel + sequence 중단
+     (BT_return_sub OneShot 의 terminate(INVALID) 가 호출하는 cancel_goal_async
+      가 여기까지 forward 됨)
 """
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ from threading import Lock
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
-from nav2_msgs.action import NavigateThroughPoses
+from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient, ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -61,19 +62,6 @@ def _nav2_status_str(status: int) -> str:
     return f"{name}({status})" if name else f"UNKNOWN({status})"
 
 
-def _path_length_m(poses: list) -> float:
-    """PoseStamped 시퀀스의 총 거리 (m). 인접 점 간 유클리드 합."""
-    if len(poses) < 2:
-        return 0.0
-    total = 0.0
-    prev = poses[0].pose.position
-    for ps in poses[1:]:
-        cur = ps.pose.position
-        total += math.hypot(cur.x - prev.x, cur.y - prev.y)
-        prev = cur
-    return total
-
-
 class GraphRouterNode(Node):
     def __init__(self) -> None:
         super().__init__("graph_router_node")
@@ -89,15 +77,15 @@ class GraphRouterNode(Node):
             "base_frame", "gogoping/base_link"
         ).value
         self._follow_action = self.declare_parameter(
-            "follow_action", "/navigate_through_poses"
+            "follow_action", "/navigate_to_pose"
         ).value
-        # lane 보간 간격 (m). 인접 vertex 사이를 이 간격으로 잘라 NavigateThroughPoses 에
-        # dense pose 시퀀스로 던짐 → nav2 planner 가 짧은 구간만 plan 해서 lane 거의 그대로 추종.
-        # 0 또는 음수면 보간 비활성 (legacy: vertex pose 만 던짐).
-        self._interp_step = float(self.declare_parameter(
-            "lane_interpolation_step", 0.15
+        # preempt next-goal — 현재 segment target 까지의 거리가 이 값 이하면 다음 vertex
+        # goal 을 미리 발사해 nav2 BT 가 자동 preempt 하게 함 → vertex 마다 robot 이 정지
+        # 안 함 (cmd_vel 끊김 없이 다음 segment 로 전이).  0 이면 비활성 (legacy SUCCESS 대기).
+        # 마지막 segment 는 preempt 안 함 (최종 도착 정밀도 보존).
+        self._preempt_distance = float(self.declare_parameter(
+            "preempt_distance", 0.5
         ).value)
-
         # reload_graph 서비스가 동일 경로로 다시 로드할 수 있게 인스턴스에 보관
         self._wp_path = wp_path
         self._lanes_path = lanes_path
@@ -120,14 +108,14 @@ class GraphRouterNode(Node):
             callback_group=cb,
         )
         # admin UI 가 yaml 편집 후 호출 — graph 를 in-place 로 다시 로드.
-        # 진행 중 NavigateThroughPoses 는 이미 발행된 path 그대로 nav2 가 따라가고,
-        # 다음 routing 부터 새 그래프 적용.
+        # 진행 중인 segment 는 이미 발행된 nav2 NavigateToPose goal 로 계속 진행되고,
+        # 다음 segment (또는 다음 routing) 부터 새 그래프 적용.
         self.create_service(
             Trigger, "/graph_router/reload_graph", self._srv_reload_graph,
             callback_group=cb,
         )
         self._nav_ac: ActionClient = ActionClient(
-            self, NavigateThroughPoses, self._follow_action, callback_group=cb,
+            self, NavigateToPose, self._follow_action, callback_group=cb,
         )
         self._action_server = ActionServer(
             self,
@@ -222,28 +210,26 @@ class GraphRouterNode(Node):
     def _act_navigate(
         self, gh: ServerGoalHandle
     ) -> NavigateToVertex.Result:
-        """graph_router 의 NavigateToVertex action 처리 — **sync**.
+        """graph_router 의 NavigateToVertex action 처리 — **sync polling chain**.
 
-        과거 async 패턴을 썼지만 rclpy ActionServer + MultiThreadedExecutor 환경에선
-        running asyncio event loop 가 없어서 ``await asyncio.sleep`` 이 즉시
-        ``RuntimeError: no running event loop`` 으로 깨졌음. nav2 goal accepted 직후
-        polling 진입과 동시에 종료 → nav_gh 가 orphan → nav2 controller 가 cmd_vel
-        계속 publish (좀비). 따라서 **동기 polling + time.sleep** 으로 변환.
+        L1 (다익스트라 vertex sequence) + L2 (Nav2 segment 단위 NavigateToPose).
+        매 vertex 마다 NavigateToPose.Goal 하나 보내고 sync polling 으로 결과 대기.
 
-        ⚠️ nav_gh 가 nav2 에 보내진 후 어떤 종료 경로에서도 cancel 을 forward 해야
-        nav2 controller_server 가 cmd_vel publish 를 멈춤. try/finally 의 safety net
-        이 핵심.
+        cancel chain 함정 3개 (nav-cancel-chain.md):
+          1. NavTo race      — caller 측 책임 (외층 BT). 여기 무관.
+          2. state change    — 외층 BT 책임. 여기 무관.
+          3. async + orphan  — sync polling + try/finally safety net 으로 회피.
+                                각 iteration 별로 nav_gh 살아있으면 cancel 보장.
 
-        호출 thread: MultiThreadedExecutor + ReentrantCallbackGroup — 본 함수가 polling
-        으로 thread 를 block 해도 다른 callback (cancel_callback / TF / 다른 service)
-        은 별도 thread 에서 정상 동작.
+        호출 thread: MultiThreadedExecutor + ReentrantCallbackGroup — 본 함수가
+        polling 으로 thread 를 block 해도 cancel_callback / TF tick 등 다른 콜백은
+        별도 thread 에서 정상 동작.
 
         모든 abort 경로에 admin UI NavDebugLogCard 용 event publish.
         """
         target = gh.request.target_name
         result = NavigateToVertex.Result()
-        nav_gh = None
-        # target vertex 좌표 첨부 — "어디로 가려 했나" 가 admin UI 에 그대로 보임.
+
         target_v = self._graph.vertices.get(target) if hasattr(self._graph, "vertices") else None
         if target_v is not None:
             self._dbg(
@@ -270,10 +256,6 @@ class GraphRouterNode(Node):
             self._dbg(f"abort: graph error {e}", level="err")
             return result
 
-        # vertex sequence → PoseStamped 리스트 (lane 보간 적용)
-        poses = self._build_dense_poses(seq)
-
-        # nav2 FollowWaypoints 호출
         if not self._nav_ac.wait_for_server(timeout_sec=2.0):
             gh.abort()
             result.success = False
@@ -284,153 +266,197 @@ class GraphRouterNode(Node):
             )
             return result
 
-        nav_goal = NavigateThroughPoses.Goal()
-        nav_goal.poses = poses
-
-        last_idx = 0
-
-        def _on_nav_feedback(_fb_msg) -> None:
-            """NavigateThroughPoses 의 feedback 에는 current_waypoint 없음.
-            odom 으로 sequence 안 nearest vertex 인덱스 추정."""
-            nonlocal last_idx
-            cur = self._current_xy()
-            if cur is None:
-                return
-            cx, cy = cur
-            best_i, best_d = last_idx, float("inf")
-            for i, name in enumerate(seq):
-                v = self._graph.vertices[name]
-                d = (v.x - cx) ** 2 + (v.y - cy) ** 2
-                if d < best_d:
-                    best_d, best_i = d, i
-            # 단조 증가 — 뒤로 안 감
-            if best_i >= last_idx:
-                last_idx = best_i
-            self._publish_feedback(gh, seq, last_idx)
-
-        # ★ safety net — nav_gh 가 만들어지면 어떤 종료 경로에서도 cancel forward 보장
-        try:
-            send_future = self._nav_ac.send_goal_async(
-                nav_goal, feedback_callback=_on_nav_feedback
-            )
-            # send_future 동기 대기 — 5s timeout 안 오면 abort
-            send_deadline = time.monotonic() + 5.0
-            while not send_future.done():
-                if gh.is_cancel_requested:
-                    gh.canceled()
-                    result.success = False
-                    result.message = "canceled before send completed"
-                    self._dbg("canceled before send completed", level="warn")
-                    return result
-                if time.monotonic() > send_deadline:
-                    gh.abort()
-                    result.success = False
-                    result.message = "send_goal_async timeout"
-                    self._dbg("abort: send_goal_async timeout", level="err")
-                    return result
-                time.sleep(0.01)
-
-            nav_gh = send_future.result()
-            if not nav_gh.accepted:
-                nav_gh = None   # 어차피 active 아님 → finally cancel skip
-                gh.abort()
-                result.success = False
-                result.message = "nav2 rejected goal"
-                self._dbg("abort: nav2 rejected goal", level="warn")
-                return result
-
-            self._dbg(
-                f"nav2 goal accepted ({len(poses)} poses, {_path_length_m(poses):.1f}m)"
-            )
-
-            # 최종 결과 대기 — polling 으로 클라이언트 cancel request 검출.
-            get_result_future = nav_gh.get_result_async()
-            while not get_result_future.done():
-                if gh.is_cancel_requested:
-                    self.get_logger().info(
-                        "navigate_to_vertex: client cancel → nav2 NavigateThroughPoses cancel"
-                    )
-                    self._dbg(
-                        f"client cancel → nav2 cancel (target={target!r}, "
-                        f"reached_idx={last_idx}/{len(seq)-1})",
-                        level="warn",
-                    )
-                    try:
-                        cancel_future = nav_gh.cancel_goal_async()
-                        # cancel_future 도 짧게 동기 대기 (2s) — nav2 ack 보장
-                        cancel_deadline = time.monotonic() + 2.0
-                        while not cancel_future.done():
-                            if time.monotonic() > cancel_deadline:
-                                self._dbg(
-                                    "nav2 cancel ack timeout — proceed anyway",
-                                    level="warn",
-                                )
-                                break
-                            time.sleep(0.02)
-                        if cancel_future.done():
-                            self._dbg(f"nav2 cancel ack (target={target!r})")
-                    except Exception as e:
-                        self.get_logger().warning(f"nav2 cancel failed: {e}")
-                        self._dbg(f"nav2 cancel FAILED: {e}", level="err")
-                    nav_gh = None   # 명시 cancel — finally 가 중복 cancel 안 하게
-                    gh.canceled()
-                    result.success = False
-                    result.message = "canceled by client"
-                    result.final_vertex = seq[last_idx] if last_idx < len(seq) else ""
-                    return result
-                time.sleep(0.05)
-
-            wrapper = get_result_future.result()
-            # action_msgs/GoalStatus: 4=SUCCEEDED — nav2 자체가 종료한 상태라 nav_gh 도 끝남
-            nav_gh = None   # 정상 종료 — finally cancel skip
-            succeeded = wrapper.status == 4
-
-            if not succeeded:
-                gh.abort()
-                result.success = False
-                result.message = f"nav2 status={wrapper.status}"
-                result.final_vertex = seq[last_idx] if last_idx < len(seq) else target
-                self._dbg(
-                    f"abort: nav2 status={_nav2_status_str(wrapper.status)}",
-                    level="warn",
-                )
-                return result
-
+        # 첫 vertex (src) 는 현재 위치이므로 skip — seq[1:] 부터 segment 별 nav.
+        # seq 가 1개 (src == target) 면 즉시 SUCCESS.
+        if len(seq) <= 1:
             gh.succeed()
             result.success = True
-            result.message = ""
+            result.message = "already at target"
             result.final_vertex = target
-            self._dbg(f"SUCCESS (target={target!r})")
+            self._dbg(f"SUCCESS (already at target={target!r})")
             return result
 
-        except Exception as e:
-            # polling 중 일반 예외 — nav_gh 가 살아있으면 orphan 방지 위해 cancel
-            # RcutilsLogger 는 .exception 메서드 없음 — .error 로 traceback 직접 format
-            import traceback
-            self.get_logger().error(
-                f"navigate_to_vertex exception: {e}\n{traceback.format_exc()}"
-            )
-            self._dbg(f"abort: exception {type(e).__name__}: {e}", level="err")
+        last_idx = 0
+        self._publish_feedback(gh, seq, last_idx)
+
+        for i in range(1, len(seq)):
+            segment_target = seq[i]
+            nav_gh = None
             try:
-                gh.abort()
-            except Exception:
-                pass
-            result.success = False
-            result.message = f"exception: {e}"
-            return result
-        finally:
-            # ★ safety net — nav_gh 가 active 상태로 살아남으면 nav2 controller 가
-            # cmd_vel 을 계속 publish 하는 좀비 bug. 어떤 종료 경로에서도 cancel forward.
-            if nav_gh is not None:
-                try:
-                    nav_gh.cancel_goal_async()
+                nav_goal = NavigateToPose.Goal()
+                nav_goal.pose = self._vertex_pose(segment_target)
+
+                self._dbg(
+                    f"segment {i}/{len(seq)-1} → {segment_target!r}"
+                )
+
+                send_future = self._nav_ac.send_goal_async(nav_goal)
+                send_deadline = time.monotonic() + 5.0
+                while not send_future.done():
+                    if gh.is_cancel_requested:
+                        gh.canceled()
+                        result.success = False
+                        result.message = "canceled before send completed"
+                        result.final_vertex = seq[last_idx]
+                        self._dbg(
+                            f"canceled before send completed (segment {i})",
+                            level="warn",
+                        )
+                        return result
+                    if time.monotonic() > send_deadline:
+                        gh.abort()
+                        result.success = False
+                        result.message = f"send_goal_async timeout (segment {i})"
+                        result.final_vertex = seq[last_idx]
+                        self._dbg(f"abort: send timeout (segment {i})", level="err")
+                        return result
+                    time.sleep(0.01)
+
+                nav_gh = send_future.result()
+                if not nav_gh.accepted:
+                    nav_gh = None
+                    gh.abort()
+                    result.success = False
+                    result.message = f"nav2 rejected goal (segment {i} → {segment_target!r})"
+                    result.final_vertex = seq[last_idx]
                     self._dbg(
-                        f"orphan nav_gh canceled in finally (target={target!r})",
-                        level="err",
+                        f"abort: nav2 rejected (segment {i} → {segment_target!r})",
+                        level="warn",
                     )
-                except Exception as e:
-                    self.get_logger().warning(f"orphan cancel failed: {e}")
-                    self._dbg(f"orphan cancel FAILED: {e}", level="err")
+                    return result
+
+                get_result_future = nav_gh.get_result_async()
+                # preempt next-goal — 마지막 segment 가 아니고 preempt 활성이면
+                # 현재 segment target 거리 검사 후 도착 직전에 미리 다음 iter 로 break.
+                is_last_segment = (i == len(seq) - 1)
+                preempt_active = (self._preempt_distance > 0.0 and not is_last_segment)
+                preempted = False
+                while not get_result_future.done():
+                    if preempt_active:
+                        cur_xy = self._current_xy()
+                        if cur_xy is not None:
+                            tv = self._graph.vertices[segment_target]
+                            d = math.hypot(cur_xy[0] - tv.x, cur_xy[1] - tv.y)
+                            if d <= self._preempt_distance:
+                                # 다음 vertex goal 미리 발사 — nav2 가 자동 preempt
+                                # 현재 nav_gh 의 result_future 는 CANCELED 로 해결될 예정.
+                                # 명시 cancel 하지 않음 (cmd_vel 끊김 방지) — nav2 BT 가
+                                # 새 goal 받자마자 이전 BT halt + 새 goal 시작.
+                                self._dbg(
+                                    f"preempt @ segment {i} (d={d:.2f}m ≤ "
+                                    f"{self._preempt_distance:.2f}m) — fire next"
+                                )
+                                preempted = True
+                                nav_gh = None   # finally cancel skip — nav2 가 자동 preempt
+                                break
+                    if gh.is_cancel_requested:
+                        self.get_logger().info(
+                            f"navigate_to_vertex: client cancel @ segment {i} → "
+                            f"nav2 NavigateToPose cancel"
+                        )
+                        self._dbg(
+                            f"client cancel → nav2 cancel "
+                            f"(target={target!r}, segment={i}/{len(seq)-1})",
+                            level="warn",
+                        )
+                        try:
+                            cancel_future = nav_gh.cancel_goal_async()
+                            cancel_deadline = time.monotonic() + 2.0
+                            while not cancel_future.done():
+                                if time.monotonic() > cancel_deadline:
+                                    self._dbg(
+                                        "nav2 cancel ack timeout — proceed anyway",
+                                        level="warn",
+                                    )
+                                    break
+                                time.sleep(0.02)
+                            if cancel_future.done():
+                                self._dbg(
+                                    f"nav2 cancel ack (segment {i})"
+                                )
+                        except Exception as e:
+                            self.get_logger().warning(f"nav2 cancel failed: {e}")
+                            self._dbg(f"nav2 cancel FAILED: {e}", level="err")
+                        nav_gh = None
+                        gh.canceled()
+                        result.success = False
+                        result.message = "canceled by client"
+                        result.final_vertex = seq[last_idx]
+                        return result
+                    time.sleep(0.05)
+
+                if preempted:
+                    # preempt path — result_future 는 곧 CANCELED 로 해결되지만 우리는
+                    # 이미 다음 segment 로 넘어감. nav2 가 새 goal 받으면 자동 preempt.
+                    last_idx = i
+                    self._publish_feedback(gh, seq, last_idx)
+                    continue
+
+                wrapper = get_result_future.result()
+                nav_gh = None   # 정상 종료 — finally skip
+                succeeded = wrapper.status == 4
+
+                if not succeeded:
+                    gh.abort()
+                    result.success = False
+                    result.message = (
+                        f"nav2 status={_nav2_status_str(wrapper.status)} "
+                        f"(segment {i} → {segment_target!r})"
+                    )
+                    result.final_vertex = seq[last_idx]
+                    self._dbg(
+                        f"abort: nav2 status={_nav2_status_str(wrapper.status)} "
+                        f"(segment {i})",
+                        level="warn",
+                    )
+                    return result
+
+                # segment 성공 → last_idx 갱신, feedback publish
+                last_idx = i
+                self._publish_feedback(gh, seq, last_idx)
+                self._dbg(f"segment {i} done ({segment_target!r})")
+
+            except Exception as e:
+                import traceback
+                self.get_logger().error(
+                    f"navigate_to_vertex exception @ segment {i}: {e}\n"
+                    f"{traceback.format_exc()}"
+                )
+                self._dbg(
+                    f"abort: exception {type(e).__name__}: {e} (segment {i})",
+                    level="err",
+                )
+                try:
+                    gh.abort()
+                except Exception:
+                    pass
+                result.success = False
+                result.message = f"exception @ segment {i}: {e}"
+                result.final_vertex = seq[last_idx]
+                return result
+            finally:
+                # ★ safety net per segment — nav_gh 가 active 상태로 남으면
+                # nav2 controller 가 cmd_vel 계속 publish (좀비). 어떤 종료
+                # 경로에서도 cancel forward 보장.
+                if nav_gh is not None:
+                    try:
+                        nav_gh.cancel_goal_async()
+                        self._dbg(
+                            f"orphan nav_gh canceled in finally "
+                            f"(target={target!r}, segment={i})",
+                            level="err",
+                        )
+                    except Exception as e:
+                        self.get_logger().warning(f"orphan cancel failed: {e}")
+                        self._dbg(f"orphan cancel FAILED: {e}", level="err")
+
+        # 모든 segment 성공
+        gh.succeed()
+        result.success = True
+        result.message = ""
+        result.final_vertex = target
+        self._dbg(f"SUCCESS (target={target!r}, segments={len(seq)-1})")
+        return result
 
     # ──────── service: reload_graph ────────
     def _srv_reload_graph(
@@ -460,45 +486,14 @@ class GraphRouterNode(Node):
         ps.pose.orientation.w = float(math.cos(yaw / 2.0))
         return ps
 
-    def _build_dense_poses(self, seq: list[str]) -> list[PoseStamped]:
-        """vertex sequence → dense PoseStamped 리스트.
+    def _vertex_pose(self, name: str) -> PoseStamped:
+        """vertex name → PoseStamped (map frame).
 
-        인접 vertex (A,B) 사이를 직선으로 가정하고 ``self._interp_step`` 간격으로 잘라
-        중간 pose 를 삽입. 중간 pose 의 yaw 는 A→B 진행방향 (atan2(dy,dx)),
-        도착 vertex 의 yaw 는 waypoints.yaml 에 정의된 값 그대로.
-
-        보간을 끄려면 ``lane_interpolation_step`` 을 0 이하로.
-
-        lane 이 비직선 (코너) 인 경우 중간점이 벽 통과할 수 있으니, 그 lane 은
-        waypoints.yaml 에 중간 vertex 를 명시적으로 추가해서 직선 구간으로 쪼개야 함.
+        NavigateToPose 의 단일 goal 로 사용. lane 보간은 nav2 의 global planner
+        가 담당 (graph_router 는 vertex sequence 만 결정 — L1).
         """
-        poses: list[PoseStamped] = []
-        if len(seq) == 0:
-            return poses
-        if self._interp_step <= 0.0:
-            # legacy — vertex 만
-            for name in seq:
-                v = self._graph.vertices[name]
-                poses.append(self._make_pose(v.x, v.y, v.yaw))
-            return poses
-
-        for i in range(len(seq) - 1):
-            v = self._graph.vertices[seq[i]]
-            v_next = self._graph.vertices[seq[i + 1]]
-            dx = v_next.x - v.x
-            dy = v_next.y - v.y
-            dist = math.hypot(dx, dy)
-            seg_yaw = math.atan2(dy, dx)
-            n_steps = max(1, int(math.ceil(dist / self._interp_step)))
-            for k in range(n_steps):
-                t = k / n_steps
-                poses.append(self._make_pose(
-                    v.x + dx * t, v.y + dy * t, seg_yaw,
-                ))
-        # 도착 vertex 는 자체 yaw 보존
-        last = self._graph.vertices[seq[-1]]
-        poses.append(self._make_pose(last.x, last.y, last.yaw))
-        return poses
+        v = self._graph.vertices[name]
+        return self._make_pose(v.x, v.y, v.yaw)
 
     def _publish_feedback(
         self, gh: ServerGoalHandle, seq: list[str], idx: int
