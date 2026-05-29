@@ -190,7 +190,10 @@ async def recognize_faces_multi(
     면 matched=False 로 결과에 포함 (얼굴은 봤지만 누군지 모름).
     """
     content = await file.read()
-    faces = extract_embeddings_all(content)
+    # InsightFace 는 동기 CPU/GPU 추론 — 직접 호출하면 이벤트 루프를 블록해 같은 루프의
+    # 무궁화 영상 relay(/ws/eduping/mugunghwa/video) 가 멈춰 사람이 보일 때 PIP 가 프리징한다.
+    # 스레드로 오프로드 (recognize 단건은 line 85 에서 이미 동일 처리).
+    faces = await asyncio.to_thread(extract_embeddings_all, content)
     if not faces:
         return FaceRecognizeMultiResult(matches=[])
 
