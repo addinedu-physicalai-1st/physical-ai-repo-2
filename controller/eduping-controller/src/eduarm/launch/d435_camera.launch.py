@@ -12,8 +12,9 @@ ros-jazzy-realsense2-camera 의 rs_launch.py 가 워낙 인자가 많아 매번 
     내부 chain 을 TF 로 publish. doctor_teleop.launch.py 의 static_tf 가
     openarm_body_link0 → d435_link 부분을 채워 octomap 이 depth point 를
     world frame 으로 변환 가능.
-  - `align_depth.enable:=false` — octomap 은 depth 본연 intrinsics 그대로 받는 게
-    가장 정확. aligned-to-color 는 색감 시각화용일 뿐.
+  - `align_depth.enable:=true` — color 정렬 depth 추가 publish
+    (`/d435/aligned_depth_to_color/image_raw`). depth_streamer 구독용.
+    octomap 은 raw `/d435/depth/color/points` 그대로 사용.
   - `pointcloud.enable:=true` — MoveIt PointCloudOctomapUpdater + octomap_server
     사이드카 둘 다 pointcloud 를 입력으로 받음. `/d435/depth/color/points` 토픽 생성.
   - default 해상도/fps 는 기존 d435_depth.launch.py (WS 스트리머) 와 동일하게
@@ -73,7 +74,9 @@ def generate_launch_description() -> LaunchDescription:
                 "enable_infra2": "false",
                 "enable_gyro": "false",
                 "enable_accel": "false",
-                "align_depth.enable": "false",
+                # depth_streamer 가 color 정렬 depth (/d435/aligned_depth_to_color/image_raw)
+                # 를 구독. octomap 은 raw /d435/depth/color/points 그대로 사용.
+                "align_depth.enable": "true",
                 "pointcloud.enable": "true",
                 # profile = WxHxFPS (realsense2_camera 의 string convention)
                 "depth_module.depth_profile": [depth_width, "x", depth_height, "x", fps],
