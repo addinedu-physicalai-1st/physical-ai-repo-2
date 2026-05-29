@@ -23,8 +23,10 @@ import {
 import { useDepthStream, type DecodedDepthFrame } from './useDepthStream';
 import { useHandTracker } from './useHandTracker';
 import type { HandBbox } from './useDepthCloudInScene';
+import { useProximityOverride } from '@/composables/useProximityOverride';
 
 const stream = useDepthStream('eduping');
+useProximityOverride();  // 뎁스카메라 뷰(하이파이브) — 아이가 팔에 손 대는 모드라 근접 정지 우회
 const depthStatusLabel = computed(() => {
   switch (stream.status.value) {
     case 'streaming':

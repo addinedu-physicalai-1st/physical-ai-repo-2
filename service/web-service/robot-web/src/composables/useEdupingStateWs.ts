@@ -18,6 +18,7 @@ export interface StateSnapshot {
   leader: JointSnapshot | null;
   follower: JointSnapshot | null;
   real_active?: boolean;
+  proximity_blocked?: boolean;
 }
 
 export interface UseEdupingStateWs {
@@ -25,6 +26,8 @@ export interface UseEdupingStateWs {
   leader: Ref<JointSnapshot | null>;
   follower: Ref<JointSnapshot | null>;
   realActive: Ref<boolean>;
+  /** 근접 안전정지 — depth 로 사람이 0.6m 이내. true 면 팔 정지 + (율동/무궁화) 음악 정지. */
+  proximityBlocked: Ref<boolean>;
   /** leader 토픽이 최근 2초 내에 들어왔는지 — leader bringup 가동 여부. */
   leaderActive: ComputedRef<boolean>;
   start: () => void;
@@ -41,6 +44,7 @@ export function useEdupingStateWs(): UseEdupingStateWs {
   const leader = ref<JointSnapshot | null>(null);
   const follower = ref<JointSnapshot | null>(null);
   const realActive = ref(false);
+  const proximityBlocked = ref(false);
 
   const leaderActive = computed(() => {
     const l = leader.value;
@@ -78,6 +82,7 @@ export function useEdupingStateWs(): UseEdupingStateWs {
         leader.value = snap.leader;
         follower.value = snap.follower;
         realActive.value = !!snap.real_active;
+        proximityBlocked.value = !!snap.proximity_blocked;
       } catch (err) {
         console.warn('[edupingState] parse 실패', err);
       }
@@ -126,5 +131,5 @@ export function useEdupingStateWs(): UseEdupingStateWs {
 
   onBeforeUnmount(stop);
 
-  return { connected, leader, follower, realActive, leaderActive, start, stop };
+  return { connected, leader, follower, realActive, proximityBlocked, leaderActive, start, stop };
 }
