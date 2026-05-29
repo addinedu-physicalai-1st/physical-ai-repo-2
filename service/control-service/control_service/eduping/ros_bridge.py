@@ -79,6 +79,11 @@ KIND_MUGUNGHWA = "mugunghwa"  # 무궁화꽃이 피었습니다 (SR-PLAY-004) �
 PLAYBACK_RAMP_MIN_S = 0.3
 PLAYBACK_RAMP_MAX_S = 2.5
 PLAYBACK_RAMP_MAX_VEL = 1.5   # rad/s — 갭 / 이 값 = ramp 시간 (clamp 사이)
+# 전역 모션 속도 거버너 — 녹화 루틴 재생(greeting/dance/무궁화)의 시간축을 1/scale 로 늘려
+# 전체적으로 느리고 부드럽게. 시간 stretch 라 속도∝scale·가속도∝scale²·저크∝scale³ 로 함께
+# 감소(끝점 v=0 ease-in/out + JTC 100Hz 보간과 결합 → 느릴수록 더 매끄러움). teleop(live
+# mirror)·return_to_home(이미 느린 trapezoidal)에는 미적용. 1.0=원속도. 실물 보고 값만 조정.
+MOTION_TIME_SCALE = 0.6
 TELEOP_MAX_VEL_RAD_S = 2.0    # rad/s — SmoothDamp 의 catch-up 단계 속도 cap
 TELEOP_SMOOTH_TIME_S = 0.25   # SmoothDamp 시정수 — target 도달까지 nominal 시간
 TELEOP_TICK_DT_MAX = 0.04     # dt clamp 상한 — leader stale 시 단일 tick 점프 방지
@@ -696,6 +701,11 @@ class EdupingRosBridge:
 
         # 첫 keyframe 와 현재 follower pose 차이로 부드러운 ramp 시간 산출.
         ramp_s = self._compute_ramp_s(routine)
+        # 전역 속도 거버너 — 시간축을 1/MOTION_TIME_SCALE 로 stretch. speed↓·ramp↑ 둘 다 적용해
+        # keyframe 간격과 ease-in 을 균일하게 늘림. 이하 sim publish·_start_playback·실물 goal
+        # 전부 이 (speed, ramp_s) 를 쓰므로 sim·실물이 같은 속도. teleop 은 이 경로 밖이라 무관.
+        speed *= MOTION_TIME_SCALE
+        ramp_s /= MOTION_TIME_SCALE
 
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
