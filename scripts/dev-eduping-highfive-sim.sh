@@ -7,7 +7,7 @@
 #
 # Prereqs:
 #   scripts/run_server.sh  (control :8000 + streaming :8100)
-#   D435 (뎁스카메라 뷰): ros2 launch eduarm d435_depth.launch.py
+#   D435 (뎁스카메라 뷰): scripts/device-eduping-d435.sh base  (또는 ros2 launch eduarm eduping_d435_base.launch.py)
 #   cd service/web-service/robot-web && npm run dev
 #
 # UI: EduPing → 뎁스카메라 뷰 → ✋ ON → hold hand in 0.3–1.5 m
@@ -53,7 +53,7 @@ except Exception:
     pass
 " 2>/dev/null || true)"
   if [[ -z "$depth_seq" ]]; then
-    echo "[highfive-sim] ⚠ D435 depth producer 없음 — 뎁스카메라 뷰: ros2 launch eduarm d435_depth.launch.py" >&2
+    echo "[highfive-sim] ⚠ D435 depth producer 없음 — 뎁스카메라 뷰: scripts/device-eduping-d435.sh base" >&2
   fi
 fi
 echo "[highfive-sim] Launching highfive_sim (move_group + sim_twin + highfive_node)…"
