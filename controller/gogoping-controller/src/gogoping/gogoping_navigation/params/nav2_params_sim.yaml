@@ -88,7 +88,7 @@ controller_server:
       yaw_goal_tolerance: 3.14
     FollowPath:
       plugin: nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController
-      desired_linear_vel: 0.2    # default — preempt next-goal 로 drift 자동 해결
+      desired_linear_vel: 0.28   # 0.2 → 0.28 선속도 상향 (사용자 요청 — sim 일반주행 가속)
       lookahead_dist: 1.2
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
@@ -285,11 +285,11 @@ velocity_smoother:
     scale_velocities: false
     feedback: OPEN_LOOP
     max_velocity:
-    - 0.25
+    - 0.35    # 0.25 → 0.35 선속도 cap 상향 (desired 0.28 안 잘리게)
     - 0.0
     - 0.6     # angular max — 1.0 → 0.6 rad/s (~34°/s, 부드러운 회전)
     min_velocity:
-    - -0.25
+    - -0.35
     - 0.0
     - -0.6
     max_accel:

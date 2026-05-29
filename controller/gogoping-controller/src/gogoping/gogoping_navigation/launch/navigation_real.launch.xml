@@ -21,7 +21,8 @@
   토픽 경로 (모두 절대):
    * controller_server cmd_vel out → /gogoping/cmd_vel_nav
    * velocity_smoother cmd_vel in   → /gogoping/cmd_vel_nav
-   * velocity_smoother cmd_vel out  → /gogoping/cmd_vel (vicpinky_bringup 가 subscribe)
+   * velocity_smoother cmd_vel out  → /gogoping/cmd_vel_raw
+   * safety_filter cmd_vel_raw      → /gogoping/cmd_vel (vicpinky_bringup 가 subscribe)
 
   사용:
     ros2 launch gogoping_navigation navigation_real.launch.xml
@@ -72,7 +73,7 @@
         <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
 
-    <!-- velocity_smoother — controller cmd_vel_nav → vicpinky 가 받는 /gogoping/cmd_vel -->
+    <!-- velocity_smoother — controller cmd_vel_nav → /gogoping/cmd_vel_raw (safety_filter 가 relay) -->
     <node pkg="nav2_velocity_smoother" exec="velocity_smoother"
           name="velocity_smoother" output="screen"
           args="--ros-args --log-level $(var log_level)">
@@ -81,6 +82,15 @@
         <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
         <remap from="cmd_vel_smoothed" to="/gogoping/cmd_vel_raw"/>
     </node>
+
+    <!-- safety_filter — /gogoping/cmd_vel_raw → /gogoping/cmd_vel relay.
+         velocity_smoother 출력(cmd_vel_raw)을 vicpinky 가 받는 cmd_vel 로 전달하는 필수 노드.
+         perception(safety_monitor) 기동 시 /gogoping/safety_stop 으로 정지 gating,
+         미기동 시 safety_stop=false 기본값이라 순수 패스스루. perception 과 독립적으로
+         nav 와 항상 함께 떠야 주행 가능 — 과거 perception.launch.py 에만 있어 perception
+         미기동 시 로봇이 cmd_vel 을 못 받던 문제 수정. lifecycle 노드 아님(아래 매니저 제외). -->
+    <node pkg="gogoping_perception" exec="safety_filter"
+          name="gogoping_safety_filter" output="screen"/>
 
     <!-- lifecycle_manager_navigation — 위 6 노드 autostart -->
     <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager"

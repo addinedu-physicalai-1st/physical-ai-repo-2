@@ -147,20 +147,21 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     )
 
     # Step 2: recruit — UI 가 등록 종료 시 control-service 가 HIDESEEK_REGISTERED_IDS 셋팅.
-    # 등록 완료 후 180° 회전 → 왼쪽(yaw=π) 정렬.
+    # 등록 완료까지만 — 180° 회전은 countdown 과 동시에(아래 step_countdown 의 parallel).
     step_recruit = py_trees.composites.Sequence(
         name="step_recruit",
         memory=True,
         children=[
             SetHideseekPhase(name="set_phase_recruit", phase="recruit"),
             AwaitRecruitComplete(name="await_recruit"),
-            RotateToYaw(name="face_left_after_recruit", target_yaw=math.pi),
         ],
     )
 
-    # Step 3: countdown — 30초.
-    step_countdown = py_trees.composites.Sequence(
-        name="step_countdown",
+    # Step 3: countdown — 30초. 출발 누르면 "완전히 뒤돈 뒤 카운트" 가 아니라
+    # **바로 30초 카운트 시작 + 180° 회전을 동시에**(병렬) 진행. 회전은 그때만 1.4배 빠르게
+    # (angular_speed 0.5 → 0.7). countdown 이 끝나면 step_countdown SUCCESS (회전은 ~4.5s 면 끝).
+    countdown_seq = py_trees.composites.Sequence(
+        name="countdown_seq",
         memory=True,
         children=[
             SetHideseekPhase(name="set_phase_countdown", phase="countdown"),
@@ -168,6 +169,21 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
                 name="countdown_30s",
                 seconds=_COUNTDOWN_SECONDS,
                 check_skip_key=Keys.HIDESEEK_SKIP_COUNTDOWN,
+            ),
+        ],
+    )
+    step_countdown = py_trees.composites.Parallel(
+        name="step_countdown",
+        # countdown 이 SUCCESS 판정 기준 — 회전은 동시 진행만 (먼저 끝나도 countdown 대기).
+        policy=py_trees.common.ParallelPolicy.SuccessOnSelected(
+            children=[countdown_seq], synchronise=False,
+        ),
+        children=[
+            countdown_seq,
+            RotateToYaw(
+                name="face_left_during_countdown",
+                target_yaw=math.pi,
+                angular_speed=0.7,   # 0.5 × 1.4 — 카운트다운 중에만 빠르게 뒤돌기
             ),
         ],
     )

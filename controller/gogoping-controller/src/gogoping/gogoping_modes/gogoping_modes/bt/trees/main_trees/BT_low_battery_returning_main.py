@@ -25,6 +25,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         include_map_boundary=True,
         include_hw_health=True,
         include_collision=True,
+        include_proximity=True,
         include_command_listener=False,
         task_body=False,
     )

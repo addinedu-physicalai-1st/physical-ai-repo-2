@@ -37,8 +37,8 @@ interface GogopingSnapshot {
 function snapshotToModeLabel(snap: GogopingSnapshot): string | null {
   const fsm = snap.fsm_state ?? '';
   switch (fsm) {
-    case 'IDLE':
-    case 'CHARGING':            return '대기';
+    case 'IDLE':                return '대기';
+    case 'CHARGING':            return '충전';   // 충전 중 — '대기' 와 구분 (도크에서 충전).
     case 'MANUAL':              return '수동';
     case 'RETURNING':
     case 'LOW_BATTERY_RETURNING':  return '복귀';
@@ -46,7 +46,8 @@ function snapshotToModeLabel(snap: GogopingSnapshot): string | null {
     case 'FOLLOW':              return '추종';
     case 'LULLABY':             return '자장가';
     case 'HIDEANDSEEK':         return '숨바꼭질';
-    default:                    return null;  // ERROR / 알 수 없는 state — mode 변경 안 함
+    case 'ERROR':               return '오류';   // 고장 — 직전 모드 유지하지 않고 명시 표시.
+    default:                    return null;  // 알 수 없는 state — mode 변경 안 함
   }
 }
 

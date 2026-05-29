@@ -26,6 +26,7 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         include_map_boundary=True,
         include_hw_health=True,
         include_collision=True,
+        include_proximity=True,
         include_command_listener=True,
         task_body=False,    # docked trigger 가 별도 — root SUCCESS 시 task_done 발화 X
     )

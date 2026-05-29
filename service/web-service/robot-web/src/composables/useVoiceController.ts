@@ -295,7 +295,7 @@ export function useVoiceController(robot: RobotConfig): {
       return;  // tts_start 도착 시 onTtsStart 가 speaking 으로 전이
     }
     if (intent.kind === 'goto_vertex') {
-      void handleGotoVertex(intent.name);
+      void handleGotoVertex(intent.name, intent.then_mode);
       return;
     }
     if (intent.kind === 'sub_command') {
@@ -389,7 +389,7 @@ export function useVoiceController(robot: RobotConfig): {
     enterCooldown();
   }
 
-  async function handleGotoVertex(name: string): Promise<void> {
+  async function handleGotoVertex(name: string, thenMode?: string): Promise<void> {
     if (!name) {
       enterCooldown();
       return;
@@ -399,12 +399,20 @@ export function useVoiceController(robot: RobotConfig): {
       // GOTO 진입 — Control 의 /api/gogoping/goto_vertex 호출.
       // SetGoal.srv → FSM trigger 경로라 robot 이동 + state GOTO 전이 둘 다 발생.
       // (직접 graph_router action 호출인 /waypoints/navigate 는 FSM 우회 — admin 디버그 전용.)
+      // then_mode: 복합 명령 "X 가서 Y" — 서버가 도착(GOTO→IDLE) 후 모드 전환 orchestrate
+      // (robot-web 은 state 스트림이 없어 client 가 도착을 못 봄 → 서버 위임).
       const r = await fetch('/api/gogoping/goto_vertex', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, then_mode: thenMode ?? '' }),
       });
-      confirmation = r.ok ? `${name}으로 갈게요` : `${name}을(를) 찾지 못했어요`;
+      if (r.ok) {
+        confirmation = thenMode
+          ? `${name}으로 가서 ${thenMode} 할게요`
+          : `${name}으로 갈게요`;
+      } else {
+        confirmation = `${name}을(를) 찾지 못했어요`;
+      }
     } catch {
       confirmation = '지금은 이동할 수 없어요';
     }

@@ -183,7 +183,7 @@ waypoints:
     y: 11.062299728393555
     yaw: -3.061305838306777
     id: 43
-    group: 복도
+    # group 제거 — 숨바꼭질 patrol(_build_group_patrol_order)에서 제외. lane 라우팅엔 무관.
   - name: 놀이방입구-하
     x: -0.0340039256
     y: 3.3549065589904785

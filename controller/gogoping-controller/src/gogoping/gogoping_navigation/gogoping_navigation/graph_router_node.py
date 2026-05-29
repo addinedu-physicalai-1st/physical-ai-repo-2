@@ -165,6 +165,18 @@ class GraphRouterNode(Node):
         )
 
         # ── graph_router 심화 (2026-05-28) — proximity 기반 pause/reroute/backup ──
+        # 시연/디버그용 토글 — NO_PROXIMITY_SAFETY=1 → launch 가 disable_proximity_safety:=true
+        # 전달. true 면 _act_navigate_impl 의 person_close/wall_close 분기를 skip("ok" 취급)
+        # → 정지·60s·reroute·후진 전부 비활성. (BT 의 ProximitySafetyMonitor 는 동일 param 을
+        #  modes 노드에서 읽어 표시용으로 사용 — 기능 gating 은 여기 graph_router 가 담당.)
+        self._proximity_disabled: bool = bool(
+            self.declare_parameter("disable_proximity_safety", False).value
+        )
+        if self._proximity_disabled:
+            self.get_logger().warning(
+                "proximity safety DISABLED (disable_proximity_safety=true) — "
+                "사람/벽 근접 정지·reroute·후진 비활성. 시연/디버그 모드."
+            )
         self._proximity_level: str = "ok"
         self._proximity_person_dist_m: float = float("inf")
         self._proximity_wall_dist_m: float = float("inf")
@@ -553,7 +565,8 @@ class GraphRouterNode(Node):
                 proximity_reroute = False
                 while not get_result_future.done():
                     # ── proximity 분기 (사람/벽) ──
-                    level = self._proximity_level
+                    # disable_proximity_safety=true 면 항상 "ok" 로 취급 → pause/backup/reroute skip.
+                    level = "ok" if self._proximity_disabled else self._proximity_level
                     if level == "person_close":
                         if nav_gh is not None:
                             try:

@@ -89,20 +89,18 @@ function stopChantTimer(): void {
 watch(
   () => state.phase,
   (p, prev) => {
-    // countdown 진입 — 안내 + 1Hz tick + 챈트 반복
+    // countdown 진입 — 1Hz tick + 챈트(시각 애니메이션)만. 로봇 TTS 음성은 끔
+    // (countdown_bgm '꼭꼭 숨어라' mp3 가 CountdownPhase 에서 따로 재생되므로 음성 중복 제거).
     if (p === 'countdown' && prev !== 'countdown') {
-      speak(`눈 감고 ${COUNTDOWN_SEC} 초 셀게!`);
       stopCountdownTimer();
       countdownTimer = window.setInterval(() => {
         actions.tickCountdown();
       }, 1000);
-      // 즉시 한 번 챈트 + 이후 HIDE_CHANT_INTERVAL_MS 마다 반복
+      // 즉시 한 번 챈트(시각) + 이후 HIDE_CHANT_INTERVAL_MS 마다 반복 — speak 없음
       stopChantTimer();
       chantTick.value += 1;
-      speak('꼭꼭 숨어라, 머리카락 보일라!');
       chantTimer = window.setInterval(() => {
         chantTick.value += 1;
-        speak('꼭꼭 숨어라, 머리카락 보일라!');
       }, HIDE_CHANT_INTERVAL_MS);
     }
     // countdown 이탈 — 두 timer 정지
