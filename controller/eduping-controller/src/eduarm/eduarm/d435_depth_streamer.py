@@ -6,7 +6,6 @@ realsense2_camera(d435_camera.launch.py) 토픽을 구독해 동일 DepthFrame �
 """
 from __future__ import annotations
 
-import json
 import threading
 import time
 
