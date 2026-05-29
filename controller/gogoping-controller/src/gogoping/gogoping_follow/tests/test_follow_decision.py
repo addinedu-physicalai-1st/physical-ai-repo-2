@@ -140,6 +140,52 @@ def test_lost_duration_below_threshold_stays_in_mode():
     assert d.mode == DecisionMode.REACTIVE
 
 
+# ── Phase F — Voice-guided search ─────────────────────────────────────────
+def test_decision_mode_has_voice_states():
+    assert DecisionMode.VOICE_SEARCH.value == "voice_search"
+    assert DecisionMode.VOICE_FOUND.value == "voice_found"
+    assert DecisionMode.VOICE_RESUME.value == "voice_resume"
+
+
+def test_voice_search_keeps_prev_mode_on_nan_distance():
+    # VOICE_SEARCH 중 NaN distance + lost_duration 길어도 RECOVERY 안 감.
+    d = decide_follow_action(
+        distance_m=float("nan"),
+        prev_mode=DecisionMode.VOICE_SEARCH,
+        stop_max=0.35, reactive_max=1.2, nav2_min=0.8, initial_threshold=1.0,
+        lost_duration_s=10.0, recovery_lost_timeout_s=2.0,
+    )
+    assert d.mode == DecisionMode.VOICE_SEARCH
+
+
+def test_voice_search_keeps_prev_mode_on_valid_distance():
+    # VOICE_SEARCH 중 valid distance 들어와도 mode 유지 (전이는 _on_hint / _tick 내부).
+    d = decide_follow_action(
+        distance_m=1.0,
+        prev_mode=DecisionMode.VOICE_SEARCH,
+        stop_max=0.35, reactive_max=1.2, nav2_min=0.8, initial_threshold=1.0,
+    )
+    assert d.mode == DecisionMode.VOICE_SEARCH
+
+
+def test_voice_found_keeps_prev_mode():
+    d = decide_follow_action(
+        distance_m=0.5,
+        prev_mode=DecisionMode.VOICE_FOUND,
+        stop_max=0.35, reactive_max=1.2, nav2_min=0.8, initial_threshold=1.0,
+    )
+    assert d.mode == DecisionMode.VOICE_FOUND
+
+
+def test_voice_resume_keeps_prev_mode():
+    d = decide_follow_action(
+        distance_m=0.5,
+        prev_mode=DecisionMode.VOICE_RESUME,
+        stop_max=0.35, reactive_max=1.2, nav2_min=0.8, initial_threshold=1.0,
+    )
+    assert d.mode == DecisionMode.VOICE_RESUME
+
+
 def test_idle_with_lost_timeout_stays_idle():
     # IDLE 에서 lost_duration 무관 — IDLE 그대로 (RECOVERY 진입 X)
     d = decide_follow_action(

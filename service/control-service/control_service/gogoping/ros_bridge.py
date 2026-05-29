@@ -38,6 +38,7 @@ SERVICE_SET_BLACKBOARD = "/gogoping/blackboard/set"
 # admin UI 에서 IDLE → RETURNING 임계값 (idle_timeout_seconds) 조정 시 호출.
 SERVICE_SET_PARAMETERS = "/gogoping/gogoping_modes/set_parameters"
 TOPIC_FOLLOW_TARGET = "/gogoping/follow_target"
+TOPIC_FOLLOW_HINT = "/gogoping/follow_hint"
 TOPIC_TRACKING_STATE = "/gogoping/tracking_state"
 
 # Blackboard 키 — gogoping_modes 의 SetBlackboard 서버가 허용하는 allowlist 와 일치.
@@ -106,6 +107,10 @@ class GogopingRosBridge:
         self._sub: Any = None              # /gogoping/state subscriber
         self._nav_event_sub: Any = None    # /gogoping/debug/nav_events subscriber
         self._follow_target_pub: Any = None   # /gogoping/follow_target publisher
+        self._follow_hint_pub: Any = None     # /gogoping/follow_hint publisher (debug)
+        self._follow_state_sub: Any = None    # /gogoping/follow_state subscriber
+        self._last_follow_state: str | None = None
+        self._follow_state_callbacks: list[Callable[[str], None]] = []
         self._tracking_state_sub: Any = None  # /gogoping/tracking_state subscriber
         self._last_tracking_state: dict | None = None
         self._tracking_state_callbacks: list[Callable[[dict], None]] = []
@@ -183,6 +188,14 @@ class GogopingRosBridge:
         from gogoping_msgs.msg import FollowTarget, TrackingState
         self._follow_target_pub = self._node.create_publisher(
             FollowTarget, TOPIC_FOLLOW_TARGET, 10,
+        )
+        # follow_hint publisher (debug 패널용 — WAITING_HINT 모드에 left/right/front/back 발행)
+        self._follow_hint_pub = self._node.create_publisher(
+            String, TOPIC_FOLLOW_HINT, 10,
+        )
+        # follow_state subscriber — follow_node 가 mode 전이 시 publish
+        self._follow_state_sub = self._node.create_subscription(
+            String, "/gogoping/follow_state", self._on_follow_state, 10,
         )
         self._tracking_state_sub = self._node.create_subscription(
             TrackingState, TOPIC_TRACKING_STATE, self._on_tracking_state, 10,
@@ -666,6 +679,53 @@ class GogopingRosBridge:
         msg.embedding = []
         msg.ts_ms = int(time.time() * 1000)
         self._follow_target_pub.publish(msg)
+
+    _VALID_HINT_DIRECTIONS = frozenset({"left", "right", "front", "back", "search", "resume"})
+
+    def publish_follow_hint(self, direction: str) -> None:
+        """`/gogoping/follow_hint` (std_msgs/String) publish — follow_node WAITING_HINT 모드용.
+
+        디버그 패널에서 left/right/front/back 버튼 클릭 시 호출. STT 미연동 시
+        UI 에서 직접 발행.
+        """
+        if direction not in self._VALID_HINT_DIRECTIONS:
+            raise ValueError(f"invalid direction: {direction!r}")
+        if self._follow_hint_pub is None:
+            raise BridgeUnavailable("follow_hint publisher not ready")
+        from std_msgs.msg import String
+        msg = String()
+        msg.data = direction
+        self._follow_hint_pub.publish(msg)
+
+    def _on_follow_state(self, msg: Any) -> None:
+        """/gogoping/follow_state 토픽 콜백 — follow_node mode 전이."""
+        with self._lock:
+            self._last_follow_state = msg.data
+            callbacks = list(self._follow_state_callbacks)
+        for cb in callbacks:
+            try:
+                cb(msg.data)
+            except Exception:
+                logger.exception("follow_state callback failed")
+
+    def current_follow_state(self) -> str | None:
+        """최근 follow_node mode (없으면 None)."""
+        with self._lock:
+            return self._last_follow_state
+
+    def register_follow_state_callback(
+        self, cb: Callable[[str], None],
+    ) -> Callable[[], None]:
+        """follow_state 가 갱신될 때마다 호출되는 callback 등록. unregister 함수 반환."""
+        with self._lock:
+            self._follow_state_callbacks.append(cb)
+
+        def _unregister() -> None:
+            with self._lock:
+                if cb in self._follow_state_callbacks:
+                    self._follow_state_callbacks.remove(cb)
+
+        return _unregister
 
     def current_tracking_state(self) -> dict | None:
         """최근 TrackingState (없으면 None)."""

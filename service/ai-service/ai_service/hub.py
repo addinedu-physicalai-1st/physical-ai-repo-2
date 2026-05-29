@@ -129,8 +129,36 @@ class ConfirmNo(BaseModel):
     kind: Literal["confirm_no"] = "confirm_no"
 
 
+class FollowSearch(BaseModel):
+    """추종 lost 시 운영자 음성 '고고핑 추종 위치확인' → PAN sweep 시작."""
+    kind: Literal["follow_search"] = "follow_search"
+
+
+class FollowResume(BaseModel):
+    """VOICE_FOUND 에서 '고고핑 추종 위치이동' → base 회전 후 follow 재개."""
+    kind: Literal["follow_resume"] = "follow_resume"
+
+
 class Ignored(BaseModel):
     kind: Literal["ignored"] = "ignored"
+
+
+class TtsSayIn(BaseModel):
+    """고정 멘트 TTS — LLM 우회."""
+    text: str
+
+
+@app.post("/api/tts/say")
+async def tts_say(payload: TtsSayIn) -> StreamingResponse:
+    """단순 고정 멘트 TTS — LLM 우회. ko-KR-InJoonNeural 합성, mp3 stream 응답.
+
+    GogoPing 의 voice-guided search 가 "선생님 찾았습니다" 같은 고정 멘트 발화에 사용.
+    """
+    from ai_service.edge_tts_synth import synthesize_edge_mp3_stream
+    return StreamingResponse(
+        synthesize_edge_mp3_stream(payload.text),
+        media_type="audio/mpeg",
+    )
 
 
 @app.get("/health")
@@ -160,6 +188,14 @@ async def voice_intent(req: IntentRequest) -> dict:
 
     logger.info("voice.intent.in robot=%s text=%r", req.robot, req.text)
     print(f"[voice.intent] robot={req.robot} text={req.text!r}", flush=True)
+
+    # GogoPing voice-guided search — fast-path 정형 명령 매칭 (LLM 우회).
+    if req.robot == "gogoping":
+        from ai_service.intents.gogoping import match_follow_voice_intent
+        m = match_follow_voice_intent(req.text)
+        if m is not None:
+            logger.info("intent.matched robot=gogoping handler=follow_voice text=%r", req.text)
+            return m.model_dump()
 
     # Inline import: hub.py defines the Pydantic models (IntentRequest, Chat, ...)
     # that intents/* modules import. Module-level import here would cycle.

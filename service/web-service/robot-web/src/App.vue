@@ -29,7 +29,10 @@ import { VIDEO_STREAM_KEY } from '@/gogoping/videoStreamKey';
 import { useGogopingStateWs } from '@/gogoping/composables/useGogopingStateWs';
 import CameraView from '@/gogoping/CameraView.vue';
 import PanTiltControl from '@/gogoping/PanTiltControl.vue';
+import GogopingDebugPanel from '@/gogoping/GogopingDebugPanel.vue';
 import FollowFaceAuth from '@/gogoping/FollowFaceAuth.vue';
+import { useFollowStateWs } from '@/gogoping/composables/useFollowStateWs';
+import { useTtsSay } from '@/composables/useTtsSay';
 import HideAndSeekGame from '@/gogoping/HideAndSeekGame.vue';
 import FollowMode from '@/gogoping/FollowMode.vue';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
@@ -84,9 +87,31 @@ const showHighfive = computed(() => robot.value.id === 'eduping' && currentMode.
 const showGogopingManual = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '수동'
 );
+// 디버그 패널 토글 — URL 에 ?debug=1 (대소문자 무관) 명시할 때만 표시.
+// 검증 필요 시: localhost:5173/?debug=1 (또는 ?Debug=1) 식으로 접속.
+// 완전 제거 시: 본 줄 + GogopingDebugPanel import + template 의 v-if 라인 삭제.
+const showDebug = computed(() => {
+  const params = new URLSearchParams(window.location.search.toLowerCase());
+  return params.get('debug') === '1';
+});
 const showGogopingHideAndSeek = computed(
   () => robot.value.id === 'gogoping' && currentMode.value === '숨바꼭질'
 );
+
+// Voice-guided search — follow_node mode 전이 감지 → TTS 발화.
+//   VOICE_SEARCH → VOICE_FOUND: "선생님 찾았습니다"
+//   VOICE_SEARCH → IDLE (못 찾음): "선생님을 찾지 못했습니다"
+const followStateWs = useFollowStateWs();
+const ttsSay = useTtsSay();
+let prevFollowMode: string | null = null;
+watch(() => followStateWs.state.value.mode, (newMode) => {
+  if (prevFollowMode === 'voice_search' && newMode === 'voice_found') {
+    void ttsSay.sayText('선생님 찾았습니다');
+  } else if (prevFollowMode === 'voice_search' && newMode === 'idle') {
+    void ttsSay.sayText('선생님을 찾지 못했습니다');
+  }
+  prevFollowMode = newMode;
+});
 
 // embed (admin QWebEngineView) 페이지에서는 main app 측 gogoping 리소스를 생성하지 않는다.
 // AdminGogopingVideo 가 자체적으로 useWebRTCStream('admin-ui') 을 만들기 때문에, 같은
@@ -258,6 +283,7 @@ function handleStart(): void {
     <DepthViewer v-if="showHighfive" />
     <CameraView v-if="showGogopingManual" />
     <PanTiltControl v-if="showGogopingManual" />
+    <GogopingDebugPanel v-if="(showGogopingManual || showGogopingFollowAuth) && showDebug" />
     <FollowFaceAuth
       v-if="showGogopingFollowAuth"
       :active="showGogopingFollowAuth"

@@ -109,6 +109,18 @@ class PerceptionNode(Node):
         self._yolo = None
         self._reid: ReIDEngine | None = None
         self._tracker: TargetTracker | None = None
+        # MediaPipe Pose 검증기 — bbox 별 사람/사물 판정 (사물 오인식 차단).
+        from gogoping_perception.pose_validator import PoseValidator
+        self._pose_validator = PoseValidator(
+            enabled=config.POSE_ENABLED,
+            min_visible_landmarks=config.POSE_MIN_VISIBLE_LANDMARKS,
+            visibility_threshold=config.POSE_VISIBILITY_THRESHOLD,
+            min_bbox_side_px=config.POSE_MIN_BBOX_SIDE_PX,
+        )
+        # pose 검증 통계 — 5초마다 로그.
+        self._pose_stats_pass = 0
+        self._pose_stats_fail = 0
+        self._pose_stats_last_log = 0.0
 
         # imgsz — preset 에서 가져옴 (camera 패키지 PERCEPTION_PRESETS 와 동기).
         self._imgsz: int = config.PERCEPTION_PRESETS[config.ACTIVE_PRESET]["imgsz"]
@@ -325,6 +337,14 @@ class PerceptionNode(Node):
             if crop_color.size == 0:
                 continue
             bbox = (x1, y1, x2, y2)
+
+            # MediaPipe Pose 검증 — landmark 없는 bbox (사물) 는 ReID 단계로 안 감.
+            pose_result = self._pose_validator.validate(crop_color, bbox)
+            if not pose_result.is_person:
+                self._pose_stats_fail += 1
+                continue
+            self._pose_stats_pass += 1
+
             d_med = self._bbox_depth_median(depth, bbox)
             assert self._reid is not None
             if d_med > 0 and crop_depth.size > 0:
@@ -336,6 +356,19 @@ class PerceptionNode(Node):
             else:
                 emb = self._reid.extract_features(crop_color)
             bbox_meta.append((bbox, d_med, emb, int(boxes_id[i]), float(boxes_conf[i])))
+
+        # pose 검증 통계 — 5초마다 로그.
+        now_pose = time.time()
+        if now_pose - self._pose_stats_last_log >= 5.0:
+            total = self._pose_stats_pass + self._pose_stats_fail
+            if total > 0:
+                self.get_logger().info(
+                    f"[pose] pass={self._pose_stats_pass} fail={self._pose_stats_fail} "
+                    f"({100 * self._pose_stats_fail / total:.0f}% bbox 차단)"
+                )
+            self._pose_stats_pass = 0
+            self._pose_stats_fail = 0
+            self._pose_stats_last_log = now_pose
 
         # ── enrollment 첫 frame face matching ──
         if do_face_matching_this_frame and bbox_meta:

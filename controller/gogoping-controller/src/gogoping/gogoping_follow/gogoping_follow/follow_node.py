@@ -42,6 +42,8 @@ from gogoping_follow.close_follow import (
     nearest_doorway_distance,
 )
 from gogoping_follow.config import (
+    CHASSIS_TURN_SCALE_LEFT,
+    CHASSIS_TURN_SCALE_RIGHT,
     CLOSE_ANGLE_STABLE_DEG,
     CLOSE_ANGLE_STABLE_S,
     CLOSE_RELEASE_DIST_M,
@@ -49,6 +51,7 @@ from gogoping_follow.config import (
     CMD_VEL_RAW_TOPIC,
     FOLLOW_DISTANCE_CLOSE_M,
     FOLLOW_DISTANCE_M,
+    FOLLOW_STATE_TOPIC,
     GOAL_CHANGE_THRESHOLD_M,
     HINT_BACK_TURN_RATE_RAD_S,
     HINT_TOPIC,
@@ -63,10 +66,14 @@ from gogoping_follow.config import (
     REACTIVE_MAX_ANG,
     REACTIVE_MAX_DISTANCE_M,
     REACTIVE_MAX_LIN,
-    RECOVERY_DWELL_S,
+    RECOVERY_BODY_MAX_TOTAL_DEG,
+    RECOVERY_BODY_TURN_DEG,
+    RECOVERY_BODY_TURN_RATE_RAD_S,
+    RECOVERY_FULL_PAN_LEFT_DEG,
+    RECOVERY_FULL_PAN_RIGHT_DEG,
     RECOVERY_HINT_DWELL_S,
     RECOVERY_LOST_TIMEOUT_S,
-    RECOVERY_MAX_CANDIDATE_DIST_M,
+    RECOVERY_NARROW_PAN_HALF_DEG,
     RECOVERY_PAN_CENTER_DEG,
     RECOVERY_PAN_FRONT_DEG,
     RECOVERY_PAN_LEFT_DEG,
@@ -77,18 +84,41 @@ from gogoping_follow.config import (
     STATE_STALE_TIMEOUT_S,
     STOP_MAX_CLOSE_M,
     STOP_MAX_DISTANCE_M,
+    TILT_CMD_TOPIC,
     TRACKING_STATE_EMA_ALPHA,
+    VOICE_FOUND_TIMEOUT_S,
+    VOICE_RESUME_TURN_RATE_RAD_S,
+    VOICE_SEARCH_PAN_HOME_DEG,
+    VOICE_SEARCH_PAN_LEFT_DEG,
+    VOICE_SEARCH_PAN_RATE_DEG_S,
+    VOICE_SEARCH_PAN_RIGHT_DEG,
+    VOICE_TILT_HOME_DEG,
 )
 from gogoping_follow.follow_decision import DecisionMode, decide_follow_action
 from gogoping_follow.nav2_client import Nav2Client
 from gogoping_follow.reactive_control import compute_reactive_cmd
 from gogoping_follow.recovery import (
-    compute_candidates,
+    compute_candidates,  # noqa: F401 — legacy graph 모드 (현 미사용, 호환 import)
     compute_pan_step,
     hint_to_action,
 )
+from gogoping_follow.recovery_body_planner import (
+    BodyPhase,
+    BodyState,
+    compute_pan_step as compute_body_pan_step,
+    consume_body_turn,
+    initial_state as recovery_initial_state,
+    on_body_turn_complete,
+    on_narrow_sweep_reach_target,
+    on_sweep_complete,
+)
 from gogoping_follow.state_filter import TrackingStateEMA
 from gogoping_follow.target_pose_estimator import estimate_follow_goal
+from gogoping_follow.voice_search_planner import (
+    SweepPhase,
+    compute_voice_resume_yaw,
+    compute_voice_sweep_step,
+)
 
 
 class FollowNode(Node):
@@ -124,12 +154,10 @@ class FollowNode(Node):
         # close-follow 상태
         self._close_state = CloseFollowState()
 
-        # RECOVERY 상태
+        # RECOVERY 상태 (Phase A/B/C body-search state machine)
         self._lost_since: float | None = None
-        self._recovery_candidates: list = []
-        self._recovery_idx: int = 0
-        self._recovery_phase: str = "moving"  # "moving" or "dwelling"
-        self._recovery_dwell_until: float = 0.0
+        self._recovery_body: BodyState | None = None  # 진입 시 lazy init
+        self._narrow_swept_once: bool = False  # narrow sweep 의 첫 끝 도달 여부
         self._pan_current_deg: float = RECOVERY_PAN_CENTER_DEG
 
         # WAITING_HINT 상태
@@ -137,6 +165,15 @@ class FollowNode(Node):
         self._back_turn_until: float = 0.0
         self._back_turn_active: bool = False
         self._hint_dwell_until: float | None = None
+
+        # Voice-guided search 상태
+        self._voice_sweep_phase: SweepPhase = SweepPhase.DONE
+        self._voice_pan_found: float | None = None
+        self._voice_found_until: float = 0.0
+        self._voice_resume_yaw: float = 0.0
+        self._voice_resume_dir: int = 0  # +1 (CCW) / -1 (CW) / 0 (회전 없음)
+        self._voice_resume_until: float = 0.0
+        self._voice_resume_done_actions: bool = False
 
         # Subscriptions
         self.create_subscription(
@@ -159,8 +196,14 @@ class FollowNode(Node):
         # Publishers
         # cmd_vel_raw — STOP/REACTIVE/back-rotate 에서 사용. NAV2 동안엔 침묵 (Nav2 가 담당).
         self._cmd_vel_pub = self.create_publisher(Twist, CMD_VEL_RAW_TOPIC, 10)
-        # PAN 명령 — RECOVERY / WAITING_HINT 에서 사용. servo_bridge 가 subscribe.
+        # PAN 명령 — RECOVERY / WAITING_HINT / VOICE_SEARCH 에서 사용.
         self._pan_pub = self.create_publisher(Float32, PAN_CMD_TOPIC, 10)
+        # TILT 명령 — VOICE_RESUME 끝에 home 복귀.
+        self._tilt_pub = self.create_publisher(Float32, TILT_CMD_TOPIC, 10)
+        # follow_state publisher — mode 전이 시 publish. frontend WS subscribe.
+        self._follow_state_pub = self.create_publisher(String, FOLLOW_STATE_TOPIC, 10)
+        # 초기 mode publish (IDLE)
+        self._publish_follow_state()
 
         self.create_timer(1.0 / NAV2_GOAL_HZ, self._tick_control)
 
@@ -222,10 +265,36 @@ class FollowNode(Node):
         self._robot_map_pose = msg.pose.pose
 
     def _on_hint(self, msg: String) -> None:
-        """음성/UI hint 수신 — WAITING_HINT 모드일 때만 처리."""
+        """음성/UI hint 수신 — direction 별 분기.
+
+        - "search" → VOICE_SEARCH 전이 (mode 무관, target_id 필요)
+        - "resume" → VOICE_FOUND 일 때만 VOICE_RESUME 전이
+        - left/right/front/back → WAITING_HINT 모드일 때만 처리 (기존)
+        """
         direction = msg.data.strip()
         if not direction:
             return
+
+        # Voice-guided search 명령
+        if direction == "search":
+            if not self._target_id:
+                self.get_logger().warn("hint 'search' 수신 — target_id 미설정, 무시")
+                return
+            self.get_logger().info("hint 'search' 수신 → VOICE_SEARCH 전이")
+            self._on_mode_transition(self._mode, DecisionMode.VOICE_SEARCH)
+            return
+
+        if direction == "resume":
+            if self._mode != DecisionMode.VOICE_FOUND:
+                self.get_logger().debug(
+                    f"hint 'resume' 수신 — mode {self._mode.value}, 무시"
+                )
+                return
+            self.get_logger().info("hint 'resume' 수신 → VOICE_RESUME 전이")
+            self._on_mode_transition(DecisionMode.VOICE_FOUND, DecisionMode.VOICE_RESUME)
+            return
+
+        # 기존 left/right/front/back hint (WAITING_HINT 모드용)
         if self._mode != DecisionMode.WAITING_HINT:
             self.get_logger().debug(
                 f"hint '{direction}' 수신 — 현재 mode {self._mode.value}, 무시"
@@ -280,6 +349,12 @@ class FollowNode(Node):
                 self._tick_recovery(now)
             elif new_mode == DecisionMode.WAITING_HINT:
                 self._tick_waiting_hint(now)
+            elif new_mode == DecisionMode.VOICE_SEARCH:
+                self._tick_voice_search(now)
+            elif new_mode == DecisionMode.VOICE_FOUND:
+                self._tick_voice_found(now)
+            elif new_mode == DecisionMode.VOICE_RESUME:
+                self._tick_voice_resume(now)
             else:
                 # 짧은 lost 또는 IDLE 유지 — cmd_vel zero
                 self._publish_zero()
@@ -351,6 +426,12 @@ class FollowNode(Node):
             self._publish_cmd(cmd.linear_x, cmd.angular_z)
         elif new_mode == DecisionMode.NAV2:
             self._tick_nav2_send_goal(state)
+        elif new_mode == DecisionMode.VOICE_SEARCH:
+            self._tick_voice_search(now)
+        elif new_mode == DecisionMode.VOICE_FOUND:
+            self._tick_voice_found(now)
+        elif new_mode == DecisionMode.VOICE_RESUME:
+            self._tick_voice_resume(now)
         # IDLE: do nothing (already handled above by _enter_idle)
 
     def _tick_nav2_send_goal(self, state: TrackingState) -> None:
@@ -374,79 +455,111 @@ class FollowNode(Node):
             self._nav2.send_goal(estimate.goal, behavior_tree=self._follow_bt)
             self._last_goal = estimate.goal
 
-    # ---------- RECOVERY ----------
+    # ---------- RECOVERY (body-search state machine) ----------
     def _tick_recovery(self, now: float) -> None:
-        """RECOVERY mode tick — graph adjacency PAN 슬로우 스캔."""
-        # candidates 비어있으면 첫 진입 시 계산
-        if not self._recovery_candidates:
-            if self._robot_map_pose is None or self._graph is None:
-                self.get_logger().warn("RECOVERY: amcl_pose 또는 graph 없음 → WAITING_HINT")
-                self._mode = DecisionMode.WAITING_HINT
-                self._publish_zero()
-                return
-            rx = self._robot_map_pose.position.x
-            ry = self._robot_map_pose.position.y
-            q = self._robot_map_pose.orientation
-            ryaw = math.atan2(
-                2.0 * (q.w * q.z + q.x * q.y),
-                1.0 - 2.0 * (q.y * q.y + q.z * q.z),
-            )
-            # nearest_vertex + adjacency
-            try:
-                v_cur = self._graph.nearest_vertex(rx, ry)
-                adj = self._graph._build_adjacency()[v_cur]  # noqa: SLF001
-                adj_xy = [
-                    (name, self._graph.vertices()[name].x, self._graph.vertices()[name].y)
-                    for name, _w in adj
-                ]
-            except Exception as e:  # noqa: BLE001
-                self.get_logger().warn(f"RECOVERY: graph query 실패: {e} → WAITING_HINT")
-                self._mode = DecisionMode.WAITING_HINT
-                self._publish_zero()
-                return
-            self._recovery_candidates = compute_candidates(
-                robot_xy=(rx, ry),
-                robot_yaw=ryaw,
-                adjacent_vertices=adj_xy,
-                max_dist=RECOVERY_MAX_CANDIDATE_DIST_M,
-                pan_min=RECOVERY_PAN_MIN_DEG,
-                pan_max=RECOVERY_PAN_MAX_DEG,
-            )
-            self._recovery_idx = 0
-            self._recovery_phase = "moving"
-            self.get_logger().info(
-                f"RECOVERY: {len(self._recovery_candidates)} candidates — "
-                f"{[c.vertex_name for c in self._recovery_candidates]}"
-            )
-            if not self._recovery_candidates:
-                self._mode = DecisionMode.WAITING_HINT
-                self._publish_zero()
-                return
+        """Phase A (FULL_SWEEP) → B (BODY_TURN) → C (NARROW_SWEEP), B/C 반복.
 
-        # 현재 후보 처리
-        if self._recovery_idx >= len(self._recovery_candidates):
-            self.get_logger().info("RECOVERY: 모든 후보 실패 → WAITING_HINT")
+        본체 누적 ≥ MAX → WAITING_HINT. state 머신은 recovery_body_planner 참조.
+        """
+        # 첫 진입 — state 초기화
+        if self._recovery_body is None:
+            self._recovery_body = recovery_initial_state(
+                current_pan_deg=self._pan_current_deg,
+                pan_left_deg=RECOVERY_FULL_PAN_LEFT_DEG,
+                pan_right_deg=RECOVERY_FULL_PAN_RIGHT_DEG,
+            )
+            self.get_logger().info(
+                f"RECOVERY 진입 — Phase A FULL_SWEEP target="
+                f"{self._recovery_body.pan_target_deg:.0f}°"
+            )
+
+        state = self._recovery_body
+        dt = 1.0 / NAV2_GOAL_HZ
+
+        if state.phase == BodyPhase.EXHAUSTED:
+            self.get_logger().info("RECOVERY EXHAUSTED — WAITING_HINT 전이")
             self._mode = DecisionMode.WAITING_HINT
+            self._recovery_body = None  # 다음 진입 시 reset
             self._publish_zero()
             return
-        c = self._recovery_candidates[self._recovery_idx]
-        dt = 1.0 / NAV2_GOAL_HZ
-        if self._recovery_phase == "moving":
-            step = compute_pan_step(
-                current=self._pan_current_deg, target=c.pan_deg,
-                rate=RECOVERY_PAN_RATE_DEG_S, dt=dt,
+
+        if state.phase in (BodyPhase.FULL_SWEEP, BodyPhase.NARROW_SWEEP):
+            # PAN sweep — 목표 도달 시 다음 phase 전이
+            next_pan, reached = compute_body_pan_step(
+                current_deg=self._pan_current_deg,
+                target_deg=state.pan_target_deg,
+                rate_deg_s=RECOVERY_PAN_RATE_DEG_S,
+                dt=dt,
             )
-            self._pan_current_deg += step
+            self._pan_current_deg = next_pan
+            self._publish_pan(next_pan)
+            self._publish_zero()  # base 정지 (sweep 동안)
+
+            if reached:
+                if state.phase == BodyPhase.NARROW_SWEEP:
+                    # narrow sweep: 첫 끝 도달이면 반대 끝으로 전환, 두 번째 도달이면 1 cycle 완료.
+                    # _narrow_swept_once flag 로 양 끝 도달 여부 추적.
+                    next_state = on_narrow_sweep_reach_target(
+                        state, RECOVERY_PAN_FRONT_DEG, RECOVERY_NARROW_PAN_HALF_DEG,
+                    )
+                    if not self._narrow_swept_once:
+                        self._narrow_swept_once = True
+                        self._recovery_body = next_state
+                        self.get_logger().info(
+                            f"RECOVERY NARROW: 첫 끝 도달 → 반대 끝 "
+                            f"{next_state.pan_target_deg:.0f}° 로 전환"
+                        )
+                    else:
+                        self._narrow_swept_once = False
+                        self._recovery_body = on_sweep_complete(
+                            state, RECOVERY_FULL_PAN_LEFT_DEG,
+                            RECOVERY_FULL_PAN_RIGHT_DEG,
+                            RECOVERY_BODY_TURN_DEG,
+                            RECOVERY_BODY_MAX_TOTAL_DEG,
+                        )
+                        self.get_logger().info(
+                            f"RECOVERY NARROW cycle 완료 → BODY_TURN "
+                            f"(누적 {self._recovery_body.total_body_turn_deg:.0f}°)"
+                        )
+                else:
+                    self._recovery_body = on_sweep_complete(
+                        state, RECOVERY_FULL_PAN_LEFT_DEG,
+                        RECOVERY_FULL_PAN_RIGHT_DEG,
+                        RECOVERY_BODY_TURN_DEG,
+                        RECOVERY_BODY_MAX_TOTAL_DEG,
+                    )
+                    self.get_logger().info(
+                        f"RECOVERY FULL_SWEEP 도달 (PAN {next_pan:.0f}°) → BODY_TURN "
+                        f"yaw_dir={self._recovery_body.yaw_dir}"
+                    )
+            return
+
+        if state.phase == BodyPhase.BODY_TURN:
+            # chassis 비대칭 보정 — yaw_dir 부호에 따라 effective_rate scale.
+            # angular.z 와 duration 계산에 같은 effective_rate 사용 (일관성).
+            scale = CHASSIS_TURN_SCALE_LEFT if state.yaw_dir > 0 else CHASSIS_TURN_SCALE_RIGHT
+            effective_rate = RECOVERY_BODY_TURN_RATE_RAD_S * scale
+            twist = Twist()
+            twist.angular.z = effective_rate * state.yaw_dir
+            self._cmd_vel_pub.publish(twist)
             self._publish_pan(self._pan_current_deg)
-            if abs(self._pan_current_deg - c.pan_deg) < 0.5:
-                self._recovery_phase = "dwelling"
-                self._recovery_dwell_until = now + RECOVERY_DWELL_S
-        else:  # dwelling
-            if now >= self._recovery_dwell_until:
-                self._recovery_idx += 1
-                self._recovery_phase = "moving"
-        # cmd_vel zero (RECOVERY 동안 base 정지)
-        self._publish_zero()
+            next_state, completed = consume_body_turn(
+                state, effective_rate, dt,
+            )
+            if completed:
+                self._recovery_body = on_body_turn_complete(
+                    next_state,
+                    current_pan_deg=self._pan_current_deg,
+                    narrow_pan_front_deg=RECOVERY_PAN_FRONT_DEG,
+                    narrow_pan_half_deg=RECOVERY_NARROW_PAN_HALF_DEG,
+                )
+                self.get_logger().info(
+                    f"RECOVERY BODY_TURN 완료 → NARROW_SWEEP target="
+                    f"{self._recovery_body.pan_target_deg:.0f}°"
+                )
+            else:
+                self._recovery_body = next_state
+            return
 
     # ---------- WAITING_HINT ----------
     def _tick_waiting_hint(self, now: float) -> None:
@@ -471,10 +584,13 @@ class FollowNode(Node):
         assert action is not None  # _on_hint 에서 이미 검증
         dt = 1.0 / NAV2_GOAL_HZ
 
-        # Phase 1: base 180° 회전 (back hint 만)
+        # Phase 1: base 180° 회전 (back hint). chassis 비대칭 보정 적용.
+        yaw_dir_hint = 1.0 if action.base_rotate_rad > 0 else -1.0
+        hint_scale = CHASSIS_TURN_SCALE_LEFT if yaw_dir_hint > 0 else CHASSIS_TURN_SCALE_RIGHT
+        hint_effective_rate = HINT_BACK_TURN_RATE_RAD_S * hint_scale
         if action.base_rotate_rad != 0.0 and not self._back_turn_active and self._hint_dwell_until is None:
             self._back_turn_active = True
-            turn_duration = abs(action.base_rotate_rad) / HINT_BACK_TURN_RATE_RAD_S
+            turn_duration = abs(action.base_rotate_rad) / hint_effective_rate
             self._back_turn_until = now + turn_duration
             self.get_logger().info(
                 f"hint 'back' — base 180° 회전 시작 ({turn_duration:.1f}s)"
@@ -482,9 +598,7 @@ class FollowNode(Node):
         if self._back_turn_active:
             if now < self._back_turn_until:
                 twist = Twist()
-                twist.angular.z = HINT_BACK_TURN_RATE_RAD_S * (
-                    1.0 if action.base_rotate_rad > 0 else -1.0
-                )
+                twist.angular.z = hint_effective_rate * yaw_dir_hint
                 self._cmd_vel_pub.publish(twist)
                 return
             else:
@@ -521,6 +635,74 @@ class FollowNode(Node):
 
         self._publish_zero()
 
+    # ---------- Voice-guided search ----------
+    def _tick_voice_search(self, now: float) -> None:
+        """VOICE_SEARCH — home → left → right → home sweep. matched 시 즉시 VOICE_FOUND."""
+        # 사람 발견 체크
+        state = self._last_state
+        if state is not None and state.matched and state.mode == "tracking":
+            self._voice_pan_found = self._pan_current_deg
+            self.get_logger().info(
+                f"VOICE_SEARCH: 발견 (PAN={self._voice_pan_found:.1f}°) → VOICE_FOUND"
+            )
+            self._on_mode_transition(DecisionMode.VOICE_SEARCH, DecisionMode.VOICE_FOUND)
+            self._publish_zero()
+            return
+
+        # sweep 진행
+        if self._voice_sweep_phase == SweepPhase.DONE:
+            self.get_logger().info("VOICE_SEARCH: sweep 끝 (못 찾음) → IDLE")
+            self._on_mode_transition(DecisionMode.VOICE_SEARCH, DecisionMode.IDLE)
+            self._publish_zero()
+            return
+
+        dt = 1.0 / NAV2_GOAL_HZ
+        next_pan, next_phase = compute_voice_sweep_step(
+            current=self._pan_current_deg,
+            phase=self._voice_sweep_phase,
+            rate=VOICE_SEARCH_PAN_RATE_DEG_S,
+            dt=dt,
+            pan_home=VOICE_SEARCH_PAN_HOME_DEG,
+            pan_left=VOICE_SEARCH_PAN_LEFT_DEG,
+            pan_right=VOICE_SEARCH_PAN_RIGHT_DEG,
+        )
+        self._pan_current_deg = next_pan
+        self._voice_sweep_phase = next_phase
+        self._publish_pan(self._pan_current_deg)
+        self._publish_zero()
+
+    def _tick_voice_found(self, now: float) -> None:
+        """VOICE_FOUND — PAN 정지 + base 정지. 사용자 'resume' 명령 대기.
+
+        VOICE_FOUND_TIMEOUT_S 초과 시 IDLE 복귀.
+        """
+        self._publish_zero()
+        if now >= self._voice_found_until:
+            self.get_logger().info("VOICE_FOUND: timeout → IDLE")
+            self._on_mode_transition(DecisionMode.VOICE_FOUND, DecisionMode.IDLE)
+
+    def _tick_voice_resume(self, now: float) -> None:
+        """VOICE_RESUME — base 회전 + 회전 끝나면 PAN/TILT home + IDLE 전이."""
+        if now < self._voice_resume_until and self._voice_resume_dir != 0:
+            # chassis 비대칭 보정 — yaw_dir 부호에 따라 angular.z scale.
+            scale = CHASSIS_TURN_SCALE_LEFT if self._voice_resume_dir > 0 else CHASSIS_TURN_SCALE_RIGHT
+            twist = Twist()
+            twist.angular.z = VOICE_RESUME_TURN_RATE_RAD_S * scale * self._voice_resume_dir
+            self._cmd_vel_pub.publish(twist)
+            return
+
+        # 회전 끝 — 한 번만 PAN/TILT home publish
+        if not self._voice_resume_done_actions:
+            self._publish_zero()
+            self._pan_current_deg = VOICE_SEARCH_PAN_HOME_DEG
+            self._publish_pan(VOICE_SEARCH_PAN_HOME_DEG)
+            self._publish_tilt(VOICE_TILT_HOME_DEG)
+            self._voice_resume_done_actions = True
+            self.get_logger().info("VOICE_RESUME: 회전 끝 + PAN/TILT home → IDLE")
+
+        # IDLE 전이
+        self._on_mode_transition(DecisionMode.VOICE_RESUME, DecisionMode.IDLE)
+
     # ---------- mode transition handlers ----------
     def _on_mode_transition(self, old: DecisionMode, new: DecisionMode) -> None:
         """Mode 전환 시 정리 — cmd_vel zero / Nav2 cancel / filter reset / PAN reset."""
@@ -532,15 +714,17 @@ class FollowNode(Node):
         # 이전이 REACTIVE 였고 새 mode 가 NAV2 면 residual cmd_vel 정지
         if old == DecisionMode.REACTIVE and new == DecisionMode.NAV2:
             self._publish_zero()
-        # RECOVERY 진입 시 candidates 초기화 (다음 tick 에서 계산)
+        # RECOVERY 진입 시 body-search state 초기화 (다음 tick 에서 lazy init)
         if new == DecisionMode.RECOVERY and old != DecisionMode.RECOVERY:
-            self._recovery_candidates = []
-            self._recovery_idx = 0
-            self._recovery_phase = "moving"
-        # RECOVERY 탈출 시 PAN center 복귀
+            self._recovery_body = None
+            self._narrow_swept_once = False
+        # RECOVERY 탈출 시 PAN center 복귀 + state 클리어
         if old == DecisionMode.RECOVERY and new != DecisionMode.RECOVERY:
             self._pan_current_deg = RECOVERY_PAN_CENTER_DEG
             self._publish_pan(RECOVERY_PAN_CENTER_DEG)
+            self._recovery_body = None
+            self._narrow_swept_once = False
+            self._publish_zero()  # BODY_TURN 잔여 cmd_vel 정지
         # WAITING_HINT 탈출 시 (perception 자동 lock 등) hint 클리어
         if old == DecisionMode.WAITING_HINT and new != DecisionMode.WAITING_HINT:
             self._pending_hint = None
@@ -549,8 +733,30 @@ class FollowNode(Node):
             self._pan_current_deg = RECOVERY_PAN_CENTER_DEG
             self._publish_pan(RECOVERY_PAN_CENTER_DEG)
             self.get_logger().info("WAITING_HINT 탈출 — hint 상태 클리어")
-        # Mode 변경 logging
+        # VOICE_SEARCH 진입 시 sweep phase 초기화 + 발견 위치 초기화
+        if new == DecisionMode.VOICE_SEARCH and old != DecisionMode.VOICE_SEARCH:
+            self._voice_sweep_phase = SweepPhase.TO_HOME_START
+            self._voice_pan_found = None
+        # VOICE_FOUND 진입 시 timeout 설정
+        if new == DecisionMode.VOICE_FOUND and old != DecisionMode.VOICE_FOUND:
+            self._voice_found_until = time.time() + VOICE_FOUND_TIMEOUT_S
+        # VOICE_RESUME 진입 — yaw + 회전 종료 시각. duration 도 chassis 보정 반영.
+        if new == DecisionMode.VOICE_RESUME and old != DecisionMode.VOICE_RESUME:
+            pan = self._voice_pan_found if self._voice_pan_found is not None else 90.0
+            yaw = compute_voice_resume_yaw(pan)
+            self._voice_resume_yaw = abs(yaw)
+            self._voice_resume_dir = 1 if yaw > 0 else (-1 if yaw < 0 else 0)
+            vr_scale = CHASSIS_TURN_SCALE_LEFT if self._voice_resume_dir > 0 else CHASSIS_TURN_SCALE_RIGHT
+            vr_effective_rate = VOICE_RESUME_TURN_RATE_RAD_S * vr_scale
+            self._voice_resume_until = time.time() + (
+                self._voice_resume_yaw / vr_effective_rate
+                if self._voice_resume_yaw > 0 else 0.0
+            )
+            self._voice_resume_done_actions = False
+        # Mode 변경 logging + follow_state publish
         self.get_logger().info(f"follow mode: {old.value} → {new.value}")
+        self._mode = new  # caller 가 직후 또 set 해도 무해 — 여기서 확정해 publish 정확.
+        self._publish_follow_state()
 
     def _enter_idle(self) -> None:
         """IDLE 진입 — Nav2 cancel + cmd_vel zero + PAN center + hint 클리어."""
@@ -565,8 +771,8 @@ class FollowNode(Node):
         self._pending_hint = None
         self._hint_dwell_until = None
         self._back_turn_active = False
-        self._recovery_candidates = []
-        self._recovery_idx = 0
+        self._recovery_body = None
+        self._narrow_swept_once = False
         self._lost_since = None
         self._mode = DecisionMode.IDLE
 
@@ -585,6 +791,17 @@ class FollowNode(Node):
         msg = Float32()
         msg.data = float(deg)
         self._pan_pub.publish(msg)
+
+    def _publish_tilt(self, deg: float) -> None:
+        msg = Float32()
+        msg.data = float(deg)
+        self._tilt_pub.publish(msg)
+
+    def _publish_follow_state(self) -> None:
+        """현재 mode 를 /gogoping/follow_state 토픽으로 publish (frontend WS subscribe)."""
+        msg = String()
+        msg.data = self._mode.value
+        self._follow_state_pub.publish(msg)
 
 
 def _pose_distance(a: Pose, b: Pose) -> float:
