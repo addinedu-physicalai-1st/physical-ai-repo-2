@@ -2,16 +2,16 @@
 /**
  * 무궁화 율동 등록 — 무궁화꽃이 피었습니다 (SR-PLAY-004) 의 양팔 가리기 모션 단일 녹화.
  *
- * 게임 중에는 같은 모션을 정방향 (가리기) + 역재생 (떼기) 으로 두 번 사용한다 — 별도
- * 떼기 녹화 없음. 저장 경로 shared/openarm_mugunghwa/motion.yaml. REST 경로
- * /api/eduping/mugunghwa/motion/{record/start,record/stop,play}.
+ * 게임 흐름: 가리기(정방향) 재생 완료 → 음악 재생(팔은 가리기 자세 정지 유지) →
+ * 음악 종료 → 같은 모션 역재생(떼기). 별도 떼기 녹화 없음. 고정 속도(자연 속도)로
+ * 재생한다 — 동적 변속(tempo pattern) 없음. 저장 경로 shared/openarm_mugunghwa/motion.yaml.
+ * REST 경로 /api/eduping/mugunghwa/motion/{record/start,record/stop,play}.
  *
- * 박자 가이드 — `public/sounds/yeonghui_mugunghwa.mp3` (자연 속도, ~4.6s). 런타임
- * `audio.playbackRate = REFERENCE_PLAYBACK_RATE` 로 일정한 느린 속도 재생.
- * 등록 단계는 단일 템포여야 한다 — 교사가 한 박자에 맞춰 팔 동작을 녹화하면, 게임의
- * tempo pattern (느렸다가 빠르게 등) 이 그 한 녹화를 동적으로 변속해서 쓴다.
+ * 박자 가이드 — `public/sounds/yeonghui_mugunghwa.mp3` (자연 속도, ~4.6s). 녹화한 가리기
+ * 동작이 게임에서 그대로(고정 속도) 재생되므로, 교사는 이 박자에 맞춰 한 번의 자연스러운
+ * 가리기 동작을 녹화하면 된다.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
 import Icon from '@/common/Icon.vue';
@@ -19,63 +19,8 @@ import OpenarmViewer from './OpenarmViewer.vue';
 import RecorderControls from './RecorderControls.vue';
 
 const MOTION_NAME = 'motion';
-const REFERENCE_TTS_TEXT = '무궁화 꼬치 피었습니다';
-const REFERENCE_CUE_URL = '/sounds/yeonghui_mugunghwa.mp3';
-const REFERENCE_PLAYBACK_RATE = 0.8;  // yeonghui mp3 가 자연 속도부터 이미 느려서 0.45 는 과도 — 0.8 로 상향
-
-const referenceDurationS = ref(0);
-const referenceEffectiveDurationS = computed(
-  () => referenceDurationS.value / REFERENCE_PLAYBACK_RATE,
-);
-let referenceAudio: HTMLAudioElement | null = null;
-// pause() 직후 play() 가 일으키는 AbortError 를 잡으려면 currently-pending play 토큰을
-// 들고 있어야 함. 새 play 가 시작되면 이전 토큰은 stale 처리해 .catch 가 silently 무시.
-let playToken = 0;
-
-function ensureReferenceAudio(): HTMLAudioElement {
-  if (referenceAudio) return referenceAudio;
-  const audio = new Audio(REFERENCE_CUE_URL);
-  audio.preload = 'auto';
-  audio.playbackRate = REFERENCE_PLAYBACK_RATE;
-  audio.addEventListener('loadedmetadata', () => {
-    if (Number.isFinite(audio.duration)) referenceDurationS.value = audio.duration;
-  });
-  referenceAudio = audio;
-  return audio;
-}
-
-function startReferenceTts(): void {
-  const audio = ensureReferenceAudio();
-  const myToken = ++playToken;
-  try { audio.pause(); } catch { /* noop */ }
-  try { audio.currentTime = 0; } catch { /* noop */ }
-  audio.playbackRate = REFERENCE_PLAYBACK_RATE;
-  const p = audio.play();
-  if (p && typeof p.catch === 'function') {
-    p.catch((err: unknown) => {
-      if (playToken !== myToken) return;
-      const name = (err as { name?: string } | null)?.name;
-      if (name === 'AbortError' || name === 'NotAllowedError') return;
-      console.warn('[yeonghui-cue] play failed', err);
-    });
-  }
-}
-
-function stopReferenceTts(): void {
-  if (!referenceAudio) return;
-  playToken++;
-  try {
-    referenceAudio.pause();
-    referenceAudio.currentTime = 0;
-  } catch { /* noop */ }
-}
-
-function disposeReferenceAudio(): void {
-  if (!referenceAudio) return;
-  try { referenceAudio.pause(); } catch { /* noop */ }
-  referenceAudio.src = '';
-  referenceAudio = null;
-}
+// 가리기 모션 녹화에는 박자 가이드 음악·길이 제한이 없다 — 새 흐름은 녹화 모션을 고정
+// 속도로 그대로 재생하므로(음악과 동기 불필요), 교사가 자유 길이로 한 번 녹화하면 된다.
 
 interface MotionMeta {
   duration_s?: number;
@@ -127,12 +72,6 @@ function close(): void {
 
 onMounted(() => {
   void refresh();
-  // mount 시 미리 fetch 해 두면 녹화 시작 시점에 바로 재생 — 첫 로딩 지연 회피.
-  void ensureReferenceAudio();
-});
-onBeforeUnmount(() => {
-  stopReferenceTts();
-  disposeReferenceAudio();
 });
 </script>
 
@@ -162,20 +101,12 @@ onBeforeUnmount(() => {
             가리기 모션
           </h3>
           <p class="hint">
-            노래 단계 시작과 함께 재생할 양팔 가리기 모션입니다. <br />
-            게임 중에는 이 한 녹화로 <strong>가리기</strong> (정방향) →
-            <strong>떼기</strong> (역재생) 를 모두 처리합니다.
-          </p>
-          <p class="tts-hint">
-            <Icon name="music" :size="14" />
-            <span class="tts-hint-text">
-              녹화·재생 시 <strong>"{{ REFERENCE_TTS_TEXT }}"</strong> 박자 가이드<span
-                v-if="referenceDurationS > 0"
-              > (<strong>{{ Math.round(REFERENCE_PLAYBACK_RATE * 100) }}%</strong> 속도,
-              <strong>{{ referenceEffectiveDurationS.toFixed(1) }}s</strong>)</span>
-              가 재생됩니다. 이 박자에 맞춰 양팔로 눈을 가려주세요 —
-              게임에서는 이 한 녹화를 빠르게/느리게 변속해 씁니다.
-            </span>
+            노래 단계에서 재생할 양팔 가리기 모션입니다. <br />
+            게임 흐름: <strong>가리기</strong>(정방향) 완료 → 음악 재생(팔은 가리기 자세로
+            정지) → 음악 종료 → 같은 녹화의 <strong>떼기</strong>(역재생). 별도 떼기 녹화 없음.
+            <br />
+            녹화 시 음악·길이 제한 없음 — 양팔로 눈을 가리는 동작을 원하는 길이로 한 번
+            녹화하세요. 게임에서는 이 녹화를 고정 속도로 그대로 재생합니다.
           </p>
 
           <div v-if="loading" class="muted">로딩…</div>
@@ -197,8 +128,6 @@ onBeforeUnmount(() => {
             :name="MOTION_NAME"
             @recorded="refresh"
             @played="onPlayed"
-            @song-play="startReferenceTts"
-            @song-stop="stopReferenceTts"
           />
         </section>
       </aside>
@@ -285,31 +214,6 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 .hint strong { color: #be185d; font-weight: 700; }
-.tts-hint {
-  margin: 0 0 14px;
-  padding: 10px 12px;
-  background: rgba(236, 72, 153, 0.08);
-  border: 1px solid rgba(236, 72, 153, 0.2);
-  border-radius: 10px;
-  font-size: 12px;
-  color: #6b4258;
-  line-height: 1.6;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.tts-hint :deep(.icon) {
-  color: #be185d;
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-.tts-hint-text {
-  flex: 1;
-  min-width: 0;       /* flex item 이 텍스트 줄바꿈 허용하도록 */
-  word-break: keep-all; /* 한글 단어 단위 줄바꿈 — 음절 단위 자르기 방지 */
-  overflow-wrap: anywhere;
-}
-.tts-hint strong { color: #be185d; font-weight: 700; }
 .meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
