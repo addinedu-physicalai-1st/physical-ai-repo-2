@@ -20,6 +20,7 @@ import { useModeIntents } from '@/composables/useModeIntents';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
+import { useProximityOverride } from '@/composables/useProximityOverride';
 import { useMugunghwaPerception } from './useMugunghwaPerception';
 import OpenarmViewer from './OpenarmViewer.vue';
 import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
@@ -102,7 +103,7 @@ useModeIntents('무궁화꽃이 피었습니다', {
     // end: 놀이 끝 popup → '다시하기' → 참가자 초기화 후 entry 로 복귀.
     // 그 외 stage (song / observation / eliminationWait) 는 음성 진행점 정의 안 됨.
     if (stage.value === 'entry') {
-      setStage('ready');
+      startEntryGame();
     } else if (stage.value === 'ready') {
       setStage('song');
     } else if (stage.value === 'end') {
@@ -355,16 +356,13 @@ function startMusicPhase(): void {
     // 3) 음악 종료 → 관찰(떼기 + 프리즈). 음악 중에만 이동 허용, 이후 움직이면 탈락.
     if (stage.value === 'song') setStage('observation');
   };
-  // 근접 정지 중이면 음악도 대기 — 해제 시 watcher 가 재생. (팔/음악 같이 멈춤/재개)
-  if (!stateWs.proximityBlocked.value) {
-    const pr = audio.play();
-    if (pr && typeof pr.catch === 'function') {
-      pr.catch((err: unknown) => {
-        const name = (err as { name?: string } | null)?.name;
-        if (name === 'AbortError' || name === 'NotAllowedError') return;
-        console.warn('[mugunghwa-song] play failed', err);
-      });
-    }
+  const pr = audio.play();
+  if (pr && typeof pr.catch === 'function') {
+    pr.catch((err: unknown) => {
+      const name = (err as { name?: string } | null)?.name;
+      if (name === 'AbortError' || name === 'NotAllowedError') return;
+      console.warn('[mugunghwa-song] play failed', err);
+    });
   }
   // 음악 진행률 (progress bar) 만 갱신. 팔은 가리기 자세로 정지 유지 (armSnapshot update 안 함).
   songTimer = window.setInterval(() => {
@@ -391,6 +389,15 @@ function stopSongStage(): void {
     try { songAudio.currentTime = 0; } catch { /* noop */ }
   }
   songProgressRatio.value = 0;
+}
+
+// 참가자(등록된 어린이)가 한 명도 없으면 게임 시작 불가 — entry 에 머물며 안내.
+function startEntryGame(): void {
+  if (registeredCount.value === 0) {
+    pushToast('참가자를 먼저 등록해주세요 — 카메라 앞에 친구가 인식되어야 시작할 수 있어요');
+    return;
+  }
+  setStage('ready');
 }
 
 // ---- stage transitions ------------------------------------------------------
@@ -523,16 +530,10 @@ function toggleDrawer(): void { drawerOpen.value = !drawerOpen.value }
 const stateWs = useEdupingStateWs();
 stateWs.start();
 
-// 근접 안전정지 — 사람이 0.6m 이내면 음악도 정지(팔은 bridge 가 정지), 해제 시 같이 재개.
-// songTimer !== null = 음악 단계 진입함. currentTime 이 유지되어 멈춘 지점부터 이어짐.
-watch(() => stateWs.proximityBlocked.value, (blocked) => {
-  if (!songAudio) return;
-  if (blocked) {
-    try { songAudio.pause(); } catch { /* noop */ }
-  } else if (stage.value === 'song' && songTimer !== null) {
-    void songAudio.play()?.catch(() => { /* noop */ });
-  }
-});
+// 무궁화는 "사람이 다가오는 것"이 게임 목표라, 근접을 팔/음악 정지가 아니라 도달(게임 종료)
+// 신호로 쓴다. 따라서 전역 proximity 정지(bridge pause)는 이 모드 동안 override 로 끄고
+// (가리기/떼기가 끊기거나 떨리지 않도록), 도달 판정은 perception 노드의 reached 이벤트로 받는다.
+useProximityOverride();
 
 const simMinimized = ref(true);
 const simEverOpened = ref(false);
@@ -587,7 +588,35 @@ const perception = useMugunghwaPerception({
     motionFlash.value = true;
     window.setTimeout(() => { motionFlash.value = false; }, 400);
   },
+  onReached: (childId) => { onPhysicalReach(childId); },
 });
+
+// 근접 도달 — perception 노드가 사람이 0.6m 이내(디바운스됨)로 다가오면 보내는 신호.
+// 게임 진행 중(song/observation/eliminationWait)일 때만 "로봇 도달"로 인정 → 도달한 아이
+// (바인딩됐으면)를 골인 처리하고 게임 종료. ready/entry/end 단계의 신호는 무시.
+function onPhysicalReach(childId: number | null): void {
+  if (
+    stage.value !== 'song'
+    && stage.value !== 'observation'
+    && stage.value !== 'eliminationWait'
+  ) return;
+  let name: string | null = null;
+  if (childId != null) {
+    const p = participants.value.find((x) => x.id === childId);
+    if (p && p.registered && !p.eliminated) {
+      name = p.name;
+      if (!p.reached) {
+        p.reached = true;
+        const maxPlace = participants.value.reduce((m, x) => Math.max(m, x.place ?? 0), 0);
+        p.place = maxPlace + 1;
+      }
+    }
+  }
+  playTouchdownSound();
+  pushToast(name ? `${name} 로봇 도착! 게임 끝!` : '로봇 도착! 게임 끝!');
+  void tts.speak(name ? `${name} 도착! 게임 끝!` : '로봇에 도착했어요! 게임 끝!').catch(() => { /* noop */ });
+  setStage('end');
+}
 
 // ---- perception stage signals -----------------------------------------------
 // observation 진입/이탈 및 end 단계에서 노드에 신호를 보낸다.
@@ -901,7 +930,7 @@ onUnmounted(() => {
                     <strong>{{ registeredCount }}</strong> / {{ participants.length }} 명 등록됨
                   </div>
                 </div>
-                <button type="button" class="btn-start" @click="setStage('ready')">시작</button>
+                <button type="button" class="btn-start" :disabled="registeredCount === 0" @click="startEntryGame">시작</button>
               </footer>
 
               <!-- 준비 단계 하단 컨트롤 -->
