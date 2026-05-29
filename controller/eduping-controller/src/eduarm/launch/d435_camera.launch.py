@@ -57,6 +57,9 @@ def generate_launch_description() -> LaunchDescription:
                         " e.g. _123456789. 기본 빈 string → 첫 장치.",
         ),
 
+        # 참고: rs_launch.py 는 ambient launch_configurations 전체를 순회하며 자기 파라미터가
+        # 아닌 건 "Parameter X is not supported" 경고를 낸다(무해 — realsense 가 무시). 부모
+        # 인자(control_url 등)가 전파돼 경고가 늘지만 카메라 동작엔 영향 없음.
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 PathJoinSubstitution([
