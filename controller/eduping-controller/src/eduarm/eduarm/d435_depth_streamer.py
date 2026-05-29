@@ -1,340 +1,160 @@
-"""EduPing 노트북의 D435 → Control Server 깊이/컬러 WebSocket 송출.
+"""EduPing D435 depth+color → Control Server WS 송출 (ROS 구독 버전).
 
-영상 MJPEG (gogoping_camera/streamer.py) 과 분리: D435 의 16-bit depth 를 그대로
-보존하기 위해 별도 WS 채널 (/ws/depth-stream/producer/eduping) 사용. uint16 depth
-는 zstd 압축, color 는 JPEG.
-
-기본 동작:
-  - 320×240 @ 10fps (depth + color, color → depth 해상도로 align)
-  - 매 frame 인코딩 후 WS 로 push
-  - server 끊기면 1s/2s/4s... 최대 30s exponential backoff 로 reconnect
-  - SIGINT/SIGTERM 에서 cleanly shutdown
-
-서버는 [service/control-service/control_service/streaming/depth_ws_router.py]
-의 producer 엔드포인트, 와이어 포맷은
-[service/control-service/control_service/streaming/depth_protocol.py].
+단일 opener 모델: 더 이상 pyrealsense2 로 장치를 직접 열지 않는다.
+realsense2_camera(d435_camera.launch.py) 토픽을 구독해 동일 DepthFrame 을
+/ws/depth-stream/producer/<robot> 로 송출. 와이어 포맷은 eduarm.depth_frame.
 """
 from __future__ import annotations
 
-import argparse
-import asyncio
-import logging
-import os
-import signal
-import sys
+import json
+import threading
 import time
-from dataclasses import dataclass
-from typing import Optional
 
-import cv2
+import message_filters
 import numpy as np
-import websockets
+import rclpy
 import zstandard as zstd
+from cv_bridge import CvBridge
+from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, Image
+from websockets.sync.client import connect as ws_connect
 
-try:
-    import pyrealsense2 as rs
-except ImportError as exc:   # pragma: no cover
-    sys.stderr.write(
-        f"[d435_depth_streamer] pyrealsense2 import 실패: {exc}\n"
-        "  pip install -e . (또는 별도 `pip install pyrealsense2`)\n",
-    )
-    raise
+from eduarm.depth_frame import ROBOT_IDS, Intr, build_depth_frame, encode_depth_frame
 
-from control_service.streaming.depth_protocol import (
-    DepthFrame, encode_depth_frame,
-)
+COLOR_TOPIC = "/d435/color/image_raw"
+ALIGNED_DEPTH_TOPIC = "/d435/aligned_depth_to_color/image_raw"
+COLOR_INFO_TOPIC = "/d435/color/camera_info"
 
 
-ROBOT_IDS = {"gogoping": 0x01, "eduping": 0x02, "noriarm": 0x03}
+class _WsProducer:
+    """control-service WS producer + 재접속 데몬 (mugunghwa_perception 패턴)."""
 
-# 연속 frame timeout 이 이 값 이상이면 pipeline 종료 → USB hardware_reset → 재연결.
-_FRAME_TIMEOUT_RESET_STREAK = 15
+    def __init__(self, url: str, logger, *, name: str = "depth-ws") -> None:
+        self._url = url
+        self._log = logger
+        self._ws = None
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        threading.Thread(target=self._loop, name=name, daemon=True).start()
 
+    def _loop(self) -> None:
+        backoff = 1.0
+        while not self._stop.is_set():
+            try:
+                ws = ws_connect(self._url, max_size=None)
+                with self._lock:
+                    self._ws = ws
+                self._log.info(f"WS connected → {self._url}")
+                backoff = 1.0
+                try:
+                    for _ in ws:  # 서버는 보내는 게 없음 — 끊김 감지용
+                        pass
+                except Exception:
+                    pass
+            except Exception as exc:
+                self._log.warn(f"WS connect failed: {exc}")
+            with self._lock:
+                self._ws = None
+            self._stop.wait(backoff)
+            backoff = min(backoff * 2.0, 30.0)
 
-@dataclass
-class Config:
-    server_host: str
-    server_port: int
-    robot: str
-    width: int
-    height: int
-    fps: int
-    jpeg_quality: int
-    device_serial: Optional[str]
-
-    @property
-    def robot_id(self) -> int:
-        return ROBOT_IDS[self.robot]
-
-    @property
-    def ws_url(self) -> str:
-        return f"ws://{self.server_host}:{self.server_port}/ws/depth-stream/producer/{self.robot}"
-
-
-def _make_pipeline(cfg: Config) -> tuple[rs.pipeline, rs.align, rs.intrinsics, float]:
-    """RealSense pipeline 시작 + depth intrinsics + depth_scale 반환.
-
-    D435 가 지원하는 depth 해상도: 256x144, 424x240, 480x270, 640x360, 640x480,
-    848x480, 1280x720. 미지원 조합이면 rs.error('Couldn't resolve requests') 발생 →
-    그 경우 사용자에게 명확한 안내 후 실패.
-    """
-    pipeline = rs.pipeline()
-    rs_config = rs.config()
-    if cfg.device_serial:
-        rs_config.enable_device(cfg.device_serial)
-    rs_config.enable_stream(rs.stream.depth, cfg.width, cfg.height, rs.format.z16, cfg.fps)
-    rs_config.enable_stream(rs.stream.color, cfg.width, cfg.height, rs.format.bgr8, cfg.fps)
-
-    try:
-        profile = pipeline.start(rs_config)
-    except RuntimeError as exc:
-        raise RuntimeError(
-            f"RealSense pipeline 시작 실패 ({cfg.width}x{cfg.height}@{cfg.fps}fps): {exc}. "
-            "D435 가 지원하는 해상도/fps 조합인지 확인 — depth 는 424x240 / 480x270 / "
-            "640x360 / 640x480 / 848x480 / 1280x720 만 지원하며 fps 는 보통 6/15/30/60/90 중 하나."
-        ) from exc
-    align = rs.align(rs.stream.depth)
-
-    depth_sensor = profile.get_device().first_depth_sensor()
-    depth_scale = float(depth_sensor.get_depth_scale())   # meters / unit (보통 0.001)
-
-    depth_profile = profile.get_stream(rs.stream.depth).as_video_stream_profile()
-    intrinsics = depth_profile.get_intrinsics()
-    return pipeline, align, intrinsics, depth_scale
-
-
-def _capture_frame(
-    pipeline: rs.pipeline, align: rs.align,
-) -> Optional[tuple[np.ndarray, np.ndarray]]:
-    """blocking — wait_for_frames + align. (depth_u16, color_bgr) 반환.
-
-    Timeout 시 pyrealsense2 가 RuntimeError 던짐 — None 으로 변환해 호출자가 skip + retry.
-    USB hiccup / 카메라 일시 미응답 시 streamer 가 죽지 않도록 함.
-    """
-    try:
-        frames = pipeline.wait_for_frames(timeout_ms=2000)
-    except RuntimeError:
-        return None
-    aligned = align.process(frames)
-    depth_frame = aligned.get_depth_frame()
-    color_frame = aligned.get_color_frame()
-    if not depth_frame or not color_frame:
-        return None
-    depth = np.asanyarray(depth_frame.get_data())   # uint16, shape (h, w)
-    color = np.asanyarray(color_frame.get_data())   # uint8 BGR
-    return depth, color
-
-
-def _hardware_reset_device(cfg: Config, log: logging.Logger) -> None:
-    """Hung RealSense (pipeline open but no frames) — USB reset 후 재열거 대기."""
-    ctx = rs.context()
-    devices = ctx.query_devices()
-    if len(devices) == 0:
-        log.warning("hardware_reset: no RealSense devices found")
-        return
-    for dev in devices:
-        serial = dev.get_info(rs.camera_info.serial_number)
-        if cfg.device_serial and serial != cfg.device_serial:
-            continue
-        log.warning("hardware_reset serial=%s (wait for USB re-enumerate)", serial)
+    def send_bytes(self, payload: bytes) -> None:
+        with self._lock:
+            ws = self._ws
+        if ws is None:
+            return
         try:
-            dev.hardware_reset()
-        except Exception as exc:
-            log.error("hardware_reset failed: %s", exc)
-        time.sleep(3.0)
-        return
-    log.warning("hardware_reset: no device matched serial=%s", cfg.device_serial)
-
-
-def _encode_payload(
-    depth: np.ndarray, color: np.ndarray, jpeg_quality: int, compressor: zstd.ZstdCompressor,
-) -> tuple[bytes, bytes, int, int]:
-    """(depth_zstd, color_jpeg, depth_min_mm, depth_max_mm)."""
-    if depth.dtype != np.uint16:
-        depth = depth.astype(np.uint16)
-    depth_bytes = compressor.compress(depth.tobytes(order="C"))
-    ok, jpeg_buf = cv2.imencode(".jpg", color, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
-    if not ok:
-        raise RuntimeError("cv2.imencode JPEG 실패")
-    nonzero = depth[depth > 0]
-    if nonzero.size:
-        dmin = int(nonzero.min())
-        dmax = int(nonzero.max())
-    else:
-        dmin = dmax = 0
-    return depth_bytes, jpeg_buf.tobytes(), dmin, dmax
-
-
-async def _stream_one_connection(cfg: Config, log: logging.Logger) -> None:
-    """단일 WS 연결 — 끊기면 호출자가 backoff 후 재호출."""
-    pipeline, align, intrinsics, depth_scale = _make_pipeline(cfg)
-    compressor = zstd.ZstdCompressor(level=3)   # 3 = 빠르면서 ratio 적당
-    frame_seq = 0
-    period = 1.0 / cfg.fps
-
-    log.info(
-        "connecting to %s (depth_scale=%.6f m/unit, intrinsics fx=%.2f cx=%.2f)",
-        cfg.ws_url, depth_scale, intrinsics.fx, intrinsics.ppx,
-    )
-    timeout_streak = 0
-    try:
-        async with websockets.connect(cfg.ws_url, max_size=8 * 1024 * 1024) as ws:
-            log.info("WS open — streaming %d fps", cfg.fps)
-            next_tick = time.monotonic()
-            while True:
-                captured = await asyncio.to_thread(_capture_frame, pipeline, align)
-                if captured is None:
-                    timeout_streak += 1
-                    if timeout_streak == 1 or timeout_streak % 5 == 0:
-                        log.warning(
-                            "frame timeout — skip (%d consecutive)",
-                            timeout_streak,
-                        )
-                    if timeout_streak >= _FRAME_TIMEOUT_RESET_STREAK:
-                        raise RuntimeError(
-                            f"RealSense: {timeout_streak} consecutive frame timeouts",
-                        )
-                    continue
-                timeout_streak = 0
-                depth, color = captured
-                depth_zstd, color_jpeg, dmin, dmax = _encode_payload(
-                    depth, color, cfg.jpeg_quality, compressor,
-                )
-                frame = DepthFrame(
-                    robot_id=cfg.robot_id,
-                    frame_seq=frame_seq, ts_ms=int(time.time() * 1000),
-                    depth_w=depth.shape[1], depth_h=depth.shape[0],
-                    color_w=color.shape[1], color_h=color.shape[0],
-                    fx=float(intrinsics.fx), fy=float(intrinsics.fy),
-                    cx=float(intrinsics.ppx), cy=float(intrinsics.ppy),
-                    depth_scale=float(depth_scale),
-                    depth_min_mm=dmin, depth_max_mm=dmax,
-                    depth_zstd=depth_zstd, color_jpeg=color_jpeg,
-                )
-                await ws.send(encode_depth_frame(frame))
-                frame_seq = (frame_seq + 1) & 0xFFFFFFFF
-
-                next_tick += period
-                now = time.monotonic()
-                sleep_for = next_tick - now
-                if sleep_for > 0:
-                    await asyncio.sleep(sleep_for)
-                else:
-                    next_tick = now
-    finally:
-        try:
-            pipeline.stop()
+            ws.send(payload)
         except Exception:
             pass
 
+    def stop(self) -> None:
+        self._stop.set()
+        with self._lock:
+            if self._ws:
+                try:
+                    self._ws.close()
+                except Exception:
+                    pass
+                self._ws = None
 
-async def _run(cfg: Config, log: logging.Logger, stop_event: asyncio.Event) -> None:
-    backoff = 1.0
-    while not stop_event.is_set():
-        try:
-            await _stream_one_connection(cfg, log)
-            backoff = 1.0
-        except (OSError, websockets.WebSocketException) as exc:
-            log.warning("WS disconnect: %s — reconnecting in %.1fs", exc, backoff)
-        except RuntimeError as exc:
-            log.warning("RealSense error: %s — reconnecting in %.1fs", exc, backoff)
-            if "frame timeouts" in str(exc):
-                await asyncio.to_thread(_hardware_reset_device, cfg, log)
-        except Exception as exc:
-            log.exception("unexpected: %s — reconnecting in %.1fs", exc, backoff)
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=backoff)
+
+class D435DepthStreamer(Node):
+    def __init__(self) -> None:
+        super().__init__("d435_depth_streamer")
+        self.declare_parameter("server_host", "127.0.0.1")
+        self.declare_parameter("server_port", 8100)
+        self.declare_parameter("robot", "eduping")
+        self.declare_parameter("jpeg_quality", 70)
+        self.declare_parameter("throttle_hz", 15.0)
+
+        gp = self.get_parameter
+        host = gp("server_host").get_parameter_value().string_value
+        port = int(gp("server_port").get_parameter_value().integer_value)
+        self._robot = gp("robot").get_parameter_value().string_value
+        self._robot_id = ROBOT_IDS[self._robot]
+        self._quality = int(gp("jpeg_quality").get_parameter_value().integer_value)
+        hz = float(gp("throttle_hz").get_parameter_value().double_value)
+        self._min_period = 1.0 / max(0.1, hz)
+
+        url = f"ws://{host}:{port}/ws/depth-stream/producer/{self._robot}"
+        self._ws = _WsProducer(url, self.get_logger())
+        self._bridge = CvBridge()
+        self._compressor = zstd.ZstdCompressor(level=3)
+        self._intr: Intr | None = None
+        self._depth_scale = 0.001  # D435 기본 mm
+        self._seq = 0
+        self._last_send = 0.0
+
+        self.create_subscription(CameraInfo, COLOR_INFO_TOPIC, self._on_info, 1)
+        color_sub = message_filters.Subscriber(self, Image, COLOR_TOPIC)
+        depth_sub = message_filters.Subscriber(self, Image, ALIGNED_DEPTH_TOPIC)
+        self._sync = message_filters.ApproximateTimeSynchronizer(
+            [color_sub, depth_sub], queue_size=5, slop=0.05,
+        )
+        self._sync.registerCallback(self._on_pair)
+        self.get_logger().info(f"d435_depth_streamer up → {url}")
+
+    def _on_info(self, msg: CameraInfo) -> None:
+        # K = [fx 0 cx; 0 fy cy; 0 0 1]
+        self._intr = Intr(fx=msg.k[0], fy=msg.k[4], cx=msg.k[2], cy=msg.k[5])
+
+    def _on_pair(self, color_msg: Image, depth_msg: Image) -> None:
+        now = time.monotonic()
+        if now - self._last_send < self._min_period:
             return
-        except asyncio.TimeoutError:
-            pass
-        backoff = min(backoff * 2.0, 30.0)
+        if self._intr is None:
+            return  # intrinsics 아직 안 옴
+        self._last_send = now
+        try:
+            color = self._bridge.imgmsg_to_cv2(color_msg, desired_encoding="bgr8")
+            depth = self._bridge.imgmsg_to_cv2(depth_msg, desired_encoding="16UC1")
+        except Exception as exc:
+            self.get_logger().warn(f"cv_bridge failed: {exc}")
+            return
+        frame = build_depth_frame(
+            np.ascontiguousarray(depth), color, self._intr, self._depth_scale,
+            robot_id=self._robot_id, frame_seq=self._seq,
+            ts_ms=int(time.time() * 1000), jpeg_quality=self._quality,
+            compressor=self._compressor,
+        )
+        self._ws.send_bytes(encode_depth_frame(frame))
+        self._seq = (self._seq + 1) & 0xFFFFFFFF
+
+    def destroy_node(self) -> bool:
+        self._ws.stop()
+        return super().destroy_node()
 
 
-def parse_args() -> Config:
-    p = argparse.ArgumentParser(
-        description="EduPing D435 depth+color → Control Server WS streamer",
-    )
-    p.add_argument(
-        "--server-host",
-        default=os.environ.get("DEPTH_SERVER_HOST", "127.0.0.1"),
-        help="Control Server 호스트 (env DEPTH_SERVER_HOST, 기본 127.0.0.1)",
-    )
-    p.add_argument(
-        "--server-port", type=int,
-        default=int(os.environ.get("DEPTH_SERVER_PORT", "8100")),
-        help="Control Server streaming port (env DEPTH_SERVER_PORT, 기본 8100)",
-    )
-    p.add_argument(
-        "--robot", choices=list(ROBOT_IDS),
-        default=os.environ.get("DEPTH_ROBOT", "eduping"),
-    )
-    # D435 최소 depth 해상도 = 424x240, 최소 fps = 6/15. 320x240 은 미지원.
-    p.add_argument("--width", type=int, default=int(os.environ.get("DEPTH_WIDTH", "424")))
-    p.add_argument("--height", type=int, default=int(os.environ.get("DEPTH_HEIGHT", "240")))
-    p.add_argument("--fps", type=int, default=int(os.environ.get("DEPTH_FPS", "15")))
-    p.add_argument(
-        "--jpeg-quality", type=int,
-        default=int(os.environ.get("DEPTH_JPEG_QUALITY", "70")),
-    )
-    p.add_argument(
-        "--device-serial",
-        default=os.environ.get("DEPTH_DEVICE_SERIAL"),
-        help="여러 RealSense 가 꽂혔을 때 특정 device 시리얼 지정 (선택)",
-    )
-    p.add_argument(
-        "--log-level", default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-    )
-    args, _unknown = p.parse_known_args()
-
-    if not (1 <= args.jpeg_quality <= 100):
-        p.error("--jpeg-quality 는 1..100")
-    if not (1 <= args.fps <= 60):
-        p.error("--fps 는 1..60")
-
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
-    )
-
-    return Config(
-        server_host=args.server_host,
-        server_port=args.server_port,
-        robot=args.robot,
-        width=args.width,
-        height=args.height,
-        fps=args.fps,
-        jpeg_quality=args.jpeg_quality,
-        device_serial=args.device_serial,
-    )
-
-
-def main() -> int:
-    cfg = parse_args()
-    log = logging.getLogger("d435")
-    log.info(
-        "config: server=%s:%d robot=%s %dx%d@%d quality=%d",
-        cfg.server_host, cfg.server_port, cfg.robot,
-        cfg.width, cfg.height, cfg.fps, cfg.jpeg_quality,
-    )
-
-    stop_event = asyncio.Event()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    def _shutdown(signum: int, _frame) -> None:
-        log.info("signal %d — shutting down", signum)
-        loop.call_soon_threadsafe(stop_event.set)
-
-    signal.signal(signal.SIGINT, _shutdown)
-    signal.signal(signal.SIGTERM, _shutdown)
-
+def main() -> None:
+    rclpy.init()
+    node = D435DepthStreamer()
     try:
-        loop.run_until_complete(_run(cfg, log, stop_event))
+        rclpy.spin(node)
     finally:
-        loop.close()
-    return 0
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
