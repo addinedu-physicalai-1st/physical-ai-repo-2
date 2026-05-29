@@ -16,6 +16,9 @@
   <arg name="follow_action" default="/navigate_to_pose"/>
   <arg name="frame_id" default="map"/>
   <arg name="base_frame" default="gogoping/base_link"/>
+  <!-- 시연/디버그 토글 — NO_PROXIMITY_SAFETY=1 이면 device 스크립트가 true 로 전달.
+       true 면 graph_router 가 사람/벽 근접 정지·reroute·후진 분기를 skip. -->
+  <arg name="disable_proximity_safety" default="false"/>
 
   <node pkg="gogoping_navigation" exec="graph_router_node"
         name="graph_router" output="screen">
@@ -24,5 +27,6 @@
     <param name="follow_action" value="$(var follow_action)"/>
     <param name="frame_id" value="$(var frame_id)"/>
     <param name="base_frame" value="$(var base_frame)"/>
+    <param name="disable_proximity_safety" value="$(var disable_proximity_safety)"/>
   </node>
 </launch>

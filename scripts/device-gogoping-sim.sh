@@ -25,9 +25,10 @@
 #   scripts/device-gogoping-sim.sh status    # 세션 상태
 #
 # 시연/디버그 환경변수 (gogoping_modes 노드에 ros-args 로 전달):
-#   NO_BATTERY_SAFETY=1   BatteryLowMonitor 비활성 — 배터리 ≤20% 자동 RETURNING 차단
-#   NO_ERROR_SAFETY=1     HardwareHealth / MapBoundary fault → ERROR 차단
-# 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 scripts/device-gogoping-sim.sh
+#   NO_BATTERY_SAFETY=1    BatteryLowMonitor 비활성 — 배터리 ≤20% 자동 RETURNING 차단
+#   NO_ERROR_SAFETY=1      HardwareHealth / MapBoundary fault → ERROR 차단
+#   NO_PROXIMITY_SAFETY=1  사람(1.5m)/벽(0.5m) 근접 정지·reroute·후진 비활성 (graph_router)
+# 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 NO_PROXIMITY_SAFETY=1 scripts/device-gogoping-sim.sh
 #
 # 의존:
 #   - tmux
@@ -136,13 +137,17 @@ case "$ACTION" in
 
     # 시연/디버그 — 환경변수 → ros-args. gogoping_modes 노드의 IdleTimeout/Battery/Health
     # monitor 들이 declare_parameter 로 받음 (utils/safety_flags.py).
-    MODES_ARGS=""
-    if [[ -n "${NO_BATTERY_SAFETY:-}" || -n "${NO_ERROR_SAFETY:-}" ]]; then
-      MODES_ARGS="--ros-args"
-      [[ -n "${NO_BATTERY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_battery_safety:=true"
-      [[ -n "${NO_ERROR_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_error_safety:=true"
-      echo "[device-gogoping-sim] modes 인자: $MODES_ARGS"
-    fi
+    # modes 의 직접 cmd_vel 제어(RotateToYaw / AlignToDock / ReverseIntoDock / StopAllMotors)를
+    # safety_filter 경유시켜 /gogoping/cmd_vel 단일 writer 보장 (real laptop.sh 와 동일 remap).
+    # 안 하면 safety_filter 의 stale-zero 와 같은 토픽을 두고 충돌 → 제자리 회전이 씹힘.
+    MODES_ARGS="--ros-args -r /gogoping/cmd_vel:=/gogoping/cmd_vel_raw"
+    [[ -n "${NO_BATTERY_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_battery_safety:=true"
+    [[ -n "${NO_ERROR_SAFETY:-}" ]]     && MODES_ARGS+=" -p disable_error_safety:=true"
+    [[ -n "${NO_PROXIMITY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_proximity_safety:=true"
+    echo "[device-gogoping-sim] modes 인자: $MODES_ARGS"
+    # graph_router 토글 — 실제 사람/벽 반응 gating 은 graph_router 가 담당하므로 별도 전달.
+    GR_ARGS=""
+    [[ -n "${NO_PROXIMITY_SAFETY:-}" ]] && GR_ARGS=" disable_proximity_safety:=true"
 
     # GOGOPING_MAP / GOGOPING_WORLD env 로 PGM·Gazebo world 후보 swap 가능 —
     # ~/pingdergarten-maps/cand_XX/{map.yaml,world.sdf} 같은 외부 후보 디렉토리를 빌드 없이 테스트.
@@ -183,7 +188,7 @@ case "$ACTION" in
 
     # window 1: graph-router (vertex 그래프 + 다익스트라 + nav2 위임)
     tmux new-window -t "$SESSION" -n graph-router -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml"
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml${GR_ARGS}"
 
     # window 2: gogoping_modes (FSM + BT 본체 — /gogoping/state publish, /gogoping/set_goal server)
     tmux new-window -t "$SESSION" -n modes -c "$REPO_ROOT" \
@@ -218,8 +223,8 @@ case "$ACTION" in
     # Gazebo GUI 와 RViz 두 창이 같이 떠서 거슬릴 때 비활성화 — Gazebo 만 사용.
     # 필요하면 아래 두 줄 주석 해제 (또는 별도 터미널에서 `rviz2 -d $RVIZ_CONFIG` 수동 실행).
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
-    # tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
-    #   "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
+    tmux new-window -t "$SESSION" -n rviz -c "$REPO_ROOT" \
+      "$SOURCE_ENV && exec rviz2 -d $RVIZ_CONFIG"
 
     # 마우스 + status bar 설정
     tmux set-option -t "$SESSION" -g mouse on

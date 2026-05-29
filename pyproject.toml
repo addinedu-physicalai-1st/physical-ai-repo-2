@@ -55,8 +55,9 @@ dependencies = [
   "pydub>=0.25.1",
   # GogoPing FSM (gogoping_modes/fsm/robot_fsm.py) — pytransitions state machine
   "transitions>=0.9",
-  # GogoPing BT 본체 — py_trees 2.2.x (py-trees-spike.md 의 spike 가 2.2 기준)
-  "py-trees>=2.2,<2.3",
+  # GogoPing BT 본체 — ROS jazzy 시스템 py_trees 2.4.x 와 호환 (spike 는 2.2 였으나 2.4 에서 정상 동작 검증).
+  # 핀을 좁히면 pip 이 /opt/ros 의 2.4 를 다운그레이드하려다 권한 거부.
+  "py-trees>=2.2",
   # WebRTC — control-service 가 브라우저와 PeerConnection 으로 양방향 audio + DataChannel.
   # Opus 디코딩/인코딩에 av (pyav) 의존.
   "aiortc>=1.9",

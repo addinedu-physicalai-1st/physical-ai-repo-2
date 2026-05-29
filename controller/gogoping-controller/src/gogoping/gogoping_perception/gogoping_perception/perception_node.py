@@ -172,6 +172,22 @@ class PerceptionNode(Node):
             callback_group=self._target_cbg,
         )
 
+        # ── debug image publish (2026-05-29) — YOLO 박스 시각화 ──
+        # rqt_image_view 로 /gogoping/perception/debug_image 구독하면 박스 확인 가능.
+        # subscriber 없을 땐 draw/encode/publish 전부 skip → 평상시 오버헤드 0.
+        # cv_bridge 미설치 환경에선 _debug_pub=None 으로 두고 perception 본기능은 유지.
+        try:
+            from sensor_msgs.msg import Image
+            from cv_bridge import CvBridge
+            self._bridge = CvBridge()
+            self._debug_pub = self.create_publisher(
+                Image, "/gogoping/perception/debug_image", 1,
+            )
+        except Exception as e:  # noqa: BLE001
+            self._bridge = None
+            self._debug_pub = None
+            self.get_logger().warn(f"debug image publisher disabled: {e}")
+
         self.get_logger().info(
             "PerceptionNode initialized — waiting for FollowTarget "
             "(YOLO+ReID lazy-load on first target / state)"
@@ -330,6 +346,55 @@ class PerceptionNode(Node):
         except Exception as e:
             self.get_logger().warn(f"person_proximity publish failed: {e}")
 
+    def _publish_debug_image(self, color: np.ndarray, results) -> None:
+        """YOLO 박스를 그린 프레임을 /gogoping/perception/debug_image 로 publish.
+
+        subscriber 가 없으면 즉시 return — draw/encode 비용 0.
+        target track 은 초록 굵은 박스, 그 외는 주황 얇은 박스.
+        좌상단에 현재 FSM state 오버레이.
+        """
+        if self._debug_pub is None or self._debug_pub.get_subscription_count() == 0:
+            return
+        try:
+            import cv2
+            annotated = color.copy()
+            with self._lock:
+                target_id = (
+                    self._last_track.track_id if self._last_track is not None else None
+                )
+            if results:
+                r = results[0]
+                if r.boxes is not None and len(r.boxes.xyxy) > 0:
+                    xyxy = r.boxes.xyxy.cpu().numpy()
+                    ids = (
+                        r.boxes.id.cpu().numpy().astype(int)
+                        if r.boxes.id is not None else None
+                    )
+                    confs = r.boxes.conf.cpu().numpy()
+                    for i in range(len(xyxy)):
+                        x1, y1, x2, y2 = map(int, xyxy[i].tolist())
+                        tid = int(ids[i]) if ids is not None else -1
+                        conf = float(confs[i])
+                        is_target = target_id is not None and tid == target_id
+                        box_color = (0, 255, 0) if is_target else (255, 160, 0)
+                        thick = 3 if is_target else 1
+                        cv2.rectangle(annotated, (x1, y1), (x2, y2), box_color, thick)
+                        label = f"id{tid} {conf:.2f}" if tid >= 0 else f"{conf:.2f}"
+                        cv2.putText(
+                            annotated, label, (x1, max(12, y1 - 5)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 1, cv2.LINE_AA,
+                        )
+            cv2.putText(
+                annotated, f"state={self._current_state}", (8, 22),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA,
+            )
+            msg = self._bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = "camera_color_optical_frame"
+            self._debug_pub.publish(msg)
+        except Exception as e:  # noqa: BLE001
+            self.get_logger().warn(f"debug image publish failed: {e}")
+
     @staticmethod
     def _bbox_depth_median(depth, bbox, patch=5):
         """bbox 상단 1/3 지점 (얼굴 영역) patch×patch median depth (mm). invalid 시 0.
@@ -380,6 +445,9 @@ class PerceptionNode(Node):
 
         # ── person_proximity publish — target 유무 무관 (graph_router 용) ──
         self._publish_person_proximity(results, depth)
+
+        # ── debug image publish — subscriber 있을 때만 (target 유무 무관) ──
+        self._publish_debug_image(color, results)
 
         # target 없으면 tracker 로직 skip — person_proximity 만 publish 하고 종료
         if not self._tracker.has_target():

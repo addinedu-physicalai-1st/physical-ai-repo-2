@@ -3,7 +3,7 @@
  * 30초 카운트다운 + "꼭꼭 숨어라 머리카락 보일라" 챈트 반복.
  * chant tick 은 부모 (HideAndSeekGame) 가 HIDE_CHANT_INTERVAL_MS 마다 +1 해 내려준다.
  */
-import { computed } from 'vue';
+import { computed, onMounted, onBeforeUnmount } from 'vue';
 
 const props = defineProps<{
   remainingSec: number;
@@ -15,6 +15,22 @@ const props = defineProps<{
 const progress = computed(() => {
   const elapsed = props.totalSec - props.remainingSec;
   return Math.max(0, Math.min(1, elapsed / props.totalSec));
+});
+
+// ─── 카운트다운 브금 (꼭꼭 숨어라) — countdown phase 동안만 재생, 이탈 시 정지 ───
+const COUNTDOWN_BGM_SRC = '/sounds/countdown_bgm.mp3';
+let countdownAudio: HTMLAudioElement | null = null;
+onMounted(() => {
+  countdownAudio = new Audio(COUNTDOWN_BGM_SRC);
+  countdownAudio.loop = true;
+  countdownAudio.volume = 0.7;
+  void countdownAudio.play().catch(() => {});  // autoplay 차단 시 무음 (예외 무시)
+});
+onBeforeUnmount(() => {
+  if (countdownAudio) {
+    countdownAudio.pause();
+    countdownAudio = null;
+  }
 });
 </script>
 

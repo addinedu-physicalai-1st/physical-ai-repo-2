@@ -29,9 +29,10 @@
 #   scripts/device-gogoping-laptop.sh status    # 세션 상태
 #
 # 시연/디버그 환경변수 (gogoping_modes 노드에 ros-args 로 전달):
-#   NO_BATTERY_SAFETY=1   BatteryLowMonitor 비활성 — 배터리 ≤20% 자동 RETURNING 차단
-#   NO_ERROR_SAFETY=1     HardwareHealth / MapBoundary fault → ERROR 차단
-# 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 scripts/device-gogoping-laptop.sh
+#   NO_BATTERY_SAFETY=1    BatteryLowMonitor 비활성 — 배터리 ≤20% 자동 RETURNING 차단
+#   NO_ERROR_SAFETY=1      HardwareHealth / MapBoundary fault → ERROR 차단
+#   NO_PROXIMITY_SAFETY=1  사람(1.5m)/벽(0.5m) 근접 정지·reroute·후진 비활성 (graph_router)
+# 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 NO_PROXIMITY_SAFETY=1 scripts/device-gogoping-laptop.sh
 #
 # 의존:
 #   - tmux
@@ -90,11 +91,15 @@ case "$ACTION" in
     # 로 받음 (utils/safety_flags.py).
     # cmd_vel 을 safety_filter 경유시키기 위해 remap 고정 설정.
     MODES_ARGS="--ros-args -r /gogoping/cmd_vel:=/gogoping/cmd_vel_raw"
-    if [[ -n "${NO_BATTERY_SAFETY:-}" || -n "${NO_ERROR_SAFETY:-}" ]]; then
-      [[ -n "${NO_BATTERY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_battery_safety:=true"
-      [[ -n "${NO_ERROR_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_error_safety:=true"
+    if [[ -n "${NO_BATTERY_SAFETY:-}" || -n "${NO_ERROR_SAFETY:-}" || -n "${NO_PROXIMITY_SAFETY:-}" ]]; then
+      [[ -n "${NO_BATTERY_SAFETY:-}" ]]   && MODES_ARGS+=" -p disable_battery_safety:=true"
+      [[ -n "${NO_ERROR_SAFETY:-}" ]]     && MODES_ARGS+=" -p disable_error_safety:=true"
+      [[ -n "${NO_PROXIMITY_SAFETY:-}" ]] && MODES_ARGS+=" -p disable_proximity_safety:=true"
       echo "[device-gogoping-laptop] modes 인자: $MODES_ARGS"
     fi
+    # graph_router 토글 — 실제 사람/벽 반응 gating 은 graph_router 담당.
+    GR_ARGS=""
+    [[ -n "${NO_PROXIMITY_SAFETY:-}" ]] && GR_ARGS=" disable_proximity_safety:=true"
 
     # /dev/arduino-camera (camera-pan 서보용 symlink) 없으면 udev rule 자동 install — 1회만, sudo 묻음.
     # 실패해도 진행 — camera-pan window 에서 serial open 에러로 표시됨.
@@ -147,7 +152,7 @@ case "$ACTION" in
     # graph-router: base_frame:=base_link — Pi 가 unprefixed frame (base_link) 발행하므로 매칭.
     # sim 은 launch.xml default ('gogoping/base_link') 그대로 (이 스크립트 안 거침).
     tmux respawn-pane -k -t "$SESSION:graph-router" -c "$REPO_ROOT" \
-      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml base_frame:=base_link"
+      "$SOURCE_ENV && exec ros2 launch gogoping_navigation graph_router.launch.xml base_frame:=base_link${GR_ARGS}"
 
     # window 1: localization (map_server + AMCL + lifecycle_manager_localization)
     # map:= 로 default (real_lidar_map.yaml) 대신 map.yaml (도면 + SLAM 정합) 사용.

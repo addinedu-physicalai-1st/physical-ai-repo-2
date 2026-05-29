@@ -24,6 +24,7 @@ from ...behaviors.common.command_listener import CommandListener
 from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
 from ...behaviors.common.idle_timeout_monitor import IdleTimeoutMonitor
 from ...behaviors.common.map_boundary_monitor import MapBoundaryMonitor
+from ...behaviors.common.proximity_safety_monitor import ProximitySafetyMonitor
 
 if TYPE_CHECKING:
     from ....context import Context
@@ -40,6 +41,7 @@ def build_active_main_tree(
     include_map_boundary: bool = True,
     include_hw_health: bool = True,
     include_collision: bool = True,    # TODO 추후 CollisionMonitor wiring
+    include_proximity: bool = False,   # 사람/벽 근접 관측 leaf (graph_router 주행 트리만)
     include_command_listener: bool = True,
     task_body: bool = False,
 ) -> py_trees.behaviour.Behaviour:
@@ -74,6 +76,8 @@ def build_active_main_tree(
     if include_hw_health:
         children.append(HardwareHealthMonitor("HardwareHealthMonitor", ctx))
     # TODO: include_collision 시 CollisionMonitor 추가 (지금 wiring 없음)
+    if include_proximity:
+        children.append(ProximitySafetyMonitor("ProximitySafetyMonitor", ctx))
     if include_command_listener:
         children.append(CommandListener("CommandListener", ctx))
 

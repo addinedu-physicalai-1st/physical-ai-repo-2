@@ -15,10 +15,14 @@ import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFace
 import { mapMatchesToTracks, postRecognizeMulti } from '@/composables/identifyTracksFromFrame';
 
 const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change-me';
-const STABLE_FRAMES_REQUIRED = 3;
+// 순찰은 로봇이 sweep 하며 지나가 숨은 아이 얼굴이 잠깐만 보임 → 5(모집)·3 보다 낮춰
+// 2 프레임만 안정돼도 identify 발동 (짧은 노출 윈도우 안에 잡기). 매칭은 백엔드 threshold 가 게이트.
+const STABLE_FRAMES_REQUIRED = 2;
 
 export interface HideSeekRecognitionOptions {
-  imgEl: Ref<HTMLImageElement | null>;
+  // CameraView 는 <video>(WebRTC)만 expose(getVideoEl). 기존 imgEl(<img>)은 CameraView 에
+  // getImgEl 이 없어 항상 null → detector.send 가 안 불려 순찰 인식이 전혀 안 됐음. video 로 교체.
+  videoEl: Ref<HTMLVideoElement | null>;
   captureCanvas: Ref<HTMLCanvasElement | null>;
   isRegistered: (childId: number) => boolean;
   isCaught: (childId: number) => boolean;
@@ -51,6 +55,12 @@ export function useHideSeekRecognition(
   });
 
   const detector = useFaceDetector({
+    // 순찰: 아이가 멀리/부분적으로 숨어 있어 'short'(~2m 근거리)로는 검출 실패.
+    // 'full'(원거리 ~5m) + confidence 0.6→0.4 로 멀고 측면/부분 얼굴도 검출.
+    // (모집 RecruitPhase 는 아이가 가까워서 'short' 그대로 — 여기만 변경.)
+    // 오검출이 늘어도 identify(등록자 매칭)가 게이트라 false caught 는 안 됨.
+    model: 'full',
+    minDetectionConfidence: 0.4,
     onDetections: (faces) => {
       latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
       void identityCache.feed(latestTracks).then(applyCaught);
@@ -73,14 +83,15 @@ export function useHideSeekRecognition(
   let rafId: number | null = null;
 
   async function loop(): Promise<void> {
-    const img = opts.imgEl.value;
+    const video = opts.videoEl.value;
     const canvas = opts.captureCanvas.value;
-    if (img && canvas && img.complete && img.naturalWidth > 0) {
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+    // RecruitPhase 와 동일하게 <video>(WebRTC)에서 풀해상도 프레임 캡처.
+    if (video && canvas && video.readyState >= 2 && video.videoWidth > 0) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(video, 0, 0);
         try { await detector.send(canvas); } catch { /* noop */ }
       }
     }

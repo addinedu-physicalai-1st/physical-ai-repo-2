@@ -21,8 +21,12 @@ from typing import Any
 
 
 _GROUP_PARAM = {
-    "battery": "disable_battery_safety",
-    "error":   "disable_error_safety",
+    "battery":   "disable_battery_safety",
+    "error":     "disable_error_safety",
+    # proximity : 사람(1.5m)/벽(0.5m) 근접 정지·reroute·후진. 실제 반응은 graph_router
+    #             (_act_navigate_impl) 가 수행하고, BT 의 ProximitySafetyMonitor 는 관측·표시용.
+    #             graph_router 도 동일 param 명(disable_proximity_safety)을 직접 읽어 분기 skip.
+    "proximity": "disable_proximity_safety",
 }
 
 

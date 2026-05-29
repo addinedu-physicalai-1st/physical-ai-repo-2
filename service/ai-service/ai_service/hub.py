@@ -85,9 +85,15 @@ class SubCommand(BaseModel):
 
 
 class GotoVertex(BaseModel):
-    """vertex 이름으로 graph routing 이동 — gogoping 보조 모드 전용."""
+    """vertex 이름으로 graph routing 이동 — gogoping 보조 모드 전용.
+
+    then_mode: 도착 후 전환할 모드 (복합 명령 "X 가서 Y" — 정보불필요 모드만:
+    자장가/수동/대기). 빈 문자열이면 단순 이동. 순서 제어(도착 감지 후 모드 전환)는
+    robot-web(useVoiceController)가 client orchestration 으로 수행.
+    """
     kind: Literal["goto_vertex"] = "goto_vertex"
     name: str
+    then_mode: str = ""
 
 
 class StoreItem(BaseModel):

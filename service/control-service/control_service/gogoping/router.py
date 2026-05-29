@@ -46,9 +46,14 @@ class GogopingGotoVertexRequest(BaseModel):
     """robot-web 음성 "X로 가" 처리. vertex 이름으로 GOTO 진입.
 
     `/waypoints/navigate` (graph_router action 직접) 와 달리 SetGoal.srv → FSM trigger 거침 — robot 이동 + state GOTO 전이 둘 다 발생.
+
+    then_mode: 복합 명령 "X 가서 Y" — 도착(GOTO→IDLE) 후 전환할 모드. 정보불필요
+    모드(자장가/수동/대기)만. 빈 문자열이면 단순 이동. 서버가 background task 로
+    도착 감지 후 모드 전환 (robot-web 은 state 스트림이 없어 서버가 orchestrate).
     """
 
     name: str  # waypoints.yaml 의 vertex 이름
+    then_mode: str = ""
 
 
 class GogopingGotoVertexResponse(BaseModel):
@@ -288,6 +293,104 @@ def _build_hideseek_goal_dynamic(bridge: GogopingRosBridge, base: Goal) -> Goal:
     )
 
 
+# 복합 명령 "X 가서 Y" 에서 도착 후 전환 허용할 모드 — 정보불필요(추가 대상/장소 X) 만.
+# 이동/추종/숨바꼭질은 목적지/대상이 필요해 체인 대상에서 제외 (state_to_goal 의 demo 기본값 회피).
+_CHAINABLE_THEN_MODES = frozenset({"자장가", "수동", "대기"})
+
+# 도착 감지 polling — 0.5s 간격. 도착(이동 중) 대기엔 타임아웃 없음 (사용자 요청).
+# 단 GOTO 가 시작조차 안 하면(then_mode 는 왔는데 goto 전이 실패 등) 좀비 방지로
+# _STARTUP_GRACE_POLLS(=60s) 안에 GOTO 를 못 보면 포기.
+_ARRIVAL_POLL_INTERVAL_S = 0.5
+_STARTUP_GRACE_POLLS = 120  # 60s — GOTO 시작 관측 유예
+
+# 진행 중인 goto→then_mode 체인 task. 새 명령(goto/mode)이 들어오면 취소 → 새 명령 우선.
+# 단일 로봇 가정 — 동시에 하나의 체인만 유효.
+_pending_chain_task: "asyncio.Task | None" = None
+
+
+def _cancel_pending_chain(reason: str) -> None:
+    """진행 중인 goto→then_mode 체인을 취소 — 새 명령이 우선하도록.
+
+    goto_vertex / set_mode 등 새 명령 진입 시 호출. 취소되면 도착 후 then_mode 전환이
+    발생하지 않음 (예: '수면실 가서 자장가' 중 '복귀'/'정지'/'추종' 들어오면 자장가 skip).
+    """
+    global _pending_chain_task
+    t = _pending_chain_task
+    _pending_chain_task = None
+    if t is not None and not t.done():
+        t.cancel()
+        logger.info(f"[goto_then_mode] 진행 중 체인 취소 — {reason}")
+
+
+async def _await_arrival_then_mode(
+    bridge: GogopingRosBridge, name: str, then_mode: str
+) -> None:
+    """GOTO 도착(GOTO→IDLE) 감지 후 then_mode 로 전환 — server orchestration.
+
+    robot-web 은 FSM state 스트림이 없어 control-service 가 ``get_latest_state()`` 로
+    polling. GOTO 를 한 번 본 뒤 IDLE 로 돌아오면 도착으로 간주 → mode_to_goal(then_mode)
+    전송. GOTO/IDLE 외 다른 state(error/다른 task)로 가면 체인 취소. 새 명령(goto/mode)이
+    오면 ``_cancel_pending_chain`` 으로 외부 취소됨. 도착 대기엔 타임아웃 없음 — 단 GOTO
+    시작 자체를 _STARTUP_GRACE_POLLS 안에 못 보면 포기(좀비 방지).
+    """
+    global _pending_chain_task
+    logger.info(f"[goto_then_mode] watcher 시작 target={name!r} then_mode={then_mode!r}")
+    try:
+        seen_goto = False
+        startup_polls = 0
+        while True:
+            await asyncio.sleep(_ARRIVAL_POLL_INTERVAL_S)
+            st = bridge.get_latest_state() or {}
+            fsm = st.get("fsm_state", "")
+            if fsm == "GOTO":
+                if not seen_goto:
+                    logger.info("[goto_then_mode] GOTO 감지 — 도착 대기 (타임아웃 없음)")
+                seen_goto = True
+                continue
+            if not seen_goto:
+                # 아직 GOTO 진입 전 — startup grace 안에서만 대기.
+                startup_polls += 1
+                if startup_polls >= _STARTUP_GRACE_POLLS:
+                    logger.warning(
+                        f"[goto_then_mode] GOTO 시작 못 봄 ({_STARTUP_GRACE_POLLS*_ARRIVAL_POLL_INTERVAL_S:.0f}s) — 포기 {name!r}"
+                    )
+                    bridge.publish_admin_event(
+                        "goto_then_mode", f"never entered GOTO {name!r}→{then_mode!r}",
+                    )
+                    return
+                continue
+            if fsm == "IDLE":
+                # 도착 — then_mode 전환.
+                logger.info(f"[goto_then_mode] 도착(IDLE) 감지 → {then_mode!r} 전환")
+                try:
+                    goal = mode_to_goal(then_mode)
+                except UnsupportedMode as e:
+                    logger.warning(f"goto_then_mode: bad then_mode={then_mode!r}: {e}")
+                    return
+                accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
+                logger.info(
+                    f"[goto_then_mode] {then_mode!r} 전환 결과 accepted={accepted} reason={reason!r}"
+                )
+                bridge.publish_admin_event(
+                    "goto_then_mode",
+                    f"arrived {name!r} → {then_mode!r} accepted={accepted} reason={reason!r}",
+                )
+                return
+            # GOTO/IDLE 외 다른 state — 체인 취소 (error / 다른 task 가 직접 전이).
+            logger.info(f"[goto_then_mode] 체인 중단 — 예상밖 state={fsm!r}")
+            bridge.publish_admin_event(
+                "goto_then_mode", f"chain aborted (state={fsm!r}) {name!r}→{then_mode!r}",
+            )
+            return
+    except asyncio.CancelledError:
+        logger.info(f"[goto_then_mode] 체인 취소됨 (새 명령 우선) {name!r}→{then_mode!r}")
+        raise
+    finally:
+        # 자기 자신이 현재 pending 이면 clear (외부에서 이미 교체했으면 건드리지 않음).
+        if _pending_chain_task is asyncio.current_task():
+            _pending_chain_task = None
+
+
 def install(
     app: FastAPI,
     bridge: GogopingRosBridge,
@@ -305,6 +408,9 @@ def install(
     async def set_mode(req: GogopingModeRequest) -> GogopingModeResponse:
         if req.robot != "gogoping":
             raise HTTPException(400, f"unsupported robot: {req.robot!r}")
+        # 새 모드 명령 — 진행 중인 goto→then_mode 체인이 있으면 취소 (새 명령 우선).
+        # 예: '수면실 가서 자장가' 중 '복귀'/'정지'/'추종' 들어오면 자장가 전환 안 함.
+        _cancel_pending_chain(f"new mode {req.mode!r}")
         bridge.publish_admin_event("mode", f"mode={req.mode!r}")
         try:
             goal = mode_to_goal(req.mode)
@@ -334,12 +440,35 @@ def install(
 
     @router.post("/goto_vertex", response_model=GogopingGotoVertexResponse)
     async def goto_vertex(req: GogopingGotoVertexRequest) -> GogopingGotoVertexResponse:
-        bridge.publish_admin_event("goto_vertex", f"name={req.name!r}")
+        global _pending_chain_task
+        logger.info(
+            f"[goto_vertex] name={req.name!r} then_mode={req.then_mode!r}"
+        )
+        # 새 이동 명령 — 이전 goto→then_mode 체인이 진행 중이면 취소 (새 명령 우선).
+        _cancel_pending_chain(f"new goto_vertex {req.name!r}")
+        bridge.publish_admin_event(
+            "goto_vertex", f"name={req.name!r} then_mode={req.then_mode!r}"
+        )
         goal = Goal(target_state="GOTO", destination_key=req.name)
         accepted, reason = await asyncio.to_thread(bridge.send_goal_sync, goal)
         if not accepted:
             logger.warning(
                 f"SetGoal 거부 (goto_vertex): name={req.name!r} reason={reason!r}"
+            )
+        # 복합 명령 "X 가서 Y" — GOTO 수락됐고 then_mode 가 chainable 이면
+        # 도착(GOTO→IDLE) 후 모드 전환을 background task 로 orchestrate.
+        if accepted and req.then_mode in _CHAINABLE_THEN_MODES:
+            logger.info(
+                f"[goto_vertex] then_mode={req.then_mode!r} chainable → "
+                f"arrival watcher 시작 (target={req.name!r})"
+            )
+            _pending_chain_task = asyncio.create_task(
+                _await_arrival_then_mode(bridge, req.name, req.then_mode)
+            )
+        elif req.then_mode:
+            logger.warning(
+                f"[goto_vertex] then_mode={req.then_mode!r} 는 chainable 아님 "
+                f"(허용: {sorted(_CHAINABLE_THEN_MODES)}) — 체인 skip"
             )
         return GogopingGotoVertexResponse(
             accepted=accepted, reason=reason, destination_key=req.name,

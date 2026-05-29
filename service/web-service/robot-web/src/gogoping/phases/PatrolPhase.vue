@@ -128,17 +128,64 @@ const caughtParticipants = computed(() =>
 );
 
 const voiceController = inject(VOICE_CONTROLLER_KEY);
-const cameraViewRef = ref<{ getImgEl: () => HTMLImageElement | null } | null>(null);
+// CameraView 는 getVideoEl()(<video> WebRTC)만 expose — getImgEl 은 없어서 늘 null 이었음
+// (→ 순찰 인식이 전혀 안 됨). RecruitPhase 와 동일하게 video 엘리먼트 사용.
+const cameraViewRef = ref<{ getVideoEl: () => HTMLVideoElement | null } | null>(null);
 const captureCanvasRef = ref<HTMLCanvasElement | null>(null);
-const cameraImgEl = computed(() => cameraViewRef.value?.getImgEl() ?? null);
+const cameraVideoEl = computed(() => cameraViewRef.value?.getVideoEl() ?? null);
+
+// 발견 효과 — 카메라 위에 사진 오버레이 띄웠다가 천천히 페이드아웃 → 원래 카메라 서서히 노출.
+// onCaught 마다 tick++ → <img :key> 재생성으로 애니메이션 재생 (재발견 시 다시).
+const CAPTURE_FX_SRC = '/caught_fx.png';   // public/caught_fx.png (코난 탐정 이미지)
+const captureFxTick = ref(0);
 
 const currentWaypointLabel = computed<string | undefined>(() => {
   if (props.currentIdx < 0 || props.currentIdx >= props.waypoints.length) return undefined;
   return props.waypoints[props.currentIdx].label;
 });
 
+// ─── 브금 — 순찰: Pink Panther loop / 발견 시 짧게 인터럽트 후 순찰 브금 복귀 ───
+const PATROL_BGM_SRC = '/sounds/patrol_bgm.mp3';
+const FOUND_BGM_SRC = '/sounds/found_bgm.mp3';   // 찾았을 때 짧은 브금 — public/sounds/ 에 넣어주세요
+const FOUND_BGM_MAX_MS = 12000;                  // 발견 브금 ~10-12초 후 순찰 브금 복귀
+let patrolAudio: HTMLAudioElement | null = null;
+let foundAudio: HTMLAudioElement | null = null;
+let foundTimer: number | null = null;
+
+function startPatrolBgm(): void {
+  if (!patrolAudio) {
+    patrolAudio = new Audio(PATROL_BGM_SRC);
+    patrolAudio.loop = true;
+    patrolAudio.volume = 0.55;
+  }
+  void patrolAudio.play().catch(() => {});
+}
+function resumePatrolBgm(): void {
+  if (foundTimer !== null) { window.clearTimeout(foundTimer); foundTimer = null; }
+  if (foundAudio) foundAudio.pause();
+  if (patrolAudio) void patrolAudio.play().catch(() => {});
+}
+function playFoundBgm(): void {
+  // 순찰 브금 잠시 끄고 → 발견 브금 ~10-12초 → 다시 순찰 브금.
+  if (patrolAudio) patrolAudio.pause();
+  if (!foundAudio) {
+    foundAudio = new Audio(FOUND_BGM_SRC);
+    foundAudio.volume = 0.85;
+    foundAudio.addEventListener('ended', resumePatrolBgm);
+  }
+  try { foundAudio.currentTime = 0; } catch { /* not seekable yet */ }
+  void foundAudio.play().catch(() => { resumePatrolBgm(); });  // 파일 없으면 즉시 순찰 복귀
+  if (foundTimer !== null) window.clearTimeout(foundTimer);
+  foundTimer = window.setTimeout(resumePatrolBgm, FOUND_BGM_MAX_MS);
+}
+function stopAllBgm(): void {
+  if (foundTimer !== null) { window.clearTimeout(foundTimer); foundTimer = null; }
+  if (patrolAudio) patrolAudio.pause();
+  if (foundAudio) foundAudio.pause();
+}
+
 const recognition = useHideSeekRecognition({
-  imgEl: cameraImgEl,
+  videoEl: cameraVideoEl,
   captureCanvas: captureCanvasRef,
   isRegistered: (id) => props.participants.find((p) => p.id === id)?.registered ?? false,
   isCaught: (id) => props.participants.find((p) => p.id === id)?.caught ?? false,
@@ -146,14 +193,20 @@ const recognition = useHideSeekRecognition({
     voiceController?.speak(`${childName} 찾았다!`);
     void postCaught(childId, currentWaypointLabel.value);
     emit('caught', childId, childName, currentWaypointLabel.value);
+    playFoundBgm();   // 발견 브금 인터럽트 (순찰 브금 잠시 끄고 ~10-12초)
+    captureFxTick.value += 1;   // 발견 효과 — 사진 오버레이 → 천천히 페이드아웃 (재발견 시 재생)
   },
 });
 
 onMounted(() => {
   recognition.start();
   void loadGroupMap();
+  startPatrolBgm();
 });
-onBeforeUnmount(() => recognition.stop());
+onBeforeUnmount(() => {
+  recognition.stop();
+  stopAllBgm();
+});
 </script>
 
 <template>
@@ -175,6 +228,15 @@ onBeforeUnmount(() => recognition.stop());
       <div class="camera-wrap">
         <CameraView ref="cameraViewRef" />
         <canvas ref="captureCanvasRef" hidden />
+        <!-- 발견 효과 — 사진 오버레이 → 천천히 페이드아웃(카메라 서서히 노출). tick 마다 재생. -->
+        <img
+          v-if="captureFxTick > 0"
+          :key="captureFxTick"
+          class="capture-fx"
+          :src="CAPTURE_FX_SRC"
+          alt=""
+          aria-hidden="true"
+        />
         <div class="banners">
           <TransitionGroup name="banner">
             <div
@@ -301,6 +363,23 @@ onBeforeUnmount(() => recognition.stop());
   background: #000;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
   min-height: 0;
+}
+
+/* 발견 효과 — 사진 확 띄운 뒤 천천히 페이드아웃하며 원래 카메라가 서서히 보이게. */
+.capture-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 5;            /* 카메라 위, 배너 아래 정도 */
+  pointer-events: none;
+  animation: capture-fx-fade 2.6s ease-out forwards;
+}
+@keyframes capture-fx-fade {
+  0%   { opacity: 1; }   /* 사진 확 뜸 */
+  20%  { opacity: 1; }   /* 잠깐 유지 (~0.5s) */
+  100% { opacity: 0; }   /* 천천히 사라짐 → 카메라 노출 */
 }
 
 .waypoints {

@@ -32,6 +32,7 @@ class Keys:
     DOCKING_CONTACT = "docking_contact"           # bool
     ROBOT_POSE = "robot_pose"                     # dict {x: float, y: float, yaw: float} — **map frame** (PoseSubscriber 가 /amcl_pose 에서 W)
     POSE_OVERRIDE_ACTIVE = "pose_override_active" # bool — True 면 PoseSubscriber 가 W skip (디버그 좌표 강제 시)
+    PROXIMITY_LEVEL = "proximity_level"           # str "ok"/"person_close"/"wall_close" — ProximitySafetyMonitor 가 /gogoping/proximity_event 에서 W (관측·표시용. 실제 반응은 graph_router)
 
     # 명령 / 모드 (command_listener 가 W)
     TARGET_PERSON_ID = "target_person_id"         # str (ReID / face_id)
