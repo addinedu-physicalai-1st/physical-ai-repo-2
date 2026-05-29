@@ -103,6 +103,13 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               ws: true,
             },
+            // 무궁화 device-local perception — JSON 이벤트(/ws/eduping/mugunghwa) +
+            // JPEG 영상(/ws/eduping/mugunghwa/video). 둘 다 이 prefix 로 forward.
+            '/ws/eduping/mugunghwa': {
+              target: controlTarget,
+              changeOrigin: true,
+              ws: true,
+            },
             // WebRTC signaling — 의사 ↔ EduPing SDP/ICE 교환.
             '/ws/doctor/signal': {
               target: controlTarget,
