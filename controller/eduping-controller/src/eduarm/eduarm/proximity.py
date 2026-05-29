@@ -1,35 +1,94 @@
-"""근접 안전정지 — D435 depth 에서 "사람이 너무 가까운가" 판정 (순수 로직).
+"""근접 안전정지 판정 (순수 로직).
 
-ROS/카메라 없이 단위 테스트 가능하도록 분리. 노드(proximity_safety_node)가 depth
-프레임을 넘겨 호출한다.
+naive depth-min 은 로봇 자기 팔·바닥·구조물이 0.6m 안에 잡혀 영구 block 되는 문제가
+있었다. 그래서 **사람 검출 게이트**로 전환: YOLO 가 찾은 사람 bbox 영역의 depth 만
+보고, 그 사람이 가까우면 block. 팔·바닥은 "사람"이 아니라 무시된다.
 
-거리 히스테리시스: 정지는 near_mm 이내, 해제는 clear_mm 밖 — 경계에서 stop↔resume 가
-깜빡이는 것을 막는다. 단일 노이즈 픽셀로 오작동하지 않도록 임계 거리 이내 픽셀 수가
-min_pixels 이상일 때만 block.
+ROS/카메라/YOLO 없이 단위 테스트 가능하도록 분리 — 노드가 (depth, person_bboxes) 를
+넘겨 호출한다.
 """
 from __future__ import annotations
 
 import numpy as np
 
-NEAR_MM_DEFAULT = 600    # 0.60 m — 이내면 정지
-CLEAR_MM_DEFAULT = 650   # 0.65 m — 밖이면 해제 (히스테리시스)
-MIN_PIXELS_DEFAULT = 50  # 임계 거리 이내 픽셀이 이만큼 이상이어야 사람으로 인정
+NEAR_MM_DEFAULT = 600     # 0.60 m — 사람이 이내면 정지
+CLEAR_MM_DEFAULT = 650    # 0.65 m — 밖이면 해제 (히스테리시스)
+PERSON_PCTL_DEFAULT = 20  # 안전정지용: 사람 bbox 내 가까운 쪽 백분위 = 최근접부 추정. 정지는
+#                            fail-safe 라 민감해도 됨(과검출 OK).
+REACH_PCTL_DEFAULT = 50   # 게임 도달용: 중앙값. 소수 near 픽셀(가리기 팔이 bbox 에 겹침,
+#                            윤곽 flying-pixel)이 과반이 아니면 무시 → 사람 몸통 실제 거리.
+#                            도달 오검출은 게임을 끊으므로 robust 가 우선.
+MIN_VALID_PX_DEFAULT = 30  # bbox 내 유효 depth 픽셀 최소 — 이하면 측정 불가로 무시
+
+
+def person_distance_mm(
+    depth_mm: np.ndarray,
+    bbox: tuple[float, float, float, float],
+    *,
+    percentile: int = PERSON_PCTL_DEFAULT,
+    min_valid_px: int = MIN_VALID_PX_DEFAULT,
+) -> float | None:
+    """사람 bbox(x1,y1,x2,y2, color=aligned-depth 프레임 픽셀) 영역의 대표 거리(mm).
+
+    bbox 는 배경을 포함하므로 가까운 쪽 percentile(기본 20%)을 사람 최근접부로 본다.
+    유효(>0) depth 픽셀이 너무 적으면 측정 불가 → None.
+    """
+    h, w = depth_mm.shape
+    x1 = max(0, int(bbox[0]))
+    y1 = max(0, int(bbox[1]))
+    x2 = min(w, int(bbox[2]))
+    y2 = min(h, int(bbox[3]))
+    if x2 <= x1 or y2 <= y1:
+        return None
+    crop = depth_mm[y1:y2, x1:x2]
+    valid = crop[crop > 0]
+    if valid.size < min_valid_px:
+        return None
+    return float(np.percentile(valid, percentile))
 
 
 def decide_block(
-    depth_mm: np.ndarray,
+    person_dists: list[float | None],
     prev_blocked: bool,
     *,
     near_mm: int = NEAR_MM_DEFAULT,
     clear_mm: int = CLEAR_MM_DEFAULT,
-    min_pixels: int = MIN_PIXELS_DEFAULT,
 ) -> bool:
-    """depth(uint16, mm) 한 프레임 → block 여부.
+    """사람 거리 목록 중 임계 이내가 하나라도 있으면 block. 히스테리시스(정지 near, 해제 clear).
 
-    depth 0 은 invalid(측정 실패)라 제외. 현재 block 상태에 따라 임계 거리를 바꿔
-    (정지 near_mm / 해제 clear_mm) 히스테리시스를 준다.
+    사람이 없거나(빈 목록) 거리 측정 불가(None) 면 block 아님 — 팔/바닥은 애초에 사람
+    bbox 가 아니라 목록에 안 들어온다.
     """
     threshold = clear_mm if prev_blocked else near_mm
-    near = (depth_mm > 0) & (depth_mm < threshold)
-    count = int(np.count_nonzero(near))
-    return count >= min_pixels
+    return any(d is not None and d < threshold for d in person_dists)
+
+
+ON_FRAMES_DEFAULT = 2   # block 진입: 연속 N프레임 근접 (오검출 1프레임 무시)
+OFF_FRAMES_DEFAULT = 6  # block 해제: 연속 M프레임 clear (가리기 팔 occlusion 으로 사람이
+#                          잠깐 사라져도 유지 — 떨림 방지, off 를 크게 해 sticky)
+
+
+def step_debounce(
+    prev: bool,
+    raw: bool,
+    streak: int,
+    *,
+    on_frames: int = ON_FRAMES_DEFAULT,
+    off_frames: int = OFF_FRAMES_DEFAULT,
+) -> tuple[bool, int]:
+    """프레임 단위 시간 디바운스. 검출 깜빡임(occlusion/근접 crop)이 그대로 block 토글로
+    전파되는 것을 막는다.
+
+    streak = 현재 상태(prev)와 반대 방향으로 raw 가 연속 유지된 프레임 수. raw 가 prev 와
+    같으면 streak 리셋. 반대면 누적해, 켜기엔 on_frames·끄기엔 off_frames 도달 시 flip.
+    off_frames 를 크게 두면 "sticky block" — 잠깐의 검출 소실에 풀리지 않는다.
+
+    반환: (새 상태, 새 streak).
+    """
+    if raw == prev:
+        return prev, 0
+    streak += 1
+    need = on_frames if raw else off_frames
+    if streak >= need:
+        return raw, 0
+    return prev, streak
