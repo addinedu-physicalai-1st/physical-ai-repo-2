@@ -13,6 +13,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
 
+// OX 보드 데코는 OX 퀴즈 전용 — 블럭쌓기 등 다른 게임은 :show-board="false" 로 숨긴다.
+// default true 라 OXQuiz.vue 의 기존 `<UrdfViewer />` 호출은 영향 없음.
+const props = withDefaults(
+  defineProps<{ showBoard?: boolean }>(),
+  { showBoard: true },
+);
+
 const containerRef = ref<HTMLDivElement | null>(null);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
 const errorMsg = ref('');
@@ -211,7 +218,7 @@ onMounted(() => {
   const w = containerRef.value.clientWidth || 480;
   const h = containerRef.value.clientHeight || 360;
   setupScene(w, h);
-  addAnswerBoard();
+  if (props.showBoard) addAnswerBoard();
   loadUrdf();
   startAnimation();
   setupResize();

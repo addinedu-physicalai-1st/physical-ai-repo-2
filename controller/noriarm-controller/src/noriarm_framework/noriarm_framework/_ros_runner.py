@@ -141,8 +141,14 @@ class GameRunner(Node):
                 f"policy.kind={self._cfg.config.policy.kind} 인데 manifest 에 arm 이 없음"
             )
         camera_keys = tuple(c.id for c in self._cfg.config.cameras) or ("top",)
+        # sim["joint_state_names"] 가 있으면 우선 사용 — 학습 데이터의 obs.state 차원과
+        # 일치시키기 위함. real /joint_states 도 동일 이름으로 publish 해야 함.
         per_arm_state: dict[str, Any] = {
-            arm.id: LatestJointState(expected_names=arm.controller_joint_names)
+            arm.id: LatestJointState(
+                expected_names=list(
+                    arm.sim.get("joint_state_names") or arm.controller_joint_names
+                )
+            )
             for arm in arms
         }
         # 팔 순서 — manifest 선언 순서를 그대로 state 벡터 concat 순서로 사용.
@@ -177,6 +183,9 @@ class GameRunner(Node):
             state.update(names, positions)
 
     def _start_camera_capture_threads(self, camera_keys: tuple[str, ...]) -> None:
+        # target=real 이면 매니페스트의 by_id v4l path, target=sim 이면 webcam index.
+        # int enumeration 으로 잡으면 OS 의 /dev/video 순서에 따라 카메라가 섞이므로
+        # real 에서는 반드시 device path 로 지정 (noriarm-inference.sh 와 동일).
         import threading
 
         cameras_by_id = {c.id: c for c in self._cfg.config.cameras}
@@ -218,6 +227,11 @@ class GameRunner(Node):
                 f"카메라 {key} (device={device!r}) open 실패 — obs.images 미공급"
             )
             return
+        # noriarm-inference.sh 와 동일하게 MJPG/640/480/30Hz 강제.
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 30)
         try:
             while rclpy.ok():
                 ok, frame = cap.read()

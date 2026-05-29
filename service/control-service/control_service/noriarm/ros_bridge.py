@@ -20,37 +20,6 @@ from typing import Any, Awaitable, Callable
 logger = logging.getLogger(__name__)
 
 
-def _home_pose_listener_factory(
-    *,
-    joint_names: list[str],
-    on_event: Callable[[int], None],
-) -> Callable[[dict], None]:
-    """SSE forward 콜백과 동일한 dict payload 를 받아 HomePoseDetector 를 돌리는 헬퍼.
-
-    bridge.add_joint_state_listener() 에 등록할 콜백을 만든다. 게임이 끝나고
-    detector 가 리셋되어야 할 때는 unsubscribe 한 뒤 다시 factory 를 호출한다.
-    """
-    from noriarm_framework.games.block_stacking.home_pose import HomePoseDetector  # lazy
-
-    detector = HomePoseDetector(holding_s=0.5)
-    expected = list(joint_names)
-
-    def on_payload(payload: dict) -> None:
-        names = payload.get("name") or []
-        position = payload.get("position") or []
-        idx_map = {n: i for i, n in enumerate(names)}
-        try:
-            joints = [position[idx_map[n]] for n in expected]
-        except (KeyError, IndexError):
-            return  # 우리가 원하는 5 축이 다 안 들어옴 — 무시.
-        stamp = payload.get("stamp") or {}
-        t = float(stamp.get("sec", 0)) + float(stamp.get("nanosec", 0)) * 1e-9
-        before = detector.events
-        after = detector.update(t=t, joint_positions=joints)
-        if after > before:
-            on_event(after)
-
-    return on_payload
 
 
 def _norm_to_rad(mode: str) -> Callable[[float], float]:
@@ -580,38 +549,7 @@ class NoriarmRosBridge:
                 logger.warning(f"gripper replay 에서 예외: {e}")
         logger.info("trajectory 재생 완료, 정책 reset")
 
-    # ---------------------------------------------- block_stacking 세션
-    async def start_block_stacking_session(
-        self, on_home_event: Callable[[int], None]
-    ) -> Callable[[], None]:
-        """블럭쌓기 세션 시작 — home pose 이벤트 listener 를 붙이고 unsubscribe 함수 반환.
 
-        ACT 추론은 별도 서브프로세스 (runner_entry) 가 담당. bridge 의 역할은
-        /joint_states 를 구독하면서 HOME 임계 진입 이벤트를 카운트해 콜백으로
-        흘려주는 것 한 가지.
-        """
-        cb = _home_pose_listener_factory(
-            joint_names=list(self._arm.controller_joint_names),
-            on_event=on_home_event,
-        )
-        return self.add_joint_state_listener(cb)
-
-    async def play_rps_paper(self) -> dict:
-        """RPS '보' trajectory replay 단발 호출 (서브프로세스 spawn 전에 bridge 가 직접 처리).
-
-        block_stacking 의 ACT 게임 루프와 무관 — bridge 가 가진 publisher 로 OX 퀴즈
-        replay 와 동일한 경로로 발사. block_stacking/rps_paper_trajectory.json 을
-        package resource 로 로드.
-        """
-        from importlib import resources
-
-        load_trajectory = self._fw["load_trajectory"]
-        with resources.path(
-            "noriarm_framework.games.block_stacking", "rps_paper_trajectory.json"
-        ) as rps_path:
-            traj = load_trajectory(rps_path)
-        asyncio.create_task(self._play_trajectory(traj, "rps_paper_trajectory.json"))
-        return {"ok": True, "action": "replay_trajectory", "duration_s": traj.duration_s}
 
     # ---------------------------------------------- 정보 조회
 

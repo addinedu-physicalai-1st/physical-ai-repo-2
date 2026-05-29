@@ -12,8 +12,7 @@ hardware:
         index: 0
       real:
         source: usb
-        # `ls /dev/v4l/by-id` 로 실제 카메라 id 채우기.
-        by_id: "PLACEHOLDER-front-cam"
+        by_id: "/dev/v4l/by-id/usb-Alcorlink_Corp._USB_2.0_Camera-video-index0"
     - id: wrist
       role: gripper_close_up
       resolution: [640, 480]
@@ -23,7 +22,7 @@ hardware:
         index: 1
       real:
         source: usb
-        by_id: "PLACEHOLDER-wrist-cam"
+        by_id: "/dev/v4l/by-id/usb-Sonix_Technology_Co.__Ltd._USB_2.0_Camera_SN0001-video-index0"
 
   arms:
     - id: pointer
@@ -45,9 +44,12 @@ hardware:
 policy:
   kind: act
   module: noriarm_framework.games.block_stacking.policy_act
-  repo_id: jisoo3/act_game_block_stacking_0520
+  repo_id: jisoo3/act_game_block_stacking_0527_recovery
   joint_names: [joint1, joint2, joint3, joint4, joint5]
   camera_keys: [front, wrist]
+  extra:
+    n_action_steps: 1
+    temporal_ensemble_coeff: 0.01
   # device: cuda:0    # 명시 안 하면 lerobot 가 자동 선택.
 
 # RPS '보' replay 는 별도 매니페스트 (rule_based 정책) 로 가져가지 않고, bridge 측

@@ -26,6 +26,7 @@ dependencies = [
   "insightface>=0.7",
   "onnxruntime>=1.18",
   "opencv-python-headless>=4.10",
+  "mediapipe>=0.10",
   # Admin UI
   "PyQt5>=5.15",
   "PyQtWebEngine>=5.15",
