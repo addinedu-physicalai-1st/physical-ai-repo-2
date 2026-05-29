@@ -53,6 +53,7 @@ source install/setup.bash
 |---|---|---|
 | [scripts/device-eduping.sh](../../scripts/device-eduping.sh) | OpenArm 벤더 bringup (mock / real, bimanual) | follower (실물 팔) |
 | [scripts/device-eduping-leader.sh](../../scripts/device-eduping-leader.sh) | 실물 mini leader (`feetech_leader_node`) — `/eduping/leader/joint_states` publisher | USB 시리얼 양팔 (`/dev/ttyUSB0` 오른팔, `/dev/ttyUSB1` 왼팔) |
+| [scripts/device-eduping-d435.sh](../../scripts/device-eduping-d435.sh) | D435 단일 opener — `base`(camera+rgb/pointcloud/depth bridge 상시) / `game`(무궁화 perception only) | D435 미연결 시 base 미기동. autostart 미설치 머신용 |
 
 ```bash
 # mock — CAN/하드웨어 없이 ros2_control 토픽만
