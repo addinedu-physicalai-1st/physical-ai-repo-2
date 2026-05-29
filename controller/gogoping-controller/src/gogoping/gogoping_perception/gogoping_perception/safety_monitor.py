@@ -112,6 +112,9 @@ def _make_ros_node():
             self._last_stop_ts: float = 0.0
             # graph_router 심화 (2026-05-28)
             self._person_dist_m: float = float("inf")
+            # wall_dist 는 perception 의 /gogoping/obstacle_distance(중앙 밴드 최근접)를
+            # 그대로 사용 — rqt debug_image 의 obstacle 거리와 동일 값으로 통일.
+            self._obstacle_dist_m: float = float("inf")
 
             self._pub = self.create_publisher(Bool, "/gogoping/safety_stop", 10)
             self._prox_pub = self.create_publisher(
@@ -126,6 +129,10 @@ def _make_ros_node():
             self.create_subscription(
                 Float32, "/gogoping/person_proximity",
                 self._on_person_proximity, 10,
+            )
+            self.create_subscription(
+                Float32, "/gogoping/obstacle_distance",
+                self._on_obstacle_distance, 10,
             )
             self._timer = self.create_timer(
                 1.0 / config.SAFETY_PUBLISH_HZ, self._tick,
@@ -149,32 +156,9 @@ def _make_ros_node():
         def _on_person_proximity(self, msg: Float32) -> None:
             self._person_dist_m = float(msg.data)
 
-        def _compute_wall_dist_m(self, depth) -> float:
-            """depth ROI 중앙 50% × 하단 60% 의 최소 거리 (m). person bbox 영역 제외.
-
-            person 이 박스 안에 있다면 그건 사람 trigger 라 wall_close 와 별도. 여기서는
-            wall 만 — 사람 영역 0 처리.
-            """
-            if depth is None or depth.size == 0:
-                return float("inf")
-            h, w = depth.shape[:2]
-            y_start = int(h * config.OBSTACLE_ROI_TOP_RATIO)
-            x_start = int(w * 0.25)
-            x_end = int(w * 0.75)
-            roi = depth[y_start:, x_start:x_end].copy()
-            if self._tracking_bbox is not None:
-                bx1, by1, bx2, by2 = self._tracking_bbox
-                by1_roi = max(0, by1 - y_start)
-                by2_roi = max(0, by2 - y_start)
-                bx1_roi = max(0, bx1 - x_start)
-                bx2_roi = max(0, min(roi.shape[1], bx2 - x_start))
-                if by2_roi > 0 and bx2_roi > bx1_roi:
-                    roi[by1_roi:by2_roi, bx1_roi:bx2_roi] = 0
-            valid = roi[(roi > 0) & (roi < config.DEPTH_MAX_MM)]
-            if valid.size == 0:
-                return float("inf")
-            min_mm = int(valid.min())
-            return min_mm / 1000.0
+        def _on_obstacle_distance(self, msg: Float32) -> None:
+            # perception 의 정면 중앙 밴드 최근접 장애물 거리 — wall_close 판정에 사용.
+            self._obstacle_dist_m = float(msg.data)
 
         def _tick(self) -> None:
             depth = None
@@ -205,7 +189,8 @@ def _make_ros_node():
                 self.get_logger().info(f"safety_stop=True reason={decision.reason}")
 
             # ── graph_router 심화 — proximity_event JSON ─────────────────
-            wall_dist_m = self._compute_wall_dist_m(depth)
+            # wall_dist = perception 의 중앙 밴드 obstacle 거리 (rqt 라벨과 동일 값).
+            wall_dist_m = self._obstacle_dist_m
             level = evaluate_proximity_level(
                 person_dist_m=self._person_dist_m,
                 wall_dist_m=wall_dist_m,

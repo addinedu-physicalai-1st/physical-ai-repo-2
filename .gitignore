@@ -55,3 +55,7 @@ service/web-service/portal-web/public/openarm/meshes/
 log/rosbags/
 *.mcap
 *.db3
+
+# mem-watchdog — 진단 도구 + 로그 (개인 디버깅용, 트래킹 제외)
+scripts/mem-watchdog.sh
+log/mem-watchdog.log

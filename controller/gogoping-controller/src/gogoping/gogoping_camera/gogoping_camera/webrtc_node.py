@@ -126,10 +126,6 @@ class WebRTCNode(Node):
             self._capture.stop()
 
 
-def _cand_to_json(cand) -> dict:
-    return {"candidate": cand.candidate, "sdpMid": cand.sdpMid, "sdpMLineIndex": cand.sdpMLineIndex}
-
-
 def _cand_from_json(c: dict) -> RTCIceCandidate | None:
     """server 가 보낸 SDP candidate 문자열 → RTCIceCandidate.
 

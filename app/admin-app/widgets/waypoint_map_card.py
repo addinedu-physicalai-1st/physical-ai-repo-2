@@ -1259,10 +1259,15 @@ class WaypointMapCard(QFrame):
         self._map.set_route(seq)
 
     def _on_graph_navigate(self, name: str) -> None:
-        """graph routing 으로 실제 이동 (vertex sequence → nav2 FollowWaypoints)."""
+        """장소 클릭 → FSM GOTO 진입 (SetGoal.srv → state GOTO 전이).
+
+        /waypoints/navigate(graph_router action 직행)는 robot 이동은 하지만 FSM 을
+        안 거쳐 state 가 IDLE 에 머문다 → proximity/YOLO(person·obstacle 감지)가 안 켜짐.
+        FSM trigger 를 거치는 /api/gogoping/goto_vertex 로 호출해 state=GOTO 전이까지 발생시킨다.
+        """
         import httpx
         try:
-            httpx.post(f"{self._control_url}/waypoints/navigate",
+            httpx.post(f"{self._control_url}/api/gogoping/goto_vertex",
                        json={"name": name}, timeout=2.0)
         except httpx.HTTPError:
             pass
@@ -1310,8 +1315,9 @@ class WaypointMapCard(QFrame):
             key=lambda w: math.hypot(w["x"] - x, w["y"] - y),
         )
         try:
+            # 리스트 클릭과 동일하게 FSM GOTO 경로 — state=GOTO 전이로 proximity/YOLO 활성화.
             httpx.post(
-                f"{self._control_url}/waypoints/navigate",
+                f"{self._control_url}/api/gogoping/goto_vertex",
                 json={"name": nearest["name"]}, timeout=2.0,
             )
         except httpx.HTTPError:

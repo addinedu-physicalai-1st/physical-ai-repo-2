@@ -15,10 +15,17 @@
 import { onBeforeUnmount } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useHideseekPhaseStore, type HideseekPhase } from '@/gogoping/stores/hideseekPhase';
+import { useProximityStore, type ProximityLevel } from '@/gogoping/stores/proximity';
 
 interface SnapshotPatrol {
   vertices?: string[];
   current_index?: number;
+}
+
+interface SnapshotProximity {
+  level?: string;
+  person_dist_m?: number | null;
+  wall_dist_m?: number | null;
 }
 
 interface GogopingSnapshot {
@@ -26,6 +33,7 @@ interface GogopingSnapshot {
   fsm_state?: string;
   hideseek_phase?: string;  // BT blackboard 의 hideseek_phase (Task 7 에서 추가)
   patrol?: SnapshotPatrol | null;  // BT blackboard 의 search_waypoints + patrol_current_index
+  proximity?: SnapshotProximity | null;  // 근접 상황 (person_close/wall_close) — 미지원 서버면 없음
   // 평탄화 (2026-05-25): assist_task / play_task 필드 제거. fsm_state 자체가 task.
   // 그 외 필드는 본 composable 에서 사용 안 함 (main_tree / sub_tree / battery_level 등)
 }
@@ -54,6 +62,7 @@ function snapshotToModeLabel(snap: GogopingSnapshot): string | null {
 export function useGogopingStateWs(): { stop: () => void } {
   const mode = useModeStore();
   const hideseekPhaseStore = useHideseekPhaseStore();
+  const proximityStore = useProximityStore();
 
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${protocol}://${window.location.host}/ws/robot-state`;
@@ -96,6 +105,17 @@ export function useGogopingStateWs(): { stop: () => void } {
         } else if (snap.patrol === null) {
           hideseekPhaseStore.setPatrol({ vertices: [], currentIndex: -1 });
         }
+
+        // proximity → store (UI 안내 표시용). 미지원 서버면 필드 없음 → ok 유지.
+        const px = snap.proximity;
+        const lvl = (px && (px.level === 'person_close' || px.level === 'wall_close'))
+          ? (px.level as ProximityLevel)
+          : 'ok';
+        proximityStore.setProximity({
+          level: lvl,
+          personDistM: typeof px?.person_dist_m === 'number' ? px.person_dist_m : null,
+          wallDistM: typeof px?.wall_dist_m === 'number' ? px.wall_dist_m : null,
+        });
       } catch {
         // JSON 파싱 실패는 무시 (서버 측 포맷 변경 등 — 다음 메시지에서 회복)
       }

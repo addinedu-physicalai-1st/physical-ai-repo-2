@@ -50,9 +50,11 @@ _DEBUG_TOPIC = "/gogoping/debug/nav_events"   # admin UI NavDebugLogCard 가 SSE
 _ROUTE_PATH_TOPIC = "/graph_router/route_path"  # RViz Path display — L1 vertex sequence 시각화
 
 # graph_router 심화 (2026-05-28) — proximity 기반 pause/resume/reroute/backup 상수
-SUSTAIN_TIMEOUT_S = 60.0           # 사람 60s 유지 → reroute
-BACKUP_DISTANCE_M = 0.15           # 후진 거리
-BACKUP_MAX_RETRIES = 3             # 후진 + 재시도 한계
+SUSTAIN_TIMEOUT_S = 10.0           # 사람 10s 유지 → reroute (디버깅값)
+RESUME_GRACE_S = 1.0               # 사람이 이 시간 이상 확실히 비켜야 resume — depth flicker 무시
+BACKUP_PRE_DELAY_S = 3.0           # wall_close 정지 후 후진 시작까지 대기 (디버깅값)
+BACKUP_DISTANCE_M = 0.15           # 후진 거리 (뒤로 조금씩)
+BACKUP_MAX_RETRIES = 3             # 후진 + 재시도 한계 (3회)
 BACKUP_SPEED_MPS = 0.05            # 후진 속도 (m/s)
 BACKUP_REAR_CLEARANCE_M = 0.25     # LiDAR 후방 최소 clearance (15cm + 10cm 여유)
 BACKUP_STUCK_DELTA_M = 0.03        # odom 변화 임계값 (미만이면 stuck)
@@ -188,8 +190,11 @@ class GraphRouterNode(Node):
             self._on_proximity_event, 10,
             callback_group=cb,
         )
+        # 로봇 odom 은 /gogoping 네임스페이스로 발행됨 (/gogoping/odom). 예전엔 빈 토픽
+        # "/odom" 을 구독해 _latest_odom 이 영영 0 → backup 이동량이 항상 0 으로 측정돼
+        # 매번 STUCK 오판하던 버그. (backup 명령 자체는 정상 — cmd_vel 까지 -0.05 전달됨)
         self.create_subscription(
-            Odometry, "/odom",
+            Odometry, "/gogoping/odom",
             self._on_odom, 10,
             callback_group=cb,
         )
@@ -198,9 +203,12 @@ class GraphRouterNode(Node):
             self._on_scan, 10,
             callback_group=cb,
         )
-        # 모터로 가는 실제 토픽 — relay 가 /gogoping/cmd_vel_raw → /gogoping/cmd_vel
-        # 로 relay 하므로 여기 publish 하면 모터까지 직접 전달.
-        self._cmd_vel_pub = self.create_publisher(Twist, "/gogoping/cmd_vel", 10)
+        # backup/in-place rotate 같은 직접 maneuver 는 cmd_vel_raw 로 publish 해
+        # safety_filter 단일 경유로 통일한다 (이전엔 /gogoping/cmd_vel 직행 →
+        # safety_filter 의 stale-zero/ safety_stop-zero 와 같은 토픽에서 충돌 →
+        # backup/rotate 가 0 으로 상쇄돼 STUCK/TIMEOUT 나던 버그). safety_filter 는
+        # safety_stop 시에도 후진·회전은 통과시키므로 앞 장애물 탈출이 가능하다.
+        self._cmd_vel_pub = self.create_publisher(Twist, "/gogoping/cmd_vel_raw", 10)
 
     def _dbg(self, msg: str, level: str = "info") -> None:
         try:
@@ -494,6 +502,7 @@ class GraphRouterNode(Node):
 
         # graph_router 심화 (2026-05-28) — pause/reroute/backup state (per action)
         pause_start_ts: float | None = None
+        person_clear_since: float | None = None   # 사람 비킨 시작 시각 — resume grace 판정
         blocked_vertices: set[str] = set()
         backup_retry: int = 0
 
@@ -502,6 +511,8 @@ class GraphRouterNode(Node):
         while i < len(seq):
             segment_target = seq[i]
             nav_gh = None
+            pause_start_ts = None   # 새 segment 시도 시작 — 직전 pause 상태 클리어
+            person_clear_since = None
             try:
                 nav_goal = NavigateToPose.Goal()
                 nav_goal.pose = self._vertex_pose(segment_target)
@@ -563,7 +574,16 @@ class GraphRouterNode(Node):
                 # graph_router 심화 (2026-05-28) — proximity 분기 결과 신호
                 proximity_retry = False
                 proximity_reroute = False
-                while not get_result_future.done():
+                # 특수 케이스 플래그 — "사람이 앞을 막아서 재경로를 생성한 경우"에만 True.
+                # 이때만 재경로의 첫 방향으로 제자리 회전한다 (회전하면 사람이 정면 박스에서
+                # 빠져 다른 길로 출발 가능). wall_close reroute 에는 적용 안 함.
+                reroute_by_person = False
+                # person_close PAUSE 중에는 nav goal 을 cancel 하므로 get_result_future 가
+                # CANCELED 로 done 된다. 그때 루프를 빠져나가면 아래 wrapper.status 검사가
+                # CANCELED 를 "주행 실패"로 오인 → goto FAILURE → FSM RETURNING 전이 버그.
+                # pause 중(pause_start_ts is not None)에는 루프를 유지해 resume/reroute 분기로만
+                # 빠져나가게 한다. (wall_close 는 항상 flag 세팅 후 break 라 영향 없음)
+                while (not get_result_future.done()) or (pause_start_ts is not None):
                     # ── proximity 분기 (사람/벽) ──
                     # disable_proximity_safety=true 면 항상 "ok" 로 취급 → pause/backup/reroute skip.
                     level = "ok" if self._proximity_disabled else self._proximity_level
@@ -574,6 +594,7 @@ class GraphRouterNode(Node):
                             except Exception:
                                 pass
                             nav_gh = None
+                        person_clear_since = None   # 사람 다시 가까움 — 비킴 카운트 리셋
                         if pause_start_ts is None:
                             pause_start_ts = time.monotonic()
                             self._dbg(
@@ -589,17 +610,25 @@ class GraphRouterNode(Node):
                                 level="warn",
                             )
                             proximity_reroute = True
+                            reroute_by_person = True   # 특수 케이스 — 회전 후 출발
                             break
                         time.sleep(0.1)
                         continue
-                    # ok 또는 wall_close 복귀 시 pause 해제
+                    # pause 중 ok 복귀 — depth flicker 무시 위해 RESUME_GRACE_S 이상 확실히
+                    # 비켜야 resume. 그 전 잠깐 비춤은 sustain 타이머 유지하며 계속 대기.
                     if pause_start_ts is not None and level == "ok":
-                        pause_start_ts = None
-                        self._dbg(
-                            f"RESUME after person clear near {segment_target!r}"
-                        )
-                        proximity_retry = True
-                        break
+                        if person_clear_since is None:
+                            person_clear_since = time.monotonic()
+                        if time.monotonic() - person_clear_since >= RESUME_GRACE_S:
+                            pause_start_ts = None
+                            person_clear_since = None
+                            self._dbg(
+                                f"RESUME after person clear near {segment_target!r}"
+                            )
+                            proximity_retry = True
+                            break
+                        time.sleep(0.1)
+                        continue
 
                     if level == "wall_close":
                         if nav_gh is not None:
@@ -618,26 +647,35 @@ class GraphRouterNode(Node):
                             blocked_vertices.add(segment_target)
                             proximity_reroute = True
                             break
-                        # backup
+                        # 정지 후 후진 시작까지 대기 (첫 backup 진입 시 1회) — 디버깅용.
+                        # nav goal 은 위에서 cancel 됨 → 대기 동안 로봇 정지 상태.
+                        if backup_retry == 0:
+                            self._dbg(
+                                f"wall_close 정지 — {BACKUP_PRE_DELAY_S:.0f}s 대기 후 후진",
+                                level="warn",
+                            )
+                            time.sleep(BACKUP_PRE_DELAY_S)
+                        # backup (뒤로 조금씩)
                         ok = self._do_backup(BACKUP_DISTANCE_M)
-                        if not ok:
-                            gh.abort()
-                            result.success = False
-                            result.message = "stuck_during_backup"
-                            result.final_vertex = seq[last_idx]
-                            self._dbg("STUCK → abort", level="err")
-                            return result
                         backup_retry += 1
+                        if not ok:
+                            # stuck 이어도 abort 하지 않는다 — "3회 시도 후 재탐색"이 목표.
+                            # (예전엔 첫 stuck 에서 abort → goto FAILURE → RETURNING 으로 튐)
+                            self._dbg(
+                                f"backup 거의 못 움직임 (<{BACKUP_STUCK_DELTA_M}m) — "
+                                f"시도 {backup_retry}/{BACKUP_MAX_RETRIES}",
+                                level="warn",
+                            )
                         if backup_retry >= BACKUP_MAX_RETRIES:
                             self._dbg(
-                                f"backup max retries ({BACKUP_MAX_RETRIES}) → reroute",
+                                f"backup {BACKUP_MAX_RETRIES}회 시도 → reroute",
                                 level="warn",
                             )
                             blocked_vertices.add(segment_target)
                             backup_retry = 0
                             proximity_reroute = True
                             break
-                        # backup 성공 → segment 재시도
+                        # 다음 backup 시도 — segment 재시도 (성공/stuck 무관)
                         proximity_retry = True
                         break
 
@@ -703,10 +741,61 @@ class GraphRouterNode(Node):
                     continue
 
                 if proximity_reroute:
-                    # blocked_vertices 추가됐음 → 새 경로로 재시작
-                    return self._restart_with_reroute(
-                        gh, target, blocked_vertices,
+                    # blocked_vertices 에 막힌 vertex 추가됨 → 같은 액션 안에서 새 경로로
+                    # 재주행 (in-place). 예전엔 abort 후 caller 재발사에 의존했는데,
+                    # BT 가 navigate FAILURE 를 RETURNING 도피로 처리해 실제로 재탐색이
+                    # 안 됐음. 여기서 새 seq 로 갈아끼우고 처음부터 다시 주행한다.
+                    cur = self._current_xy()
+                    if cur is None:
+                        gh.abort()
+                        result.success = False
+                        result.message = "reroute: no tf"
+                        self._dbg("reroute abort: no tf", level="err")
+                        return result
+                    try:
+                        src = self._graph.nearest_vertex(*cur)
+                        new_seq = self._graph.route(
+                            src, target, start_yaw=self._current_yaw(),
+                            blocked=blocked_vertices,
+                        )
+                    except Exception as e:  # GraphError 등 — 우회로 없음
+                        gh.abort()
+                        result.success = False
+                        result.message = f"reroute failed (no path): {e}"
+                        self._dbg(
+                            f"reroute abort: 우회로 없음 blocked={sorted(blocked_vertices)}: {e}",
+                            level="err",
+                        )
+                        return result
+                    if len(new_seq) <= 1:
+                        gh.succeed()
+                        result.success = True
+                        result.message = "already at target after reroute"
+                        result.final_vertex = target
+                        self._dbg(f"SUCCESS (reroute → already at target={target!r})")
+                        return result
+                    self._publish_route_path(new_seq)
+                    self._dbg(
+                        f"REROUTE blocked={sorted(blocked_vertices)} → new_seq={new_seq}"
                     )
+                    # ── 특수 케이스: 사람이 막아서 재경로한 경우에만 새 방향으로 제자리 회전 ──
+                    # 사람은 "원래 가던 방향"(정면 박스)에 있으므로, 새 경로 첫 vertex 방향으로
+                    # 돌면 사람이 정면 박스에서 벗어나 다른 길로 출발할 수 있다.
+                    # wall_close reroute 에는 적용 안 함 (reroute_by_person=False).
+                    if reroute_by_person and len(new_seq) >= 2:
+                        nv = self._graph.vertices.get(new_seq[1])
+                        if nv is not None:
+                            face_yaw = math.atan2(nv.y - cur[1], nv.x - cur[0])
+                            self._dbg(
+                                f"person-reroute → 새 경로 방향으로 제자리 회전 "
+                                f"(→{new_seq[1]!r})"
+                            )
+                            self._do_rotate_in_place(face_yaw)
+                    seq = new_seq
+                    i = 1
+                    last_idx = 0
+                    self._publish_feedback(gh, seq, last_idx)
+                    continue   # 새 경로 처음부터 주행
 
                 if proximity_retry:
                     # 같은 segment 재시도 — i 증가 X
@@ -802,51 +891,6 @@ class GraphRouterNode(Node):
         result.message = ""
         result.final_vertex = target
         self._dbg(f"SUCCESS (target={target!r}, segments={len(seq)-1})")
-        return result
-
-    def _restart_with_reroute(
-        self,
-        gh: ServerGoalHandle,
-        target: str,
-        blocked: set[str],
-    ) -> NavigateToVertex.Result:
-        """blocked vertex 제외하고 새 경로 계산 → 단순 abort + reason.
-
-        caller (BT / admin UI) 가 abort message 보고 새 액션 재발사. 액션 안에서
-        재진입은 더 큰 refactor 필요 — 현 spec 은 abort + 명시적 reason 으로 단순화.
-        """
-        result = NavigateToVertex.Result()
-        cur = self._current_xy()
-        if cur is None:
-            gh.abort()
-            result.success = False
-            result.message = "reroute: no tf"
-            self._dbg("reroute abort: no tf", level="err")
-            return result
-        yaw = self._current_yaw()
-        try:
-            src = self._graph.nearest_vertex(*cur)
-            new_seq = self._graph.route(
-                src, target, start_yaw=yaw, blocked=blocked,
-            )
-        except Exception as e:
-            gh.abort()
-            result.success = False
-            result.message = f"reroute failed: {e}"
-            self._dbg(f"reroute abort: {e}", level="err")
-            return result
-
-        self._publish_route_path(new_seq)
-        self._dbg(
-            f"REROUTE blocked={sorted(blocked)} new_seq={new_seq}"
-        )
-        # caller 재발사 권장 — message 에 새 경로 정보 포함
-        gh.abort()
-        result.success = False
-        result.message = (
-            f"rerouted: blocked={sorted(blocked)}; "
-            f"new_seq len={len(new_seq)} — caller should reissue"
-        )
         return result
 
     # ──────── service: reload_graph ────────

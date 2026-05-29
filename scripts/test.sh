@@ -137,6 +137,18 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[gogoping_perception] frontal_box / safety / reid / target_tracker (pure logic)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+# perception 패키지는 workspace install(egg-link)이 conda site 밖이라 PYTHONPATH 로 주입.
+_PERCEPTION_DIR="controller/gogoping-controller/src/gogoping/gogoping_perception"
+if ! PYTHONPATH="$_PERCEPTION_DIR" conda run -n jazzy pytest "$_PERCEPTION_DIR/tests/" -v "$@"; then
+  EXIT=1
+fi
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "[tests] Graph (vertex 자동 lane + 다익스트라)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
