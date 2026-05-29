@@ -12,18 +12,26 @@ _app = None  # type: ignore[var-annotated]
 
 
 def get_app():
-    """InsightFace FaceAnalysis 앱 (CPU). 첫 호출 시 모델 로딩."""
+    """InsightFace FaceAnalysis 앱. 첫 호출 시 모델 로딩.
+
+    onnxruntime-gpu(CUDAExecutionProvider)가 있으면 GPU 사용, 없으면 CPU 로 fallback.
+    무궁화 진입 단계의 recognize-multi 는 CPU 에서 무거워 CPU 를 점유한다 — onnxruntime-gpu
+    설치 시 자동으로 GPU 오프로드되어 CPU 부하/버벅임이 크게 준다.
+    """
     global _app
     if _app is None:
         with _lock:
             if _app is None:
+                import onnxruntime as ort  # noqa: WPS433
                 from insightface.app import FaceAnalysis  # noqa: WPS433
 
-                app = FaceAnalysis(
-                    name="buffalo_l",
-                    providers=["CPUExecutionProvider"],
+                use_cuda = "CUDAExecutionProvider" in ort.get_available_providers()
+                providers = (
+                    ["CUDAExecutionProvider", "CPUExecutionProvider"]
+                    if use_cuda else ["CPUExecutionProvider"]
                 )
-                app.prepare(ctx_id=-1, det_size=(640, 640))
+                app = FaceAnalysis(name="buffalo_l", providers=providers)
+                app.prepare(ctx_id=0 if use_cuda else -1, det_size=(640, 640))
                 _app = app
     return _app
 
