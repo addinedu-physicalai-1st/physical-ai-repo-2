@@ -8,6 +8,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
+import { useProximityOverride } from '@/composables/useProximityOverride';
 import Icon from '@/common/Icon.vue';
 import OpenarmViewer from './OpenarmViewer.vue';
 import RecorderControls from './RecorderControls.vue';
@@ -34,6 +35,7 @@ const SLOT_ICONS: Record<SlotId, string> = {
 const mode = useModeStore();
 const stateWs = useEdupingStateWs();
 stateWs.start();
+useProximityOverride();  // 등하원 인사 설정(관리) — 교사가 팔 옆에서 녹화하므로 근접 정지 우회
 
 const slots = ref<Record<SlotId, SlotMeta | null>>({ morning: null, evening: null });
 const selected = ref<SlotId>('morning');

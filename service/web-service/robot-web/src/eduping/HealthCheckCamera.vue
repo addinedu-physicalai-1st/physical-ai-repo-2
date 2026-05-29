@@ -11,9 +11,11 @@
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
+import { useProximityOverride } from '@/composables/useProximityOverride';
 import { useTelehealthWebRTC } from './useTelehealthWebRTC';
 
 const modeStore = useModeStore();
+useProximityOverride();  // 건강검진 — 아이가 팔/카메라에 가까이 오는 모드라 근접 정지 우회
 function exitHealthCheck(): void { modeStore.setMode('대기'); }
 
 const EDUPING_RGB_PATH = '/ws/eduping/rgb?role=consumer';

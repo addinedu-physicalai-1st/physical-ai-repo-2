@@ -355,13 +355,16 @@ function startMusicPhase(): void {
     // 3) 음악 종료 → 관찰(떼기 + 프리즈). 음악 중에만 이동 허용, 이후 움직이면 탈락.
     if (stage.value === 'song') setStage('observation');
   };
-  const pr = audio.play();
-  if (pr && typeof pr.catch === 'function') {
-    pr.catch((err: unknown) => {
-      const name = (err as { name?: string } | null)?.name;
-      if (name === 'AbortError' || name === 'NotAllowedError') return;
-      console.warn('[mugunghwa-song] play failed', err);
-    });
+  // 근접 정지 중이면 음악도 대기 — 해제 시 watcher 가 재생. (팔/음악 같이 멈춤/재개)
+  if (!stateWs.proximityBlocked.value) {
+    const pr = audio.play();
+    if (pr && typeof pr.catch === 'function') {
+      pr.catch((err: unknown) => {
+        const name = (err as { name?: string } | null)?.name;
+        if (name === 'AbortError' || name === 'NotAllowedError') return;
+        console.warn('[mugunghwa-song] play failed', err);
+      });
+    }
   }
   // 음악 진행률 (progress bar) 만 갱신. 팔은 가리기 자세로 정지 유지 (armSnapshot update 안 함).
   songTimer = window.setInterval(() => {
@@ -519,6 +522,18 @@ function toggleDrawer(): void { drawerOpen.value = !drawerOpen.value }
 // 시뮬은 보조 정보라 default 최소화. 첫 펼침 전엔 three.js/URDF/STL 로드 자체를 안 함.
 const stateWs = useEdupingStateWs();
 stateWs.start();
+
+// 근접 안전정지 — 사람이 0.6m 이내면 음악도 정지(팔은 bridge 가 정지), 해제 시 같이 재개.
+// songTimer !== null = 음악 단계 진입함. currentTime 이 유지되어 멈춘 지점부터 이어짐.
+watch(() => stateWs.proximityBlocked.value, (blocked) => {
+  if (!songAudio) return;
+  if (blocked) {
+    try { songAudio.pause(); } catch { /* noop */ }
+  } else if (stage.value === 'song' && songTimer !== null) {
+    void songAudio.play()?.catch(() => { /* noop */ });
+  }
+});
+
 const simMinimized = ref(true);
 const simEverOpened = ref(false);
 watch(simMinimized, (m) => { if (!m) simEverOpened.value = true; });

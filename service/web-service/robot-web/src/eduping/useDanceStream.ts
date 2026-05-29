@@ -37,6 +37,9 @@ export interface UseDanceStream {
   play: (slug: string) => void;
   stop: () => void;
   close: () => void;
+  /** 근접 안전정지 — 음악만 일시정지/재개 (팔은 bridge). */
+  pauseAudio: () => void;
+  resumeAudio: () => void;
   currentSnapshot: Ref<JointSnapshot | null>;
   isPlaying: Ref<boolean>;
   durationMs: Ref<number>;
@@ -253,11 +256,22 @@ export function useDanceStream(): UseDanceStream {
     endCallback = cb;
   }
 
+  // 근접 안전정지 — 음악(AudioContext)만 일시정지/재개. 팔 정지는 control bridge 가 담당.
+  // suspend 는 오디오 클럭을 멈춰 예약된 buffer source 도 함께 보류, resume 시 이어짐.
+  function pauseAudio(): void {
+    if (audioCtx && audioCtx.state === 'running') void audioCtx.suspend().catch(() => {});
+  }
+  function resumeAudio(): void {
+    if (audioCtx && audioCtx.state === 'suspended') void audioCtx.resume().catch(() => {});
+  }
+
   return {
     connect,
     play,
     stop,
     close,
+    pauseAudio,
+    resumeAudio,
     currentSnapshot,
     isPlaying,
     durationMs,
