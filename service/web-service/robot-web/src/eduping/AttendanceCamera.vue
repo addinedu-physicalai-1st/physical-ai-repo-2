@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, inject, ref, onBeforeUnmount, onMounted, watch } from 'vue';
+import { inject, ref, onBeforeUnmount, watch } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
-import { pickExternalCamera } from '@/composables/selectExternalCamera';
 import { useFaceDetector } from '@/composables/useFaceDetector';
 import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
 import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
@@ -22,7 +21,13 @@ function buildGreeting(name: string, type: 'IN' | 'OUT'): string {
     : `${name} 어린이, 잘 가요! 내일 또 만나요!`;
 }
 
-const videoRef = ref<HTMLVideoElement | null>(null);
+// 카메라는 EduPing D435 — 노드(d435_rgb_uploader)가 /ws/eduping/rgb 로 JPEG 를 송출하고
+// 여기선 그걸 canvas 에 그려 표시 + 얼굴검출/인식에 사용한다. 브라우저 getUserMedia·장치
+// 선택 없음 (D435 는 perception 노드가 점유하므로 브라우저가 직접 열 수 없음).
+const RGB_PATH = '/ws/eduping/rgb?role=consumer';
+const rgbCanvas = ref<HTMLCanvasElement | null>(null);
+let rgbWs: WebSocket | null = null;
+let hasFrame = false;
 
 const status = ref<string>('');
 const lastResult = ref<{
@@ -45,11 +50,6 @@ function armSkipMessage(code: string | null): string | null {
   return null;
 }
 
-const cameras = ref<MediaDeviceInfo[]>([]);
-const selectedDeviceId = ref<string>('');
-const hasCameras = computed(() => cameras.value.length > 0);
-
-let stream: MediaStream | null = null;
 let rafId: number | null = null;
 let busy = false;
 
@@ -72,81 +72,46 @@ interface CheckResult {
   arm_status: string | null;
 }
 
-async function listCameras(): Promise<void> {
-  let devs = await navigator.mediaDevices.enumerateDevices();
-  if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
-    try {
-      const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
-      tmp.getTracks().forEach((t) => t.stop());
-    } catch {
-      /* 권한 거부해도 enumerate 는 동작 (label 빈 채로) */
-    }
-    devs = await navigator.mediaDevices.enumerateDevices();
-  }
-  cameras.value = devs.filter((d) => d.kind === 'videoinput');
-  if (cameras.value.length === 0) {
-    selectedDeviceId.value = '';
+function wsUrl(path: string): string {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}${path}`;
+}
+
+async function drawRgb(blob: Blob): Promise<void> {
+  const c = rgbCanvas.value;
+  if (!c) return;
+  let bm: ImageBitmap;
+  try {
+    bm = await createImageBitmap(blob);
+  } catch {
     return;
   }
-  const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
-  if (!selectedDeviceId.value || !stillValid) {
-    // 등하원 인식 기본값은 외장 USB — 노트북 내장은 거리·각도가 안 맞아 정확도가 낮다.
-    const ext = await pickExternalCamera();
-    selectedDeviceId.value = ext?.deviceId ?? cameras.value[0].deviceId;
+  if (c.width !== bm.width || c.height !== bm.height) {
+    c.width = bm.width;
+    c.height = bm.height;
   }
+  c.getContext('2d')?.drawImage(bm, 0, 0);
+  bm.close();
+  hasFrame = true;
 }
 
-async function setupCamera(): Promise<void> {
-  if (stream) return;
-  if (cameras.value.length === 0) await listCameras();
-  if (!selectedDeviceId.value) {
-    throw new Error('사용 가능한 카메라가 없습니다');
-  }
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      deviceId: { exact: selectedDeviceId.value },
-      width: { ideal: 640 },
-      height: { ideal: 480 },
-    },
-    audio: false,
-  });
-  if (videoRef.value) {
-    videoRef.value.srcObject = stream;
-    await videoRef.value.play();
-  }
+function connectRgb(): void {
+  if (rgbWs) return;
+  rgbWs = new WebSocket(wsUrl(RGB_PATH));
+  rgbWs.binaryType = 'blob';
+  rgbWs.onmessage = (ev: MessageEvent): void => {
+    if (ev.data instanceof Blob) void drawRgb(ev.data);
+  };
+  rgbWs.onerror = () => { /* close 가 뒤따름 */ };
 }
 
-async function restartStream(): Promise<void> {
-  if (!stream) return;
-  stream.getTracks().forEach((t) => t.stop());
-  stream = null;
-  await setupCamera();
-}
-
-async function onChange(): Promise<void> {
-  // 모드 활성 중에 카메라를 바꾸면 새 스트림으로 교체. 비활성 상태면 다음 활성 때 새 선택값 사용.
-  if (props.mode !== null) {
-    try {
-      await restartStream();
-    } catch {
-      status.value = '카메라 접근 실패';
-    }
+function disconnectRgb(): void {
+  if (rgbWs) {
+    rgbWs.onmessage = rgbWs.onerror = rgbWs.onclose = null;
+    try { rgbWs.close(); } catch { /* noop */ }
+    rgbWs = null;
   }
-}
-
-async function rescan(): Promise<void> {
-  await listCameras();
-}
-
-let deviceChangeDebounce: number | null = null;
-function scheduleListCamerasOnDeviceChange(): void {
-  if (deviceChangeDebounce !== null) {
-    window.clearTimeout(deviceChangeDebounce);
-  }
-  deviceChangeDebounce = window.setTimeout(() => {
-    deviceChangeDebounce = null;
-    void listCameras();
-  }, 400);
+  hasFrame = false;
 }
 
 const tracker = useFaceTracker();
@@ -170,21 +135,15 @@ const detector = useFaceDetector({
 
 /** 전체 frame 을 /recognize-multi 로 보내고 응답 bbox 를 stable track 에 IoU 매칭. */
 async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
-  const video = videoRef.value;
-  if (!video || video.readyState < 2) return [];
-  const blob = await captureFullFrame(video);
+  const c = rgbCanvas.value;
+  if (!c || !hasFrame) return [];
+  const blob = await captureFullFrame(c);
   if (!blob) return [];
   const matches = await postRecognizeMulti(blob, DEVICE_TOKEN);
   return mapMatchesToTracks(tracks, matches).map((p) => p.result);
 }
 
-async function captureFullFrame(video: HTMLVideoElement): Promise<Blob | null> {
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(video, 0, 0);
+async function captureFullFrame(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
 }
 
@@ -196,11 +155,7 @@ function teardown(): void {
   detector.close();
   tracker.reset();
   identityCache.reset();
-  if (stream) {
-    stream.getTracks().forEach((t) => t.stop());
-    stream = null;
-  }
-  if (videoRef.value) videoRef.value.srcObject = null;
+  disconnectRgb();
   status.value = '';
   lastResult.value = null;
   latestTracks = [];
@@ -269,55 +224,43 @@ async function performCheck(childId: number): Promise<void> {
 // 카메라 앞에 잠시 멈춰 있을 때 잡는 시나리오라 4fps 면 충분.
 const FACE_SEND_INTERVAL_MS = 220;
 async function loop(): Promise<void> {
-  if (videoRef.value && videoRef.value.readyState >= 2) {
+  const c = rgbCanvas.value;
+  if (c && hasFrame && c.width > 0) {
     const t0 = performance.now();
-    await detector.send(videoRef.value);
+    await detector.send(c);
     const elapsed = performance.now() - t0;
     if (elapsed < FACE_SEND_INTERVAL_MS) {
       await new Promise((r) => setTimeout(r, FACE_SEND_INTERVAL_MS - elapsed));
     }
+  } else {
+    await new Promise((r) => setTimeout(r, FACE_SEND_INTERVAL_MS));
   }
   rafId = requestAnimationFrame(() => { void loop(); });
 }
 
 watch(
   () => props.mode,
-  async (newMode) => {
+  (newMode) => {
     if (newMode === null) {
       teardown();
       return;
     }
-    try {
-      await setupCamera();
-      detector.start();
-      status.value = '얼굴 인식 중...';
-      lastResult.value = null;
-      // childCooldowns 는 reset 하지 않음 — IN→OUT 전환 시 같은 어린이가
-      // 즉시 다른 type 으로 또 trigger 되는 것을 방지
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          void loop();
-        });
-      }
-    } catch {
-      status.value = '카메라 접근 실패';
+    connectRgb();
+    detector.start();
+    status.value = '카메라 연결 중...';
+    lastResult.value = null;
+    // childCooldowns 는 reset 하지 않음 — IN→OUT 전환 시 같은 어린이가
+    // 즉시 다른 type 으로 또 trigger 되는 것을 방지
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        void loop();
+      });
     }
   },
   { immediate: true },
 );
 
-onMounted(() => {
-  // 첫 mount 에서 카메라 목록을 채워둠 — props.mode 가 null 이라 setupCamera 가 늦더라도
-  // 드롭다운에 즉시 항목이 표시됨.
-  void listCameras();
-  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
-});
 onBeforeUnmount(() => {
-  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
-  if (deviceChangeDebounce !== null) {
-    window.clearTimeout(deviceChangeDebounce);
-    deviceChangeDebounce = null;
-  }
   teardown();
 });
 </script>
@@ -328,22 +271,8 @@ onBeforeUnmount(() => {
       <div class="header">
         <span class="badge">{{ mode === 'IN' ? '등원' : '하원' }}</span>
       </div>
-      <div class="cam-controls">
-        <select
-          v-model="selectedDeviceId"
-          :disabled="!hasCameras"
-          class="cam-select"
-          @change="onChange"
-        >
-          <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
-          <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
-            {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
-          </option>
-        </select>
-        <button class="rescan" type="button" title="다시 스캔" @click="rescan">↻</button>
-      </div>
       <div class="video-wrap">
-        <video ref="videoRef" muted playsinline class="video" />
+        <canvas ref="rgbCanvas" class="video" />
       </div>
       <p v-if="status && !lastResult" class="status">{{ status }}</p>
 
@@ -403,37 +332,6 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   letter-spacing: 0.5px;
 }
-.cam-controls {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-.cam-select {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid #ccd;
-  font-size: 12px;
-  font-family: inherit;
-  background: white;
-  color: #1f3a4d;
-}
-.cam-select:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.rescan {
-  background: white;
-  border: 1px solid #ccd;
-  border-radius: 6px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 13px;
-  font-family: inherit;
-  color: #5b7a8c;
-  flex-shrink: 0;
-}
 .video-wrap {
   position: relative;
   width: 100%;
@@ -446,7 +344,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1);
 }
 .status {
   margin: 0;
