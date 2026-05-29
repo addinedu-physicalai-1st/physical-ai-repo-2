@@ -267,56 +267,23 @@ function interpolateMotion(t: number): StreamJointSnapshot | null {
   return { jointNames: m.joint_names, positions, tMs: tt * 1000 };
 }
 
-// ---- 노래 stage: tempo variation + 실 오디오 진행 추적 -----------------------
-// `yeonghui_mugunghwa.mp3` (자연 속도 ~4.6s) 가 단일 진실의 원천 (single source of truth).
-// `audio.currentTime / audio.duration` 으로 진행률을 그리고, `audio.ended` 가 발화하면
-// 짧은 꼬리 후 관찰 단계로 전이. 이전엔 TTS 발화 vs. 가상 타이머 두 경주를 돌리느라
-// 빠른 tempo 에서 가상 시간이 먼저 만료돼 "무궁화" 도중 끊기는 버그가 있었음.
-type TempoPattern = 'random' | 'slow_to_fast' | 'fast_to_slow';
-
-const TEMPO_LABEL: Record<TempoPattern, string> = {
-  random: '빨랐다 느렸다',
-  slow_to_fast: '점점 빠르게',
-  fast_to_slow: '점점 느리게',
-};
-
-// 0.6 = 늘어진 슬로우모, 1.1 = 자연 속도 + 10%. 실물 로봇팔 안전상 RATE_MAX 는
-// 자연 속도 110% 를 넘기지 않는다 — 모터 부하·관성 우려 + 어린이 손이 닿는 거리.
-// 슬로우 쪽은 모터에 무해하므로 RATE_MIN 은 충분히 낮게 유지.
-const RATE_MIN = 0.6;
-const RATE_MAX = 1.1;
-const RATE_MID = (RATE_MIN + RATE_MAX) / 2;
-// 'random' 패턴의 속도 갱신 간격도 무작위 — 일정 주기로 바뀌면 거기에 적응당함.
-const RANDOM_RATE_MIN_REFRESH_MS = 220;
-const RANDOM_RATE_MAX_REFRESH_MS = 700;
+// ---- 노래 stage: 고정 속도 + 실 오디오 진행 추적 -----------------------------
+// `yeonghui_mugunghwa.mp3` (자연 속도 ~4.6s) 가 진행률의 단일 진실의 원천.
+// 속도는 고정(자연 속도 1.0×) — sim 모션·오디오·실물 팔 play 가 모두 같은 속도라 별도
+// 동기 로직 불필요. (이전엔 quintic/random 동적 템포였으나 실물 팔과 sim 동기 단순화 위해 고정.)
 const TICK_MS = 80;
 const SONG_AUDIO_URL = '/sounds/yeonghui_mugunghwa.mp3';
 
-const tempoPattern = ref<TempoPattern>('slow_to_fast');
-const currentRate = ref(1.0);
 const songProgressRatio = ref(0);  // audio.currentTime / audio.duration, live updated
 const songProgressPct = computed(() => Math.min(100, songProgressRatio.value * 100));
 
-let songTimer: number | null = null;
-let songTailTimer: number | null = null;
-let lastTickAt = 0;
-let lastRandomChangeAt = 0;
-let nextRandomRefreshMs = RANDOM_RATE_MIN_REFRESH_MS;
+let songTimer: number | null = null;        // 음악 진행률 timer
+let coverTimer: number | null = null;        // 가리기 애니메이션 timer (sim)
+let coverStartTimer: number | null = null;   // 가리기 완료 → 음악 시작 짧은 텀
 let songAudio: HTMLAudioElement | null = null;
 
-function pickTempoPattern(): TempoPattern {
-  const r = Math.random();
-  if (r < 1 / 3) return 'random';
-  if (r < 2 / 3) return 'slow_to_fast';
-  return 'fast_to_slow';
-}
-
-function pickRandomRefreshMs(): number {
-  return (
-    RANDOM_RATE_MIN_REFRESH_MS
-    + Math.random() * (RANDOM_RATE_MAX_REFRESH_MS - RANDOM_RATE_MIN_REFRESH_MS)
-  );
-}
+const COVER_HOLD_BUFFER_MS = 250;   // 가리기 끝나고 음악 시작 전 짧은 텀
+const COVER_FALLBACK_S = 2.5;       // motion 미로딩 시 가리기 추정 시간
 
 function ensureSongAudio(): HTMLAudioElement {
   if (songAudio) return songAudio;
@@ -326,54 +293,94 @@ function ensureSongAudio(): HTMLAudioElement {
   return a;
 }
 
+// 실물 팔 — song(가리기 forward) / observation(떼기 reverse) 시 녹화된 mugunghwa 모션을
+// follower 로 재생. realActive 일 때만 — sim 은 realActive 면 패널이 숨겨지므로 불필요.
+// speed=1.0(자연 속도) 고정 — 실물 안전상 자연 속도 110% 를 넘기지 않는다.
+async function playArmMotion(reverse: boolean): Promise<void> {
+  if (!stateWs.realActive.value) return;
+  try {
+    await fetch('/api/eduping/mugunghwa/motion/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: 'real', speed: 1.0, reverse }),
+    });
+  } catch { /* 실물 재생 실패는 게임 진행을 막지 않음 */ }
+}
+
+// 게임 종료/나가기 시 양팔을 부드럽게 home pose 로 복귀 (율동 정지와 동일 메커니즘 —
+// trapezoidal velocity profile). 가리기 자세로 멈춰 끝나도 제자리로 돌아온다.
+async function returnArmHome(): Promise<void> {
+  if (!stateWs.realActive.value) return;
+  try {
+    await fetch('/api/eduping/arm/return-home', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: 'real' }),
+    });
+  } catch { /* noop */ }
+}
+
+// 새 흐름: 1) 가리기 동작이 끝나면 → 2) 음악 재생 (팔은 가리기 자세로 정지 유지,
+// 음악 중에만 이동 허용) → 3) 음악 종료 → 관찰(떼기 + 프리즈, 움직이면 탈락).
 function startSongStage(): void {
   stopSongStage();
-  tempoPattern.value = pickTempoPattern();
-  nextRandomRefreshMs = pickRandomRefreshMs();
   songProgressRatio.value = 0;
-  currentRate.value =
-    tempoPattern.value === 'fast_to_slow' ? RATE_MAX
-    : tempoPattern.value === 'slow_to_fast' ? RATE_MIN
-    : RATE_MID;
-  // 노래 시작 = t=0 keyframe (≈ 팔 내림 자세) 부터 시작. 직전 관찰 단계에서 가리기
-  // 자세로 멈춰있던 viewer 가 갑자기 점프하지 않도록 즉시 reset — 첫 songTick 까지의
-  // 80ms 갭에서 발생하던 visual jump 제거.
-  armSnapshot.value = interpolateMotion(0);
+  armSnapshot.value = interpolateMotion(0);  // 팔 내림 자세에서 시작
+  // 1) 가리기 — 실물 forward play + sim 1회 보간 (coverDur 동안 0→full).
+  void playArmMotion(false);
+  const coverDur = motion.value?.duration_s ?? COVER_FALLBACK_S;
+  const startAt = performance.now();
+  coverTimer = window.setInterval(() => {
+    const elapsed = (performance.now() - startAt) / 1000;
+    const p = coverDur > 0 ? Math.min(1, elapsed / coverDur) : 1;
+    if (motion.value) armSnapshot.value = interpolateMotion(coverDur * p);
+    if (p >= 1) {
+      if (coverTimer !== null) { window.clearInterval(coverTimer); coverTimer = null; }
+      if (motion.value) armSnapshot.value = interpolateMotion(coverDur);  // 가리기 자세 유지
+      // 2) 가리기 완료 → 짧은 텀 후 음악 재생.
+      coverStartTimer = window.setTimeout(() => {
+        coverStartTimer = null;
+        if (stage.value === 'song') startMusicPhase();
+      }, COVER_HOLD_BUFFER_MS);
+    }
+  }, TICK_MS);
+}
 
+function startMusicPhase(): void {
   const audio = ensureSongAudio();
   try { audio.pause(); } catch { /* noop */ }
   try { audio.currentTime = 0; } catch { /* noop */ }
-  audio.playbackRate = currentRate.value;
+  audio.playbackRate = 1.0;  // 고정 속도
   audio.onended = () => {
-    if (stage.value !== 'song') return;
-    // 짧은 꼬리 — 아이가 멈출 0.2~0.8초 반응 시간. 가속/감속 패턴 모두 자연스럽게.
-    songTailTimer = window.setTimeout(() => {
-      songTailTimer = null;
-      if (stage.value === 'song') setStage('observation');
-    }, 200 + Math.random() * 600);
+    // 3) 음악 종료 → 관찰(떼기 + 프리즈). 음악 중에만 이동 허용, 이후 움직이면 탈락.
+    if (stage.value === 'song') setStage('observation');
   };
-  const p = audio.play();
-  if (p && typeof p.catch === 'function') {
-    p.catch((err: unknown) => {
+  const pr = audio.play();
+  if (pr && typeof pr.catch === 'function') {
+    pr.catch((err: unknown) => {
       const name = (err as { name?: string } | null)?.name;
       if (name === 'AbortError' || name === 'NotAllowedError') return;
       console.warn('[mugunghwa-song] play failed', err);
     });
   }
-
-  lastTickAt = performance.now();
-  lastRandomChangeAt = lastTickAt;
-  songTimer = window.setInterval(songTick, TICK_MS);
+  // 음악 진행률 (progress bar) 만 갱신. 팔은 가리기 자세로 정지 유지 (armSnapshot update 안 함).
+  songTimer = window.setInterval(() => {
+    const dur = audio.duration;
+    if (Number.isFinite(dur) && dur > 0) {
+      songProgressRatio.value = Math.min(1, audio.currentTime / dur);
+    }
+  }, TICK_MS);
 }
 
 function stopSongStage(): void {
-  if (songTimer !== null) {
-    window.clearInterval(songTimer);
-    songTimer = null;
+  for (const t of [songTimer, coverTimer]) {
+    if (t !== null) window.clearInterval(t);
   }
-  if (songTailTimer !== null) {
-    window.clearTimeout(songTailTimer);
-    songTailTimer = null;
+  songTimer = null;
+  coverTimer = null;
+  if (coverStartTimer !== null) {
+    window.clearTimeout(coverStartTimer);
+    coverStartTimer = null;
   }
   if (songAudio) {
     songAudio.onended = null;
@@ -381,55 +388,6 @@ function stopSongStage(): void {
     try { songAudio.currentTime = 0; } catch { /* noop */ }
   }
   songProgressRatio.value = 0;
-}
-
-function songTick(): void {
-  const audio = songAudio;
-  if (!audio) return;
-  const now = performance.now();
-  lastTickAt = now;
-
-  // 진행률 — duration 이 metadata 로딩 전엔 NaN 이므로 가드.
-  const dur = audio.duration;
-  if (Number.isFinite(dur) && dur > 0) {
-    songProgressRatio.value = Math.min(1, audio.currentTime / dur);
-  }
-
-  // 가리기 모션 정방향 — audio progress 에 lock 된 motion 시간으로 keyframe 보간.
-  // audio.playbackRate 가 동적으로 변하면 audio.currentTime 도 같은 속도로 변하므로
-  // motion 도 자동으로 같은 tempo 로 재생됨.
-  if (motion.value) {
-    armSnapshot.value = interpolateMotion(motion.value.duration_s * songProgressRatio.value);
-  }
-
-  // 패턴별 rate. slow_to_fast / fast_to_slow 는 **quintic** 커브 (t⁵) — 실제 무궁화꽃이
-  // 피었습니다 놀이의 술래 가락은 "무우구웅화 꼬오치이" 늘어진 슬로우모로 끌다 끝에 가서
-  // "피었습니다!" 휘몰아치는 형태. 선형 ramp 는 중간부터 이미 보통 속도가 돼버려서
-  // 슬로우모 느낌이 안 남. 5제곱 곡선이면 t=0.7 까지 rate < 0.75× 로 늘어진 채 유지되고,
-  // 마지막 ~25% 구간에서 가속해 RATE_MAX 에 도달.
-  //   t=0.50 → rate ≈ 0.46  (거의 RATE_MIN — 늘어진 슬로우모)
-  //   t=0.70 → rate ≈ 0.74  (여전히 느림)
-  //   t=0.85 → rate ≈ 1.29
-  //   t=1.00 → rate = RATE_MAX
-  // random 은 무작위 간격으로 새 값.
-  if (tempoPattern.value === 'random') {
-    if (now - lastRandomChangeAt >= nextRandomRefreshMs) {
-      currentRate.value = RATE_MIN + (RATE_MAX - RATE_MIN) * Math.random();
-      lastRandomChangeAt = now;
-      nextRandomRefreshMs = pickRandomRefreshMs();
-    }
-  } else {
-    const t = songProgressRatio.value;
-    const eased = t * t * t * t * t;  // t^5 — 슬로우 구간이 곡선의 대부분
-    if (tempoPattern.value === 'slow_to_fast') {
-      // 거의 RATE_MIN 유지하다 끝에서 가속.
-      currentRate.value = RATE_MIN + (RATE_MAX - RATE_MIN) * eased;
-    } else {
-      // fast_to_slow — 대칭형. 거의 RATE_MAX 유지하다 끝에서 늘어짐.
-      currentRate.value = RATE_MAX - (RATE_MAX - RATE_MIN) * eased;
-    }
-  }
-  try { audio.playbackRate = currentRate.value; } catch { /* noop */ }
 }
 
 // ---- stage transitions ------------------------------------------------------
@@ -619,9 +577,16 @@ const perception = useMugunghwaPerception({
 // ---- perception stage signals -----------------------------------------------
 // observation 진입/이탈 및 end 단계에서 노드에 신호를 보낸다.
 watch(stage, (s, prev) => {
+  // recognize 는 참가자 확인(entry) 단계에만. 초기 entry 는 노드가 peer 접속 시 처리하고,
+  // 여기선 재진입(다시하기) 시 켜고, entry 를 벗어나면 끈다 → song/종료 중 recognize 중단.
+  if (s === 'entry') perception.registerStart();
+  else if (prev === 'entry') perception.registerStop();
   if (s === 'observation') perception.observeStart();
   else if (prev === 'observation') perception.observeStop();
-  if (s === 'end') perception.reset();
+  if (s === 'end') {
+    perception.reset();
+    void returnArmHome();  // 종료 화면 — 실물 팔 부드럽게 제자리 복귀
+  }
 });
 
 
@@ -688,6 +653,8 @@ function countEliminated(): number {
 
 function startObservationCountdown(): void {
   stopObservationCountdown();
+  // 실물 팔: 떼기(reverse) 재생 (realActive 일 때만, 고정 속도).
+  void playArmMotion(true);
   observationEliminatedBefore = countEliminated();
   observationDur = OBS_DURATION_MIN_MS + Math.random() * (OBS_DURATION_MAX_MS - OBS_DURATION_MIN_MS);
   observationEndAt = performance.now() + observationDur;
@@ -755,7 +722,7 @@ watch(stage, (s, prev) => {
 // 단계별 viewer 입력:
 //   entry / ready / end / eliminationWait — rest snapshot (자연 하강 자세). follower WS
 //     가 잔존 pose 를 들고 있어도 명시적으로 zero pose 로 덮어쓴다.
-//   song — 음악 진행률에 lock 된 모션 보간 (songTick 에서 갱신)
+//   song — 가리기 1회 보간 후 가리기 자세 유지 (startSongStage 의 coverTimer)
 //   observation — 노래 끝 자세 (가리기) 에서 정지 (update 안 함)
 watch(stage, (s) => {
   if (s === 'entry' || s === 'ready' || s === 'end' || s === 'eliminationWait') {
@@ -804,6 +771,8 @@ watch(
 
 onUnmounted(() => {
   voice.setSttHints([]);
+  // 어떤 경로로 나가든(종료·대기·언마운트) 실물 팔을 제자리로 복귀 — stateWs.stop() 전에 호출.
+  void returnArmHome();
   stopSongStage();
   if (songAudio) {
     try { songAudio.pause(); } catch { /* noop */ }
@@ -932,10 +901,6 @@ onUnmounted(() => {
               </footer>
 
               <div v-if="stage === 'song'" class="arm-overlay">
-                <div class="tempo-badge" :class="`tempo-${tempoPattern}`">
-                  <span class="tempo-name">{{ TEMPO_LABEL[tempoPattern] }}</span>
-                  <span class="tempo-rate">{{ currentRate.toFixed(2) }}×</span>
-                </div>
                 <div class="song-bar" role="progressbar" aria-label="노래 진행">
                   <div class="song-fill" :style="{ width: `${songProgressPct}%` }" />
                 </div>

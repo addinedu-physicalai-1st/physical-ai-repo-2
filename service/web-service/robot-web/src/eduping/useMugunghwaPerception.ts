@@ -117,6 +117,8 @@ export function useMugunghwaPerception(handlers: PerceptionHandlers) {
     connect,
     disconnect,
     captureStream,
+    registerStart: () => send({ type: 'register_start' }),
+    registerStop: () => send({ type: 'register_stop' }),
     observeStart: () => send({ type: 'observe_start' }),
     observeStop: () => send({ type: 'observe_stop' }),
     reset: () => send({ type: 'reset' }),
