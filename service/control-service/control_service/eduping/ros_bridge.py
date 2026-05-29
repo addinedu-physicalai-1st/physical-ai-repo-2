@@ -42,8 +42,9 @@ try:
     from geometry_msgs.msg import PointStamped
     from rclpy.action import ActionClient
     from rclpy.node import Node
+    from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
     from sensor_msgs.msg import JointState
-    from std_msgs.msg import Float64MultiArray
+    from std_msgs.msg import Bool, Float64MultiArray
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
     _ROS_AVAILABLE = True
@@ -66,6 +67,7 @@ TOPIC_FOLLOWER = "/joint_states"
 TOPIC_TRAJECTORY = "/eduping/joint_trajectory"
 TOPIC_HIGHFIVE_HAND_POINT = "/eduping/highfive/hand_point"
 HIGHFIVE_HAND_FRAME = "d435_depth_optical_frame"
+TOPIC_PROXIMITY_BLOCK = "/eduping/proximity_block"  # proximity_safety_node → 근접 정지 신호
 
 # routine 타입
 KIND_DANCE = "dance"
@@ -157,6 +159,13 @@ class EdupingRosBridge:
         # return_to_home 중복 호출 dedup — 서버 사이드 (stream 종료) + 프론트 POST 가
         # 같은 정지 이벤트로 0.x 초 안에 두 번 들어오면 두 번째는 trajectory 재발행 skip.
         self._last_return_home_at: float = 0.0
+        # 근접 안전정지 — proximity_safety_node 의 /eduping/proximity_block 구독 결과.
+        # override(모드별 우회)가 True 면 block 무시. _proximity_paused 는 현재 정지 중 여부,
+        # _active_real_play 는 정지 시 이어서 재개할 진행 중 실물 재생 (routine/speed/ramp/start).
+        self._proximity_blocked: bool = False
+        self._proximity_override: bool = False
+        self._proximity_paused: bool = False
+        self._active_real_play: dict | None = None
         # Live teleop 독립 상태 — 녹화와 무관하게 leader → forward_position 패스스루 ON/OFF.
         self._teleop_active: bool = False
         # Teleop SmoothDamp tracking — cmd + per-joint velocity 를 함께 유지.
@@ -201,6 +210,16 @@ class EdupingRosBridge:
         )
         self._node.create_subscription(JointState, TOPIC_LEADER, self._on_leader, 50)
         self._node.create_subscription(JointState, TOPIC_FOLLOWER, self._on_follower, 50)
+        # 근접 안전정지 — proximity_safety_node 가 latched(transient_local) 로 송출하므로
+        # 같은 QoS 로 구독해야 마지막 상태를 즉시 받는다.
+        _prox_qos = QoSProfile(
+            depth=1,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self._node.create_subscription(
+            Bool, TOPIC_PROXIMITY_BLOCK, self._on_proximity_block, _prox_qos,
+        )
         # Real follower action clients — server 가 아직 안 떠 있을 수 있으니 wait 은 send 시점.
         self._ac_right_arm = ActionClient(
             self._node, FollowJointTrajectory, "/right_joint_trajectory_controller/follow_joint_trajectory"
@@ -426,6 +445,8 @@ class EdupingRosBridge:
                 "leader": _js_to_dict(self._leader),
                 "follower": _js_to_dict(self._follower),
                 "real_active": self.is_real_follower_active(),
+                "proximity_blocked": self._proximity_blocked,
+                "proximity_override": self._proximity_override,
             }
 
     # WS hub 가 broadcast 주기로 사용 — burst 활성 시 50Hz, 평소 10Hz.
@@ -554,6 +575,7 @@ class EdupingRosBridge:
                 self._teleop_grip_left_last = None
                 self._teleop_grip_right_sent_s = 0.0
                 self._teleop_grip_left_sent_s = 0.0
+            self._apply_proximity()  # teleop 활성 → 근접 정지 자동 우회 (정지 중이면 재개)
             return {"active": True, "switch": "ok"}
         else:
             with self._lock:
@@ -572,6 +594,7 @@ class EdupingRosBridge:
                 activate=["right_joint_trajectory_controller", "left_joint_trajectory_controller"],
                 deactivate=["right_forward_position_controller", "left_forward_position_controller"],
             )
+            self._apply_proximity()  # teleop 종료 → 근접 정지 다시 적용
             return {"active": False, "switch": "ok"}
 
     def stop_recording(self, save: bool) -> dict:
@@ -833,7 +856,26 @@ class EdupingRosBridge:
 
         action server 가 미가동 (실물 bringup 안 됨) 이면 그 채널은 skip 하고 다른
         채널만 처리 — 부분 실패도 status 에 반영.
+
+        근접 안전정지: 진행 중 재생을 추적(_active_real_play)해 정지 시 이어서 재개할 수
+        있게 한다. 송출 시점에 이미 block 중이면 실물 goal 을 보내지 않고 보류 — 해제 시
+        _do_resume 이 처음부터 보낸다 (사람이 가까이 있는 동안 팔이 움직이지 않도록).
         """
+        with self._lock:
+            blocked = (
+                self._proximity_blocked
+                and not self._proximity_override
+                and not self._teleop_active
+            )
+            self._active_real_play = {
+                "routine": routine, "speed": speed, "ramp_s": ramp_s,
+                "start_mono": time.monotonic(), "paused_elapsed_s": 0.0,
+            }
+            if blocked:
+                self._proximity_paused = True
+        if blocked:
+            logger.info("proximity blocked — 실물 goal 송출 보류 (해제 시 재개)")
+            return {"right_arm": "proximity blocked", "left_arm": "proximity blocked"}
         names = list(routine.joint_names)
         right_arm = [f"openarm_right_joint{i}" for i in range(1, 8)]
         left_arm = [f"openarm_left_joint{i}" for i in range(1, 8)]
@@ -896,6 +938,100 @@ class EdupingRosBridge:
             status[label] = "sent"
             logger.info("[%s] goal sent", label)
         return status
+
+    # --- 근접 안전정지 (proximity safety) -----------------------------------
+    def _on_proximity_block(self, msg: "Bool") -> None:
+        with self._lock:
+            self._proximity_blocked = bool(msg.data)
+        self._apply_proximity()
+
+    def set_proximity_override(self, enabled: bool) -> dict:
+        """모드별 우회 — True 면 근접 정지를 무시(원격진찰/건강검진/녹화 등). 즉시 반영."""
+        with self._lock:
+            self._proximity_override = bool(enabled)
+        self._apply_proximity()
+        return {"ok": True, "proximity_override": bool(enabled)}
+
+    def _apply_proximity(self) -> None:
+        """effective block(근접 & !override) 전환 시 팔 정지/재개. 플래그 전환은 lock
+        안에서 원자적으로 — 두 스레드(executor/HTTP)가 동시에 호출해도 중복 정지/재개 방지."""
+        action = None
+        with self._lock:
+            # 원격진찰(teleop) 중에는 의사가 팔을 의도적으로 아이 가까이 가져가므로 자동 우회.
+            effective = (
+                self._proximity_blocked
+                and not self._proximity_override
+                and not self._teleop_active
+            )
+            if effective and not self._proximity_paused:
+                self._proximity_paused = True
+                right, left = _extract_arm_pos(self._follower)
+                active = self._active_real_play
+                if active is not None:
+                    active["paused_elapsed_s"] = max(0.0, time.monotonic() - active["start_mono"])
+                action = ("pause", right, left)
+            elif not effective and self._proximity_paused:
+                self._proximity_paused = False
+                action = ("resume", None, None)
+        if action is None:
+            return
+        if action[0] == "pause":
+            self._do_pause(action[1], action[2])
+        else:
+            self._do_resume()
+
+    def _do_pause(self, right: "list[float] | None", left: "list[float] | None") -> None:
+        """현재 양팔 자세로 1-point hold goal 전송 → 진행 goal preempt → 정지."""
+        if right is None or left is None:
+            logger.warning("proximity pause: follower pose 없음 — hold goal skip")
+            return
+        hold_t = Duration(sec=0, nanosec=300_000_000)  # 0.3s 안에 현재 자세로 감속·정지
+        for client, side, pos in (
+            (self._ac_right_arm, "right", right),
+            (self._ac_left_arm, "left", left),
+        ):
+            if client is None or not client.wait_for_server(timeout_sec=0.5):
+                continue
+            goal = FollowJointTrajectory.Goal()
+            goal.trajectory.joint_names = [f"openarm_{side}_joint{i}" for i in range(1, 8)]
+            pt = JointTrajectoryPoint()
+            pt.positions = [float(x) for x in pos]
+            pt.velocities = [0.0] * 7
+            pt.time_from_start = hold_t
+            goal.trajectory.points.append(pt)
+            client.send_goal_async(goal)
+        logger.info("proximity pause — 팔 정지 (근접 감지)")
+
+    def _do_resume(self) -> None:
+        """정지 시점 이후 남은 keyframe 을 현재 자세에서 이어서 재전송."""
+        with self._lock:
+            active = self._active_real_play
+        if active is None:
+            logger.info("proximity resume — 재개할 진행 재생 없음")
+            return
+        routine = active["routine"]
+        speed = active["speed"]
+        # t_scaled = kf.t/speed + ramp 였으므로, 정지까지의 벽시계 경과에서 ramp 를 빼고
+        # speed 를 곱해 routine-time 으로 환산 → 그보다 뒤의 keyframe 만 남김.
+        routine_t = max(0.0, (active.get("paused_elapsed_s", 0.0) - active["ramp_s"]) * speed)
+        remaining = [kf for kf in routine.keyframes if float(kf.t) > routine_t]
+        if not remaining:
+            with self._lock:
+                self._active_real_play = None
+            logger.info("proximity resume — 남은 모션 없음 (이미 완료)")
+            return
+        from types import SimpleNamespace
+
+        from eduarm.routines_io import Keyframe  # type: ignore[import-not-found]
+        base_t = float(remaining[0].t)
+        shim = SimpleNamespace(
+            joint_names=routine.joint_names,
+            keyframes=[Keyframe(t=float(kf.t) - base_t, pos=list(kf.pos)) for kf in remaining],
+        )
+        ramp_s = self._compute_ramp_s(shim)
+        # _send_real_follower_goals 가 _active_real_play 를 남은 구간으로 재기록 → 다회 정지/재개 OK.
+        self._send_real_follower_goals(shim, speed, ramp_s)
+        logger.info("proximity resume — 남은 %d keyframe 재개", len(remaining))
 
     def _switch_controllers(self, *, activate: list[str], deactivate: list[str]) -> bool:
         """controller_manager 의 switch_controller 호출. 실물 bringup 안 떠 있으면 False."""

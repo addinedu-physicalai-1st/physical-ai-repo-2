@@ -345,6 +345,21 @@ async def arm_return_home(req: Request, body: ReturnHomeIn) -> dict:
         raise HTTPException(400, str(e)) from e
 
 
+class ProximityOverrideIn(BaseModel):
+    enabled: bool
+
+
+@router.post("/arm/proximity-override")
+async def arm_proximity_override(req: Request, body: ProximityOverrideIn) -> dict:
+    """근접 안전정지 모드별 우회 — 원격진찰/건강검진/녹화 등 진입 시 enabled=true,
+    이탈 시 false. true 면 사람이 가까워도 팔이 멈추지 않는다 (안전 OFF)."""
+    bridge = _bridge(req)
+    try:
+        return bridge.set_proximity_override(body.enabled)
+    except (ValueError, BridgeUnavailable) as e:
+        raise HTTPException(400, str(e)) from e
+
+
 class HighfiveHandTargetIn(BaseModel):
     """DepthViewer 가 보낸 손 3D 위치 (d435 optical frame, meters)."""
     x: float = Field(..., description="optical X (right, m)")
