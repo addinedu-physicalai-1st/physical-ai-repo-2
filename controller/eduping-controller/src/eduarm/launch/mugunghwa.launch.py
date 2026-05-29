@@ -17,7 +17,8 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         DeclareLaunchArgument("control_url", default_value="ws://localhost:8000"),
         DeclareLaunchArgument("recognize_base_url", default_value="http://localhost:8000"),
-        DeclareLaunchArgument("device_token", default_value=""),
+        # dev 기본값 — control-service ROBOT_DEVICE_TOKEN / robot-web VITE_ROBOT_TOKEN 와 동일.
+        DeclareLaunchArgument("device_token", default_value="dev-robot-token-change-me"),
         DeclareLaunchArgument("yolo_model", default_value="yolov8n.pt"),
 
         Node(

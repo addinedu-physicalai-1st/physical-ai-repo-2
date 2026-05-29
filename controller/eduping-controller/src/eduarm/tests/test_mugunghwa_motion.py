@@ -36,6 +36,14 @@ def test_match_recognize_no_overlap_unbound():
     assert match_recognize_to_tracks(matches, tracks) == {}
 
 
+def test_match_recognize_face_inside_person_binds():
+    # recognize 는 InsightFace 얼굴 bbox(작음), track 은 YOLO 사람(class 0) bbox(큼).
+    # 얼굴이 사람 박스 안에 들어가면 바인딩돼야 한다. IoU 로는 얼굴/사람 면적 차로 실패.
+    matches = [{"child_id": 7, "bbox": [110, 100, 140, 150]}]   # 얼굴 30x50
+    tracks = [{"track_id": 3, "bbox": (90, 90, 180, 400)}]      # 사람 90x310 (얼굴 포함)
+    assert match_recognize_to_tracks(matches, tracks) == {3: 7}
+
+
 def test_select_movers_strict():
     tracks = [
         {"track_id": 1, "bbox": (10, 10, 50, 50)},     # centroid (30,30)

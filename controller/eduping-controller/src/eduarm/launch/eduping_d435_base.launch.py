@@ -1,11 +1,15 @@
 """eduping_d435_base.launch.py — EduPing D435 상시 세트 (단일 opener).
 
-realsense2_camera(유일 D435 opener) + RGB/PointCloud/Depth bridge + 카메라 static TF.
-무궁화 perception(YOLO)은 게임때만 mugunghwa.launch.py 로 별도 기동.
-follower(OpenArm) 와 독립 — CAN/모터 불필요.
+realsense2_camera(유일 D435 opener) + RGB/PointCloud/Depth bridge + 카메라 static TF
++ 무궁화 perception 노드. follower(OpenArm) 와 독립 — CAN/모터 불필요.
+
+perception 노드는 항상 떠 있되 idle 에선 YOLO 를 돌리지 않는다. robot-web 가 무궁화
+모드에 진입(/ws/eduping/mugunghwa role=ui)하면 relay 가 peer present=true 를 보내
+노드가 entry 로 전환되며 그때부터 YOLO 추론 시작, 모드 이탈 시 다시 idle. 즉 무거운
+추론은 UI 가 켜고 끈다 — 별도 기동 단계 불필요.
 
   ros2 launch eduarm eduping_d435_base.launch.py \
-    control_url:=ws://localhost:8000 server_host:=127.0.0.1
+    control_url:=ws://localhost:8000 server_host:=127.0.0.1 device_token:=<robot-token>
 """
 from __future__ import annotations
 
@@ -25,6 +29,10 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         DeclareLaunchArgument("control_url", default_value="ws://localhost:8000"),
+        DeclareLaunchArgument("recognize_base_url", default_value="http://localhost:8000"),
+        # dev 기본값 — control-service ROBOT_DEVICE_TOKEN / robot-web VITE_ROBOT_TOKEN 와 동일.
+        DeclareLaunchArgument("device_token", default_value="dev-robot-token-change-me"),
+        DeclareLaunchArgument("yolo_model", default_value="yolov8n.pt"),
         DeclareLaunchArgument("server_host", default_value="127.0.0.1"),
         DeclareLaunchArgument("server_port", default_value="8100"),
         DeclareLaunchArgument("serial_no", default_value="''"),
@@ -70,6 +78,18 @@ def generate_launch_description() -> LaunchDescription:
                 "server_host": LaunchConfiguration("server_host"),
                 "server_port": LaunchConfiguration("server_port"),
                 "robot": "eduping",
+            }],
+        ),
+        # 무궁화 perception — 항상 실행, idle 에선 YOLO 미가동. robot-web 무궁화 모드
+        # 진입 시 relay 의 peer 이벤트로 entry 전환되어 추론 시작 (UI 가 켜고 끈다).
+        Node(
+            package="eduarm", executable="mugunghwa_perception_node",
+            name="mugunghwa_perception", output="screen",
+            parameters=[{
+                "control_url": LaunchConfiguration("control_url"),
+                "recognize_base_url": LaunchConfiguration("recognize_base_url"),
+                "device_token": LaunchConfiguration("device_token"),
+                "yolo_model": LaunchConfiguration("yolo_model"),
             }],
         ),
     ])

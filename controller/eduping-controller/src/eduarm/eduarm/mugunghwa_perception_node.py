@@ -134,7 +134,9 @@ class MugunghwaPerception(Node):
         super().__init__("mugunghwa_perception")
         self.declare_parameter("control_url", "ws://localhost:8000")
         self.declare_parameter("recognize_base_url", "http://localhost:8000")
-        self.declare_parameter("device_token", "")
+        # control-service ROBOT_DEVICE_TOKEN / robot-web VITE_ROBOT_TOKEN 와 동일한 dev 기본값.
+        # 운영에선 launch arg(device_token:=) 또는 env 로 override. 빈값이면 recognize 401.
+        self.declare_parameter("device_token", "dev-robot-token-change-me")
         self.declare_parameter("jpeg_quality", 75)
         self.declare_parameter("throttle_hz", 15.0)
         self.declare_parameter("entry_recognize_hz", 1.5)
@@ -194,8 +196,17 @@ class MugunghwaPerception(Node):
             msg = json.loads(text)
         except Exception:
             return
+        # 모드: idle(YOLO 안 함) | entry(YOLO+recognize) | playing(YOLO 추적만) | observing(YOLO+판정)
+        # recognize(InsightFace 호출)는 entry 단계에만. register_start/stop 으로 UI 가 참가자
+        # 확인 단계 진입/이탈을 알려, song/종료 중엔 recognize 가 멈춘다.
         t = msg.get("type")
-        if t == "observe_start":
+        if t == "register_start":
+            with self._state_lock:
+                self._mode = "entry"
+        elif t == "register_stop":
+            with self._state_lock:
+                self._mode = "playing"
+        elif t == "observe_start":
             with self._state_lock:
                 self._baseline = {
                     tk["track_id"]: centroid(tk["bbox"]) for tk in self._tracks
@@ -204,15 +215,15 @@ class MugunghwaPerception(Node):
             self.get_logger().info(f"observe_start (baseline n={len(self._baseline)})")
         elif t == "observe_stop":
             with self._state_lock:
-                self._mode = "entry"
+                self._mode = "playing"
                 self._baseline = {}
         elif t == "reset":
             with self._state_lock:
-                self._mode = "entry"
+                self._mode = "playing"
                 self._bindings = {}
                 self._baseline = {}
         elif t == "peer":
-            # ui 접속 시 entry 로 진입 (present True). 떠나면 idle.
+            # ui 접속 시 entry 로 진입(초기 참가자 확인 — recognize on). 떠나면 idle.
             with self._state_lock:
                 self._mode = "entry" if msg.get("present") else "idle"
 
@@ -269,6 +280,13 @@ class MugunghwaPerception(Node):
         if now - self._last_entry < self._entry_period:
             return
         if self._recognize_inflight or not tracks:
+            return
+        # 이미 모든 track 이 child 에 바인딩됐으면 recognize 불필요 — 미식별 track 이 있을 때만
+        # POST. 같은 track_id 가 유지되는 한 재인식 안 함 (서버 InsightFace 부하 ↓). 새 사람이
+        # 들어오면 새 track_id(unbound) 가 생겨 즉시 재개.
+        with self._state_lock:
+            bound = set(self._bindings)
+        if all(t["track_id"] in bound for t in tracks):
             return
         self._last_entry = now
         ok, buf = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, self._quality])

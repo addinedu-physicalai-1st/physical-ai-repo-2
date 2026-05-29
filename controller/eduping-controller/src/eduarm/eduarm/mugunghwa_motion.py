@@ -14,30 +14,31 @@ def centroid(bbox: Bbox) -> tuple[float, float]:
     return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
 
-def _iou(a: Bbox, b: Bbox) -> float:
-    ax1, ay1, ax2, ay2 = a
-    bx1, by1, bx2, by2 = b
-    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
-    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+def _containment(inner: Bbox, outer: Bbox) -> float:
+    """inner(얼굴) 가 outer(사람) 박스에 얼마나 들어가 있나 — inter / inner_area (0..1)."""
+    ix1, iy1 = max(inner[0], outer[0]), max(inner[1], outer[1])
+    ix2, iy2 = min(inner[2], outer[2]), min(inner[3], outer[3])
     iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
     inter = iw * ih
     if inter <= 0:
         return 0.0
-    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
-    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
-    union = area_a + area_b - inter
-    return inter / union if union > 0 else 0.0
+    inner_area = max(0.0, inner[2] - inner[0]) * max(0.0, inner[3] - inner[1])
+    return inter / inner_area if inner_area > 0 else 0.0
 
 
 def match_recognize_to_tracks(
     matches: list[dict],
     tracks: list[dict],
-    iou_threshold: float = 0.3,
+    containment_threshold: float = 0.5,
 ) -> dict[int, int]:
-    """recognize-multi 응답(matched=True 인 것만)의 bbox 를 track 에 greedy IoU 매칭.
+    """recognize-multi 의 얼굴 bbox 를 YOLO person track 에 greedy 매칭.
 
-    matches: [{"child_id": int, "bbox": [x1,y1,x2,y2]}, ...]
-    tracks:  [{"track_id": int, "bbox": (x1,y1,x2,y2)}, ...]
+    recognize 는 InsightFace **얼굴** bbox, track 은 YOLO **사람(class 0)** bbox 라 크기가
+    크게 달라 IoU 는 부적합 (얼굴이 사람 박스 안의 작은 영역 → IoU ≪ 0.3 → 바인딩 실패).
+    얼굴이 사람 박스에 얼마나 포함되는가(containment = inter/face_area)로 매칭한다.
+
+    matches: [{"child_id": int, "bbox": [x1,y1,x2,y2]}, ...]   # 얼굴
+    tracks:  [{"track_id": int, "bbox": (x1,y1,x2,y2)}, ...]    # 사람
     반환: {track_id: child_id}
     """
     pairs: list[tuple[float, int, int]] = []
@@ -45,10 +46,10 @@ def match_recognize_to_tracks(
         mb = m.get("bbox")
         if not mb or len(mb) < 4:
             continue
-        mbbox: Bbox = (mb[0], mb[1], mb[2], mb[3])
+        face: Bbox = (mb[0], mb[1], mb[2], mb[3])
         for ti, t in enumerate(tracks):
-            v = _iou(mbbox, t["bbox"])
-            if v >= iou_threshold:
+            v = _containment(face, t["bbox"])
+            if v >= containment_threshold:
                 pairs.append((v, mi, ti))
     pairs.sort(key=lambda p: p[0], reverse=True)
     used_m: set[int] = set()
