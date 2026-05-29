@@ -107,7 +107,7 @@ class OccupancyCheck:
         inflate_m: float = 0.0,
     ) -> "OccupancyCheck":
         """admin_map.svg 의 검정 영역을 점유로 사용. PyQt 필요 (lazy import)."""
-        from PyQt5.QtCore import Qt, QRectF
+        from PyQt5.QtCore import QRectF
         from PyQt5.QtGui import QImage, QPainter
         from PyQt5.QtSvg import QSvgRenderer
         from PyQt5.QtWidgets import QApplication

@@ -17,6 +17,10 @@
 #                      Arduino 없으면 시리얼 에러 무시.
 #       camera-pan   : gogoping_camera_pan camera_pan.launch.py — Arduino MG995 ×2
 #                      pan/tilt 서보. /dev/arduino-camera 자동 udev install.
+#       perception   : (opt-in, WITH_PERCEPTION=1) gogoping_perception perception.launch.py
+#                      — camera 의 D435 shm 을 읽어 YOLO+ReID → /gogoping/person_proximity +
+#                      /gogoping/tracking_state + debug_image. modes 의 state_str(GOTO/FOLLOW…)
+#                      로 YOLO 자동 활성.
 #       rviz         : rviz2 시각화
 #
 # 사용:
@@ -29,6 +33,12 @@
 #   NO_ERROR_SAFETY=1      HardwareHealth / MapBoundary fault → ERROR 차단
 #   NO_PROXIMITY_SAFETY=1  사람(1.5m)/벽(0.5m) 근접 정지·reroute·후진 비활성 (graph_router)
 # 예시: NO_BATTERY_SAFETY=1 NO_ERROR_SAFETY=1 NO_PROXIMITY_SAFETY=1 scripts/device-gogoping-sim.sh
+#
+# perception 토글:
+#   WITH_PERCEPTION=1  perception(YOLO+ReID) 윈도우 추가 — /gogoping/person_proximity,
+#                      /gogoping/tracking_state, /gogoping/perception/debug_image 발행.
+#                      system python3 에 ultralytics/torch 필요 (루트 CLAUDE.md 의 pip 블록).
+#                      미설치 시 perception 윈도우만 죽고 sim 본체는 정상 동작.
 #
 # 의존:
 #   - tmux
@@ -219,7 +229,17 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n camera-pan -c "$REPO_ROOT" \
       "$SOURCE_ENV && exec ros2 launch gogoping_camera_pan camera_pan.launch.py"
 
-    # window 7: rviz (map / TF / AMCL / costmap / plan 시각화)
+    # window 7 (opt-in): perception — YOLO+ByteTrack+ReID → /gogoping/tracking_state +
+    # /gogoping/person_proximity (graph_router 사람감지). WITH_PERCEPTION=1 일 때만 추가.
+    # camera 윈도우의 D435 shm 을 읽음 — modes 가 GOTO/FOLLOW 진입 시 state_str 로 YOLO 자동 활성.
+    # system python3 에 ultralytics/torch 필요 (루트 CLAUDE.md). 미설치 시 이 윈도우만 죽음.
+    if [[ -n "${WITH_PERCEPTION:-}" ]]; then
+      tmux new-window -t "$SESSION" -n perception -c "$REPO_ROOT" \
+        "$SOURCE_ENV && exec ros2 launch gogoping_perception perception.launch.py"
+      echo "[device-gogoping-sim] WITH_PERCEPTION=1 — perception 윈도우 추가"
+    fi
+
+    # window 8: rviz (map / TF / AMCL / costmap / plan 시각화)
     # Gazebo GUI 와 RViz 두 창이 같이 떠서 거슬릴 때 비활성화 — Gazebo 만 사용.
     # 필요하면 아래 두 줄 주석 해제 (또는 별도 터미널에서 `rviz2 -d $RVIZ_CONFIG` 수동 실행).
     RVIZ_CONFIG="$REPO_ROOT/install/gogoping_navigation/share/gogoping_navigation/rviz/gogoping_view.rviz"
@@ -254,6 +274,8 @@ case "$ACTION" in
       "ros2 run gogoping_modes"
       "ros2 run gogoping_bringup sim_battery_node"
       "ros2 run gogoping_bringup sim_teleport_node"
+      "ros2 launch gogoping_perception perception"
+      "gogoping_perception/lib/gogoping_perception"
       "gz sim"
       "ruby .*gz sim"
       "parameter_bridge"

@@ -34,6 +34,13 @@ def filter_twist(raw: Any, safety_stop: bool) -> Any:
             v.z = 0.0
 
     if safety_stop:
+        # safety_stop 은 "정면 장애물 근접" — 전진(+x)·측방만 차단하고, 후진(-x)과
+        # 제자리 회전(angular.z)은 허용한다. 앞 장애물에서 뒤로 빠지거나 다른 방향으로
+        # 도는 건 정면 충돌을 늘리지 않는 탈출 동작이기 때문. (후방/측방 안전은
+        # 호출측 — graph_router 의 rear_clearance 체크 등 — 이 담당)
+        fwd = float(raw.linear.x)
+        out.linear.x = fwd if fwd < 0.0 else 0.0
+        out.angular.z = float(raw.angular.z)
         return out
 
     out.linear.x = float(raw.linear.x)

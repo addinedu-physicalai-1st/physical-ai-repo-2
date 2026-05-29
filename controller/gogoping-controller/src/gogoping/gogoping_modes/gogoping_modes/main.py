@@ -118,6 +118,15 @@ class GogopingModes:
         self._timer = node.create_timer(1.0 / self.TICK_HZ, self._tick)
         self._last_publish = 0.0
 
+        # 7) 근접 상황 — robot-web/admin 안내 표시 전용 (FSM 로직엔 무관).
+        # graph_router 와 동일한 /gogoping/proximity_event 를 구독해 snapshot 에 실어
+        # 기존 /ws/robot-state 파이프로 UI 에 전달 (새 WS 불필요).
+        from std_msgs.msg import String as _String
+        self._latest_proximity: dict | None = None
+        node.create_subscription(
+            _String, "/gogoping/proximity_event", self._on_proximity_event, 10,
+        )
+
         self._logger.info(
             f"GogopingModes ready — initial state={fsm.current_state}, "
             f"tick={self.TICK_HZ}Hz, publish={self.PUBLISH_HZ}Hz"
@@ -207,6 +216,7 @@ class GogopingModes:
                 self.ctx.fsm.current_state,
                 self.tree.root,
                 map_cache=self.ctx.map_cache,
+                proximity=self._latest_proximity,
             )
             self.ctx.ui.publish_state(snap)
             self._last_publish = now
@@ -353,11 +363,31 @@ class GogopingModes:
         self._logger.info(f"[tree SUCCESS] {self._current_state} → task_done")
         self.ctx.fsm.trigger("task_done")
 
-    def _on_tree_failure(self) -> None:
-        """MainTree root FAILURE = SubTree 가 끝까지 실패 → RETURNING 으로 도피.
+    def _on_proximity_event(self, msg) -> None:
+        """/gogoping/proximity_event(JSON) → snapshot 의 proximity 필드용 캐시.
 
-        예: FollowSubTree 의 Loss Recovery 끝까지 대상 못 찾음 → FAILURE → RETURNING.
+        표시 전용 — FSM/BT 로직엔 영향 없음. 파싱 실패 시 None.
         """
+        import json
+        try:
+            self._latest_proximity = json.loads(msg.data)
+        except (ValueError, TypeError, AttributeError):
+            self._latest_proximity = None
+
+    def _on_tree_failure(self) -> None:
+        """MainTree root FAILURE 처리.
+
+        - GOTO 실패 = 목적지 도달 불가(주로 경로 막힘 + 우회로 없음). 이때 충전소 복귀
+          (RETURNING)는 부적절 — 복귀 경로도 같은 막힌 곳을 지나면 또 멈춘다. 그 자리
+          정지 후 IDLE 로 보내 사람이 비키거나 재명령을 기다린다. (배터리 부족 등 진짜
+          복귀 사유는 BatteryLowMonitor 가 별도 trigger 로 처리.)
+        - 그 외 task state(FOLLOW/LULLABY/HIDEANDSEEK) 실패 = 기존대로 RETURNING 도피.
+          예: FollowSubTree 의 Loss Recovery 끝까지 대상 못 찾음 → 복귀.
+        """
+        if self._current_state == "GOTO":
+            self._logger.warning("[tree FAILURE] GOTO 도달 불가 → cancel (IDLE 정지)")
+            self.ctx.fsm.trigger("cancel")
+            return
         self._logger.warning(
             f"[tree FAILURE] {self._current_state} → return_request"
         )
