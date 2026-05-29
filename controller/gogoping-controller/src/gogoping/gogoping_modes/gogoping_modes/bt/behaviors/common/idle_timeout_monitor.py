@@ -9,8 +9,7 @@ monitor 컨벤션 (``docs/conventions.md`` §2):
 
 타이밍 소스: ``time.monotonic()`` — 시스템 시계 변경에 영향 받지 않음.
 
-ROS param ``idle_timeout_seconds`` (기본 86400.0 = 24시간 — 시연/데모 환경에서 자동
-복귀 없이 안정적) 로 임계값 조정 — `context.node.declare_parameter` 에서 한 번만 등록
+ROS param ``idle_timeout_seconds`` (기본 900.0 = 15분) 로 임계값 조정 — `context.node.declare_parameter` 에서 한 번만 등록
 (이미 다른 곳에서 등록돼 있어도 ParameterAlreadyDeclaredException 안전).
 """
 from __future__ import annotations
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
     from ....context import Context
 
 
-_DEFAULT_TIMEOUT_S = 86400.0
+_DEFAULT_TIMEOUT_S = 900.0  # 15분
 _PARAM_NAME = "idle_timeout_seconds"
 
 

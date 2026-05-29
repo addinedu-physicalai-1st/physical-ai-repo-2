@@ -1259,16 +1259,27 @@ class WaypointMapCard(QFrame):
         self._map.set_route(seq)
 
     def _on_graph_navigate(self, name: str) -> None:
-        """장소 클릭 → FSM GOTO 진입 (SetGoal.srv → state GOTO 전이).
+        """장소 클릭 → FSM GOTO 진입 (SetGoal.srv → state GOTO 전이) + 경로선 표시.
 
-        /waypoints/navigate(graph_router action 직행)는 robot 이동은 하지만 FSM 을
-        안 거쳐 state 가 IDLE 에 머문다 → proximity/YOLO(person·obstacle 감지)가 안 켜짐.
-        FSM trigger 를 거치는 /api/gogoping/goto_vertex 로 호출해 state=GOTO 전이까지 발생시킨다.
+        GOTO 전이는 /api/gogoping/goto_vertex (FSM trigger) 로 호출 — state=GOTO 발생.
+        (/waypoints/navigate 직행은 FSM 을 안 거쳐 IDLE 에 머물러 proximity/YOLO 가 안 켜짐.)
+
+        경로선(set_route)은 /waypoints/route 로 별도 fetch 해 즉시 그린다 — goto_vertex 는
+        waypoints bridge 를 안 거쳐서 route_sequence SSE 가 안 나오기 때문. 도착 시 SSE
+        goal_status=succeeded 가 set_route(None) 으로 자동 clear 한다. route fetch 실패는
+        navigate 진행과 무관하므로 조용히 무시 (이미-도착이면 seq=1점 → 선 안 보임).
         """
         import httpx
         try:
             httpx.post(f"{self._control_url}/api/gogoping/goto_vertex",
                        json={"name": name}, timeout=2.0)
+        except httpx.HTTPError:
+            pass
+        try:
+            r = httpx.post(f"{self._control_url}/waypoints/route",
+                           json={"name": name}, timeout=2.0)
+            if r.status_code == 200:
+                self._map.set_route(r.json().get("vertex_sequence") or [])
         except httpx.HTTPError:
             pass
 

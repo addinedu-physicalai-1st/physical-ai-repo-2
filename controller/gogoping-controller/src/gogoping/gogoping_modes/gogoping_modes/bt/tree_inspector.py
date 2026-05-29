@@ -21,9 +21,9 @@ snapshot 구조::
       "robot_pose": {"x": 3.2, "y": -1.4, "yaw": 0.78},  # blackboard.ROBOT_POSE (None = odom 미수신)
       "in_map": true,         # map_cache.is_outside 부정. True/False/None (None = 맵 미수신)
       "proximity": {          # /gogoping/proximity_event (main.py 가 전달). 표시 전용. None = 미수신
-        "level": "person_close",   # "ok" | "person_close" | "wall_close"
-        "person_dist_m": 0.5, "wall_dist_m": null
-      },                      # robot-web StatusBar 가 "앞에 친구가 있어요" 등 안내 표시
+        "level": "person_close",   # "ok" | "person_close"  (person-only)
+        "person_dist_m": 0.5
+      },                      # robot-web StatusBar 가 "앞에 친구가 있어요" 안내 표시
       "ts": 1730000035.123
     }
 
@@ -235,7 +235,7 @@ def snapshot(
         # 값: "move_to_play"/"recruit"/"countdown"/"patrol"/"return"/"end"/"" (미진행).
         "hideseek_phase": _read_hideseek_phase(),
         # 근접 상황 — robot-web 이 "사람이 앞에 있어요/장애물" 안내 표시에 사용.
-        # {"level": "ok"|"person_close"|"wall_close", "person_dist_m", "wall_dist_m"} 또는 None.
+        # {"level": "ok"|"person_close", "person_dist_m"} 또는 None (person-only).
         # graph_router 가 구독하는 /gogoping/proximity_event 와 동일 소스 (main.py 가 전달).
         "proximity": proximity,
         "ts": time.time(),

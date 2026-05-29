@@ -135,37 +135,28 @@ from gogoping_perception import config
 from gogoping_perception.safety_monitor import evaluate_proximity_level
 
 
-def test_proximity_ok_no_threats():
+def test_proximity_ok_no_person():
     assert evaluate_proximity_level(
-        person_dist_m=inf, wall_dist_m=inf, current_state="GOTO"
+        person_dist_m=inf, current_state="GOTO"
     ) == "ok"
 
 
-def test_proximity_person_close_priority_over_wall():
-    # 사람·벽 둘 다 임계 안 → person_close 우선 (임계는 config 참조해 튜닝에 안 깨지게).
+def test_proximity_person_close():
+    # 사람 임계 안 → person_close (person-only; 장애물 판정 제거됨).
     assert evaluate_proximity_level(
         person_dist_m=config.PERSON_FRONT_DIST_M - 0.1,
-        wall_dist_m=config.WALL_FRONT_DIST_M - 0.1,
         current_state="GOTO",
     ) == "person_close"
 
 
-def test_proximity_wall_close_only():
-    assert evaluate_proximity_level(
-        person_dist_m=inf,
-        wall_dist_m=config.WALL_FRONT_DIST_M - 0.1,
-        current_state="GOTO",
-    ) == "wall_close"
-
-
 def test_proximity_bypass_in_manual():
     assert evaluate_proximity_level(
-        person_dist_m=0.5, wall_dist_m=0.3, current_state="MANUAL"
+        person_dist_m=0.5, current_state="MANUAL"
     ) == "ok"
 
 
 def test_proximity_person_at_exact_threshold():
     # 정확히 임계값(<=) 이면 person_close.
     assert evaluate_proximity_level(
-        person_dist_m=config.PERSON_FRONT_DIST_M, wall_dist_m=inf, current_state="GOTO"
+        person_dist_m=config.PERSON_FRONT_DIST_M, current_state="GOTO"
     ) == "person_close"

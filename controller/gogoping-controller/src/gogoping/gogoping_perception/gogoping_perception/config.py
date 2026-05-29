@@ -106,17 +106,8 @@ YOLO_NAV_MODES: tuple[str, ...] = (
 # 정면 박스 (robot frame, m) — graph_router 의 사람 감지 영역
 PERSON_FRONT_DIST_M: float = 0.6   # 디버깅값 (사람 0.6m 정지)
 PERSON_LATERAL_LIMIT_M: float = 0.5
-# 벽 close threshold (m) — proximity_event 의 wall_close 발화 기준
-WALL_FRONT_DIST_M: float = 0.6     # 디버깅값 (장애물 0.6m 정지)
 # 카메라 intrinsic (D435 default — 실측 후 튜닝)
 CAMERA_FX_PX: float = 615.0
 CAMERA_CX_PX: float = 320.0
-
-# ── depth 기반 정면 최근접 장애물 거리 (/gogoping/obstacle_distance) ──
-# 사람 무관 — 화면 정면 중앙 밴드의 최근접(저백분위) depth 를 거리로 publish.
-# 바닥은 영상 하단에 잡히므로 중앙 수평 밴드(상단~중단)만 본다. depth cam 은
-# 전방 only·바닥 포함이라 LiDAR 회피를 대체하지 않는다 — 정면 거리 참고용.
-OBSTACLE_ROW_TOP_FRAC: float = 0.30   # ROI 상단 (H 비율) — 위쪽 천장/벽 제외
-OBSTACLE_ROW_BOT_FRAC: float = 0.60   # ROI 하단 (H 비율) — 아래쪽 바닥 제외
-OBSTACLE_COL_HALF_FRAC: float = 0.25  # ROI 좌우 절반폭 (W 비율) — 정면 한정
-OBSTACLE_PERCENTILE: float = 5.0      # 최소값 대신 저백분위 — speckle 노이즈 회피
+# (person-only: 장애물 wall_close / 중앙밴드 obstacle 거리 관련 상수는 제거됨.
+#  충돌 안전용 OBSTACLE_THRESHOLD_MM / MIN_PIXELS / ROI_TOP_RATIO 는 evaluate_safety 에서 사용.)

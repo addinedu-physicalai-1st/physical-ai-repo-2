@@ -167,10 +167,6 @@ class PerceptionNode(Node):
         self._person_proximity_pub = self.create_publisher(
             Float32, "/gogoping/person_proximity", 10,
         )
-        # depth 기반 정면 최근접 장애물 거리 (사람 포함) — safety_monitor/graph_router 구독.
-        self._obstacle_pub = self.create_publisher(
-            Float32, "/gogoping/obstacle_distance", 10,
-        )
         self.create_subscription(
             String, "/gogoping/state_str", self._on_state_str, 10,
             callback_group=self._target_cbg,
@@ -350,40 +346,6 @@ class PerceptionNode(Node):
         except Exception as e:
             self.get_logger().warn(f"person_proximity publish failed: {e}")
 
-    def _publish_obstacle_distance(self, results, depth: np.ndarray) -> None:
-        """정면 중앙 밴드 최근접 '비-사람' 장애물 거리 publish.
-
-        ⚠️ 사람 bbox 픽셀은 제외한다 (nearest_in_box_split 의 obstacle 부분).
-        사람은 person_proximity(person_close) 가 따로 처리하므로, 여기서 사람을 포함하면
-        person_dist 가 깜빡일 때 wall_close 가 사람한테 오발동 → 후진(backup) → 목적지
-        상실(RETURNING) 버그가 난다. 그래서 wall_dist 용 값은 반드시 사람 제외.
-        rqt debug_image 의 obstacle 라벨과 동일 계산.
-        """
-        from std_msgs.msg import Float32
-        from gogoping_perception.frontal_box import nearest_in_box_split
-        try:
-            detections: list[tuple] = []
-            if results:
-                r = results[0]
-                if r.boxes is not None and len(r.boxes.xyxy) > 0:
-                    boxes_xyxy = r.boxes.xyxy.cpu().numpy()
-                    detections = [
-                        tuple(map(int, bbox.tolist())) for bbox in boxes_xyxy
-                    ]
-            _person_m, obstacle_m = nearest_in_box_split(
-                depth,
-                detections,
-                depth_min_mm=config.DEPTH_MIN_MM,
-                depth_max_mm=config.DEPTH_MAX_MM,
-                row_top_frac=config.OBSTACLE_ROW_TOP_FRAC,
-                row_bot_frac=config.OBSTACLE_ROW_BOT_FRAC,
-                col_half_frac=config.OBSTACLE_COL_HALF_FRAC,
-                percentile=config.OBSTACLE_PERCENTILE,
-            )
-            self._obstacle_pub.publish(Float32(data=float(obstacle_m)))
-        except Exception as e:  # noqa: BLE001
-            self.get_logger().warn(f"obstacle_distance publish failed: {e}")
-
     def _publish_debug_image(self, color: np.ndarray, depth: np.ndarray, results) -> None:
         """YOLO 박스를 그린 프레임을 /gogoping/perception/debug_image 로 publish.
 
@@ -396,18 +358,15 @@ class PerceptionNode(Node):
             return
         try:
             import cv2
-            from gogoping_perception.frontal_box import nearest_in_box_split
             annotated = color.copy()
             with self._lock:
                 target_id = (
                     self._last_track.track_id if self._last_track is not None else None
                 )
-            detections: list[tuple[int, int, int, int]] = []
             if results:
                 r = results[0]
                 if r.boxes is not None and len(r.boxes.xyxy) > 0:
                     xyxy = r.boxes.xyxy.cpu().numpy()
-                    detections = [tuple(map(int, b.tolist())) for b in xyxy]
                     ids = (
                         r.boxes.id.cpu().numpy().astype(int)
                         if r.boxes.id is not None else None
@@ -431,36 +390,6 @@ class PerceptionNode(Node):
             cv2.putText(
                 annotated, f"state={self._current_state}", (8, 22),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA,
-            )
-            # ── 정면 ROI(빨강): 사람/사물 중 가까운 쪽 거리 표시 ──
-            # ROI 안 사람 bbox 픽셀=person, 나머지=obstacle 로 나눠 더 가까운 쪽을 라벨.
-            # /gogoping/obstacle_distance 토픽 값(사람 포함)은 그대로 — rqt 표시만 변경.
-            h_img, w_img = annotated.shape[:2]
-            r0 = max(0, int(h_img * config.OBSTACLE_ROW_TOP_FRAC))
-            r1 = min(h_img, int(h_img * config.OBSTACLE_ROW_BOT_FRAC))
-            cc = w_img // 2
-            cw = int(w_img * config.OBSTACLE_COL_HALF_FRAC)
-            c0 = max(0, cc - cw)
-            c1 = min(w_img, cc + cw)
-            person_m, obstacle_m = nearest_in_box_split(
-                depth, detections,
-                depth_min_mm=config.DEPTH_MIN_MM,
-                depth_max_mm=config.DEPTH_MAX_MM,
-                row_top_frac=config.OBSTACLE_ROW_TOP_FRAC,
-                row_bot_frac=config.OBSTACLE_ROW_BOT_FRAC,
-                col_half_frac=config.OBSTACLE_COL_HALF_FRAC,
-                percentile=config.OBSTACLE_PERCENTILE,
-            )
-            if person_m == float("inf") and obstacle_m == float("inf"):
-                roi_str = "--"
-            elif person_m <= obstacle_m:
-                roi_str = f"person {person_m:.2f}m"
-            else:
-                roi_str = f"obstacle {obstacle_m:.2f}m"
-            cv2.rectangle(annotated, (c0, r0), (c1, r1), (0, 0, 255), 1)
-            cv2.putText(
-                annotated, roi_str, (c0, max(12, r0 - 5)),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA,
             )
             msg = self._bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
             msg.header.stamp = self.get_clock().now().to_msg()
@@ -520,8 +449,6 @@ class PerceptionNode(Node):
         # ── person_proximity publish — target 유무 무관 (graph_router 용) ──
         self._publish_person_proximity(results, depth)
 
-        # ── obstacle_distance publish — 사람 제외 정면 최근접 (wall_close 용) ──
-        self._publish_obstacle_distance(results, depth)
 
         # ── debug image publish — subscriber 있을 때만 (target 유무 무관) ──
         self._publish_debug_image(color, depth, results)

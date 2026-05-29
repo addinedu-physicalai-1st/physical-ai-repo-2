@@ -74,13 +74,9 @@ Visualization Manager:
           Value: true
         gogoping/base_link:
           Value: true
-        gogoping/face_decoration:
-          Value: true
-        gogoping/front_left_caster:
-          Value: true
-        gogoping/front_right_caster:
-          Value: true
         gogoping/laser_link:
+          Value: true
+        gogoping/left_caster:
           Value: true
         gogoping/left_wheel:
           Value: true
@@ -88,11 +84,11 @@ Visualization Manager:
           Value: true
         gogoping/odom:
           Value: true
-        gogoping/rear_left_caster:
-          Value: true
-        gogoping/rear_right_caster:
+        gogoping/right_caster:
           Value: true
         gogoping/right_wheel:
+          Value: true
+        map:
           Value: true
       Marker Scale: 0.5
       Name: TF
@@ -100,7 +96,21 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        map:
+          gogoping/odom:
+            gogoping/base_footprint:
+              gogoping/base_link:
+                gogoping/left_caster:
+                  {}
+                gogoping/left_wheel:
+                  {}
+                gogoping/lidar_mount:
+                  gogoping/laser_link:
+                    {}
+                gogoping/right_caster:
+                  {}
+                gogoping/right_wheel:
+                  {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -272,11 +282,11 @@ Visualization Manager:
           Class: rviz_default_plugins/Path
           Color: 30; 144; 255
           Enabled: true
-          Head Diameter: 0.08
-          Head Length: 0.08
-          Length: 0.3
+          Head Diameter: 0.07999999821186066
+          Head Length: 0.07999999821186066
+          Length: 0.30000001192092896
           Line Style: Lines
-          Line Width: 0.1
+          Line Width: 0.10000000149011612
           Name: Graph Router L1 Path
           Offset:
             X: 0
@@ -284,9 +294,9 @@ Visualization Manager:
             Z: 0
           Pose Color: 30; 144; 255
           Pose Style: None
-          Radius: 0.03
-          Shaft Diameter: 0.02
-          Shaft Length: 0.08
+          Radius: 0.029999999329447746
+          Shaft Diameter: 0.019999999552965164
+          Shaft Length: 0.07999999821186066
           Topic:
             Depth: 1
             Durability Policy: Transient Local
@@ -437,7 +447,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 17.981725692749023
+      Scale: 49.51553726196289
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz_default_plugins)
       X: 0
@@ -459,5 +469,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 347
-  Y: 907
+  X: 452
+  Y: 155
