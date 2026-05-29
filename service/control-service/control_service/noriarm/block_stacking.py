@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from .block_stacking_process import RunnerProcess
+from .front_camera import front_camera
 
 # block_stacking 게임 자산 디렉토리.
 _REPO_ROOT = Path(__file__).resolve().parents[4]  # /home/s/pingdergarten
@@ -210,12 +211,16 @@ async def create_session() -> dict:
 async def play_rps(sid: str) -> dict:
     session = _session_or_404(sid)
 
+    # 직전 추론 runner 가 양도받았던 카메라를 회수 — 프리뷰/RPS 가 다시 쓸 수 있게.
+    front_camera.reclaim()
+
     # 이미 실행 중인 rps_player가 있다면 (즉, 비겨서 다시 시작하는 경우)
     # 즉시 강제 종료(kill)하여 홈 포즈로 복귀하는 동작을 생략한다.
     fast_restart = False
     if session.rps_proc is not None and session.rps_proc.returncode is None:
         logger.warning("[block-stacking] 기존 rps_player 즉시 강제 종료 (비김 재시작)")
         session.rps_proc.kill()
+        await asyncio.sleep(0.5)  # 포트(/dev/omx_follower) 해제 대기
         session.rps_proc = None
         fast_restart = True
 
@@ -261,10 +266,9 @@ async def detect_rps(sid: str) -> dict:
     """
     session = _session_or_404(sid)
     loop = asyncio.get_running_loop()
+    front_camera.acquire()  # 공유 카메라 — 프리뷰 스트림과 디바이스를 다투지 않음
     try:
         from noriarm_framework.games.block_stacking.rps_detector import detect_rps_gesture
-        _by_id = Path("/dev/v4l/by-id/usb-Alcorlink_Corp._USB_2.0_Camera-video-index0")
-        front_cam = str(_by_id.resolve()) if _by_id.exists() else "/dev/video4"
 
         detected: list[str | None] = [None]
 
@@ -274,7 +278,9 @@ async def detect_rps(sid: str) -> dict:
                     return
                 g = await loop.run_in_executor(
                     None,
-                    lambda: detect_rps_gesture(front_cam, timeout_s=5.0, min_detections=8),
+                    lambda: detect_rps_gesture(
+                        read_frame=front_camera.read, timeout_s=5.0, min_detections=8
+                    ),
                 )
                 if g is not None:
                     detected[0] = g
@@ -290,7 +296,10 @@ async def detect_rps(sid: str) -> dict:
                     line = await asyncio.wait_for(proc.stdout.readline(), timeout=60.0)
                     if not line:
                         return
-                    if line.strip() == b"READY":
+                    token = line.strip()
+                    if token == b"TRAJ_START":
+                        session.push_event({"type": "rps_traj_start"})
+                    elif token == b"READY":
                         return
             except asyncio.TimeoutError:
                 pass
@@ -316,6 +325,8 @@ async def detect_rps(sid: str) -> dict:
     except Exception as e:
         logger.warning("[block-stacking] rps-detect 실패: %s", e)
         return {"gesture": None}
+    finally:
+        front_camera.release()
 
 
 @router.post("/sessions/{sid}/start")
@@ -332,6 +343,10 @@ async def start_play(sid: str) -> dict:
             logger.warning("[block-stacking] rps_player timeout — 강제 종료")
             session.rps_proc.kill()
     session.rps_proc = None
+
+    # 추론 runner(별도 프로세스)가 front 카메라를 직접 열어야 하므로,
+    # control-service 가 쥐고 있던 카메라(프리뷰/RPS 공유) 핸들을 양도한다.
+    front_camera.release_to_external()
 
     # 카메라 v4l2 세팅.
     if _CAMERA_TUNER.exists():
@@ -435,6 +450,9 @@ async def end_session(sid: str) -> dict:
                         pass
         except Exception:
             logger.warning("[block-stacking] runner 종료 중 예외 (무시)")
+
+    # runner 가 양도받았던 front 카메라 회수 (다음 세션/프리뷰용).
+    front_camera.reclaim()
 
     # bringup 재기동.
     if _DEVICE_NORIARM_SH.exists():

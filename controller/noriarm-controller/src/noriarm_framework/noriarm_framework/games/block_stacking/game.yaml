@@ -47,9 +47,10 @@ policy:
   repo_id: jisoo3/act_game_block_stacking_0527_recovery
   joint_names: [joint1, joint2, joint3, joint4, joint5]
   camera_keys: [front, wrist]
-  extra:
-    n_action_steps: 1
-    temporal_ensemble_coeff: 0.01
+  stacking_zone: [186, 106, 440, 302]  # (x1,y1,x2,y2) 프론트 카메라 기준 쌓기 구역
+  stacking_zone_min_blue: 15317         # 파란 픽셀 수 임계값 (블록 꽉 찼을 때 ~21882의 70%)
+  n_action_steps: 1
+  temporal_ensemble_coeff: 0.01
   # device: cuda:0    # 명시 안 하면 lerobot 가 자동 선택.
 
 # RPS '보' replay 는 별도 매니페스트 (rule_based 정책) 로 가져가지 않고, bridge 측
