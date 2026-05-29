@@ -37,7 +37,7 @@ setup(
             'soft_start_node = eduarm.soft_start_node:main',
             # Phase 4 — PointStamped target → TwistStamped (servo_node 입력).
             'servo_reach_node = eduarm.servo_reach_node:main',
-            # D435 → control-service WS 스트리머. d435_depth.launch.py 가 호출.
+            # D435 → control-service WS 스트리머 (ROS 구독 노드). eduping_d435_base.launch.py 가 호출.
             'd435_depth_streamer = eduarm.d435_depth_streamer:main',
             # 하이파이브 hand_point → IK → JointTrajectory. highfive_sim.launch.py 가 호출.
             'highfive_node = eduarm.highfive_node:main',
