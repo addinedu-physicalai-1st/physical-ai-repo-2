@@ -13,6 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # (filename, dest_dir) — filename 은 ultralytics 의 GitHub assets 저장소 기준 basename
 MODELS: list[tuple[str, Path]] = [
     ("yolov8s-worldv2.pt", REPO_ROOT / "service" / "ai-service" / "ai_service" / "models"),
+    # 무궁화 device-local perception (mugunghwa_perception_node) 의 YOLO. 노드 런치 CWD =
+    # controller/eduping-controller 라 거기에 받아두면 bare "yolov8n.pt" 로 찾는다.
+    ("yolov8n.pt", REPO_ROOT / "controller" / "eduping-controller"),
 ]
 
 
