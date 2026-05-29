@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # scripts/device-eduping.sh — OpenArm 양팔 follower bringup (실물 전용).
+# bringup(real) 시 같은 tmux 세션에 윈도 2개를 띄운다: 'bringup'(팔) + 'd435'(카메라 상시
+# 세트 = eduping_d435_base.launch.py). d435 는 팔과 독립된 별도 윈도라 CAN/모터 실패와
+# 무관하게 카메라/perception 이 뜬다.
 #
 # 인터랙티브 메뉴 (인자 없을 때 자동 표시) — 또는 인자로 직접:
 #
@@ -180,7 +183,7 @@ stage_bringup() {
     local CUR_HW
     CUR_HW=$(tmux list-windows -t "$SESSION" -F '#{window_name} #{pane_current_command}' 2>/dev/null | true)
     local CUR_CMD
-    CUR_CMD=$(tmux display-message -t "$SESSION" -p '#{pane_start_command}' 2>/dev/null || true)
+    CUR_CMD=$(tmux display-message -t "$SESSION:bringup" -p '#{pane_start_command}' 2>/dev/null || true)
     # pane_start_command 에서 hardware_type=... 추출
     local CUR_MODE=""
     if [[ "$CUR_CMD" == *"hardware_type=real"* ]]; then
@@ -213,8 +216,21 @@ stage_bringup() {
   tmux set-option -t "$SESSION" -g window-status-format ' #I:#W '
   tmux set-option -t "$SESSION" -g window-status-current-format ' #I:#W '
 
-  log "세션 '$SESSION' 시작 — arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN"
-  log "/joint_states 토픽이 살아나면 sim twin / Control Server 가 구독 가능"
+  # 카메라 상시 세트 (단일 opener + bridge + 무궁화 perception) — 팔과 독립된 별도 윈도.
+  # CAN/모터 실패와 무관하게 카메라/perception 이 뜬다. perception 의 YOLO 는 idle 이며
+  # robot-web 무궁화 진입 시에만 추론. control_url 은 기본(localhost); 원격 control 이면
+  # CONTROL_URL/DEVICE_TOKEN env override.
+  # ros2 launch 는 빈 'device_token:=' 를 거부 — 토큰 있을 때만 인자 추가 (없으면 launch 기본값 "").
+  local d435_token_arg=""
+  [[ -n "${DEVICE_TOKEN:-}" ]] && d435_token_arg=" device_token:=$DEVICE_TOKEN"
+  D435_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
+    ros2 launch eduarm eduping_d435_base.launch.py \
+      control_url:=${CONTROL_URL:-ws://localhost:8000} \
+      recognize_base_url:=${RECOGNIZE_BASE_URL:-http://localhost:8000}$d435_token_arg'"
+  tmux new-window -t "$SESSION" -n d435 -c "$WS_DIR" "$D435_CMD"
+
+  log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트"
+  log "/joint_states 토픽이 살아나면 sim twin / Control Server 가 구독 가능. d435 윈도엔 카메라/bridge/perception."
   exec tmux attach -t "$SESSION"
 }
 
@@ -253,8 +269,15 @@ case "$ACTION" in
     ;;
   d|down)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
-      tmux kill-session -t "$SESSION"
-      log "세션 '$SESSION' 종료"
+      # graceful: ros2 launch 가 노드(특히 realsense2_camera — D435 점유)를 정리하도록 각
+      # 윈도에 SIGINT(Ctrl-C) 먼저. abrupt kill-session(SIGHUP)만 하면 launch 자식 노드가
+      # orphan 으로 남아 D435 'device busy' 를 유발한다.
+      for w in $(tmux list-windows -t "$SESSION" -F '#{window_index}' 2>/dev/null); do
+        tmux send-keys -t "$SESSION:$w" C-c 2>/dev/null || true
+      done
+      sleep 3
+      tmux kill-session -t "$SESSION" 2>/dev/null || true
+      log "세션 '$SESSION' 종료 (graceful — SIGINT 후 정리)"
     else
       log "세션 '$SESSION' 없음"
     fi
