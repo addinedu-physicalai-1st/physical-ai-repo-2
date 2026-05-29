@@ -11,7 +11,8 @@ import { onUnmounted, ref, type Ref } from 'vue';
 export type PerceptionEvent =
   | { type: 'registered'; childId: number }
   | { type: 'eliminated'; childIds: number[] }
-  | { type: 'motion' };
+  | { type: 'motion' }
+  | { type: 'reached'; childId: number | null };
 
 /** WS text 한 줄을 PerceptionEvent 로. peer/presence·미지원 타입·오류는 null. */
 export function parsePerceptionEvent(raw: string): PerceptionEvent | null {
@@ -32,6 +33,11 @@ export function parsePerceptionEvent(raw: string): PerceptionEvent | null {
         : null;
     case 'motion':
       return { type: 'motion' };
+    case 'reached':
+      return {
+        type: 'reached',
+        childId: typeof msg.child_id === 'number' ? msg.child_id : null,
+      };
     default:
       return null;
   }
@@ -41,6 +47,7 @@ export interface PerceptionHandlers {
   onRegistered?: (childId: number) => void;
   onEliminated?: (childIds: number[]) => void;
   onMotion?: () => void;
+  onReached?: (childId: number | null) => void;
 }
 
 const EVENT_PATH = '/ws/eduping/mugunghwa?role=ui';
@@ -88,6 +95,7 @@ export function useMugunghwaPerception(handlers: PerceptionHandlers) {
       if (e.type === 'registered') handlers.onRegistered?.(e.childId);
       else if (e.type === 'eliminated') handlers.onEliminated?.(e.childIds);
       else if (e.type === 'motion') handlers.onMotion?.();
+      else if (e.type === 'reached') handlers.onReached?.(e.childId);
     };
 
     videoWs = new WebSocket(wsUrl(VIDEO_PATH));

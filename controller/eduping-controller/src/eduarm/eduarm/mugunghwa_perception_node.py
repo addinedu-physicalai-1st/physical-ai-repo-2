@@ -24,6 +24,7 @@ import time
 import urllib.request
 
 import cv2
+import numpy as np
 import rclpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
@@ -36,6 +37,15 @@ from eduarm.mugunghwa_motion import (
     max_displacement,
     select_movers,
 )
+from eduarm.proximity import (
+    OFF_FRAMES_DEFAULT,
+    ON_FRAMES_DEFAULT,
+    REACH_PCTL_DEFAULT,
+    person_distance_mm,
+    step_debounce,
+)
+
+ALIGNED_DEPTH_TOPIC = "/d435/aligned_depth_to_color/image_raw"
 
 EVENT_PATH = "/ws/eduping/mugunghwa?role=robot"
 VIDEO_PATH = "/ws/eduping/mugunghwa/video?role=producer"
@@ -146,6 +156,15 @@ class MugunghwaPerception(Node):
         self.declare_parameter("mover_px", 10.0)
         self.declare_parameter("mover_loose_px", 4.0)
         self.declare_parameter("motion_cooldown_s", 2.0)
+        # 근접 도달 — 사람이 0.6m 이내로 다가오면 "로봇 도달"(게임 종료 트리거). 전역 proximity
+        # 정지와 달리 무궁화는 접근이 게임 목표라 정지 대신 도달 이벤트로 쓴다. aligned depth 의
+        # 사람 bbox 거리로 판정, step_debounce 로 occlusion 깜빡임 무시.
+        self.declare_parameter("reach_near_mm", 600)
+        self.declare_parameter("reach_on_frames", ON_FRAMES_DEFAULT)
+        self.declare_parameter("reach_off_frames", OFF_FRAMES_DEFAULT)
+        # median(50) — bbox 에 겹친 로봇 팔/윤곽 노이즈 같은 소수 near 픽셀에 강건. 사람 몸통
+        # 실제 거리를 잡아 "멀어도 종료" 오검출 방지.
+        self.declare_parameter("reach_person_pctl", REACH_PCTL_DEFAULT)
 
         gp = self.get_parameter
         base = gp("control_url").get_parameter_value().string_value
@@ -163,6 +182,10 @@ class MugunghwaPerception(Node):
         self._mover_px = float(gp("mover_px").get_parameter_value().double_value)
         self._mover_loose_px = float(gp("mover_loose_px").get_parameter_value().double_value)
         self._cooldown_s = float(gp("motion_cooldown_s").get_parameter_value().double_value)
+        self._reach_near_mm = int(gp("reach_near_mm").get_parameter_value().integer_value)
+        self._reach_on = int(gp("reach_on_frames").get_parameter_value().integer_value)
+        self._reach_off = int(gp("reach_off_frames").get_parameter_value().integer_value)
+        self._reach_pctl = int(gp("reach_person_pctl").get_parameter_value().integer_value)
 
         from ultralytics import YOLO  # lazy — import 비용 큼
         self._yolo = YOLO(gp("yolo_model").get_parameter_value().string_value)
@@ -181,6 +204,11 @@ class MugunghwaPerception(Node):
         self._baseline: dict[int, tuple[float, float]] = {}
         self._state_lock = threading.Lock()
         self._recognize_inflight = False
+        # 근접 도달 상태 — 최신 aligned depth + 디바운스. _reach_near 는 디바운스된 근접 여부,
+        # rising edge(False→True)에서만 reached 이벤트 1회 emit (멀어지면 자연 re-arm).
+        self._latest_depth: np.ndarray | None = None
+        self._reach_near = False
+        self._reach_streak = 0
 
         self._events = _WsProducer(base + EVENT_PATH, self.get_logger(),
                                    name="mugunghwa-ws-events", on_message=self._on_command)
@@ -188,7 +216,17 @@ class MugunghwaPerception(Node):
                                   name="mugunghwa-ws-video")
 
         self.create_subscription(Image, "/d435/color/image_raw", self._on_image, 1)
+        self.create_subscription(Image, ALIGNED_DEPTH_TOPIC, self._on_depth, 1)
         self.get_logger().info("mugunghwa_perception up")
+
+    def _on_depth(self, msg: Image) -> None:
+        # 16UC1 aligned-to-color → 최신 프레임만 캐시 (color bbox 를 그대로 인덱싱).
+        try:
+            self._latest_depth = np.frombuffer(
+                msg.data, dtype=np.uint16
+            ).reshape(msg.height, msg.width)
+        except Exception:  # noqa: BLE001
+            pass
 
     # ---- 브라우저 명령 ----
     def _on_command(self, text: str) -> None:
@@ -272,6 +310,14 @@ class MugunghwaPerception(Node):
         elif mode == "observing":
             self._judge_movers(tracks)
 
+        # 근접 도달 — 게임 진행(playing/observing) 중에만. entry/idle 에선 등록차 가까이
+        # 와도 도달로 보지 않는다. (브라우저도 단계로 한 번 더 게이팅)
+        if mode in ("playing", "observing"):
+            self._judge_reach(tracks)
+        else:
+            self._reach_near = False
+            self._reach_streak = 0
+
         self._maybe_send_video(bgr)
 
     # ---- entry: recognize-multi (worker thread, blocking) ----
@@ -336,6 +382,34 @@ class MugunghwaPerception(Node):
         elif max_disp >= self._mover_loose_px:
             self._last_elim = now
             self._emit({"type": "motion"})  # 미식별 — 브라우저 flash + 교사 ✕
+
+    # ---- 근접 도달 판정 ----
+    def _judge_reach(self, tracks: list[dict]) -> None:
+        depth = self._latest_depth
+        if depth is None:
+            return
+        # 가장 가까운 track 과 그 거리. bbox 영역 depth 가 측정 불가면 그 track 은 건너뜀.
+        nearest_tid: int | None = None
+        nearest_mm: float | None = None
+        for tk in tracks:
+            d = person_distance_mm(depth, tk["bbox"], percentile=self._reach_pctl)
+            if d is None:
+                continue
+            if nearest_mm is None or d < nearest_mm:
+                nearest_mm = d
+                nearest_tid = tk["track_id"]
+        raw = nearest_mm is not None and nearest_mm < self._reach_near_mm
+        near, self._reach_streak = step_debounce(
+            self._reach_near, raw, self._reach_streak,
+            on_frames=self._reach_on, off_frames=self._reach_off,
+        )
+        if near and not self._reach_near:
+            # rising edge — 도달 1회 emit. 바인딩된 child 면 child_id, 아니면 null.
+            with self._state_lock:
+                child_id = self._bindings.get(nearest_tid) if nearest_tid is not None else None
+            self._emit({"type": "reached", "child_id": child_id})
+            self.get_logger().info(f"reached — child_id={child_id} dist={nearest_mm:.0f}mm")
+        self._reach_near = near
 
     # ---- 영상 송출 ----
     def _maybe_send_video(self, bgr) -> None:
