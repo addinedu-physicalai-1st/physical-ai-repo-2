@@ -1,4 +1,4 @@
-"""doctor_teleop.launch.py — 원격 진찰 (doctor teleop) sim 환경 부트.
+"""doctor_teleop.launch.py — 원격 진찰 (doctor teleop) arm teleop + MoveIt 부트.
 
 띄움:
   - robot_state_publisher  (양팔 URDF, mock_components 모드)
@@ -10,8 +10,8 @@
 note: 이전엔 moveit_servo × 2 포함했었으나 spec §12 의 hybrid IK 채택 후 무용.
       텔레옵은 leader 가 leader_hybrid_ik_node 를 통해 처리 (leader_teleop.launch.py).
 
-D435 (point cloud → octomap) 는 d435_camera.launch.py 를 include 로 같이 띄움.
-카메라 미연결이면 realsense 가 retry 로그만 찍고 octomap 은 비어있음 (launch 통과).
+D435/pointcloud/RGB 는 eduping_d435_base.launch.py 가 담당한다.
+이 launch 는 arm teleop + MoveIt 스택만 다룬다.
 RViz 는 기본 OFF (doctor UI 가 3D 뷰를 담당).
 
 검증 (Task 6 smoke):
@@ -34,9 +34,8 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -111,29 +110,6 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[robot_description_param],
     )
 
-    # D435 의 root frame (d435_link) 을 robot body 에 mount.
-    # 물리적 카메라가 살짝 위/아래/옆을 향하게 설치됐다면 cam_pitch/yaw/roll 로 보정.
-    # 양수 cam_pitch (rad) → 카메라 노즈 다운 (X→Z 회전 = 앞이 아래로). 위로 들렸을 때 음수.
-    # 적용 즉시 RViz + octomap + 의사 UI pointcloud + collision 거리 계산까지 일괄 반영.
-    # args: x y z yaw pitch roll parent child  (REP-103 ZYX intrinsic Euler)
-    cam_pitch_arg = DeclareLaunchArgument("cam_pitch", default_value="0.0",
-        description="D435 mount pitch (rad). 카메라가 위 향하면 음수 (e.g. -0.1).")
-    cam_yaw_arg = DeclareLaunchArgument("cam_yaw", default_value="0.0")
-    cam_roll_arg = DeclareLaunchArgument("cam_roll", default_value="0.0")
-    static_tf_camera = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_tf_camera_to_body",
-        arguments=[
-            "--x", "0.05", "--y", "0.0", "--z", "0.62",
-            "--yaw", LaunchConfiguration("cam_yaw"),
-            "--pitch", LaunchConfiguration("cam_pitch"),
-            "--roll", LaunchConfiguration("cam_roll"),
-            "--frame-id", "openarm_body_link0", "--child-frame-id", "d435_link",
-        ],
-        output="screen",
-    )
-
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
@@ -181,33 +157,6 @@ def generate_launch_description() -> LaunchDescription:
         name="move_group",
         output="screen",
         parameters=[moveit_params],
-    )
-
-    # D435 RealSense — pointcloud publish (/d435/depth/color/points). 없으면 octomap
-    # 비어있음. 카메라 미연결 환경에서 launch 자체는 통과 (realsense 가 retry 만 함).
-    d435_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory("eduarm"),
-                "launch", "d435_camera.launch.py",
-            )
-        ),
-    )
-
-    # D435 RGB / PointCloud → control-service WebSocket producer.
-    # ROS DDS 로 image cross-machine 보내면 WiFi 부담 — uploader 가 WS 로 우회.
-    # 같은 머신에선 localhost. control_url override 로 원격 서버 가리킬 수 있음.
-    d435_rgb_uploader = Node(
-        package="eduarm",
-        executable="d435_rgb_uploader_node",
-        name="d435_rgb_uploader",
-        output="screen",
-    )
-    d435_pointcloud_uploader = Node(
-        package="eduarm",
-        executable="d435_pointcloud_uploader_node",
-        name="d435_pointcloud_uploader",
-        output="screen",
     )
 
     # Controller spawner 는 ros2_control_node 가 뜬 뒤에 등록되어야 함.
@@ -264,17 +213,12 @@ def generate_launch_description() -> LaunchDescription:
 
     actions = [
         rviz_arg,
-        cam_pitch_arg, cam_yaw_arg, cam_roll_arg,
         robot_state_publisher,
-        static_tf_camera,
         ros2_control_node,
         delayed_jsb,
         delayed_arm,
         delayed_gripper,
         move_group_node,
-        d435_launch,
-        d435_rgb_uploader,
-        d435_pointcloud_uploader,
         delayed_passthrough,
         rviz_node,
     ]
