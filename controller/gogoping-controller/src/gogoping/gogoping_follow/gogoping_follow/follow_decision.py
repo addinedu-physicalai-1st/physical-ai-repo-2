@@ -27,6 +27,17 @@ class DecisionMode(Enum):
     NAV2 = "nav2"
     RECOVERY = "recovery"
     WAITING_HINT = "waiting_hint"
+    VOICE_SEARCH = "voice_search"
+    VOICE_FOUND = "voice_found"
+    VOICE_RESUME = "voice_resume"
+
+
+# Voice-guided mode 는 외부 hint / 내부 _tick 으로만 전이 — distance 무관.
+_VOICE_MODES = frozenset({
+    DecisionMode.VOICE_SEARCH,
+    DecisionMode.VOICE_FOUND,
+    DecisionMode.VOICE_RESUME,
+})
 
 
 @dataclass(frozen=True)
@@ -56,6 +67,10 @@ def decide_follow_action(
     - prev=NAV2:     distance < nav2_min → REACTIVE, else NAV2
     - prev=IDLE/STOP/etc: distance < initial_threshold → REACTIVE, else NAV2
     """
+    # Voice-guided mode 는 distance 와 무관하게 prev 유지 (전이는 _on_hint / _tick).
+    if prev_mode in _VOICE_MODES:
+        return Decision(mode=prev_mode)
+
     if math.isnan(distance_m):
         # NaN distance — tracking 없음.
         # active mode 였고 lost 가 임계 초과 → RECOVERY

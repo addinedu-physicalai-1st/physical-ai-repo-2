@@ -413,7 +413,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 t0=$SECONDS
 if ! conda run -n jazzy bash -c '
   cd controller/gogoping-controller/src/gogoping/gogoping_follow && \
-  PYTHONPATH=. pytest tests/test_state_filter.py tests/test_follow_decision.py tests/test_reactive_control.py tests/test_close_follow.py tests/test_recovery.py -v "$@"
+  PYTHONPATH=. pytest tests/test_state_filter.py tests/test_follow_decision.py tests/test_reactive_control.py tests/test_close_follow.py tests/test_recovery.py tests/test_voice_search_planner.py -v "$@"
 ' _ "$@"; then
   EXIT=1
 fi

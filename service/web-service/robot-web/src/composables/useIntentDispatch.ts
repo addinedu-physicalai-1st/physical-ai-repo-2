@@ -14,6 +14,8 @@ export type IntentResponse =
   | { kind: 'rhythm_stop' }
   | { kind: 'confirm_yes' }
   | { kind: 'confirm_no' }
+  | { kind: 'follow_search' }
+  | { kind: 'follow_resume' }
   | { kind: 'ignored' };
 
 /**

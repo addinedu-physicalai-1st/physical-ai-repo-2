@@ -353,6 +353,39 @@ export function useVoiceController(robot: RobotConfig): {
       enterCooldown();
       return;
     }
+    if (intent.kind === 'follow_search') {
+      // 음성 "고고핑 추종 위치확인" → follow_node VOICE_SEARCH 전이
+      void fetch('/api/gogoping/follow/hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction: 'search' }),
+      });
+      enterCooldown();
+      return;
+    }
+    if (intent.kind === 'follow_resume') {
+      // 음성 "고고핑 추종 위치이동" → VOICE_RESUME 전이 + TTS 즉시 응답
+      void fetch('/api/gogoping/follow/hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction: 'resume' }),
+      });
+      void (async () => {
+        try {
+          const res = await fetch('/api/tts/say', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: '네 고고핑 추종 위치로 이동합니다' }),
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            await new Audio(URL.createObjectURL(blob)).play();
+          }
+        } catch { /* TTS 실패는 무성 진행 */ }
+      })();
+      enterCooldown();
+      return;
+    }
     enterCooldown();
   }
 

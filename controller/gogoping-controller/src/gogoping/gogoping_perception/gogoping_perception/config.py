@@ -5,29 +5,36 @@ control 상수 (CMD_VEL_HZ 등) 와는 분리.
 """
 
 # ---------- YOLO ----------
-# yolov8s (~21.5M params) → yolov8n (~3.2M params) — 추론 빠름, 단일 클래스(person)
-# 근거리 추종이라 mAP 차이 거의 무영향. 속도/지연 테스트용.
+# yolov8n (~3.2M params) — 단일 클래스 (person) 근거리 추종이라 mAP 차이 무영향, 속도 우선.
 YOLO_MODEL_NAME = "yolov8n.pt"
-# 시연 친화적 낮은 임계값 — 상반신/부분 frame 도 검출. 후속에서 카메라 환경에 맞춰 튜닝.
-YOLO_CONF_THRESHOLD = 0.20
+# 0.40 — 진짜 사람 위주 검출. 상반신/일부 frame 통과, 사물(마네킹/인형 등) 1차 차단.
+# 0.5+ 는 멀리/가려진 사람 놓침 위험.
+YOLO_CONF_THRESHOLD = 0.40
 YOLO_PERSON_CLASS = 0  # COCO class id
 YOLO_IMG_SIZE = 640
 # device=None → ultralytics 자동 (cuda 0 우선 → cpu fallback)
 YOLO_DEVICE: str | None = None
+
+# ---------- MediaPipe Pose validation (사물 오인식 2차 차단) ----------
+# YOLO bbox crop 안에서 Pose 추론 → visible landmark ≥ MIN 이면 사람, 아니면 사물.
+# 마네킹/인형/의자 등은 keypoint 거의 안 잡혀 걸러짐. ENABLED=False 면 검증 skip.
+POSE_ENABLED = True
+POSE_MIN_VISIBLE_LANDMARKS = 5     # 33개 중 (얼굴/어깨 등 상반신 5개)
+POSE_VISIBILITY_THRESHOLD  = 0.5   # landmark visibility 점수 임계 (0~1)
+POSE_MIN_BBOX_SIDE_PX      = 40    # bbox 너무 작으면 skip (멀리 있는 사람 보호)
 
 # ---------- ByteTrack ----------
 # ultralytics 내장 yaml. custom 튜닝 필요 시 패키지 share 로 옮긴 뒤 절대경로.
 TRACKER_NAME = "bytetrack.yaml"
 
 # ---------- ReID ----------
-# track_id 유지 시 ReID skip. drift 후 재매칭 시에만 비교.
-# 단일 사용자 시연 환경 — InsightFace face embedding 과 OSNet body embedding 의 cross-modal
-# 한계 회피용 낮은 임계값. 갤러리 정책 개선 후 0.5~0.7 권장.
-REID_SIM_THRESHOLD = 0.55
-# Asymmetric hysteresis — track_id 유지 분기에서 sim 이 이 값 아래로 떨어지면
-# 잘못 lock 된 것으로 보고 해제 → drift 분기에서 LOCK 임계값(0.7) 으로 재매칭.
-# 0.30 = 정상 자세 변동(0.4~0.5)은 통과, 다른 사람으로 ID 가 바뀐 경우(보통 < 0.3) 만 해제.
-REID_SIM_UNLOCK_THRESHOLD = 0.30
+# track_id 유지 시 ReID skip, drift 시에만 비교. ByteTrack track_id 가 occlusion/jitter
+# 로 자주 바뀌는 환경에서 LOCK 임계 낮춰 matched=false 빈도 줄임 (single-user 시연).
+# 갤러리 정책 개선 후 0.5~0.7 권장.
+REID_SIM_THRESHOLD = 0.40
+# Asymmetric hysteresis — track_id 유지 분기에서 이 값 미만이면 lock 해제 → drift.
+# UNLOCK < LOCK 이라 한 번 lock 되면 자세 변동 흡수.
+REID_SIM_UNLOCK_THRESHOLD = 0.20
 # drift 재매칭 시 후보의 distance 가 마지막 target distance 에서 이 값 이상 떨어져
 # 있으면 거부 (다른 거리의 사람이 sim 만 우연히 높은 경우 차단). 0 = depth 비활성.
 # 5Hz publish 기준 1.0m 점프 → 5m/s — 일반 보행 1.5m/s 의 3배. 보수적 마진.
