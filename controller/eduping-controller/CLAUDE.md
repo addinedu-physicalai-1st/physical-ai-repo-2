@@ -51,9 +51,9 @@ source install/setup.bash
 
 | 스크립트 | 용도 | 비고 |
 |---|---|---|
-| [scripts/device-eduping.sh](../../scripts/device-eduping.sh) | OpenArm 벤더 bringup (mock / real, bimanual) | follower (실물 팔) |
+| [scripts/device-eduping.sh](../../scripts/device-eduping.sh) | OpenArm 벤더 bringup (mock / real, bimanual). real bringup 시 `d435` 윈도(카메라 상시 세트)도 같이 기동 | follower (실물 팔) + D435 |
 | [scripts/device-eduping-leader.sh](../../scripts/device-eduping-leader.sh) | 실물 mini leader (`feetech_leader_node`) — `/eduping/leader/joint_states` publisher | USB 시리얼 양팔 (`/dev/ttyUSB0` 오른팔, `/dev/ttyUSB1` 왼팔) |
-| [scripts/device-eduping-d435.sh](../../scripts/device-eduping-d435.sh) | D435 단일 opener — `base`(camera+rgb/pointcloud/depth bridge 상시) / `game`(무궁화 perception only) | D435 미연결 시 base 미기동. autostart 미설치 머신용 |
+| [scripts/device-eduping-d435.sh](../../scripts/device-eduping-d435.sh) | D435 단일 opener `up` — camera + rgb/pointcloud/depth bridge + 무궁화 perception 상시. YOLO 는 robot-web 무궁화 진입 시에만 추론 | D435 미연결 시 미기동. autostart 미설치 머신용 |
 
 ```bash
 # mock — CAN/하드웨어 없이 ros2_control 토픽만

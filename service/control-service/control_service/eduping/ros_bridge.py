@@ -438,14 +438,18 @@ class EdupingRosBridge:
         return self.STATE_TICK_NORMAL_S
 
     def is_real_follower_active(self) -> bool:
-        """tmux 의 eduping-device 세션에 hardware_type=real bringup 이 떠있는지 — 3s TTL 캐시."""
+        """tmux 의 eduping-device 세션에 hardware_type=real bringup 이 떠있는지 — 3s TTL 캐시.
+
+        세션의 모든 pane 을 스캔한다 (display-message 는 활성 윈도만 봐서, 같은 세션에
+        d435 같은 다른 윈도가 활성이면 bringup 윈도를 놓친다 — list-panes -s 로 전체 확인).
+        """
         now = time.monotonic()
         if now - self._real_active_at <= 3.0:
             return self._real_active_val
         active = False
         try:
             result = subprocess.run(
-                ["tmux", "display-message", "-t", "eduping-device", "-p", "#{pane_start_command}"],
+                ["tmux", "list-panes", "-t", "eduping-device", "-s", "-F", "#{pane_start_command}"],
                 capture_output=True,
                 text=True,
                 timeout=0.5,
