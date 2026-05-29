@@ -80,6 +80,12 @@ def generate_launch_description() -> LaunchDescription:
                 "robot": "eduping",
             }],
         ),
+        # 근접 안전정지 — depth 로 0.6m 이내 감지 → /eduping/proximity_block. 전역(모든
+        # 팔 동작)에 적용: bridge 가 받아 팔 정지/재개, robot-web 이 음악 정지/재개.
+        Node(
+            package="eduarm", executable="proximity_safety_node",
+            name="proximity_safety", output="screen",
+        ),
         # 무궁화 perception — 항상 실행, idle 에선 YOLO 미가동. robot-web 무궁화 모드
         # 진입 시 relay 의 peer 이벤트로 entry 전환되어 추론 시작 (UI 가 켜고 끈다).
         Node(

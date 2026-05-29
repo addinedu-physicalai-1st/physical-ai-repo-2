@@ -53,6 +53,8 @@ setup(
             'd435_pointcloud_uploader_node = eduarm.d435_pointcloud_uploader_node:main',
             # 무궁화 device-local perception — D435 YOLO/ByteTrack + WS producer.
             'mugunghwa_perception_node = eduarm.mugunghwa_perception_node:main',
+            # 근접 안전정지 — D435 depth 로 0.6m 이내 감지 → /eduping/proximity_block.
+            'proximity_safety_node = eduarm.proximity_safety_node:main',
         ],
     },
 )
