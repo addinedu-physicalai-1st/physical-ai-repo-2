@@ -1,17 +1,22 @@
-# D435 깊이 카메라 자동 시작 (Linux + USB hotplug)
+# D435 카메라 상시 세트 자동 시작 (Linux + USB hotplug)
 
-EduPing 의 D435 RealSense 카메라를 노트북 USB 에 꽂으면 자동으로 streamer 가 뜨고, 뽑으면 자동으로 멈추도록 udev + systemd 로 설정해뒀습니다. 본인 머신에도 똑같이 깔고 싶으면 ↓
+EduPing 의 D435 RealSense 카메라를 노트북 USB 에 꽂으면 자동으로 `eduping_d435_base.launch.py`
+(realsense2_camera + rgb/pointcloud/depth bridge + static TF) 가 뜨고, 뽑으면 자동으로 멈추도록
+udev + systemd 로 설정해뒀습니다. 본인 머신에도 똑같이 깔고 싶으면 ↓
+
+무궁화 perception (YOLO) 은 base 에 포함되지 않습니다. 게임 시작 시
+`scripts/device-eduping-d435.sh game` 으로 별도 기동.
 
 ## 1회 설치
 
-> 전제 조건: pyproject.toml deps 설치 + eduarm colcon build 완료 (아래 "전제 조건" 섹션 참조)
+> 전제 조건: eduarm colcon build 완료 (아래 "전제 조건" 섹션 참조)
 
 ```bash
 sudo bash scripts/d435-autostart/install.sh
 ```
 
 [install.sh](install.sh) 가 [d435-streamer.service.template](d435-streamer.service.template) 의 placeholder
-(`__USER__` / `__GROUP__` / `__HOME__` / `__REPO_ROOT__` / `__PYTHON__`) 를 현재 환경에 맞춰
+(`__USER__` / `__GROUP__` / `__HOME__` / `__REPO_ROOT__`) 를 현재 환경에 맞춰
 치환한 뒤 `/etc/systemd/system/d435-streamer.service` 로 설치합니다. 동시에:
 
 - `/etc/udev/rules.d/99-d435-autostart.rules` 설치 (USB hotplug rule)
@@ -25,15 +30,8 @@ sudo bash scripts/d435-autostart/install.sh
 | `__GROUP__`     | `id -gn $SUDO_USER` |
 | `__HOME__`      | `getent passwd $SUDO_USER` |
 | `__REPO_ROOT__` | `install.sh` 위치 기준 두 단계 상위 |
-| `__PYTHON__`    | 인자 → `$D435_PYTHON` → `$HOME/{miniconda3,anaconda3,miniforge3,mambaforge}/envs/pdg/bin/python` |
 
-pdg conda env 이 표준 위치에 없거나 이름이 다르면 python 경로를 직접 넘기면 됩니다:
-
-```bash
-sudo bash scripts/d435-autostart/install.sh /home/foo/.conda/envs/pdg/bin/python
-# 또는
-sudo -E D435_PYTHON=/home/foo/.conda/envs/pdg/bin/python bash scripts/d435-autostart/install.sh
-```
+ExecStart 는 `ros2 launch` (system python3 / C++) 를 사용하므로 conda python 경로 (`__PYTHON__`) 는 더 이상 필요하지 않습니다.
 
 ## 확인
 
@@ -53,17 +51,16 @@ sudo bash scripts/d435-autostart/uninstall.sh
 
 ## 전제 조건
 
-- pyrealsense2 / websockets / zstandard 가 본인 conda env (예: `pdg`) 에 설치돼 있어야 함
-  ```bash
-  pip install -e .   # repo 루트
-  ```
-- eduarm 패키지 colcon build 완료
+- eduarm 패키지 colcon build 완료 (`ros2 launch` 진입점 필요)
   ```bash
   cd controller/eduping-controller
   source /opt/ros/jazzy/setup.bash
   colcon build --packages-select eduarm --symlink-install
   ```
-- control-service 가 8100 에서 떠 있어야 frame 이 실제로 흐름 (안 떠 있어도 streamer 자체는 살아있고 reconnect backoff 로 대기)
+- ROS2 apt 패키지: `ros-jazzy-realsense2-camera`, `ros-jazzy-cv-bridge`, `ros-jazzy-tf2-ros`
+  (apt 설치, conda env 불필요)
+- control-service 가 8100 에서 떠 있어야 depth frame 이 실제로 흐름 (안 떠 있어도 bridge 자체는 살아있고 reconnect backoff 로 대기)
+- `ultralytics` 등 무궁화 게임 전용 패키지는 base 에 불필요 — `scripts/device-eduping-d435.sh game` 시 별도 기동
 
 ## 작동 원리
 
@@ -80,8 +77,8 @@ sudo bash scripts/d435-autostart/uninstall.sh
 ## 트러블슈팅
 
 - **service 가 active 인데 frame 이 안 흐름** — `journalctl -u d435-streamer.service -n 50` 으로 streamer 로그 확인.
-  - `frame timeout` 만 반복 → RealSense 가 hung 상태 (pipeline 은 열렸는데 프레임 없음). **USB 뽑았다 꽂기** 후 `systemctl restart d435-streamer.service`. 최신 streamer 는 연속 timeout 15회 시 `hardware_reset` 시도.
-  - `RealSense error` / `Device or resource busy` → 다른 프로세스가 카메라 점유 중이거나 reset 직후 — streamer 하나만 띄울 것.
+  - `frame timeout` 만 반복 → RealSense 가 hung 상태 (pipeline 은 열렸는데 프레임 없음). **USB 뽑았다 꽂기** 후 `systemctl restart d435-streamer.service`.
+  - `RealSense error` / `Device or resource busy` → 다른 프로세스가 카메라 점유 중이거나 reset 직후 — realsense2_camera 노드 하나만 띄울 것 (base launch 가 단일 opener를 보장).
   - `WS disconnect` 반복 → `curl -s http://localhost:8100/health` 로 streaming(8100) 가동 확인, `run_server.sh` 재시작.
   - UI `뎁스 끊김` + health `latest_seq` 비어 있음 → producer 가 프레임을 못 보내는 상태 (위와 동일).
 - **USB 꽂아도 service 시작 안 됨** — `udevadm monitor --subsystem-match=usb` 로 udev 이벤트가 발생하는지 확인. 발생하지만 service 가 안 뜨면 rule 파일에 오타가 있을 수 있음.

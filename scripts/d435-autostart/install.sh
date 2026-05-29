@@ -2,24 +2,26 @@
 # scripts/d435-autostart/install.sh — D435 자동 시작 (udev + systemd) 설치.
 #
 # 동작:
-#   - d435-streamer.service.template 의 placeholder 를 현재 sudo user / repo / python 으로
+#   - d435-streamer.service.template 의 placeholder 를 현재 sudo user / repo 로
 #     치환해서 /etc/systemd/system/d435-streamer.service 로 설치
 #   - /etc/udev/rules.d/99-d435-autostart.rules 설치 (USB hotplug → SYSTEMD_WANTS)
 #
 # 사용:
-#   sudo bash scripts/d435-autostart/install.sh                       # 자동 감지
-#   sudo bash scripts/d435-autostart/install.sh /path/to/python       # python 명시
-#   sudo -E D435_PYTHON=/path/to/python bash scripts/d435-autostart/install.sh
+#   sudo bash scripts/d435-autostart/install.sh
 #
 # 자동 감지:
 #   USER  = $SUDO_USER (sudo 호출자)
 #   GROUP = id -gn $SUDO_USER (보통 USER 와 동일)
 #   HOME  = getent passwd $SUDO_USER
 #   REPO  = scripts/d435-autostart/ 의 두 단계 상위 (이 스크립트 위치 기준)
-#   PYTHON= $1 → $D435_PYTHON → $HOME/{miniconda3,anaconda3,miniforge3}/envs/pdg/bin/python 순
+#
+# ExecStart 는 ros2 launch 를 사용 — system python3 / C++ 로 실행.
+# conda python(__PYTHON__)은 더 이상 ExecStart 에 불필요. ultralytics 등 게임 전용
+# 패키지도 base launch 에는 불필요 (무궁화 perception 은 mugunghwa.launch.py 별도 기동).
 #
 # 효과:
-#   - D435 (8086:0b07) 를 USB 에 꽂으면 d435-streamer 자동 시작
+#   - D435 (8086:0b07) 를 USB 에 꽂으면 eduping_d435_base.launch.py 자동 시작
+#     (realsense2_camera + rgb/pointcloud/depth bridge + static TF)
 #   - 뽑으면 자동 정지 (StopWhenUnneeded)
 #   - service 가 죽으면 2초 후 재시작 (Restart=on-failure)
 #
@@ -43,33 +45,12 @@ TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 TARGET_GROUP="$(id -gn "$TARGET_USER")"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Python: 인자 > 환경변수 > 자동 탐색
-PYTHON_BIN="${1:-${D435_PYTHON:-}}"
-if [[ -z "$PYTHON_BIN" ]]; then
-  for candidate in \
-    "$TARGET_HOME/miniconda3/envs/pdg/bin/python" \
-    "$TARGET_HOME/anaconda3/envs/pdg/bin/python" \
-    "$TARGET_HOME/miniforge3/envs/pdg/bin/python" \
-    "$TARGET_HOME/mambaforge/envs/pdg/bin/python"; do
-    if [[ -x "$candidate" ]]; then
-      PYTHON_BIN="$candidate"
-      break
-    fi
-  done
-fi
-if [[ -z "$PYTHON_BIN" || ! -x "$PYTHON_BIN" ]]; then
-  echo "[d435-autostart] pdg conda env python 을 못 찾았습니다." >&2
-  echo "  방법 1) 첫 인자로 명시: sudo bash $0 /path/to/conda/envs/pdg/bin/python" >&2
-  echo "  방법 2) 환경변수:        sudo -E D435_PYTHON=/path/to/python bash $0" >&2
-  exit 1
-fi
-
 echo "[d435-autostart] 감지된 설정:"
 echo "  USER   = $TARGET_USER"
 echo "  GROUP  = $TARGET_GROUP"
 echo "  HOME   = $TARGET_HOME"
 echo "  REPO   = $REPO_ROOT"
-echo "  PYTHON = $PYTHON_BIN"
+echo "  (ros2 launch 사용 — conda python 경로 불필요)"
 echo
 
 echo "[d435-autostart] systemd unit 렌더링 + 설치..."
@@ -80,7 +61,6 @@ sed \
   -e "s|__GROUP__|$TARGET_GROUP|g" \
   -e "s|__HOME__|$TARGET_HOME|g" \
   -e "s|__REPO_ROOT__|$REPO_ROOT|g" \
-  -e "s|__PYTHON__|$PYTHON_BIN|g" \
   "$SCRIPT_DIR/d435-streamer.service.template" \
   > /etc/systemd/system/d435-streamer.service
 chmod 0644 /etc/systemd/system/d435-streamer.service

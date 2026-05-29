@@ -1,5 +1,5 @@
 [Unit]
-Description=EduPing D435 depth streamer (auto-start on USB plug)
+Description=EduPing D435 base (camera + rgb/pointcloud/depth bridge, auto-start on USB plug)
 # StopWhenUnneeded=yes 가 키 — udev rule 의 SYSTEMD_WANTS 가 빠지면 (USB unplug)
 # 자동 stop. 따로 stop trigger 안 만들어도 됨.
 StopWhenUnneeded=yes
@@ -11,9 +11,10 @@ Type=simple
 User=__USER__
 Group=__GROUP__
 Environment=HOME=__HOME__
-# conda pdg python + ROS install 둘 다 source 한 뒤 streamer 실행.
+# ROS Jazzy + controller ws 를 source 한 뒤 base launch 실행.
+# ros2 launch 는 system python3 / C++ 로 실행 — conda python 불필요.
 # bash -c 로 감싸야 source 가 작동.
-ExecStart=/bin/bash -c 'set +u; source /opt/ros/jazzy/setup.bash; source __REPO_ROOT__/controller/eduping-controller/install/setup.bash; exec __PYTHON__ -m eduarm.d435_depth_streamer --server-host 127.0.0.1'
+ExecStart=/bin/bash -c 'set +u; source /opt/ros/jazzy/setup.bash; source __REPO_ROOT__/controller/eduping-controller/install/setup.bash; exec ros2 launch eduarm eduping_d435_base.launch.py'
 # control-service 가 아직 안 떠있어도 streamer 의 reconnect backoff 가 알아서 처리.
 Restart=on-failure
 RestartSec=2
