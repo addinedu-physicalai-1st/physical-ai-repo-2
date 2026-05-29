@@ -7,7 +7,7 @@ ROS 노드는 system python3 에서 돌아 control_service 를 import 못 하므
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
 import cv2
@@ -18,7 +18,9 @@ MAGIC_DEPTH = b"DPTH"
 DEPTH_PROTO_VERSION = 0x01
 DEPTH_HEADER_FMT = "!4sBBBBIQHHHHfffffHHII"
 DEPTH_HEADER_SIZE = 60
-assert struct.calcsize(DEPTH_HEADER_FMT) == DEPTH_HEADER_SIZE
+assert struct.calcsize(DEPTH_HEADER_FMT) == DEPTH_HEADER_SIZE, (
+    f"DEPTH_HEADER_FMT mismatch: {struct.calcsize(DEPTH_HEADER_FMT)} != {DEPTH_HEADER_SIZE}"
+)
 
 ROBOT_IDS = {"gogoping": 0x01, "eduping": 0x02, "noriarm": 0x03}
 
@@ -98,6 +100,3 @@ def build_depth_frame(
         depth_min_mm=dmin, depth_max_mm=dmax,
         depth_zstd=depth_zstd, color_jpeg=jpeg_buf.tobytes(),
     )
-
-
-_ = fields  # noqa: 사본 비교 테스트에서 __dataclass_fields__ 사용

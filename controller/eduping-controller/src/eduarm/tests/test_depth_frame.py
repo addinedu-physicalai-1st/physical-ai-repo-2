@@ -1,10 +1,9 @@
 import numpy as np
 import zstandard as zstd
 
-from eduarm.depth_frame import Intr, build_depth_frame
-# control_service 사본 — 이 테스트는 conda(jazzy) 에서 돌아 둘 다 import 가능.
+from eduarm.depth_frame import Intr, build_depth_frame, encode_depth_frame as eduarm_encode
+# control_service 사본 — 이 테스트는 conda(pdg) 에서 돌아 둘 다 import 가능.
 from control_service.streaming.depth_protocol import decode_depth_frame, encode_depth_frame as cs_encode
-from eduarm.depth_frame import encode_depth_frame as eduarm_encode, DepthFrame as EduarmFrame
 
 
 def _sample():
