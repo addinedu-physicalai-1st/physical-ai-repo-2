@@ -35,7 +35,6 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
-from sensor_msgs.msg import LaserScan
 from tf2_ros import Buffer, LookupException, TransformException, TransformListener
 
 from std_msgs.msg import String
@@ -49,16 +48,9 @@ from gogoping_navigation.graph import Graph
 _DEBUG_TOPIC = "/gogoping/debug/nav_events"   # admin UI NavDebugLogCard 가 SSE 로 받음
 _ROUTE_PATH_TOPIC = "/graph_router/route_path"  # RViz Path display — L1 vertex sequence 시각화
 
-# graph_router 심화 (2026-05-28) — proximity 기반 pause/resume/reroute/backup 상수
+# graph_router 심화 (2026-05-28) — proximity 기반 pause/resume/reroute 상수 (person-only)
 SUSTAIN_TIMEOUT_S = 10.0           # 사람 10s 유지 → reroute (디버깅값)
 RESUME_GRACE_S = 1.0               # 사람이 이 시간 이상 확실히 비켜야 resume — depth flicker 무시
-BACKUP_PRE_DELAY_S = 3.0           # wall_close 정지 후 후진 시작까지 대기 (디버깅값)
-BACKUP_DISTANCE_M = 0.15           # 후진 거리 (뒤로 조금씩)
-BACKUP_MAX_RETRIES = 3             # 후진 + 재시도 한계 (3회)
-BACKUP_SPEED_MPS = 0.05            # 후진 속도 (m/s)
-BACKUP_REAR_CLEARANCE_M = 0.25     # LiDAR 후방 최소 clearance (15cm + 10cm 여유)
-BACKUP_STUCK_DELTA_M = 0.03        # odom 변화 임계값 (미만이면 stuck)
-REAR_SECTOR_HALF_RAD = 0.785398    # 후방 sector 반각 (45° = π/4 rad)
 
 # can_rotate vertex 에서 다음 lane 향한 in-place 회전 파라미터
 IN_PLACE_ROTATE_TOLERANCE_RAD = 0.10   # ~5.7° 이내면 회전 skip
@@ -166,44 +158,36 @@ class GraphRouterNode(Node):
             ),
         )
 
-        # ── graph_router 심화 (2026-05-28) — proximity 기반 pause/reroute/backup ──
+        # ── graph_router 심화 (2026-05-28) — proximity 기반 pause/reroute (person-only) ──
         # 시연/디버그용 토글 — NO_PROXIMITY_SAFETY=1 → launch 가 disable_proximity_safety:=true
-        # 전달. true 면 _act_navigate_impl 의 person_close/wall_close 분기를 skip("ok" 취급)
-        # → 정지·60s·reroute·후진 전부 비활성. (BT 의 ProximitySafetyMonitor 는 동일 param 을
+        # 전달. true 면 _act_navigate_impl 의 person_close 분기를 skip("ok" 취급)
+        # → 사람 근접 정지·10s·reroute 비활성. (BT 의 ProximitySafetyMonitor 는 동일 param 을
         #  modes 노드에서 읽어 표시용으로 사용 — 기능 gating 은 여기 graph_router 가 담당.)
+        #  ※ 장애물(wall_close) 반응은 제거됨 (person-only) — 충돌 안전은 safety_monitor.
         self._proximity_disabled: bool = bool(
             self.declare_parameter("disable_proximity_safety", False).value
         )
         if self._proximity_disabled:
             self.get_logger().warning(
                 "proximity safety DISABLED (disable_proximity_safety=true) — "
-                "사람/벽 근접 정지·reroute·후진 비활성. 시연/디버그 모드."
+                "사람 근접 정지·reroute 비활성. 시연/디버그 모드."
             )
         self._proximity_level: str = "ok"
         self._proximity_person_dist_m: float = float("inf")
-        self._proximity_wall_dist_m: float = float("inf")
         self._latest_odom_x: float = 0.0
         self._latest_odom_y: float = 0.0
-        self._latest_rear_clearance_m: float = float("inf")
         self.create_subscription(
             String, "/gogoping/proximity_event",
             self._on_proximity_event, 10,
             callback_group=cb,
         )
-        # 로봇 odom 은 /gogoping 네임스페이스로 발행됨 (/gogoping/odom). 예전엔 빈 토픽
-        # "/odom" 을 구독해 _latest_odom 이 영영 0 → backup 이동량이 항상 0 으로 측정돼
-        # 매번 STUCK 오판하던 버그. (backup 명령 자체는 정상 — cmd_vel 까지 -0.05 전달됨)
+        # 로봇 odom 은 /gogoping 네임스페이스로 발행됨 (/gogoping/odom).
         self.create_subscription(
             Odometry, "/gogoping/odom",
             self._on_odom, 10,
             callback_group=cb,
         )
-        self.create_subscription(
-            LaserScan, "/scan",
-            self._on_scan, 10,
-            callback_group=cb,
-        )
-        # backup/in-place rotate 같은 직접 maneuver 는 cmd_vel_raw 로 publish 해
+        # in-place rotate 같은 직접 maneuver 는 cmd_vel_raw 로 publish 해
         # safety_filter 단일 경유로 통일한다 (이전엔 /gogoping/cmd_vel 직행 →
         # safety_filter 의 stale-zero/ safety_stop-zero 와 같은 토픽에서 충돌 →
         # backup/rotate 가 0 으로 상쇄돼 STUCK/TIMEOUT 나던 버그). safety_filter 는
@@ -224,7 +208,7 @@ class GraphRouterNode(Node):
         except Exception:
             pass
 
-    # ──────── proximity / odom / scan 콜백 ────────
+    # ──────── proximity / odom 콜백 ────────
     def _on_proximity_event(self, msg) -> None:
         try:
             payload = json.loads(msg.data)
@@ -232,31 +216,11 @@ class GraphRouterNode(Node):
             return
         self._proximity_level = str(payload.get("level", "ok"))
         p = payload.get("person_dist_m")
-        w = payload.get("wall_dist_m")
         self._proximity_person_dist_m = float(p) if p is not None else float("inf")
-        self._proximity_wall_dist_m = float(w) if w is not None else float("inf")
 
     def _on_odom(self, msg) -> None:
         self._latest_odom_x = float(msg.pose.pose.position.x)
         self._latest_odom_y = float(msg.pose.pose.position.y)
-
-    def _on_scan(self, msg) -> None:
-        """LiDAR 후방 sector (±45°) 의 최소 거리 추출."""
-        ranges = msg.ranges
-        if not ranges:
-            return
-        a0 = msg.angle_min
-        da = msg.angle_increment
-        min_d = float("inf")
-        for i, r in enumerate(ranges):
-            if not (msg.range_min <= r <= msg.range_max):
-                continue
-            angle = a0 + i * da
-            # 후방 ±45° — angle 이 [π-π/4, π] ∪ [-π, -π+π/4]
-            if angle > math.pi - REAR_SECTOR_HALF_RAD or angle < -math.pi + REAR_SECTOR_HALF_RAD:
-                if r < min_d:
-                    min_d = r
-        self._latest_rear_clearance_m = min_d
 
     def _do_rotate_in_place(self, target_yaw: float) -> bool:
         """can_rotate vertex 에서 angular 만 publish 해 in-place 회전.
@@ -291,34 +255,6 @@ class GraphRouterNode(Node):
             level="warn",
         )
         return False
-
-    def _do_backup(self, distance_m: float) -> bool:
-        """time-based backup. Returns True 면 정상 (odom 변화 충분), False 면 stuck.
-
-        cmd_vel linear.x = -BACKUP_SPEED_MPS for (distance_m / BACKUP_SPEED_MPS) 초.
-        호출자가 nav2 cancel 후에만 호출해야 함 (cmd_vel 충돌 방지).
-        """
-        duration_s = distance_m / BACKUP_SPEED_MPS
-        start_x = self._latest_odom_x
-        start_y = self._latest_odom_y
-        t0 = time.monotonic()
-        twist = Twist()
-        twist.linear.x = -BACKUP_SPEED_MPS
-        while time.monotonic() - t0 < duration_s:
-            self._cmd_vel_pub.publish(twist)
-            time.sleep(0.1)
-        self._cmd_vel_pub.publish(Twist())   # 정지
-        dx = self._latest_odom_x - start_x
-        dy = self._latest_odom_y - start_y
-        moved = math.hypot(dx, dy)
-        if moved < BACKUP_STUCK_DELTA_M:
-            self._dbg(
-                f"STUCK backup moved {moved:.3f}m < {BACKUP_STUCK_DELTA_M}m",
-                level="err",
-            )
-            return False
-        self._dbg(f"backup moved {moved:.3f}m")
-        return True
 
     def _publish_route_path(self, seq: list[str]) -> None:
         """L1 vertex sequence → nav_msgs/Path publish (RViz Path display 용).
@@ -500,11 +436,10 @@ class GraphRouterNode(Node):
         last_idx = 0
         self._publish_feedback(gh, seq, last_idx)
 
-        # graph_router 심화 (2026-05-28) — pause/reroute/backup state (per action)
+        # graph_router 심화 (2026-05-28) — pause/reroute state (per action)
         pause_start_ts: float | None = None
         person_clear_since: float | None = None   # 사람 비킨 시작 시각 — resume grace 판정
         blocked_vertices: set[str] = set()
-        backup_retry: int = 0
 
         # for → while 로 변환 — proximity pause·resume 후 segment 재시도 가능
         i = 1
@@ -574,18 +509,18 @@ class GraphRouterNode(Node):
                 # graph_router 심화 (2026-05-28) — proximity 분기 결과 신호
                 proximity_retry = False
                 proximity_reroute = False
-                # 특수 케이스 플래그 — "사람이 앞을 막아서 재경로를 생성한 경우"에만 True.
-                # 이때만 재경로의 첫 방향으로 제자리 회전한다 (회전하면 사람이 정면 박스에서
-                # 빠져 다른 길로 출발 가능). wall_close reroute 에는 적용 안 함.
+                # 사람이 앞을 막아 재경로를 생성한 경우 True (person-only 라 reroute=항상 사람).
+                # 재경로의 첫 방향으로 제자리 회전한다 (회전하면 사람이 정면 박스에서 빠져
+                # 다른 길로 출발 가능).
                 reroute_by_person = False
                 # person_close PAUSE 중에는 nav goal 을 cancel 하므로 get_result_future 가
                 # CANCELED 로 done 된다. 그때 루프를 빠져나가면 아래 wrapper.status 검사가
                 # CANCELED 를 "주행 실패"로 오인 → goto FAILURE → FSM RETURNING 전이 버그.
                 # pause 중(pause_start_ts is not None)에는 루프를 유지해 resume/reroute 분기로만
-                # 빠져나가게 한다. (wall_close 는 항상 flag 세팅 후 break 라 영향 없음)
+                # 빠져나가게 한다.
                 while (not get_result_future.done()) or (pause_start_ts is not None):
-                    # ── proximity 분기 (사람/벽) ──
-                    # disable_proximity_safety=true 면 항상 "ok" 로 취급 → pause/backup/reroute skip.
+                    # ── proximity 분기 (사람) ──
+                    # disable_proximity_safety=true 면 항상 "ok" 로 취급 → pause/reroute skip.
                     level = "ok" if self._proximity_disabled else self._proximity_level
                     if level == "person_close":
                         if nav_gh is not None:
@@ -629,55 +564,6 @@ class GraphRouterNode(Node):
                             break
                         time.sleep(0.1)
                         continue
-
-                    if level == "wall_close":
-                        if nav_gh is not None:
-                            try:
-                                nav_gh.cancel_goal_async()
-                            except Exception:
-                                pass
-                            nav_gh = None
-                        # LiDAR 후방 clearance 체크
-                        if self._latest_rear_clearance_m < BACKUP_REAR_CLEARANCE_M:
-                            self._dbg(
-                                f"wall_close + rear blocked "
-                                f"({self._latest_rear_clearance_m:.2f}m) → reroute",
-                                level="warn",
-                            )
-                            blocked_vertices.add(segment_target)
-                            proximity_reroute = True
-                            break
-                        # 정지 후 후진 시작까지 대기 (첫 backup 진입 시 1회) — 디버깅용.
-                        # nav goal 은 위에서 cancel 됨 → 대기 동안 로봇 정지 상태.
-                        if backup_retry == 0:
-                            self._dbg(
-                                f"wall_close 정지 — {BACKUP_PRE_DELAY_S:.0f}s 대기 후 후진",
-                                level="warn",
-                            )
-                            time.sleep(BACKUP_PRE_DELAY_S)
-                        # backup (뒤로 조금씩)
-                        ok = self._do_backup(BACKUP_DISTANCE_M)
-                        backup_retry += 1
-                        if not ok:
-                            # stuck 이어도 abort 하지 않는다 — "3회 시도 후 재탐색"이 목표.
-                            # (예전엔 첫 stuck 에서 abort → goto FAILURE → RETURNING 으로 튐)
-                            self._dbg(
-                                f"backup 거의 못 움직임 (<{BACKUP_STUCK_DELTA_M}m) — "
-                                f"시도 {backup_retry}/{BACKUP_MAX_RETRIES}",
-                                level="warn",
-                            )
-                        if backup_retry >= BACKUP_MAX_RETRIES:
-                            self._dbg(
-                                f"backup {BACKUP_MAX_RETRIES}회 시도 → reroute",
-                                level="warn",
-                            )
-                            blocked_vertices.add(segment_target)
-                            backup_retry = 0
-                            proximity_reroute = True
-                            break
-                        # 다음 backup 시도 — segment 재시도 (성공/stuck 무관)
-                        proximity_retry = True
-                        break
 
                     if preempt_active:
                         cur_xy = self._current_xy()
@@ -778,10 +664,9 @@ class GraphRouterNode(Node):
                     self._dbg(
                         f"REROUTE blocked={sorted(blocked_vertices)} → new_seq={new_seq}"
                     )
-                    # ── 특수 케이스: 사람이 막아서 재경로한 경우에만 새 방향으로 제자리 회전 ──
+                    # ── 사람이 막아서 재경로한 경우 새 방향으로 제자리 회전 ──
                     # 사람은 "원래 가던 방향"(정면 박스)에 있으므로, 새 경로 첫 vertex 방향으로
                     # 돌면 사람이 정면 박스에서 벗어나 다른 길로 출발할 수 있다.
-                    # wall_close reroute 에는 적용 안 함 (reroute_by_person=False).
                     if reroute_by_person and len(new_seq) >= 2:
                         nv = self._graph.vertices.get(new_seq[1])
                         if nv is not None:
@@ -824,8 +709,6 @@ class GraphRouterNode(Node):
                 last_idx = i
                 self._publish_feedback(gh, seq, last_idx)
                 self._dbg(f"segment {i} done ({segment_target!r})")
-                # 사람 backup retry counter — segment 성공 시 리셋
-                backup_retry = 0
 
                 # ── can_rotate vertex 도착 + 다음 segment 있음 → in-place 회전 ──
                 # linear=0, angular 만 publish 해 다음 lane 방향으로 정렬 후 진행.

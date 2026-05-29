@@ -1,4 +1,4 @@
-"""ProximitySafetyMonitor — 사람(1.5m)/벽(0.5m) 근접 상태 관측 leaf.
+"""ProximitySafetyMonitor — 사람 근접 상태 관측 leaf (person-only).
 
 ## 책임 (관측·표시 전용 — 반응 X)
 

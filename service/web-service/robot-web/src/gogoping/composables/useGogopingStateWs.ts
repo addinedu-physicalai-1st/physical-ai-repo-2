@@ -25,7 +25,6 @@ interface SnapshotPatrol {
 interface SnapshotProximity {
   level?: string;
   person_dist_m?: number | null;
-  wall_dist_m?: number | null;
 }
 
 interface GogopingSnapshot {
@@ -106,15 +105,12 @@ export function useGogopingStateWs(): { stop: () => void } {
           hideseekPhaseStore.setPatrol({ vertices: [], currentIndex: -1 });
         }
 
-        // proximity → store (UI 안내 표시용). 미지원 서버면 필드 없음 → ok 유지.
+        // proximity → store (UI 안내 표시용, person-only). 미지원 서버면 필드 없음 → ok 유지.
         const px = snap.proximity;
-        const lvl = (px && (px.level === 'person_close' || px.level === 'wall_close'))
-          ? (px.level as ProximityLevel)
-          : 'ok';
+        const lvl: ProximityLevel = px && px.level === 'person_close' ? 'person_close' : 'ok';
         proximityStore.setProximity({
           level: lvl,
           personDistM: typeof px?.person_dist_m === 'number' ? px.person_dist_m : null,
-          wallDistM: typeof px?.wall_dist_m === 'number' ? px.wall_dist_m : null,
         });
       } catch {
         // JSON 파싱 실패는 무시 (서버 측 포맷 변경 등 — 다음 메시지에서 회복)

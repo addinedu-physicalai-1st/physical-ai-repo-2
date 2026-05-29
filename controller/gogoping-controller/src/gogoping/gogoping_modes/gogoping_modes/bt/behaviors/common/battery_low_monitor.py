@@ -59,7 +59,7 @@ class BatteryLowMonitor(py_trees.behaviour.Behaviour):
             return Status.RUNNING
 
         if self._fired:
-            # hysteresis — 55% 위로 회복되면 reset (다시 떨어지면 재발화 가능)
+            # hysteresis — 25% 위로 회복되면 reset (다시 떨어지면 재발화 가능)
             if level >= self.LOW_EXIT:
                 self._fired = False
         else:

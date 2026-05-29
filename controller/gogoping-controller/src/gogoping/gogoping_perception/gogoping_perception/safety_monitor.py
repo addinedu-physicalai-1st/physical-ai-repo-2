@@ -11,8 +11,9 @@ chatter hold + stale timeout 은 ROS node 가 담당. evaluate_safety 는 statel
 수동 모드 (MANUAL) 는 spec 대로 항상 bypass — 개발자가 상황 판단.
 
 2026-05-28 추가 (graph_router 심화):
-  evaluate_proximity_level — person_dist_m / wall_dist_m / current_state →
-  "ok" | "person_close" | "wall_close". /gogoping/proximity_event JSON publish.
+  evaluate_proximity_level — person_dist_m / current_state →
+  "ok" | "person_close". /gogoping/proximity_event JSON publish.
+  (person-only: 장애물 wall_close 반응 제거 — 충돌 안전은 위 (b) safety_stop 가 담당.)
 """
 from __future__ import annotations
 
@@ -72,21 +73,19 @@ def evaluate_safety(ctx: SafetyEvalContext) -> SafetyDecision:
 
 def evaluate_proximity_level(
     person_dist_m: float,
-    wall_dist_m: float,
     current_state: str,
 ) -> str:
     """Pure logic — graph_router 가 구독하는 proximity_event 의 level 결정.
 
-    Returns: "ok" | "person_close" | "wall_close"
+    Returns: "ok" | "person_close"
 
-    Priority: bypass > person_close > wall_close > ok.
+    사람 근접만 판정한다 (person-only). 장애물(wall_close) 반응은 제거됨 —
+    기본 충돌 안전은 evaluate_safety 의 safety_stop 이 담당. bypass > person_close > ok.
     """
     if current_state in config.SAFETY_BYPASS_STATES:
         return "ok"
     if person_dist_m <= config.PERSON_FRONT_DIST_M:
         return "person_close"
-    if wall_dist_m <= config.WALL_FRONT_DIST_M:
-        return "wall_close"
     return "ok"
 
 
@@ -112,9 +111,6 @@ def _make_ros_node():
             self._last_stop_ts: float = 0.0
             # graph_router 심화 (2026-05-28)
             self._person_dist_m: float = float("inf")
-            # wall_dist 는 perception 의 /gogoping/obstacle_distance(중앙 밴드 최근접)를
-            # 그대로 사용 — rqt debug_image 의 obstacle 거리와 동일 값으로 통일.
-            self._obstacle_dist_m: float = float("inf")
 
             self._pub = self.create_publisher(Bool, "/gogoping/safety_stop", 10)
             self._prox_pub = self.create_publisher(
@@ -129,10 +125,6 @@ def _make_ros_node():
             self.create_subscription(
                 Float32, "/gogoping/person_proximity",
                 self._on_person_proximity, 10,
-            )
-            self.create_subscription(
-                Float32, "/gogoping/obstacle_distance",
-                self._on_obstacle_distance, 10,
             )
             self._timer = self.create_timer(
                 1.0 / config.SAFETY_PUBLISH_HZ, self._tick,
@@ -155,10 +147,6 @@ def _make_ros_node():
 
         def _on_person_proximity(self, msg: Float32) -> None:
             self._person_dist_m = float(msg.data)
-
-        def _on_obstacle_distance(self, msg: Float32) -> None:
-            # perception 의 정면 중앙 밴드 최근접 장애물 거리 — wall_close 판정에 사용.
-            self._obstacle_dist_m = float(msg.data)
 
         def _tick(self) -> None:
             depth = None
@@ -188,12 +176,9 @@ def _make_ros_node():
             if decision.stop:
                 self.get_logger().info(f"safety_stop=True reason={decision.reason}")
 
-            # ── graph_router 심화 — proximity_event JSON ─────────────────
-            # wall_dist = perception 의 중앙 밴드 obstacle 거리 (rqt 라벨과 동일 값).
-            wall_dist_m = self._obstacle_dist_m
+            # ── graph_router 심화 — proximity_event JSON (person-only) ──────
             level = evaluate_proximity_level(
                 person_dist_m=self._person_dist_m,
-                wall_dist_m=wall_dist_m,
                 current_state=self._current_state,
             )
             payload = {
@@ -201,8 +186,6 @@ def _make_ros_node():
                 "level": level,
                 "person_dist_m": float(self._person_dist_m)
                 if self._person_dist_m != float("inf") else None,
-                "wall_dist_m": float(wall_dist_m)
-                if wall_dist_m != float("inf") else None,
             }
             self._prox_pub.publish(String(data=json.dumps(payload)))
 
