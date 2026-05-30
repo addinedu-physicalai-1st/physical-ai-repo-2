@@ -144,8 +144,13 @@ const telehealth = useTelehealthWebRTC({
   acquireLocalStream: async () => {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240 },
-        audio: true,
+        // 의사 송신 화질 — 320×240 은 eduping 쪽에서 흐릿. 720p ideal (카메라 한계 시 자동 하향).
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       // self-PIP 에 attach.
       if (selfVideoRef.value) {
