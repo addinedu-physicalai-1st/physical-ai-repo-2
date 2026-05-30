@@ -1,0 +1,41 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">교사 추종 — 진행 중</h2>
+    </div>
+    <div style="flex:1;display:grid;grid-template-columns:1.8fr 1fr;gap:14px;min-height:0">
+
+      <div style="background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+        <video src="slides/assets/media/gogoping/follow.mp4" autoplay muted loop playsinline
+               style="max-width:100%;max-height:100%;object-fit:contain"
+               onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/gogoping/follow.mp4&lt;/p&gt;&lt;/div&gt;'"></video>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:12px;padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
+          <span class="material-icons-round" style="font-size:28px;color:var(--mintInk)">directions_walk</span>
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin-top:6px">추종</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin-top:4px;line-height:1.6">InsightFace + ReID + LiDAR 거리</p>
+          <span class="chip" style="font-size:0.45em;background:var(--mintSoft);color:var(--mintInk);align-self:flex-start;margin-top:6px">통합 ✓</span>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--butterSoft);border-radius:12px;padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
+          <span class="material-icons-round" style="font-size:28px;color:var(--butterInk)">map</span>
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin-top:6px">자율 이동</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin-top:4px;line-height:1.6">nav graph 편집 UI · /carry/deliver</p>
+          <span class="chip" style="font-size:0.45em;background:var(--butterSoft);color:var(--butterInk);align-self:flex-start;margin-top:6px">부분 △</span>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;flex:1;display:flex;flex-direction:column;justify-content:center">
+          <span class="material-icons-round" style="font-size:28px;color:var(--babypink)">visibility_off</span>
+          <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin-top:6px">숨바꼭질</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin-top:4px;line-height:1.6">모집 UI · 순찰/얼굴인식</p>
+          <span class="chip" style="font-size:0.45em;background:var(--babypinkSoft);color:var(--babypink);align-self:flex-start;margin-top:6px">미착수 ×</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    GogoPing 핵심 3 모드 진행 상태 — 추종은 InsightFace 매칭 + LiDAR 거리 측정 통합 완료(왼쪽 영상), 자율 이동은 nav graph 편집 UI 완성·운반 액션 wiring 부분, 숨바꼭질은 모집 UI 까지·순찰 + 연속 얼굴 인식 미착수.
+  </aside>
+</section>

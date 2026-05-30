@@ -1,0 +1,19 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip" style="font-size:0.55em">EDUPING · 안전</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">근접 안전정지 — 0.6m gate</h2>
+      <span class="chip chip-mint" style="font-size:0.5em">자동 복귀</span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <video src="slides/assets/media/eduping/safety-stop.mov" autoplay muted loop playsinline
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/eduping/safety-stop.mov&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+  </div>
+  <aside class="notes">
+    근접 안전정지. D435 depth 가 0.6m 안의 사람을 검출하면 /eduping/proximity_block 토픽이 latched, 모션 거버너가 현재 keyframe 을 hold. 사람이 멀어지면 정확히 멈춘 지점부터 keyframe + 음악이 함께 resume.
+    0.6m 인 이유는 OpenArm 자체 팔길이가 0.6m — 더 짧으면 자기 팔을 사람으로 오인해 멈춥니다.
+    의사 teleop·정비 모드는 자동 override.
+  </aside>
+</section>

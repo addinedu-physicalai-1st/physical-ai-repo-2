@@ -1,0 +1,17 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 1</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">교사 추종</h2>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <video src="slides/assets/media/gogoping/follow.mp4" autoplay muted loop playsinline
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;gogoping/follow.mp4&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+  </div>
+  <aside class="notes">
+    교사 추종. InsightFace 로 등록 교사 얼굴 매칭 → ReID(OSNet)로 사람 잠금 → RPLiDAR C1 으로 그 방위 거리 측정 → 거리 제어로 따라감.
+    LiDAR 임계 거리 이내 진입 시 즉시 정지. 호출어 "고고핑" + "멈춰" 로도 정지 가능.
+  </aside>
+</section>

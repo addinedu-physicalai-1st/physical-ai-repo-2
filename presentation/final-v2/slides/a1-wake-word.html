@@ -1,0 +1,55 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-sky" style="font-size:0.55em">APPENDIX · A1</span>
+      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">호출어 — 브라우저에서 직접</h2>
+      <span class="chip chip-mint" style="font-size:0.5em">openWakeWord · ONNX · WASM</span>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px;min-height:0">
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:12px;padding:14px 18px">
+          <h3 class="font-display" style="font-size:0.92em;color:var(--ink)">파이프라인</h3>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:8px;flex-wrap:wrap">
+            <span class="chip" style="font-size:0.5em">PCM 80ms</span>
+            <span style="color:var(--butter)">→</span>
+            <span class="chip chip-butter" style="font-size:0.5em">RMS gate</span>
+            <span style="color:var(--butter)">→</span>
+            <span class="chip chip-butter" style="font-size:0.5em">Silero VAD</span>
+            <span style="color:var(--butter)">→</span>
+            <span class="chip chip-lavender" style="font-size:0.5em">mel + embed</span>
+            <span style="color:var(--butter)">→</span>
+            <span class="chip chip-mint" style="font-size:0.5em">head score</span>
+          </div>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin-top:8px;line-height:1.65">2번 연속 임계 초과 + 1.5s cooldown = 호출 확정</p>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--babypinkSoft);border-radius:12px;padding:14px 18px;flex:1">
+          <h3 class="font-display" style="font-size:0.92em;color:var(--ink)">v1 → v3 (production)</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin-top:6px;line-height:1.7">
+            v1 사람녹음+증강 → v2 TTS 10k (분포 무너짐, 폐기) → <b style="color:var(--ink)">v3</b> v1 + 2음절·유사발음 hard-negative
+          </p>
+          <table style="width:100%;margin-top:8px;font-size:0.58em;color:var(--ink);border-collapse:collapse">
+            <tr style="color:var(--inkSoft)"><th style="text-align:left">로봇</th><th>v1</th><th>v2</th><th style="color:var(--mintInk)">v3 ★</th></tr>
+            <tr><td>eduping</td><td>0.930</td><td>0.784</td><td style="color:var(--mintInk);font-weight:bold">0.973</td></tr>
+            <tr><td>gogoping</td><td>0.939</td><td>0.810</td><td style="color:var(--mintInk);font-weight:bold">0.970</td></tr>
+            <tr><td>noriarm</td><td>0.899</td><td>0.762</td><td style="color:var(--mintInk);font-weight:bold">0.956</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;align-items:center;justify-content:center">
+        <img src="slides/assets/media/diagrams/wake-roc.png" alt="ROC sweep"
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:48px&quot;&gt;analytics&lt;/span&gt;&lt;p style=&quot;font-size:0.7em;margin-top:6px&quot;&gt;wake-roc.png&lt;/p&gt;&lt;/div&gt;'">
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    호출어는 브라우저에서 ONNX Runtime Web (WASM SIMD) 으로 직접 추론 — 서버 왕복 없음, 마이크 PCM 외부 전송 없음.
+    파이프라인: 80ms PCM → RMS 게이트 → Silero VAD → mel-spectrogram → speech embedding → 로봇별 head 모델 score. 임계 2회 연속 초과 + 1.5초 cooldown.
+    v3 production AUC 0.97 수준, 각 로봇별 px·nw 옵션 sweep 후 sweet spot 채택.
+    barge-in: WebRTC AEC + speaking state 에서도 추론 유지 → TTS 중에 다시 부르면 즉시 cancel.
+  </aside>
+</section>

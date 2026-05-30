@@ -1,0 +1,19 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-lavender" style="font-size:0.55em">NORIARM · 3</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">가게놀이 — 음성 요청 + smolVLA 픽업</h2>
+      <span class="chip chip-butter" style="font-size:0.5em">사전녹음 voice</span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <video src="slides/assets/media/noriarm/blocks-alt.mov" autoplay muted loop playsinline
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;가게놀이 영상 자리&lt;br&gt;&lt;span style=&quot;font-size:0.7em&quot;&gt;pull-assets.sh 실행 후 표시됨&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+  </div>
+  <aside class="notes">
+    가게놀이. 아이가 "사과 주세요" 처럼 모형을 음성으로 요청하면 의도 분류 LLM 이 5종 과일 중 하나를 선택, smolVLA 정책이 OMX 팔로 픽업해서 아이 측 ROI 에 release. 받아간 것은 ROI 비어있음으로 검출.
+    상품 안내·로딩·greeting·인사 음성은 사전녹음 mp3 로 — 자연스러운 대화 느낌.
+    "그만하자" 또는 모든 모형 소진 시 종료.
+  </aside>
+</section>

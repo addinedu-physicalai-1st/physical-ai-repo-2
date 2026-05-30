@@ -1,0 +1,29 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 자장가</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">낮잠 시간 — 자장가 + 카메라 회전</h2>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px;min-height:0">
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <span class="material-icons-round" style="font-size:84px;color:var(--mintInk);opacity:0.6">bedtime</span>
+        <h3 class="font-display" style="font-size:1.2em;color:var(--ink);margin-top:14px">자장가 mp3 + sleep 표정</h3>
+        <p style="color:var(--inkSoft);font-size:0.7em;margin-top:8px;line-height:1.6">호출어 "고고핑" + "자장가" 로 시작<br>3초 페이드 인/아웃</p>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <span class="material-icons-round" style="font-size:84px;color:var(--mintInk);opacity:0.6">360</span>
+        <h3 class="font-display" style="font-size:1.2em;color:var(--ink);margin-top:14px">카메라 pan/tilt</h3>
+        <p style="color:var(--inkSoft);font-size:0.7em;margin-top:8px;line-height:1.6">Arduino + MG995 ×2<br>Admin UI W/A/S/D · 1초 watchdog</p>
+      </div>
+
+    </div>
+
+  </div>
+  <aside class="notes">
+    GogoPing 자장가는 호출어로 시작/종료, Sleep 셰이더 표정과 함께 사전등록 mp3 를 재생합니다. 모드 진입·종료 시각은 DB mode_history 에 기록되어 일과 보고서의 낮잠 시간 산출에 사용.
+    카메라 pan/tilt 는 Arduino Uno + MG995 서보 2개로 2축 제어. Admin UI 의 글로벌 단축키 W/A/S/D (pan/tilt) + C (센터). 펌웨어 watchdog 1초 무명령 시 자동 센터링.
+  </aside>
+</section>

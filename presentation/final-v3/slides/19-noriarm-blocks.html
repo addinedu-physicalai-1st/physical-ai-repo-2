@@ -1,0 +1,21 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-lavender" style="font-size:0.55em">NORIARM · 1</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">블럭쌓기 — ACT 모방학습</h2>
+      <span class="chip chip-butter" style="font-size:0.5em">★ 메인</span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <video src="slides/assets/media/noriarm/blocks-demo.mp4" autoplay muted loop playsinline
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/noriarm/blocks-demo.mp4&lt;br&gt;&lt;span style=&quot;font-size:0.7em&quot;&gt;pull-assets.sh 실행 후 표시됨&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+  </div>
+  <aside class="notes">
+    블럭쌓기. 사람과 NoriArm 이 번갈아 블럭을 쌓는 협동 놀이.
+    가위바위보 선공 정하기는 데모 단순화로 사람=가위·로봇=보 고정 → 사람 선공. RPS 재생 동안 백그라운드로 ACT 정책 GPU 로드.
+    ACT 정책(HuggingFace jisoo3/act_game_block_stacking_0521)이 사람 ROI 비워짐을 감지해 로봇 차례에 자기 색 블럭을 픽업·스택·홈 복귀.
+    /joint_states 의 HOME 복귀 2회를 종료 신호로 사용.
+    rerun.io 시각화로 정책 입력 + 검출 bbox 를 한 화면에 — 데모 직전 디버깅에 결정적.
+  </aside>
+</section>

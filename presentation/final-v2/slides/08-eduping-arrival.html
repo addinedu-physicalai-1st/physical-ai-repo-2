@@ -1,0 +1,17 @@
+<section>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip" style="font-size:0.55em">EDUPING · 모드 1</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">등하원 — 얼굴 인식 + 하이파이브</h2>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <video src="slides/assets/media/eduping/highfive.mov" autoplay muted loop playsinline
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/eduping/highfive.mov&lt;br&gt;&lt;span style=&quot;font-size:0.7em&quot;&gt;pull-assets.sh 실행 후 표시됨&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+  </div>
+  <aside class="notes">
+    등하원 모드. EduPing 이 정문에 상주하면서 노트북 웹캠 + InsightFace 얼굴 인식으로 등록된 아이를 식별하고, 이름을 부르며 사전녹화 OpenArm 트라젝토리(하이파이브 / 손 흔들기)를 재생합니다.
+    매칭 후 attendance 테이블에 등원·하원 시각을 INSERT 합니다.
+  </aside>
+</section>
