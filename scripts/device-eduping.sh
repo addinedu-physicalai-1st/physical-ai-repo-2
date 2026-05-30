@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # scripts/device-eduping.sh — OpenArm 양팔 follower bringup (실물 전용).
-# bringup(real) 시 같은 tmux 세션에 윈도 2개를 띄운다: 'bringup'(팔) + 'd435'(카메라 상시
-# 세트 = eduping_d435_base.launch.py). d435 는 팔과 독립된 별도 윈도라 CAN/모터 실패와
-# 무관하게 카메라/perception 이 뜬다.
+# bringup(real) 시 같은 tmux 세션에 윈도 3개를 띄운다: 'bringup'(팔) + 'd435'(카메라 상시
+# 세트 = eduping_d435_base.launch.py) + 'stetho'(청진기 FSR 브리지). d435/stetho 는 팔과
+# 독립된 별도 윈도라 CAN/모터 실패와 무관하게 카메라/perception/청진기가 뜬다.
+# (청진기 = eduping 노트북에 물린 하드웨어 → doctor teleop 이 아닌 device 세트에 둠.)
 #
 # 인터랙티브 메뉴 (인자 없을 때 자동 표시) — 또는 인자로 직접:
 #
@@ -15,10 +16,19 @@
 #
 # 사용:
 #   scripts/device-eduping.sh             # 인터랙티브 메뉴
-#   scripts/device-eduping.sh 3           # real bringup (preflight 없이 바로 띄움)
+#   scripts/device-eduping.sh 3           # real bringup (control 서버는 TTY 면 메뉴로 선택)
+#   scripts/device-eduping.sh 3 hajuntu  # control 서버 = 등록된 머신(의사 머신) IP
+#   scripts/device-eduping.sh 3 192.168.0.152   # control 서버 = IP 직접
+#   scripts/device-eduping.sh 3 local     # control 서버 = localhost
+#   CONTROL=hajuntu scripts/device-eduping.sh 3
 #   scripts/device-eduping.sh down
 #
 #   RIGHT_CAN=can0 LEFT_CAN=can1 ARM_TYPE=v10 scripts/device-eduping.sh 3
+#
+# control 서버 선택 (2-머신: eduping → 의사 머신 control):
+#   2번째 인자 또는 CONTROL env = 머신이름(shared/machine_ips.json) | IP | local.
+#   d435 uploader(ws://:8000) + recognize(http://:8000) + depth streamer(:8100) host 를 한 번에 맞춤.
+#   CONTROL_URL 을 직접 export 하면 그게 최우선(기존 동작 유지). 미지정+TTY 면 메뉴.
 #
 # 의존:
 #   - tmux, /opt/ros/jazzy, controller/eduping-controller/ 빌드 완료
@@ -28,9 +38,12 @@
 set -euo pipefail
 
 SESSION="eduping-device"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 WS_DIR="$REPO_ROOT/controller/eduping-controller"
+source "$SCRIPT_DIR/_run_lib.sh"   # _runlib::resolve_control_token / choose_control_host
 ACTION="${1:-}"
+CONTROL_ARG="${2:-}"               # control 서버 선택: 머신이름(machine_ips.json)|IP|local
 ARM_TYPE="${ARM_TYPE:-v10}"
 RIGHT_CAN="${RIGHT_CAN:-can0}"
 LEFT_CAN="${LEFT_CAN:-can1}"
@@ -218,19 +231,49 @@ stage_bringup() {
 
   # 카메라 상시 세트 (단일 opener + bridge + 무궁화 perception) — 팔과 독립된 별도 윈도.
   # CAN/모터 실패와 무관하게 카메라/perception 이 뜬다. perception 의 YOLO 는 idle 이며
-  # robot-web 무궁화 진입 시에만 추론. control_url 은 기본(localhost); 원격 control 이면
-  # CONTROL_URL/DEVICE_TOKEN env override.
+  # robot-web 무궁화 진입 시에만 추론.
+  #
+  # control 서버 host 선택 (2-머신: eduping → 의사 머신). CONTROL_URL 이 명시돼 있으면
+  # 그대로 존중(back-compat), 아니면 CONTROL/2번째 인자/메뉴로 host 를 골라 ws/http/server_host
+  # 셋을 한 host 로 구성. d435 uploader(:8000) + depth streamer(:8100) 둘 다 그 host 로.
+  local d435_server_host_arg=""
+  if [[ -z "${CONTROL_URL:-}" ]]; then
+    local ctrl_host
+    local ctrl_sel="${CONTROL_ARG:-${CONTROL:-}}"
+    if [[ -n "$ctrl_sel" ]]; then
+      ctrl_host="$(_runlib::resolve_control_token "$ctrl_sel" "$REPO_ROOT/shared/machine_ips.json")" \
+        || { log "✗ control 서버 '$ctrl_sel' 해석 실패 — 중단" >&2; exit 1; }
+    elif [[ -t 0 ]]; then
+      ctrl_host="$(_runlib::choose_control_host "Control 서버 (eduping d435 uploader :8000 / depth :8100)" "$REPO_ROOT/shared/machine_ips.json")"
+    else
+      ctrl_host="localhost"
+    fi
+    CONTROL_URL="ws://$ctrl_host:8000"
+    RECOGNIZE_BASE_URL="${RECOGNIZE_BASE_URL:-http://$ctrl_host:8000}"
+    d435_server_host_arg=" server_host:=$ctrl_host"
+    log "control 서버 host=$ctrl_host → control_url=$CONTROL_URL"
+  fi
   # ros2 launch 는 빈 'device_token:=' 를 거부 — 토큰 있을 때만 인자 추가 (없으면 launch 기본값 "").
   local d435_token_arg=""
   [[ -n "${DEVICE_TOKEN:-}" ]] && d435_token_arg=" device_token:=$DEVICE_TOKEN"
   D435_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
     ros2 launch eduarm eduping_d435_base.launch.py \
       control_url:=${CONTROL_URL:-ws://localhost:8000} \
-      recognize_base_url:=${RECOGNIZE_BASE_URL:-http://localhost:8000}$d435_token_arg'"
+      recognize_base_url:=${RECOGNIZE_BASE_URL:-http://localhost:8000}$d435_server_host_arg$d435_token_arg'"
   tmux new-window -t "$SESSION" -n d435 -c "$WS_DIR" "$D435_CMD"
 
-  log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트"
-  log "/joint_states 토픽이 살아나면 sim twin / Control Server 가 구독 가능. d435 윈도엔 카메라/bridge/perception."
+  # 청진기 압전(FSR) 브리지 — Arduino(/dev/ttyACM0) → /eduping/stethoscope/fsr_raw.
+  # eduping 노트북에 물린 하드웨어라 카메라처럼 device 세트에 같이 둔다. 팔/카메라와
+  # 독립된 별도 윈도 — 노드가 serial 실패 시 2s 재시도라 Arduino 미연결이어도 안 닫힘.
+  # 하드웨어 없이 doctor UI 검증: STETHO_FAKE=1 → 합성 sine 값 publish.
+  local stetho_fake="false"
+  case "${STETHO_FAKE:-}" in 1|true|yes|on) stetho_fake="true" ;; esac
+  STETHO_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
+    ros2 launch eduping_stethoscope stethoscope.launch.py fake:=$stetho_fake'"
+  tmux new-window -t "$SESSION" -n stetho -c "$WS_DIR" "$STETHO_CMD"
+
+  log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)"
+  log "/joint_states 토픽이 살아나면 sim twin / Control Server 가 구독 가능. d435 윈도엔 카메라/bridge/perception, stetho 윈도엔 /eduping/stethoscope/fsr_raw."
   exec tmux attach -t "$SESSION"
 }
 

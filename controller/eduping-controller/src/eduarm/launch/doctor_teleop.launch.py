@@ -49,7 +49,7 @@ def _build_robot_description() -> str:
     USE_FAKE_HARDWARE 환경변수:
       "true"  (default) → mock_components (sim)
       "false"           → openarm_hardware (실물 CAN, right=can0 left=can1)
-    device-doctor-sim.sh / device-doctor-real.sh 에서 env 설정.
+    device-doctor.sh 에서 env 설정 (기본 mock; USE_FAKE_HARDWARE=false 로 실물 override).
     """
     use_fake = os.environ.get("USE_FAKE_HARDWARE", "true")
     description_pkg_share = get_package_share_directory("openarm_description")

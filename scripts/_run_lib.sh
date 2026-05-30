@@ -89,3 +89,66 @@ _runlib::lookup_machine_ip() {
   fi
   echo "$ip"
 }
+
+# resolve_control_token <token> [json_path] → host 를 stdout 으로.
+# token: ""/local/localhost → localhost | machine_ips.json 의 키 → 그 .ip | 그 외 → 원문(IP/호스트).
+_runlib::_default_machine_json() {
+  local repo_root; repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  echo "$repo_root/shared/machine_ips.json"
+}
+_runlib::resolve_control_token() {
+  local tok="$1" json="${2:-}"
+  case "$tok" in ""|local|localhost) echo "localhost"; return 0 ;; esac
+  [[ -z "$json" ]] && json="$(_runlib::_default_machine_json)"
+  if [[ -f "$json" ]] && command -v jq >/dev/null 2>&1 \
+     && jq -e --arg n "$tok" 'has($n)' "$json" >/dev/null 2>&1; then
+    _runlib::lookup_machine_ip "$tok" "$json"   # 못 찾으면 stderr 안내 + return 1
+    return
+  fi
+  echo "$tok"   # IP/호스트 직접 지정으로 간주
+}
+
+# choose_control_host [label] [json_path] → host 를 stdout 으로 (메뉴/프롬프트는 stderr).
+# machine_ips.json 의 non-null 머신 + localhost + 수동입력 + 재스캔.
+_runlib::choose_control_host() {
+  local label="${1:-Control 서버}" json="${2:-}"
+  [[ -z "$json" ]] && json="$(_runlib::_default_machine_json)"
+  local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  while true; do
+    local names=() ips=()
+    if [[ -f "$json" ]] && command -v jq >/dev/null 2>&1; then
+      mapfile -t names < <(jq -r 'to_entries[]|select(.value.ip!=null)|.key'      "$json" 2>/dev/null)
+      mapfile -t ips   < <(jq -r 'to_entries[]|select(.value.ip!=null)|.value.ip' "$json" 2>/dev/null)
+    fi
+    {
+      echo "=== $label 선택 ==="
+      echo "  1) localhost            (이 머신에서 control 서버도 같이 돌릴 때)"
+      local i
+      for i in "${!names[@]}"; do
+        printf "  %d) %-12s %s\n" "$((i + 2))" "${names[$i]}" "${ips[$i]}"
+      done
+      echo "  m) 수동 입력 (IP/호스트)"
+      echo "  r) 재스캔 (find_machine_ips.sh — IP 갱신)"
+    } >&2
+    local choice
+    read -rp "선택 [1/번호/m/r]: " choice >&2
+    case "$choice" in
+      1|"") echo "localhost"; return 0 ;;
+      m|M)
+        local h; read -rp "  IP/호스트: " h >&2
+        [[ -n "$h" ]] && { echo "$h"; return 0; }
+        ;;
+      r|R)
+        echo "[run_lib] find_machine_ips.sh 재실행..." >&2
+        "$script_dir/find_machine_ips.sh" >/dev/null 2>&1 || true
+        continue
+        ;;
+      *)
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 2 && choice - 2 < ${#names[@]} )); then
+          echo "${ips[$((choice - 2))]}"; return 0
+        fi
+        echo "  잘못된 선택: $choice" >&2
+        ;;
+    esac
+  done
+}

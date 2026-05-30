@@ -13,6 +13,7 @@ declare -A MACS=(
   [tonyno]="e4:c7:67:61:2f:2e"
   [jungbuntu]="e8:65:38:23:fd:6f"   # backend (DB + AI Hub)
   [ai-server]="10:ff:e0:8d:a1:2a"   # woolim — AI Hub / DB (run_db_ai.sh)
+  [hajuntu]="84:1b:77:04:24:a5"    # 의사 머신 + 리드디바이스 (run_server + device-doctor) — control 서버 :8000 호스트
 )
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

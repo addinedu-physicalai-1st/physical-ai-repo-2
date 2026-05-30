@@ -1,40 +1,45 @@
 #!/usr/bin/env bash
-# Doctor teleop ROS launch — **시뮬 (mock_components) 모드.**
+# Doctor teleop bringup — **의사 컴 (doctor machine).**
 #
-# 실물 OpenArm CAN HW 로 테스트할 땐 → device-doctor-real.sh
+# 배포 구성 (2-머신):
+#   - 이 머신 = 의사 + 리드디바이스. run_server.sh (control :8000) + 이 스크립트.
+#   - eduping(로봇) 머신 = follower(OpenArm CAN) + D435 + 청진기 → device-eduping.sh.
+#     follower 제어/상태는 control 서버(:8000) WS 경유 (ROS 도메인 공유 아님).
 #
-# 다른 런처 책임 분리:
-#   - run_server.sh             → control-service :8000 / streaming :8100 / pgweb / ai-hub
-#   - ui-portal.sh              → portal-web :5174
-#   - device-doctor-sim.sh      → ROS 측 doctor_teleop launch (mock — 이 파일)
-#   - device-doctor-real.sh     → ROS 측 doctor_teleop launch (real CAN HW)
+# 그래서 이 머신엔 실물 follower 가 없다 — doctor_teleop 을 **mock follower** 로 띄워
+# doctor UI 시각화만 담당하고, 실물 팔은 eduping 머신이 control 서버 통해 받는다.
+#   기본: USE_FAKE_HARDWARE=true (mock). 드물게 follower 가 이 머신에 물려 있으면
+#         USE_FAKE_HARDWARE=false scripts/device-doctor.sh start 로 override.
+#
+# 실물 mini leader (Feetech 양팔 USB) 도 같이 기동 — 별도 'leader' 윈도에서
+# feetech_leader_node 가 /eduping/leader/joint_states 를 publish 하고, 'ros' 윈도의
+# leader_passthrough 가 그걸 구독해 (mock) follower → doctor UI 로 흘린다. 한 명령으로.
+#
+# ⚠ 사전 준비:
+#   - **leader: feetech-servo-sdk 가 깔린 conda env 활성** 후 실행. 이 스크립트는
+#     conda activate 를 하지 않고 호출 셸 env 를 그대로 상속한다 (예: conda activate pdg).
+#     leader 윈도만 그 env 가 필요 — 나머지 노드는 system python (고정 shebang) 사용.
+#   - leader USB 포트 (기본 udev 심볼릭): /dev/op_mini_right, /dev/op_mini_left
+#       symlink 없으면 PORT_RIGHT=/dev/ttyACM0 PORT_LEFT=/dev/ttyACM1 prefix 로 지정.
+#   - (USE_FAKE_HARDWARE=false override 시에만) PEAK CAN can0/can1 UP + 16모터 preflight.
+#
+# 다른 런처:
+#   - run_server.sh             → control-service :8000 (eduping 머신이 LAN IP:8000 로 접속)
+#   - ui-portal.sh              → portal-web :5174 (doctor UI)
+#   - device-eduping.sh         → eduping 머신: follower + D435 + 청진기
+#   - device-eduping-leader.sh  → leader 만 단독 기동/점검/calibration (이 스크립트와 토픽 공유)
 #
 # 사용:
-#   device-doctor-sim.sh start            # tmux + (옵션 RViz)
-#   device-doctor-sim.sh start --rviz     # RViz 같이
-#   device-doctor-sim.sh start --bg       # tmux 대신 백그라운드 + 로그 파일
-#   device-doctor-sim.sh stop             # 띄운 ROS launch / tmux 모두 종료
-#   device-doctor-sim.sh status
-#   device-doctor-sim.sh attach
-#
-# ─────────────────────────────────────────────
-# 수동 검증 체크리스트 (Acceptance — 8 시나리오)
-# ─────────────────────────────────────────────
-# 사전: run_server.sh + ui-portal.sh 띄워둔 상태
-# 1. http://localhost:5174/doctor/teleop?eduping_id=ed-01 접속 → 3D 캔버스 + 양팔 URDF
-# 2. 핸들 (파랑) 드래그 → 좌팔 30Hz 추종
-# 3. 핸들 (주황) 드래그 → 우팔 추종
-# 4. Shift+wheel on 핸들 → gripper 폭 변화
-# 5. 일반 wheel → OrbitControls zoom
-# 6. D435 시야에 손바닥 → servo_status `slowed`
-# 7. 손바닥 매우 가까이 → servo_status `stopped`
-# 8. 의사 탭 새로고침 → WS 끊김 → 양팔 hold
-# ─────────────────────────────────────────────
+#   device-doctor.sh start
+#   device-doctor.sh start --rviz
+#   device-doctor.sh stop
+#   device-doctor.sh status
+#   device-doctor.sh attach
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PID_DIR="$ROOT/.run/doctor_sim"
-TMUX_SESSION="doctor_sim"
+PID_DIR="$ROOT/.run/doctor"
+TMUX_SESSION="doctor"
 mkdir -p "$PID_DIR"
 
 # bash 내부 ros launch 명령 — RViz 는 doctor_rviz.launch.py 로 분리.
@@ -45,8 +50,10 @@ build_ros_cmd() {
   local pitch="${CAM_PITCH:--0.1745}"
   local yaw="${CAM_YAW:-0.0}"
   local roll="${CAM_ROLL:-0.0}"
-  # mock_components (sim). doctor_teleop.launch.py 가 USE_FAKE_HARDWARE 읽음.
-  echo "export USE_FAKE_HARDWARE=true && \
+  # 기본 mock_components (sim) — 이 머신엔 실물 follower 없음. doctor_teleop.launch.py 가
+  # USE_FAKE_HARDWARE 읽음. follower 가 이 머신에 물린 경우만 false override.
+  local fake_hw="${USE_FAKE_HARDWARE:-true}"
+  echo "export USE_FAKE_HARDWARE=$fake_hw && \
         source $ROOT/install/setup.bash && \
         exec ros2 launch eduarm doctor_teleop.launch.py rviz:=false \
             cam_pitch:=$pitch cam_yaw:=$yaw cam_roll:=$roll"
@@ -55,6 +62,32 @@ build_rviz_cmd() {
   echo "source $ROOT/install/setup.bash && \
         exec ros2 launch eduarm doctor_rviz.launch.py"
 }
+build_leader_cmd() {
+  # 실물 mini leader (Feetech 양팔 USB) → /eduping/leader/joint_states publisher.
+  # device-eduping-leader.sh 의 bringup 과 동일한 노드/파라미터 — env 변수명도 공유.
+  # ⚠ conda activate 안 함: 호출 셸의 활성 env (feetech-servo-sdk 보유) 를 그대로 상속.
+  #   install/setup.bash 만 source (ROS underlay 체이닝). `python` = 현재 활성 env python.
+  local port_right="${PORT_RIGHT:-/dev/op_mini_right}"
+  local port_left="${PORT_LEFT:-/dev/op_mini_left}"
+  local baud="${BAUDRATE:-1000000}"
+  local rate="${RATE_HZ:-50.0}"
+  local cal="${CALIBRATION_PATH:-$HOME/.cache/huggingface/lerobot/calibration/teleoperators/openarm_mini/my_mini_leader_arm.json}"
+  echo "source $ROOT/install/setup.bash && \
+        exec python -m eduarm.feetech_leader_node --ros-args \
+            -p port_right:=$port_right \
+            -p port_left:=$port_left \
+            -p baudrate:=$baud \
+            -p rate_hz:=$rate \
+            -p calibration_path:=$cal"
+}
+# leader 윈도가 import 에러로 즉사하기 전에 미리 경고 — 나머지 노드는 그대로 기동.
+preflight_leader_env() {
+  if ! python -c "import scservo_sdk" >/dev/null 2>&1; then
+    echo "[leader] ⚠ 현재 python 에 scservo_sdk(feetech-servo-sdk) 없음 — leader 윈도가 import 에러로 종료됩니다." >&2
+    echo "[leader]   feetech-servo-sdk 설치된 env 활성화 후 재실행하세요 (예: conda activate pdg)." >&2
+    echo "[leader]   나머지 ROS 노드는 정상 기동됩니다." >&2
+  fi
+}
 
 start_bg() {
   local rviz_flag="$1"
@@ -62,6 +95,13 @@ start_bg() {
   echo "[ros] starting → $logf"
   setsid bash -c "$(build_ros_cmd) >\"$logf\" 2>&1" &
   echo $! >"$PID_DIR/ros.pid"
+  # 청진기 FSR 브리지 / follower 는 eduping 머신 (device-eduping.sh) 에서 띄움 — 여기 아님.
+  # 실물 mini leader — 호출 셸의 활성 env 를 그대로 상속 (conda activate 안 함).
+  preflight_leader_env
+  local leaderf="$PID_DIR/leader.log"
+  echo "[leader] starting → $leaderf"
+  setsid bash -c "$(build_leader_cmd) >\"$leaderf\" 2>&1" &
+  echo $! >"$PID_DIR/leader.pid"
   if [ "$rviz_flag" = "true" ]; then
     local rvizf="$PID_DIR/rviz.log"
     echo "[rviz] starting → $rvizf"
@@ -81,10 +121,18 @@ start_tmux() {
     return 1
   fi
   echo "[tmux] starting session '$TMUX_SESSION' (자동 attach — Ctrl+B D 로 detach)"
+  preflight_leader_env
   # ROS setup.bash 는 BASH_SOURCE 가 필요 → bash 로 명시적 실행.
-  # window 'ros' = move_group + D435 + JTC + leader_passthrough.
-  # window 'rviz' = RViz 만 (분리 — 따로 죽이거나 재시작 가능).
+  # window 'ros'    = move_group + JTC + leader_passthrough + (mock) follower.
+  # window 'leader' = 실물 mini leader (feetech_leader_node). HW 가 죽어도 독립 재시작
+  #                   가능하도록 별도 윈도. remain-on-exit 로 self-check 실패 로그 보존.
+  # window 'rviz'   = RViz 만 (분리 — 따로 죽이거나 재시작 가능).
+  # (follower 실물 / D435 / 청진기는 eduping 머신의 device-eduping.sh — 여기 아님.)
   tmux new-session -d -s "$TMUX_SESSION" -n ros bash -c "$(build_ros_cmd)"
+  # 실물 mini leader — 호출 셸의 활성 env (feetech-servo-sdk) 를 그대로 상속.
+  tmux new-window -t "$TMUX_SESSION" -n leader bash -c "$(build_leader_cmd)"
+  tmux set-option -t "$TMUX_SESSION:leader" remain-on-exit on
+  tmux select-window -t "$TMUX_SESSION:ros"
   if [ "$rviz_flag" = "true" ]; then
     tmux new-window -t "$TMUX_SESSION" -n rviz bash -c "$(build_rviz_cmd)"
   fi
@@ -139,6 +187,9 @@ stop_all() {
   echo "[cleanup] forcing kill of any leftover ROS nodes from doctor_teleop"
   pkill -KILL -f "ros2 launch eduarm doctor_teleop" 2>/dev/null || true
   pkill -KILL -f "doctor_teleop.launch.py"          2>/dev/null || true
+  # 실물 mini leader (별도 윈도/백그라운드) — python -m eduarm.feetech_leader_node.
+  pkill -KILL -f "eduarm.feetech_leader_node"       2>/dev/null || true
+  pkill -KILL -f "feetech_leader_node"              2>/dev/null || true
   pkill -KILL -f "ros2_control_node"                 2>/dev/null || true
   pkill -KILL -f "lib/moveit_ros_move_group/move_group" 2>/dev/null || true
   pkill -KILL -f "lib/moveit_servo/servo_node"       2>/dev/null || true
@@ -146,11 +197,6 @@ stop_all() {
   pkill -KILL -f "eduarm/lib/eduarm/joint_state_relay"   2>/dev/null || true
   pkill -KILL -f "eduarm/lib/eduarm/home_pose_setter"    2>/dev/null || true
   pkill -KILL -f "eduarm/lib/eduarm/leader_passthrough"  2>/dev/null || true
-  pkill -KILL -f "eduarm/lib/eduarm/d435_rgb_uploader"   2>/dev/null || true
-  pkill -KILL -f "eduarm/lib/eduarm/d435_pointcloud_uploader" 2>/dev/null || true
-  # realsense2_camera_node — 카메라 device 점유 풀어줘야 다음 launch 가 성공.
-  pkill -KILL -f "realsense2_camera/realsense2_camera_node" 2>/dev/null || true
-  pkill -KILL -f "octomap_server/octomap_server_node"    2>/dev/null || true
   pkill -KILL -f "rviz2"                             2>/dev/null || true
   sleep 1
 }
@@ -184,6 +230,9 @@ case "$cmd" in
     if [ "$rviz_arg" = "true" ]; then
       echo "RViz:            창이 자동으로 뜸 (X11)"
     fi
+    echo "Follower:        ${USE_FAKE_HARDWARE:-true} (mock) — 실물 follower 는 eduping 머신"
+    echo "Leader:          'leader' 윈도에서 feetech_leader_node publish (Ctrl+B 1 로 이동)"
+    echo "                 motor self-check 실패 시 그 윈도만 종료 — Ctrl+B 1 로 로그 확인 후 재시작"
     echo "Web UI:          http://localhost:5174/doctor/teleop?eduping_id=ed-01"
     echo "                 (run_server.sh + ui-portal.sh 가 떠 있어야 함)"
     echo "Stop:            $0 stop"
@@ -224,7 +273,7 @@ case "$cmd" in
     restart_rviz_tmux
     ;;
   *)
-    echo "usage: $0 start [--no-rviz] [--bg] | stop | attach | status | rviz"
+    echo "usage: $0 start [--rviz] [--no-rviz] [--bg] | stop | attach | status | rviz"
     exit 1
     ;;
 esac
