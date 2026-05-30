@@ -491,8 +491,8 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
             remapped = masker.mask_images(remapped, task)
             provider.last_detected = masker.last_detected  # runner 가 missing 판단에 사용.
             provider.last_masked = remapped  # rerun 로깅용 (loop 에서 _rr_log 가 읽음).
-        # 2.5) UI 미리보기 — control_service /preview/{cam} endpoint 가 읽는 JPG (5fps).
-        _save_preview(remapped)
+        # UI 미리보기는 끔 — 우리 StorePlay UI 가 안 씀, cv2.imwrite IO blocking spike 회피.
+        # 함수 정의는 유지 — 다른 팀원이 dev /preview/{cam} 쓰면 호출 재추가하면 됨.
         observation: dict[str, Any] = {
             "observation.state": np.asarray(state, dtype=np.float32),
         }
@@ -523,7 +523,6 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
         remapped = masker.mask_images(remapped, task)
         provider.last_detected = masker.last_detected
         provider.last_masked = remapped
-        _save_preview(remapped)  # 게이트 중에도 UI 미리보기 갱신
         return masker.last_detected
 
     # _run_one_task 가 task 시작 시 호출 — PROMPT 마다 무조건 reset (동일 prompt 연속도 포함).

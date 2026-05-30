@@ -156,7 +156,7 @@ policy:
   # rerun 시각화 — 기본 OFF. 켜면 뷰어가 CPU 100%·RAM 수GB 잡아먹어 추론·wake 재생이
   # 느려짐(provider 40→100ms, wake slow-motion). 디버깅 때만 enabled:true.
   rerun:
-    enabled: true
+    enabled: false
   paraphrases:
     broccoli:
       - "give me broccoli"
