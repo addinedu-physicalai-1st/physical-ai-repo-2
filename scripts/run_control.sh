@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # scripts/run_control.sh — robot 박스용 (control + streaming).
 #
-# backend(DB+AI) 박스 IP 는 shared/machine_ips.json 에서 'jungbuntu' 키로 lookup.
+# backend(DB+AI) 박스 IP 는 shared/machine_ips.json 에서 'ai-server' 키로 lookup.
 # DATABASE_URL / AI_HUB_URL 을 그 IP 로 export 한 뒤 control / streaming uvicorn 기동.
 #
 # 사전 조건:
 #   - backend 박스가 같은 LAN 에 켜져있고 scripts/run_db_ai.sh 가 동작 중.
 #   - 이 박스(또는 같은 LAN 의 다른 박스)에서 scripts/find_machine_ips.sh 가 최근 실행돼
-#     shared/machine_ips.json 에 jungbuntu 항목이 채워져 있음.
+#     shared/machine_ips.json 에 ai-server 항목이 채워져 있음.
 #
 # 사용:
 #   scripts/run_control.sh           # 세션 시작·attach
@@ -22,7 +22,7 @@ source "$SCRIPT_DIR/_run_lib.sh"
 SESSION="pingdergarten-robot"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ACTION="${1:-up}"
-BACKEND_NAME="jungbuntu"
+BACKEND_NAME="ai-server"
 
 if ! command -v tmux &>/dev/null; then
   echo "[run_control] tmux 가 필요합니다." >&2
