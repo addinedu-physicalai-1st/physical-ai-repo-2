@@ -212,7 +212,8 @@ class PerceptionNode(Node):
             self._reid = ReIDEngine(device=YOLO_DEVICE)
             self._tracker = TargetTracker(self._reid)
             self.get_logger().info(
-                f"Engines ready: YOLO={YOLO_MODEL_NAME}, ReID=OSNet, tracker={TRACKER_NAME}"
+                f"Engines ready: YOLO={YOLO_MODEL_NAME} device={YOLO_DEVICE}, "
+                f"ReID=OSNet, tracker={TRACKER_NAME}"
             )
             return True
         except Exception as e:  # noqa: BLE001
@@ -431,19 +432,33 @@ class PerceptionNode(Node):
         with self._lock:
             self._image_width = w
 
-        # ultralytics yolo.track — ByteTrack 통합. persist=True 로 track_id 유지.
+        # YOLO 추론 — ByteTrack(track_id) 은 추종(FOLLOW) target 있을 때만 필요.
+        # 주행 중 사람감지(proximity)엔 ID 불필요 → predict 로 ByteTrack 오버헤드 제거.
+        # (ByteTrack 비용은 화면 내 사람 수에 비례 — 빈 화면에선 predict≈track 이지만
+        #  사람 여럿일 때만큼 절약. device 명시는 silent CPU 폴백 차단이 주목적.)
         try:
-            results = self._yolo.track(
-                color,
-                persist=True,
-                classes=[YOLO_PERSON_CLASS],
-                conf=YOLO_CONF_THRESHOLD,
-                imgsz=self._imgsz,
-                tracker=TRACKER_NAME,
-                verbose=False,
-            )
+            if self._tracker.has_target():
+                results = self._yolo.track(
+                    color,
+                    persist=True,
+                    classes=[YOLO_PERSON_CLASS],
+                    conf=YOLO_CONF_THRESHOLD,
+                    imgsz=self._imgsz,
+                    tracker=TRACKER_NAME,
+                    device=YOLO_DEVICE,
+                    verbose=False,
+                )
+            else:
+                results = self._yolo.predict(
+                    color,
+                    classes=[YOLO_PERSON_CLASS],
+                    conf=YOLO_CONF_THRESHOLD,
+                    imgsz=self._imgsz,
+                    device=YOLO_DEVICE,
+                    verbose=False,
+                )
         except Exception as e:  # noqa: BLE001
-            self.get_logger().warn(f"yolo.track failed: {e}")
+            self.get_logger().warn(f"yolo inference failed: {e}")
             return
 
         # ── person_proximity publish — target 유무 무관 (graph_router 용) ──
