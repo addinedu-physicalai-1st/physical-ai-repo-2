@@ -509,6 +509,163 @@ def smoother_involvement(
     }
 
 
+# ───────────────────────── M14: L1(레인) vs L2(실주행) 경로 유사도 ─────────────────────────
+def _pt_seg_dist(px, py, ax, ay, bx, by):
+    dx, dy = bx - ax, by - ay
+    if dx == 0.0 and dy == 0.0:
+        return math.hypot(px - ax, py - ay)
+    t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)
+    t = max(0.0, min(1.0, t))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+def _pt_polyline_dist(px, py, poly):
+    if len(poly) >= 2:
+        return min(
+            _pt_seg_dist(px, py, poly[i][0], poly[i][1], poly[i + 1][0], poly[i + 1][1])
+            for i in range(len(poly) - 1)
+        )
+    return min(math.hypot(px - qx, py - qy) for qx, qy in poly) if poly else float("inf")
+
+
+def _downsample(poly, cap):
+    if len(poly) <= cap:
+        return poly
+    step = len(poly) / cap
+    return [poly[int(i * step)] for i in range(cap)]
+
+
+def _densify(poly, step):
+    """폴리라인을 step(m) 간격으로 보간 — sparse vertex 레인을 조밀한 점열로.
+
+    discrete Fréchet 은 점-대-점 짝짓기라, route_path 처럼 vertex 만 있는 sparse
+    폴리라인엔 중간 점이 없어 값이 부풀려진다 → 보간으로 L2 와 밀도 맞춤.
+    """
+    if len(poly) < 2:
+        return poly
+    out = [poly[0]]
+    for i in range(len(poly) - 1):
+        ax, ay = poly[i]
+        bx, by = poly[i + 1]
+        seg = math.hypot(bx - ax, by - ay)
+        n = max(1, int(seg / step))
+        for k in range(1, n + 1):
+            t = k / n
+            out.append((ax + t * (bx - ax), ay + t * (by - ay)))
+    return out
+
+
+def _discrete_frechet(P, Q):
+    """discrete Fréchet distance (반복 DP, O(n·m))."""
+    n, m = len(P), len(Q)
+    if n == 0 or m == 0:
+        return 0.0
+    ca = [[0.0] * m for _ in range(n)]
+    for i in range(n):
+        for j in range(m):
+            dij = math.hypot(P[i][0] - Q[j][0], P[i][1] - Q[j][1])
+            if i == 0 and j == 0:
+                ca[i][j] = dij
+            elif i == 0:
+                ca[i][j] = max(ca[0][j - 1], dij)
+            elif j == 0:
+                ca[i][j] = max(ca[i - 1][0], dij)
+            else:
+                ca[i][j] = max(min(ca[i - 1][j], ca[i - 1][j - 1], ca[i][j - 1]), dij)
+    return ca[n - 1][m - 1]
+
+
+def compute_lane_similarity(
+    route_paths: list[tuple[float, list[tuple[float, float]]]],
+    odom_xy: list[tuple[float, float, float]],
+    tf_map_odom: list[tuple[float, float, float, float]],
+) -> dict:
+    """M14 — L1(graph_router route_path = 레인 경로) vs L2(실주행 odom, map frame) 유사도.
+
+    L1 = route_path pose 들을 순서대로 이은 폴리라인 (vertex 직선 레인).
+    L2 = odom 을 map frame 으로 변환한 실제 궤적.
+    → 실주행이 의도한 레인에서 얼마나 벗어났나 (planner 가 레인 충실 vs 코너컷·우회).
+    """
+    empty = {
+        "lane_dev_mean_m": 0.0, "lane_dev_p95_m": 0.0, "lane_dev_max_m": 0.0,
+        "lane_frechet_m": 0.0, "lane_n_samples": 0,
+    }
+    l1: list[tuple[float, float]] = []
+    for _t, poly in route_paths:
+        for x, y in poly:
+            if not l1 or math.hypot(x - l1[-1][0], y - l1[-1][1]) > 1e-3:
+                l1.append((x, y))
+    if len(l1) < 2 or not odom_xy or not tf_map_odom:
+        return empty
+    tf_ts = [t for t, _, _, _ in tf_map_odom]
+    l2: list[tuple[float, float]] = []
+    k = 0
+    for t, x_o, y_o in odom_xy:
+        while k + 1 < len(tf_ts) and tf_ts[k + 1] <= t:
+            k += 1
+        if tf_ts[k] > t:
+            continue
+        _, tx, ty, yaw = tf_map_odom[k]
+        c, s = math.cos(yaw), math.sin(yaw)
+        l2.append((tx + c * x_o - s * y_o, ty + s * x_o + c * y_o))
+    if len(l2) < 2:
+        return empty
+    devs = sorted(_pt_polyline_dist(px, py, l1) for px, py in l2)
+    n = len(devs)
+    # frechet: L1 을 0.1m 간격 보간(densify) 후 비교 — sparse vertex 부풀림 방지.
+    frechet = _discrete_frechet(_downsample(_densify(l1, 0.1), 300), _downsample(l2, 300))
+    return {
+        "lane_dev_mean_m": sum(devs) / n,
+        "lane_dev_p95_m": devs[int(0.95 * (n - 1))],
+        "lane_dev_max_m": devs[-1],
+        "lane_frechet_m": frechet,
+        "lane_n_samples": n,
+    }
+
+
+# ───────────────────────── M15: costmap 민감도 ─────────────────────────
+def _sample_costmap(cm, x: float, y: float):
+    """local costmap (odom frame) 의 (x,y) cost. 범위 밖/unknown(-1) 이면 None."""
+    w, h, res, ox, oy, data = cm
+    if res <= 0:
+        return None
+    col = int((x - ox) / res)
+    row = int((y - oy) / res)
+    if 0 <= col < w and 0 <= row < h:
+        v = data[row * w + col]
+        if v >= 0:
+            return float(v)
+    return None
+
+
+def compute_vel_clearance_corr(
+    odom_twist: list[tuple[float, float, float]],
+    scan_min: list[tuple[float, float]],
+) -> float:
+    """corr(|v_lin|, scan_min) — 장애물 가까울수록 감속하면 양수 (costmap 반응성)."""
+    if len(odom_twist) < 3 or len(scan_min) < 3:
+        return 0.0
+    sm_ts = [t for t, _ in scan_min]
+    xs, ys = [], []
+    k = 0
+    for t, vlin, _ in odom_twist:
+        while k + 1 < len(sm_ts) and sm_ts[k + 1] <= t:
+            k += 1
+        if abs(sm_ts[k] - t) > 0.5:
+            continue
+        xs.append(abs(vlin))
+        ys.append(scan_min[k][1])
+    if len(xs) < 3:
+        return 0.0
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+    vx = sum((a - mx) ** 2 for a in xs)
+    vy = sum((b - my) ** 2 for b in ys)
+    if vx <= 0 or vy <= 0:
+        return 0.0
+    return cov / math.sqrt(vx * vy)
+
+
 def analyze_bag(bag_path: Path) -> dict:
     odom_xy: list[tuple[float, float, float]] = []
     odom_twist: list[tuple[float, float, float]] = []  # (t, lin_x, ang_z)
@@ -527,6 +684,9 @@ def analyze_bag(bag_path: Path) -> dict:
     bt_events: list[tuple[float, str, str, str]] = []  # (t, node, prev, curr)
     # TF: map → gogoping/odom transform (XTE 의 좌표계 변환용)
     tf_map_odom: list[tuple[float, float, float, float]] = []  # (t, tx, ty, yaw)
+    route_paths: list[tuple[float, list[tuple[float, float]]]] = []  # M14 — L1 레인 경로
+    latest_costmap = None  # M15 — (w, h, res, ox, oy, data) 최신 local costmap
+    cost_series: list[float] = []  # M15 — 로봇 위치의 costmap cost 시계열
     plan_pubs = 0
     bt_failures = 0
     state_history: list[tuple[float, str]] = []
@@ -550,6 +710,10 @@ def analyze_bag(bag_path: Path) -> dict:
             if topic == "/gogoping/odom":
                 p = ros_msg.pose.pose.position
                 odom_xy.append((log_t, p.x, p.y))
+                if latest_costmap is not None:   # M15 — 로봇 위치 costmap cost 샘플
+                    _cv = _sample_costmap(latest_costmap, p.x, p.y)
+                    if _cv is not None:
+                        cost_series.append(_cv)
                 tw = ros_msg.twist.twist
                 odom_twist.append((log_t, tw.linear.x, tw.angular.z))
                 odom_stamps.append(log_t)
@@ -596,6 +760,17 @@ def analyze_bag(bag_path: Path) -> dict:
                 poses_xy = [(p.pose.position.x, p.pose.position.y) for p in ros_msg.poses]
                 if poses_xy:
                     plans.append((log_t, poses_xy))
+            elif topic == "/graph_router/route_path":   # M14 — L1 레인 경로
+                route_paths.append(
+                    (log_t, [(ps.pose.position.x, ps.pose.position.y) for ps in ros_msg.poses])
+                )
+            elif topic == "/local_costmap/costmap":   # M15 — costmap 민감도
+                _info = ros_msg.info
+                latest_costmap = (
+                    _info.width, _info.height, _info.resolution,
+                    _info.origin.position.x, _info.origin.position.y,
+                    ros_msg.data,
+                )
             elif topic == "/behavior_tree_log":
                 for ev in ros_msg.event_log:
                     ev_t = ev.timestamp.sec + ev.timestamp.nanosec / 1e9
@@ -663,6 +838,19 @@ def analyze_bag(bag_path: Path) -> dict:
 
     # ───────────── AMCL drift (Step D) ─────────────
     amcl = compute_amcl_drift(tf_map_odom)
+
+    # ───────────── M14 lane similarity / M15 costmap sensitivity ─────────────
+    lane = compute_lane_similarity(route_paths, odom_xy, tf_map_odom)
+    vel_corr = compute_vel_clearance_corr(odom_twist, scan_min)
+    if cost_series:
+        _cs = sorted(cost_series)
+        _ncs = len(_cs)
+        cost_mean = sum(_cs) / _ncs
+        cost_p95 = _cs[int(0.95 * (_ncs - 1))]
+        cost_max = _cs[-1]
+        high_cost_ratio = sum(1 for v in _cs if v >= 50) / _ncs
+    else:
+        cost_mean = cost_p95 = cost_max = high_cost_ratio = 0.0
 
     obs_min = min(d for _, d in scan_min) if scan_min else 0
 
@@ -769,6 +957,18 @@ def analyze_bag(bag_path: Path) -> dict:
             "M13_amcl_drift_p95": amcl["drift_p95"],
             "M13_amcl_drift_yaw_rms": amcl["drift_yaw_rms"],
             "M13_amcl_jump_count": amcl["jump_count"],
+            # M14 — L1(레인 route_path) vs L2(실주행) 경로 유사도
+            "M14_lane_dev_mean_m": lane["lane_dev_mean_m"],
+            "M14_lane_dev_p95_m": lane["lane_dev_p95_m"],
+            "M14_lane_dev_max_m": lane["lane_dev_max_m"],
+            "M14_lane_frechet_m": lane["lane_frechet_m"],
+            "M14_lane_n": lane["lane_n_samples"],
+            # M15 — costmap 민감도 (낮은 cost = 민감/회피, vel_corr 양수 = 근접 시 감속)
+            "M15_cost_at_robot_mean": cost_mean,
+            "M15_cost_at_robot_p95": cost_p95,
+            "M15_cost_at_robot_max": cost_max,
+            "M15_high_cost_ratio": high_cost_ratio,
+            "M15_vel_clearance_corr": vel_corr,
         },
         "reliability": {
             "score": reliability,
@@ -863,6 +1063,16 @@ def print_summary(results: list[dict]) -> None:
         ("M13 drift p95 (m/s)", "M13_amcl_drift_p95", "{:.4f}"),
         ("M13 yaw drift rms", "M13_amcl_drift_yaw_rms", "{:.4f}"),
         ("M13 jump count (#)", "M13_amcl_jump_count", "{:d}"),
+        # M14 — L1(레인) vs L2(실주행)
+        ("M14 lane dev mean(m)", "M14_lane_dev_mean_m", "{:.3f}"),
+        ("M14 lane dev p95 (m)", "M14_lane_dev_p95_m", "{:.3f}"),
+        ("M14 lane dev max (m)", "M14_lane_dev_max_m", "{:.3f}"),
+        ("M14 lane frechet (m)", "M14_lane_frechet_m", "{:.3f}"),
+        # M15 — costmap 민감도
+        ("M15 cost mean", "M15_cost_at_robot_mean", "{:.1f}"),
+        ("M15 cost p95", "M15_cost_at_robot_p95", "{:.1f}"),
+        ("M15 high-cost ratio", "M15_high_cost_ratio", "{:.2%}"),
+        ("M15 vel-clr corr", "M15_vel_clearance_corr", "{:+.3f}"),
     ]
     for label, key, fmt in metric_rows:
         print(f"{label:<25}", end="")
