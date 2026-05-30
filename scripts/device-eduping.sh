@@ -271,8 +271,10 @@ stage_bringup() {
   local stetho_fake="false"
   case "${STETHO_FAKE:-}" in 1|true|yes|on) stetho_fake="true" ;; esac
   local stetho_port="${STETHO_PORT:-/dev/eduping_stetho}"
+  # FSR 도 카메라처럼 control 서버로 WS push (위에서 고른 host). ROS DDS cross-machine 회피.
   STETHO_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
-    ros2 launch eduping_stethoscope stethoscope.launch.py fake:=$stetho_fake serial_port:=$stetho_port'"
+    ros2 launch eduping_stethoscope stethoscope.launch.py fake:=$stetho_fake serial_port:=$stetho_port \
+      control_url:=${CONTROL_URL:-ws://localhost:8000}'"
   tmux new-window -t "$SESSION" -n stetho -c "$WS_DIR" "$STETHO_CMD"
 
   log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)"

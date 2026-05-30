@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'fsr_bridge_node=eduping_stethoscope.fsr_bridge_node:main',
+            'fsr_ws_uploader_node=eduping_stethoscope.fsr_ws_uploader_node:main',
         ],
     },
 )
