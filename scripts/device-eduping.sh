@@ -262,14 +262,17 @@ stage_bringup() {
       recognize_base_url:=${RECOGNIZE_BASE_URL:-http://localhost:8000}$d435_server_host_arg$d435_token_arg'"
   tmux new-window -t "$SESSION" -n d435 -c "$WS_DIR" "$D435_CMD"
 
-  # 청진기 압전(FSR) 브리지 — Arduino(/dev/ttyACM0) → /eduping/stethoscope/fsr_raw.
+  # 청진기 압전(FSR) 브리지 — Arduino(udev 심볼릭 /dev/eduping_stetho) → /eduping/stethoscope/fsr_raw.
   # eduping 노트북에 물린 하드웨어라 카메라처럼 device 세트에 같이 둔다. 팔/카메라와
   # 독립된 별도 윈도 — 노드가 serial 실패 시 2s 재시도라 Arduino 미연결이어도 안 닫힘.
+  # 포트는 99-eduping-stethoscope.rules 의 고정 심볼릭(/dev/eduping_stetho) — /dev/ttyACM* 가
+  # 바뀌어도 항상 같은 보드. 다른 포트면 STETHO_PORT=/dev/ttyACM0 식으로 override.
   # 하드웨어 없이 doctor UI 검증: STETHO_FAKE=1 → 합성 sine 값 publish.
   local stetho_fake="false"
   case "${STETHO_FAKE:-}" in 1|true|yes|on) stetho_fake="true" ;; esac
+  local stetho_port="${STETHO_PORT:-/dev/eduping_stetho}"
   STETHO_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
-    ros2 launch eduping_stethoscope stethoscope.launch.py fake:=$stetho_fake'"
+    ros2 launch eduping_stethoscope stethoscope.launch.py fake:=$stetho_fake serial_port:=$stetho_port'"
   tmux new-window -t "$SESSION" -n stetho -c "$WS_DIR" "$STETHO_CMD"
 
   log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)"
