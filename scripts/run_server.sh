@@ -185,8 +185,14 @@ case "$ACTION" in
       "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; ${WS_SOURCING}export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
 
     # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
+    # --reload 는 기본 OFF: reloader watcher 가 실제 앱을 multiprocessing-fork 자식으로
+    # 띄우는데 그 자식이 시간당 GB 로 새다 OOM (2026-05-30, RSS 7.6GB KILL). 누수 추적
+    # 중엔 재시작이 baseline 을 리셋해 측정도 끊김. dev 가 본인만 자동 재시작 원하면
+    # STREAMING_RELOAD=1 을 본인 env 에 두면 켜짐 (팀 기본은 OFF). 추적은 /debug/memtop.
+    STREAMING_RELOAD_FLAG=""
+    case "${STREAMING_RELOAD:-0}" in 1|true|TRUE|yes|on) STREAMING_RELOAD_FLAG="--reload" ;; esac
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
-      "$(wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 --reload)"
+      "$(wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 $STREAMING_RELOAD_FLAG)"
 
     # window 5-7: EduPing depth view ROS 스택 — d435 카메라 + ROS→WS 스트리머 +
     # highfive_sim (IK + sim_twin + depth_mask + move_group). DepthViewer 가 사용.

@@ -18,7 +18,7 @@ waypoints:
   y: 3.3549065589904785
   yaw: 0.0
   id: 20
-  group: 놀이방
+  group: null   # 술래잡기 패트롤 그룹에서 제외 (vertex 는 graph 에 유지 — 이동/lane 가능)
   can_rotate: false
 - name: 놀이방입구-상
   x: 0.025310031
@@ -193,7 +193,7 @@ waypoints:
   y: 9.969625473022461
   yaw: 3.1360678479241204
   id: 45
-  group: 놀이방
+  group: null   # 술래잡기 패트롤 그룹에서 제외 (vertex 는 graph 에 유지 — 이동/lane 가능)
   can_rotate: false
 - name: 놀-3
   x: -3.75

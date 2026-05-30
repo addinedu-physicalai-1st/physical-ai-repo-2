@@ -86,8 +86,13 @@ case "$ACTION" in
       "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; export NORIARM_STOREPLAY_PYTHON=\"$STOREPLAY_PYTHON\"; export NORIARM_STOREPLAY_PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH\"; [ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
     tmux set-option -t "$SESSION" -g remain-on-exit on
 
+    # --reload 기본 OFF: reloader watcher 의 multiprocessing-fork 자식이 시간당 GB 로 새다
+    # OOM (2026-05-30, RSS 7.6GB KILL) + 재시작이 누수 측정 baseline 리셋. dev 가 본인만
+    # 자동 재시작 원하면 STREAMING_RELOAD=1 을 본인 env 에 (팀 기본 OFF). 추적은 /debug/memtop.
+    STREAMING_RELOAD_FLAG=""
+    case "${STREAMING_RELOAD:-0}" in 1|true|TRUE|yes|on) STREAMING_RELOAD_FLAG="--reload" ;; esac
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
-      "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; exec $(_runlib::wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 --reload)'"
+      "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; exec $(_runlib::wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 $STREAMING_RELOAD_FLAG)'"
 
     # EduPing depth view ROS 스택 — d435 카메라 + ROS→WS 스트리머 + highfive_sim
     # (IK + sim_twin + depth_mask + move_group). DepthViewer 가 사용. 항상 떠 있어야
