@@ -139,7 +139,7 @@ echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "[gogoping_perception] frontal_box / safety / reid / target_tracker (pure logic)"
+echo "[gogoping_perception] yolo_runner / proximity / frontal_box / safety / reid / target_tracker (pure logic)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 t0=$SECONDS
 # perception 패키지는 workspace install(egg-link)이 conda site 밖이라 PYTHONPATH 로 주입.

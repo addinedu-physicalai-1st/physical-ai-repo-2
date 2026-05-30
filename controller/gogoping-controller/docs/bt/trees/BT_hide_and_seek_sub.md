@@ -66,11 +66,11 @@ Sequence("BT_hide_and_seek_sub", memory=True)
 
 본 빌더가 직접 인스턴스화:
 
-- [set_destination_key](../behaviors/common.md#set_destination_key) — Step 1, 5 destination 셋
-- [set_hideseek_phase](../behaviors/common.md#set_hideseek_phase) — Step 1~6 phase 마커
-- [await_recruit_complete](../behaviors/common.md#await_recruit_complete) — Step 2
-- [countdown](../behaviors/common.md#countdown) — Step 3 (30s)
-- [hide_seek_caught_monitor](../behaviors/perception.md#hide_seek_caught_monitor) — Step 4, 5 parallel
+- [set_destination_key](../behaviors/hide_and_seek.md#set_destination_key) — Step 1, 5 destination 셋
+- [set_hideseek_phase](../behaviors/hide_and_seek.md#set_hideseek_phase) — Step 1~6 phase 마커
+- [await_recruit_complete](../behaviors/hide_and_seek.md#await_recruit_complete) — Step 2
+- [countdown](../behaviors/hide_and_seek.md#countdown) — Step 3 (30s)
+- [hide_seek_caught_monitor](../behaviors/hide_and_seek.md#hide_seek_caught_monitor) — Step 4, 5 parallel
 
 하위 트리 빌더 호출:
 

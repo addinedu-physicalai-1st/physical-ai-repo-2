@@ -37,12 +37,12 @@ import py_trees
 from py_trees.common import Access
 
 from ....context import Context
-from ...behaviors.common.await_recruit_complete import AwaitRecruitComplete
-from ...behaviors.common.countdown import Countdown
-from ...behaviors.common.set_destination_key import SetDestinationKey
-from ...behaviors.common.set_hideseek_phase import SetHideseekPhase
+from ...behaviors.hide_and_seek.await_recruit_complete import AwaitRecruitComplete
+from ...behaviors.hide_and_seek.countdown import Countdown
+from ...behaviors.hide_and_seek.set_destination_key import SetDestinationKey
+from ...behaviors.hide_and_seek.set_hideseek_phase import SetHideseekPhase
 from ...behaviors.navigation.rotate_to_yaw import RotateToYaw
-from ...behaviors.perception.hide_seek_caught_monitor import HideSeekCaughtMonitor
+from ...behaviors.hide_and_seek.hide_seek_caught_monitor import HideSeekCaughtMonitor
 from ...blackboard import Keys
 from .BT_goto_sub import build_goto_subtree
 from .BT_patrol_sub import build_patrol_sub

@@ -24,7 +24,7 @@ UI BT SUB 영역에 자동 표시.
 
 ## 사용 behavior
 
-- [LullabyAudio](../behaviors/common.md#lullaby_audio) — common/lullaby_audio.py
+- [LullabyAudio](../behaviors/lullaby.md#lullaby_audio) — lullaby/lullaby_audio.py
 
 ## 진입 / 종료 trigger
 
@@ -93,6 +93,6 @@ main.py → root.stop(INVALID) + tree.shutdown()
 ## 상태
 
 - 코드: ✅ ([BT_lullaby_sub.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_lullaby_sub.py))
-- 의존 behavior: [LullabyAudio](../behaviors/common.md#lullaby_audio) (✅), [UIPublisher.publish_event()](../../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/ui_publisher.py) (✅)
+- 의존 behavior: [LullabyAudio](../behaviors/lullaby.md#lullaby_audio) (✅), [UIPublisher.publish_event()](../../../src/gogoping/gogoping_modes/gogoping_modes/interfaces/ui_publisher.py) (✅)
 - 테스트: 빌더 2 + LullabyAudio 7 = 9 시나리오 통과
 - frontend `<audio>` 구독 코드 — 별도 PR (본 작업 범위 외)

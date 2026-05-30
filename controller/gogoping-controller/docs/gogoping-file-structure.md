@@ -72,15 +72,9 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   (LOW_BATTERY_RETURNING / ERROR 만 제외 — lockdown)
         │   │   │   ├── docking_contact_check.[py|/]  # 도킹 접점 전류 흐름 감시, 끊김 시 fault
         │   │   │   │                                 #   Used in: BT_charging_main
-        │   │   │   ├── select_vertex.py              # 고정 vertex 이름을 BB.target_vertex_name 에 W 후 SUCCESS (✅)
-        │   │   │   │                                 #   NavigateToVertex 와 짝 — Sequence(SelectVertex + NavigateToVertex) 패턴
-        │   │   │   │                                 #   Used in: BT_patrol_sub
-        │   │   │   ├── ui_publish.[py|/]             # 범용 UI 알림 publish (announce / countdown_start 등) (✅)
-        │   │   │   │                                 # message dict 1회 publish 후 즉시 SUCCESS
-        │   │   │   │                                 #   Used in: BT_goto_sub (AnnounceArrival), BT_hide_and_seek_sub
-        │   │   │   └── lullaby_audio.[py|/]          # 자장가 본체 — initialise=play publish, update=RUNNING (영구), terminate=stop publish (✅)
-        │   │   │                                     # /gogoping/ui_event 에 lullaby_play / lullaby_stop publish. idempotent (_stop_published flag).
-        │   │   │                                     #   Used in: BT_lullaby_sub 만
+        │   │   │   └── ui_publish.[py|/]             # 범용 UI 알림 publish (announce / countdown_start 등) (✅)
+        │   │   │                                     # message dict 1회 publish 후 즉시 SUCCESS
+        │   │   │                                     #   Used in: BT_goto_sub (AnnounceArrival), BT_hide_and_seek_sub
         │   │   │
         │   │   ├── navigation/
         │   │   │   ├── __init__.py
@@ -112,6 +106,31 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   Used in: BT_hide_and_seek_sub
         │   │   │   ├── child_face_tracker.[py|/]     # 놀이 상대 아이 얼굴 발견 시 blackboard.found = True
         │   │   │   │                                 #   Used in: BT_hide_and_seek_sub
+        │   │   │
+        │   │   ├── hide_and_seek/        # HIDEANDSEEK(숨바꼭질) 모드 전용 leaf
+        │   │   │   ├── __init__.py
+        │   │   │   ├── set_destination_key.py        # BB.DESTINATION_KEY = key 후 SUCCESS (✅)
+        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub
+        │   │   │   ├── set_hideseek_phase.py         # BB.HIDESEEK_PHASE = phase 후 SUCCESS (✅)
+        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub
+        │   │   │   ├── await_recruit_complete.py     # HIDESEEK_REGISTERED_IDS 비어있으면 RUNNING (✅)
+        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub 의 recruit step
+        │   │   │   ├── countdown.py                  # N초 RUNNING 후 SUCCESS — 순수 시간 게이트 (✅)
+        │   │   │   │                                 #   Used in: BT_hide_and_seek_sub 의 countdown step
+        │   │   │   └── hide_seek_caught_monitor.py   # registered_ids ⊆ caught_ids 이면 SUCCESS (✅)
+        │   │   │                                     #   Used in: BT_hide_and_seek_sub patrol/return parallel
+        │   │   │
+        │   │   ├── lullaby/              # LULLABY(자장가) 모드 전용 leaf
+        │   │   │   ├── __init__.py
+        │   │   │   └── lullaby_audio.py              # initialise=play publish, update=RUNNING (영구), terminate=stop publish (✅)
+        │   │   │                                     #   /gogoping/ui_event 에 lullaby_play / lullaby_stop publish. idempotent.
+        │   │   │                                     #   Used in: BT_lullaby_sub 만
+        │   │   │
+        │   │   ├── patrol/               # PATROL(순찰 빌딩블록) 전용 leaf
+        │   │   │   ├── __init__.py
+        │   │   │   └── select_vertex.py              # 고정 vertex 이름을 BB.target_vertex_name 에 W 후 SUCCESS (✅)
+        │   │   │                                     #   NavigateToVertex 와 짝 — Sequence(SelectVertex + NavigateToVertex) 패턴
+        │   │   │                                     #   Used in: BT_patrol_sub
         │   │   │
         │   │   ├── follow/               # 카메라 pan 제어 + 추종 관련
         │   │   │   ├── __init__.py
