@@ -27,15 +27,115 @@ import type { StateFrame } from './pose_codec';
 const route = useRoute();
 const edupingId = (route.query.eduping_id as string) || 'ed-01';
 
+// 청진기 압전(FSR) 값이 이 값을 넘으면 = 청진기가 닿음 → 심박 파형 표시.
+const FSR_HEARTBEAT_THRESHOLD = 200;
+
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const remoteVideoRef = ref<HTMLVideoElement | null>(null);
 const selfVideoRef = ref<HTMLVideoElement | null>(null);
+const ecgCanvasRef = ref<HTMLCanvasElement | null>(null);
 const wsStatus = ref<'connecting' | 'open' | 'closed'>('connecting');
 const armsReady = ref(false);
 const teleopActive = ref(false);
 const fsrRaw = ref<number | null>(null);
-const fsrPeak = ref<number | null>(null);
-function resetFsrPeak(): void { fsrPeak.value = fsrRaw.value; }
+const heartbeatActive = ref(false);
+
+// ── 심박(ECG) 파형 스트립 ────────────────────────────────────────────
+// 청진기 미접촉 시: 점선 평탄선("---"). 접촉(FSR > threshold) 시: 스크롤하는
+// 심전도 모양 파형. 데이터는 합성(샘플 캡처가 아님) — 닿았다는 신호의 시각화.
+const ECG_LEN = 360;          // 링버퍼 길이 (≈ 2초 윈도우)
+const ECG_RATE = 180;         // 초당 샘플 수 (스크롤 속도)
+const ecgBuf = new Float32Array(ECG_LEN);
+let ecgHead = 0;
+let heartClock = 0;           // 접촉 중일 때만 진행하는 심박 위상 시계 (초)
+let ecgCarry = 0;             // 프레임 간 잔여 샘플 누적
+let ecgLastT = 0;
+
+// 한 박동 위상 p∈[0,1) → 진폭. P-Q-R-S-T 가우시안 합 (전형적 ECG 모양).
+function ecgWave(t: number): number {
+  const period = 0.7;         // ≈ 86 bpm
+  let p = (t % period) / period;
+  if (p < 0) p += 1;
+  const g = (c: number, a: number, w: number): number =>
+    a * Math.exp(-((p - c) ** 2) / (2 * w * w));
+  return (
+    g(0.18, 0.12, 0.035) +    // P
+    g(0.33, -0.11, 0.012) +   // Q
+    g(0.37, 1.0, 0.018) +     // R (큰 스파이크)
+    g(0.41, -0.30, 0.013) +   // S
+    g(0.62, 0.22, 0.045)      // T
+  );
+}
+
+function sizeEcgCanvas(): void {
+  const cv = ecgCanvasRef.value;
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  cv.width = Math.max(1, Math.round(rect.width * dpr));
+  cv.height = Math.max(1, Math.round(rect.height * dpr));
+}
+
+function drawEcg(now: number): void {
+  const cv = ecgCanvasRef.value;
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  if (!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.width / dpr;
+  const h = cv.height / dpr;
+
+  // 경과 시간만큼 새 샘플 push (프레임율과 무관한 일정 스크롤 속도).
+  if (ecgLastT === 0) ecgLastT = now;
+  let dt = (now - ecgLastT) / 1000;
+  ecgLastT = now;
+  if (dt > 0.1) dt = 0.1;     // 탭 비활성 등으로 인한 큰 점프 클램프
+  const active = heartbeatActive.value;
+  ecgCarry += ECG_RATE * dt;
+  let n = Math.floor(ecgCarry);
+  ecgCarry -= n;
+  if (n > ECG_LEN) n = ECG_LEN;
+  const dtPerSample = 1 / ECG_RATE;
+  for (let i = 0; i < n; i++) {
+    let amp = 0;
+    if (active) {
+      heartClock += dtPerSample;
+      amp = ecgWave(heartClock);
+    }
+    ecgBuf[ecgHead] = amp;
+    ecgHead = (ecgHead + 1) % ECG_LEN;
+  }
+
+  // 렌더.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const baseY = h * 0.66;
+  const scaleY = h * 0.5;
+  ctx.lineWidth = 1.7;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  if (active) {
+    ctx.strokeStyle = '#3ddc84';
+    ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(61,220,132,0.6)';
+    ctx.shadowBlur = 6;
+  } else {
+    ctx.strokeStyle = 'rgba(140,160,170,0.75)';
+    ctx.setLineDash([6, 6]);   // 대기 상태 → 점선 "---"
+    ctx.shadowBlur = 0;
+  }
+  ctx.beginPath();
+  for (let i = 0; i < ECG_LEN; i++) {
+    const idx = (ecgHead + i) % ECG_LEN;
+    const x = (i / (ECG_LEN - 1)) * w;
+    const y = baseY - ecgBuf[idx] * scaleY;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+}
 
 // WebRTC — 의사 cam+mic 송신 + EduPing D435 RGB + mic 수신.
 let localStream: MediaStream | null = null;
@@ -127,7 +227,7 @@ onMounted(async () => {
     onEvent: (evt) => {
       if (evt.type === 'fsr' && typeof evt.raw === 'number') {
         fsrRaw.value = evt.raw;
-        if (fsrPeak.value === null || evt.raw > fsrPeak.value) fsrPeak.value = evt.raw;
+        heartbeatActive.value = evt.raw > FSR_HEARTBEAT_THRESHOLD;
         return;
       }
       console.info('[doctor-teleop] event', evt);
@@ -146,17 +246,22 @@ onMounted(async () => {
   sync();
   statusTimer = window.setInterval(sync, 250);
 
-  const tick = (): void => {
+  sizeEcgCanvas();
+  window.addEventListener('resize', sizeEcgCanvas);
+
+  const tick = (now: number): void => {
     raf = requestAnimationFrame(tick);
     scene!.controls.update();
     scene!.renderer.render(scene!.scene, scene!.camera);
+    drawEcg(now);
   };
-  tick();
+  raf = requestAnimationFrame(tick);
 });
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(raf);
   if (statusTimer) window.clearInterval(statusTimer);
+  window.removeEventListener('resize', sizeEcgCanvas);
   pointcloudStopped = true;
   if (pointcloudReconnect !== null) { window.clearTimeout(pointcloudReconnect); pointcloudReconnect = null; }
   if (pointcloudWs) { try { pointcloudWs.close(); } catch { /* ignore */ } pointcloudWs = null; }
@@ -201,11 +306,19 @@ function toggleTeleop(): void {
       <div class="pane sim-pane">
         <canvas ref="canvasRef" class="viewport" />
         <span class="pane-label">시뮬레이션</span>
-        <div class="fsr-overlay">
-          <span class="fsr-title">청진기 FSR</span>
-          <span class="fsr-val">{{ fsrRaw ?? '--' }}</span>
-          <span class="fsr-peak">peak {{ fsrPeak ?? '--' }}</span>
-          <button class="fsr-reset" @click="resetFsrPeak">리셋</button>
+        <div class="stetho-panel">
+          <div class="stetho-fsr">
+            <span class="fsr-title">청진기 FSR</span>
+            <span class="fsr-val">{{ fsrRaw ?? '--' }}</span>
+          </div>
+          <div class="ecg-head">
+            <span class="ecg-heart" :data-beating="heartbeatActive">♥</span>
+            <span class="ecg-label">심박</span>
+            <span class="ecg-state" :data-active="heartbeatActive">
+              {{ heartbeatActive ? '측정 중' : '청진기 대기' }}
+            </span>
+          </div>
+          <canvas ref="ecgCanvasRef" class="ecg-canvas" />
         </div>
       </div>
       <!-- 우측 절반: EduPing 환경 카메라 (WebRTC remote stream — D435 RGB + 로봇 mic) -->
@@ -316,23 +429,46 @@ header, footer {
 }
 .teleop[data-active="true"] { background: #eb5757; color: #fff; }
 .teleop:disabled { opacity: 0.4; cursor: not-allowed; }
-.fsr-overlay {
+.stetho-panel {
   position: absolute;
   top: 10px;
   left: 10px;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  width: 360px;
+  box-sizing: border-box;
+  padding: 12px 14px;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-variant-numeric: tabular-nums;
   pointer-events: auto;
 }
-.fsr-title { font-size: 12px; opacity: 0.8; }
-.fsr-val { font-size: 28px; font-weight: 700; color: #4fd1c5; min-width: 56px; }
-.fsr-peak { font-size: 13px; opacity: 0.85; }
-.fsr-reset { font-size: 11px; cursor: pointer; padding: 2px 8px; }
+.stetho-fsr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fsr-title { font-size: 13px; opacity: 0.8; }
+.fsr-val { font-size: 30px; font-weight: 700; color: #4fd1c5; min-width: 48px; }
+.ecg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+.ecg-heart { font-size: 17px; line-height: 1; color: #8aa0aa; }
+.ecg-heart[data-beating="true"] {
+  color: #ff5b6e;
+  animation: ecg-beat 0.7s ease-in-out infinite;
+}
+.ecg-label { font-size: 13px; opacity: 0.85; }
+.ecg-state { margin-left: auto; font-size: 12px; opacity: 0.8; }
+.ecg-state[data-active="true"] { color: #3ddc84; opacity: 1; }
+.ecg-canvas { width: 100%; height: 96px; display: block; }
+@keyframes ecg-beat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.35); }
+  30% { transform: scale(1); }
+}
 </style>
