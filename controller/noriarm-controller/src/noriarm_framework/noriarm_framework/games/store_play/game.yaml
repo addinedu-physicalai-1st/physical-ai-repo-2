@@ -104,6 +104,9 @@ policy:
   # (stale chunk 100개를 끝까지 밀지 않음). 단 긴급정지(abort)는 별개로 per-frame(~33ms)
   # 처리됨 — n_action_steps 와 무관.
   n_action_steps: 30
+  # ACT temporal ensemble — 액션 시간평균(지수가중). 활성 시 n_action_steps=1 강제 + smoothing.
+  # 0.01=강한 smoothing(로봇 느려짐), 0.05=중간, 0.1=약함. 끄려면 주석 처리.
+  temporal_ensemble_coeff: 0.01
   # hw udev symlink → 학습 모델 input feature key
   image_key_map:
     camera1: top
@@ -111,7 +114,7 @@ policy:
     camera3: wrist_right
   # phase5_roi 학습본은 inference 시에도 ROI mask 필수 (학습 분포 일치).
   roi:
-    yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r13_v2/weights/best.pt
+    yolo_weights: /home/kyle/omx_store_play/models/yolov8n_storeplay_r13_v2/weights/best.engine
     conf: 0.25
     iou: 0.5
     pad: 20
@@ -135,6 +138,25 @@ policy:
     enabled: true
     pose: [-12.3, 27.9, -34.6, -2.5, 48.2, 59.6, 0.8, -16.2, 14.8, 36.2, -1.4, 54.8]
     thresh: 14.0
+  # 서빙 시작 게이트 — target 과일 + plate 둘 다 YOLO 검출될 때까지 robot 정지(hold).
+  # 안 보이면 EVENT gate_waiting (UI 배너 + 멘트), 검출되면 EVENT gate_ready 후 서빙 시작.
+  # start-only: 서빙 중 occlusion 은 게이트 안 함. stable_frames: 연속 검출 요구 frame(스침 방지).
+  serve_gate:
+    enabled: true
+    stable_frames: 5
+  # 깨어나는 wake 모션 — 모델 로드(추론 준비) 동안 녹화 trajectory 를 백그라운드 루프 재생,
+  # 준비되면 멈추고 home_pose 로 부드럽게 이동. trajectory 는 scripts/record_wake_trajectory.py
+  # (리더 텔레오퍼레이션) 로 녹화한 npz. 파일 없으면 모션 스킵하고 home 이동만.
+  # home_pose: v2_en 학습데이터 서빙 시작 pose 평균 (std 평균 1.4 로 일관). MOTOR_ORDER 순서.
+  wake_motion:
+    enabled: true
+    trajectory_path: /home/kyle/omx_store_play/data/wake_trajectory.npz
+    home_pose: [-1.4, -63.7, 55.1, 45.3, -2.0, 59.7, 0.8, -64.2, 54.4, 45.6, -1.0, 59.7]
+    home_move_s: 1.0  # 추론 준비되면 홈으로 빨리 나오게 (멀면 _ramp 속도cap 으로 자동 보정)
+  # rerun 시각화 — 기본 OFF. 켜면 뷰어가 CPU 100%·RAM 수GB 잡아먹어 추론·wake 재생이
+  # 느려짐(provider 40→100ms, wake slow-motion). 디버깅 때만 enabled:true.
+  rerun:
+    enabled: true
   paraphrases:
     broccoli:
       - "give me broccoli"

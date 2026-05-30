@@ -164,22 +164,35 @@ class RoiMasker:
         target = prompt_to_target(task)
         out: dict[str, np.ndarray] = {}
         detected: set[str] = set()  # 이번 호출에서 검출된 class (전체 cam 합집합) — 객체없음 감지용.
+
+        # 정책 있는 cam 만 모아 한 번에 YOLO predict (3대 batch). 정책 없는 cam 은 그대로 통과.
+        keys: list[str] = []
+        bgrs: list[np.ndarray] = []
         for cam_key, img in images.items():
-            policy = self.cam_policy.get(cam_key)
-            if policy is None:
-                # 정책 모르면 mask 안 함 — 그대로 통과 (안전 디폴트).
-                out[cam_key] = img
+            if self.cam_policy.get(cam_key) is None:
+                out[cam_key] = img       # 정책 없으면 mask 안 함 (안전 디폴트)
                 continue
-            H, W = img.shape[:2]
-            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)  # YOLO 용 BGR
-            results = self.yolo.predict(img_bgr, conf=self.conf, iou=self.iou, verbose=False)
-            r = results[0]
-            if r.boxes is not None and len(r.boxes):
-                for cid in r.boxes.cls.cpu().numpy().astype(int):
-                    detected.add(YOLO_CLASSES[int(cid)])
-            target_fruit = target if policy["keep_target_fruit"] else None
-            bboxes = _select_bboxes(r, policy["always_keep"], target_fruit)
-            out[cam_key] = _apply_roi_mask(img, bboxes, pad=self.pad, W=W, H=H)  # mask 는 원본 RGB
+            keys.append(cam_key)
+            bgrs.append(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))  # YOLO 용 BGR
+
+        if bgrs:
+            # 3장을 한 번에 GPU 로 — device=0, half=True 로 FP16 GPU 추론 명시.
+            # for-loop 3회 호출 대비 데이터 전송/launch 오버헤드 ~3배 절감.
+            results = self.yolo.predict(
+                bgrs, conf=self.conf, iou=self.iou, verbose=False,
+                device=0, half=True,   # FP16 GPU 추론 (TRT engine 과 함께 빠름)
+            )
+            for cam_key, r in zip(keys, results, strict=False):
+                policy = self.cam_policy[cam_key]
+                img = images[cam_key]
+                H, W = img.shape[:2]
+                if r.boxes is not None and len(r.boxes):
+                    for cid in r.boxes.cls.cpu().numpy().astype(int):
+                        detected.add(YOLO_CLASSES[int(cid)])
+                target_fruit = target if policy["keep_target_fruit"] else None
+                bboxes = _select_bboxes(r, policy["always_keep"], target_fruit)
+                out[cam_key] = _apply_roi_mask(img, bboxes, pad=self.pad, W=W, H=H)
+
         self.last_detected = detected  # runner 가 읽어 target/plate 미검출 판단.
         return out
 
