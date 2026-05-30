@@ -85,6 +85,23 @@ STS3215_RESOLUTION = 4096  # ticks per turn — mid normalization uses (res - 1)
 COMM_SUCCESS = 0
 
 
+# --- scservo_sdk 타임아웃 버그 패치 -------------------------------------
+def _patch_set_packet_timeout(self, packet_length):  # noqa: N802
+    """scservo_sdk PortHandler.setPacketTimeout 의 타임아웃 과소 계산 버그 패치.
+
+    비공식 PyPI `feetech-servo-sdk` 의 setPacketTimeout 은 sync_read 처럼 여러 모터
+    응답을 한 timeout 창 안에 받아야 하는 경우 타임아웃을 너무 짧게 잡아
+    RX_TIMEOUT (comm=-6) 을 유발한다. 개별 ping (self-check) 은 통과하지만
+    GroupSyncRead (read_degrees) 만 실패하던 증상의 원인.
+
+    lerobot 의 동일 패치 (motors/feetech/feetech.py, gitee ftservo issue IBY2S6) 를
+    1:1 적용 — packet 길이 비례분 + 3바이트 여유 + 50ms 고정 마진.
+    공식 FTServo_Python 에는 수정돼 있으나 PyPI 미배포라 런타임 패치로 대응.
+    """
+    self.packet_start_time = self.getCurrentTime()
+    self.packet_timeout = (self.tx_time_per_byte * packet_length) + (self.tx_time_per_byte * 3.0) + 50
+
+
 # --- calibration --------------------------------------------------------
 
 
@@ -131,6 +148,9 @@ class _ArmReader:
         self.calibration = calibration  # right_/left_ prefix 포함
 
         self._port = scs.PortHandler(port)
+        # scservo_sdk setPacketTimeout 버그 패치 — sync_read RX_TIMEOUT(comm=-6) 방지.
+        # lerobot FeetechMotorsBus 와 동일하게 PortHandler 인스턴스 메서드를 교체.
+        self._port.setPacketTimeout = _patch_set_packet_timeout.__get__(self._port, scs.PortHandler)
         self._packet = scs.PacketHandler(0)  # protocol version 0 (STS series)
         if not self._port.openPort():
             raise RuntimeError(f"포트 열기 실패: {port}")
