@@ -18,6 +18,9 @@ PERSON_PCTL_DEFAULT = 20  # 안전정지용: 사람 bbox 내 가까운 쪽 백�
 REACH_PCTL_DEFAULT = 50   # 게임 도달용: 중앙값. 소수 near 픽셀(가리기 팔이 bbox 에 겹침,
 #                            윤곽 flying-pixel)이 과반이 아니면 무시 → 사람 몸통 실제 거리.
 #                            도달 오검출은 게임을 끊으므로 robust 가 우선.
+REACH_SELF_FLOOR_MM_DEFAULT = 400  # 이보다 가까운 픽셀은 "로봇 자기 팔"로 보고 제외. 가리기
+#                            팔은 카메라 바로 앞(다가오는 아이보다 항상 가까움)이라 depth 로
+#                            직접 분리 — extrinsic 보정 불필요. 실물 arm 거리에 맞춰 튜닝.
 MIN_VALID_PX_DEFAULT = 30  # bbox 내 유효 depth 픽셀 최소 — 이하면 측정 불가로 무시
 
 
@@ -27,11 +30,13 @@ def person_distance_mm(
     *,
     percentile: int = PERSON_PCTL_DEFAULT,
     min_valid_px: int = MIN_VALID_PX_DEFAULT,
+    self_floor_mm: int = 0,
 ) -> float | None:
     """사람 bbox(x1,y1,x2,y2, color=aligned-depth 프레임 픽셀) 영역의 대표 거리(mm).
 
-    bbox 는 배경을 포함하므로 가까운 쪽 percentile(기본 20%)을 사람 최근접부로 본다.
-    유효(>0) depth 픽셀이 너무 적으면 측정 불가 → None.
+    bbox 는 배경을 포함하므로 percentile 로 대표값을 뽑는다(safety=20 최근접, reach=50 median).
+    self_floor_mm>0 이면 그보다 가까운 픽셀(로봇 자기 팔 등)을 제외 후 계산 — extrinsic 보정
+    없이 depth 만으로 자기 팔 분리. 유효 픽셀이 너무 적으면(사람이 팔에 완전 가림 등) None.
     """
     h, w = depth_mm.shape
     x1 = max(0, int(bbox[0]))
@@ -42,6 +47,8 @@ def person_distance_mm(
         return None
     crop = depth_mm[y1:y2, x1:x2]
     valid = crop[crop > 0]
+    if self_floor_mm > 0:
+        valid = valid[valid >= self_floor_mm]
     if valid.size < min_valid_px:
         return None
     return float(np.percentile(valid, percentile))

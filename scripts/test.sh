@@ -202,6 +202,7 @@ if ! conda run -n jazzy pytest \
     controller/eduping-controller/src/eduarm/tests/test_mugunghwa_motion.py \
     controller/eduping-controller/src/eduarm/tests/test_depth_frame.py \
     controller/eduping-controller/src/eduarm/tests/test_proximity.py \
+    controller/eduping-controller/src/eduarm/tests/test_arm_self_mask.py \
     service/control-service/control_service/tests/test_mugunghwa_relay.py -v "$@"; then
   EXIT=1
 fi
