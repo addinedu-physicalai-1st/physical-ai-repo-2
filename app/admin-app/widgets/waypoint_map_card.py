@@ -80,6 +80,10 @@ class MapView(QWidget):
         self._filter: set[str] | None = None   # 검색 필터 (None = 전체)
         self._lanes: list[dict] = []           # [{from, to, bidirectional}, ...]
         self._route: list[str] | None = None   # vertex name sequence — 강조선
+        # graph_router /route_path 토픽 → control-service 가 중계한 L1 좌표 시퀀스 (map m).
+        # vertex name 매칭 없이 좌표 그대로 그린다 — BT 자율주행/navigate 무관하게 RViz 와
+        # 동일 소스로 코랄 경로 표시. 빈 리스트 = 경로 없음.
+        self._route_points: list[tuple[float, float]] = []
         # patrol 시각화 — vertex 동그라미 안에 번호 / 도착 완료 vertex 는 X.
         # 빈 리스트 / current_index == -1 면 미진행 (overlay 안 그림).
         self._patrol_vertices: list[str] = []
@@ -120,6 +124,10 @@ class MapView(QWidget):
     def set_route(self, vertex_names: list[str] | None) -> None:
         """다익스트라 결과 강조선. None = 강조 해제."""
         self._route = vertex_names; self.update()
+
+    def set_route_points(self, points: list[tuple[float, float]] | None) -> None:
+        """graph_router /route_path 좌표 시퀀스 강조선 (map m). None/빈값 = 해제."""
+        self._route_points = list(points or []); self.update()
 
     def set_filter(self, names: set[str] | None) -> None:
         """None = 전체 표시, set = 해당 name 만 표시 (검색 결과)."""
@@ -611,6 +619,13 @@ class MapView(QWidget):
                     pa = self._map_to_widget(a["x"], a["y"])
                     pb = self._map_to_widget(b["x"], b["y"])
                     qp.drawLine(pa, pb)
+            # L1 좌표 경로 (graph_router /route_path 중계) — 굵은 코랄선.
+            # vertex name 매칭 불필요, 좌표 직접. RViz 와 동일 소스라 자율주행도 표시.
+            if len(self._route_points) >= 2:
+                qp.setPen(QPen(QColor("#E07B5B"), 4 * z))
+                pts = [self._map_to_widget(px, py) for px, py in self._route_points]
+                for pa, pb in zip(pts[:-1], pts[1:]):
+                    qp.drawLine(pa, pb)
             # patrol overlay 준비 — vertex name → 1-based 순번. 없으면 0.
             patrol_index_of: dict[str, int] = {
                 n: i for i, n in enumerate(self._patrol_vertices)
@@ -830,6 +845,13 @@ class _SseDispatcher:
             seq = ev.get("sequence")
             if isinstance(seq, list) and seq:
                 self.card._map.set_route(seq)
+        elif t == "route_path":
+            # graph_router /route_path 중계 — 좌표 시퀀스. 빈 리스트면 경로 해제.
+            pts = ev.get("points")
+            if isinstance(pts, list):
+                self.card._map.set_route_points(
+                    [(float(p[0]), float(p[1])) for p in pts if len(p) >= 2]
+                )
 
 
 class _SseThread(QThread):

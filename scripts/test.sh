@@ -123,6 +123,8 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_hide_and_seek_subtree_builder.py \
   tests/test_gogoping_hideseek_subtree_sequence.py \
   tests/test_gogoping_hideseek_phase_snapshot.py \
+  tests/test_gogoping_error_reason_snapshot.py \
+  tests/test_gogoping_bt_main_sub_separation.py \
   tests/test_gogoping_hideseek_caught_api.py \
   tests/test_gogoping_hideseek_bridge_cache.py \
   tests/test_gogoping_return_subtree_builder.py \

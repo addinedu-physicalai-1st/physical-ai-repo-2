@@ -63,10 +63,10 @@ amcl:
     scan_topic: /gogoping/scan_filtered
     set_initial_pose: true
     initial_pose:
-      x: 0.0
-      y: 0.0
+      x: 0.2796
+      y: 12.0307
       z: 0.0
-      yaw: 0.0
+      yaw: -1.5708   # -90° — map 기준 아래쪽(-Y) 방향
 
 
 map_server:
@@ -149,8 +149,6 @@ controller_server:
       use_cost_regulated_linear_velocity_scaling: true
       regulated_linear_scaling_min_radius: 0.4
       regulated_linear_scaling_min_speed: 0.05
-      # Vic Pinky 실물은 앞 구동 + 뒤 스위블 캐스터라 제자리 회전 깨끗.
-      # ≥45° 회전은 제자리 회전, 작은 회전은 직진+회전 동시.
       use_rotate_to_heading: false
       rotate_to_heading_min_angle: 3.14
       max_angular_accel: 1.5

@@ -89,6 +89,8 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     bb = py_trees.blackboard.Client(name="BT_hide_and_seek_sub/builder")
     bb.register_key(key=Keys.HIDESEEK_PLAY_AREA_KEY, access=Access.READ)
     bb.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.READ)
+    # fallback(yaml 직접 로드)으로 만든 patrol 리스트를 blackboard 에 되써주기 위해 WRITE 도 등록.
+    bb.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.WRITE)
     bb.register_key(key=Keys.HIDESEEK_PATROL_ONLY, access=Access.READ)
 
     # 각 키 별도 try — 한 키 미설정이 다른 키 fallback 으로 reset 되는 버그 방지.
@@ -113,6 +115,10 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
         wps = _load_grouped_vertices_from_yaml()
         if not wps:
             return py_trees.behaviours.Failure(name="BT_hide_and_seek_sub_no_waypoints")
+        # 로컬 fallback 리스트를 blackboard 에 반영 — patrol_sub 가 쓰는 실제 순회 리스트와
+        # admin 오버레이 소스(tree_inspector._read_patrol → SEARCH_WAYPOINTS)를 일치시킨다.
+        # 안 하면 force_state 진입 시 vertices=[] 로 publish → 번호/보라 하이라이트 안 뜸.
+        bb.set(Keys.SEARCH_WAYPOINTS, list(wps))
 
     # ─── patrol_only 분기 ─────────────────────────────────────────────────
     # admin UI [순찰] 버튼이 set — 모집/카운트다운/이동/복귀 없이 patrol_sub 만
@@ -131,10 +137,10 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     # ─── 술래잡기 6-step Sequence ─────────────────────────────────────────
     if not play_area:
         # fallback (2026-05-28) — force_state 등으로 play_area 비었으면
-        # state_to_goal 의 default "운동장-단상" 사용.
-        play_area = "운동장-단상"
+        # state_to_goal 의 default "출입구" 사용.
+        play_area = "출입구"
 
-    # Step 1: move_to_play — destination 셋 → phase 마커 → 실제 goto subtree → 오른쪽(yaw=0) 정렬.
+    # Step 1: move_to_play — destination 셋 → phase 마커 → 실제 goto subtree → 위쪽(yaw=+π/2) 정렬.
     step_move = py_trees.composites.Sequence(
         name="step_move_to_play",
         memory=True,
@@ -142,7 +148,7 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
             SetDestinationKey(name="set_dest_play_area_move", key=play_area),
             SetHideseekPhase(name="set_phase_move_to_play", phase="move_to_play"),
             build_goto_subtree(ctx),
-            RotateToYaw(name="face_right_at_play_area", target_yaw=0.0),
+            RotateToYaw(name="face_up_at_play_area", target_yaw=math.pi / 2),
         ],
     )
 
@@ -158,8 +164,9 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
     )
 
     # Step 3: countdown — 30초. 출발 누르면 "완전히 뒤돈 뒤 카운트" 가 아니라
-    # **바로 30초 카운트 시작 + 180° 회전을 동시에**(병렬) 진행. 회전은 그때만 1.4배 빠르게
-    # (angular_speed 0.5 → 0.7). countdown 이 끝나면 step_countdown SUCCESS (회전은 ~4.5s 면 끝).
+    # **바로 30초 카운트 시작 + 아래쪽(yaw=-π/2) 회전을 동시에**(병렬) 진행. 회전은 그때만
+    # 1.4배 빠르게 (angular_speed 0.5 → 0.7). 모집 등록 직후(=countdown 시작) 아래를 향한다.
+    # countdown 이 끝나면 step_countdown SUCCESS (회전은 ~4.5s 면 끝).
     countdown_seq = py_trees.composites.Sequence(
         name="countdown_seq",
         memory=True,
@@ -181,9 +188,9 @@ def build_hide_and_seek_sub(ctx: Context) -> py_trees.behaviour.Behaviour:
         children=[
             countdown_seq,
             RotateToYaw(
-                name="face_left_during_countdown",
-                target_yaw=math.pi,
-                angular_speed=0.7,   # 0.5 × 1.4 — 카운트다운 중에만 빠르게 뒤돌기
+                name="face_down_after_recruit",
+                target_yaw=-math.pi / 2,
+                angular_speed=0.7,   # 0.5 × 1.4 — 카운트다운 중에만 빠르게 아래로 돌기
             ),
         ],
     )

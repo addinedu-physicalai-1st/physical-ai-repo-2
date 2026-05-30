@@ -53,20 +53,8 @@ lanes:
 - from: 복도입구
   to: 복도
   bidirectional: true
-- from: 출입구
-  to: 유치원입구
-  bidirectional: true
-- from: 유치원입구
-  to: 운동장입구
-  bidirectional: true
 - from: 놀이방입구-상
   to: 복-5
-  bidirectional: true
-- from: 운동장입구
-  to: 운동장-단상
-  bidirectional: true
-- from: 운동장-단상
-  to: 운동장
   bidirectional: true
 - from: 충전소입구
   to: 충전소
@@ -133,7 +121,4 @@ lanes:
   bidirectional: true
 - from: 수-회
   to: 수-3
-  bidirectional: true
-- from: 출입구
-  to: 출-회
   bidirectional: true

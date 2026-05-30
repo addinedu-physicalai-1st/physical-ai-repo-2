@@ -1079,7 +1079,6 @@ class MapView(QWidget):
             Room(QRectF(32, 4, 30, 32), "1반 교실", "palette",    COLORS["lavender"]),
             Room(QRectF(66, 4, 32, 32), "2반 교실", "music",      COLORS["sky"]),
             Room(QRectF(2, 38, 22, 18), "화장실",   "bath",       COLORS["mint"]),
-            Room(QRectF(28, 40, 70, 28), "운동장",  "tree",       COLORS["primary_dim"]),
             Room(QRectF(2, 60, 24, 36), "식당",     "food",       COLORS["accent"]),
             Room(QRectF(30, 72, 68, 24), "도서실",  "bookshelf",  COLORS["mint"]),
         ]

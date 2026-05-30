@@ -28,11 +28,13 @@
     <!-- world: 절대경로 직접 전달용 (.world / .sdf 후보 swap). 미지정 시 world_name 으로 share 내부 해석. -->
     <arg name="world" default="$(find-pkg-share gogoping_navigation)/worlds/$(var world_name)"/>
     <arg name="map" default="$(find-pkg-share gogoping_navigation)/maps/new_map.yaml"/>
-    <!-- Pinky spawn pose (world frame). launch_sim_with_pinky.launch.xml 의 default 와 동일. -->
-    <arg name="spawn_x" default="0.0"/>
-    <arg name="spawn_y" default="0.0"/>
+    <!-- Pinky spawn pose (world frame ≈ map frame). AMCL initial_pose (nav2_params_sim.yaml)
+         와 일치시켜 spawn 위치 = localization 추정 위치가 되게 한다. -->
+    <arg name="spawn_x" default="0.2796"/>
+    <arg name="spawn_y" default="12.0307"/>
     <arg name="spawn_z" default="0.10"/>
-    <arg name="spawn_yaw" default="0.0"/>
+    <arg name="spawn_yaw" default="-1.5708"/>   <!-- -90° — map 기준 아래쪽(-Y) 방향 -->
+
     <arg name="params_file"
          default="$(find-pkg-share gogoping_navigation)/params/nav2_params_sim.yaml"/>
     <arg name="laser_filter_params"
