@@ -88,7 +88,25 @@ export function useTelehealthWebRTC(opts: TelehealthOpts): Telehealth {
     localStream = await opts.acquireLocalStream();
     if (localStream) {
       for (const track of localStream.getTracks()) {
-        pc.addTrack(track, localStream);
+        const sender = pc.addTrack(track, localStream);
+        if (track.kind === 'video') {
+          // 송신 비트레이트 — 기본값이 낮아 720p 라도 흐릿하게 보임. LAN 이므로 넉넉히 잡고
+          // 대역 부족 시 해상도 대신 프레임을 먼저 떨어뜨려 선명도 유지.
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = 2_500_000; // ~2.5 Mbps @720p
+            (params as RTCRtpSendParameters & { degradationPreference?: string }).degradationPreference =
+              'maintain-resolution';
+            void sender.setParameters(params).catch((e) => {
+              console.warn('[telehealth] video setParameters failed', e);
+            });
+          } catch (e) {
+            console.warn('[telehealth] sender params skip', e);
+          }
+        }
       }
     }
   }
