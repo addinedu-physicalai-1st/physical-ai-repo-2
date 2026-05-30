@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # scripts/device-eduping-leader.sh — 실물 openarm_mini (Feetech 양팔 leader) 띄움.
 #
-# 인터랙티브 메뉴 (인자 없을 때 자동 표시) — 또는 인자로 1/2/3/down/status 직접 지정:
+# 인터랙티브 메뉴 (인자 없을 때 자동 표시) — 또는 인자로 0/1/2/3/down/status 직접 지정:
 #
+#   0 (setup)     모터 등록 — lerobot-setup-motors (서보 ID/baud EEPROM 기록, 1회)
 #   1 (check)     모터 점검만 — 양팔 8 모터 ping
 #   2 (calibrate) calibration JSON 존재 확인 + 없으면 lerobot 안내
 #   3 (up)        전체: 1 → 2 → bringup (tmux 세션 시작)
@@ -93,6 +94,31 @@ stage_check() {
       -p check_only:=true"
 }
 
+# --- 0. Motor setup (lerobot-setup-motors) -------------------------------
+# 서보 EEPROM 에 모터 ID/baudrate 를 기록. 다른 컴퓨터/로봇에서 쓰던 서보거나 baud 가
+# 안 맞아 모터가 enumerate 안 될 때 1회 실행 (calibration 전에). 화면 안내 따라 진행.
+stage_setup_motors() {
+  log "[0] 모터 등록 (lerobot-setup-motors — 양팔 ID/baud EEPROM 기록)"
+  if ! command -v lerobot-setup-motors &>/dev/null; then
+    log "  ✗ lerobot-setup-motors 명령 없음 — 현재 env 에 lerobot 미설치" >&2
+    log "    같은 env (pdg) 에 lerobot 설치 후 재실행." >&2
+    return 1
+  fi
+  for P in "$PORT_RIGHT" "$PORT_LEFT"; do
+    if [[ ! -e "$P" ]]; then
+      log "  ⚠ 포트 $P 없음 — USB 연결/심볼릭/권한 확인" >&2
+      log "    ls -l /dev/ttyACM* /dev/op_mini_*  ;  sudo usermod -aG dialout \$USER" >&2
+    fi
+  done
+  log "  화면 안내 따라 모터를 하나씩 등록하세요 (전원 + USB 연결 상태)."
+  lerobot-setup-motors \
+    --teleop.type=openarm_mini \
+    --teleop.port_right="$PORT_RIGHT" \
+    --teleop.port_left="$PORT_LEFT" \
+    || { log "  ✗ lerobot-setup-motors 실패 — 전원·결선·baud 확인" >&2; return 1; }
+  log "  ✓ 모터 등록 완료 — 이제 메뉴 2 (calibration) 진행"
+}
+
 # --- 2. Calibration ------------------------------------------------------
 # JSON 있으면 "다시 하시겠습니까?" 묻고 NO 면 그대로 통과, YES 면 lerobot-calibrate 실행.
 # JSON 없으면 바로 실행. lerobot-calibrate 가 같은 env (pdg) 에 설치돼있어야 함.
@@ -166,6 +192,7 @@ stage_bringup() {
 prompt_menu() {
   cat >&2 <<EOF
 === eduping-leader 메뉴 ===
+  0) 모터 등록          (lerobot-setup-motors — ID/baud, 1회/모터 교체 시)
   1) 모터 점검만        (양팔 16 모터 ping)
   2) calibration       (JSON 새로 만들기 / 다시 만들기)
   3) bringup 시작       (모터 점검 → tmux 세션 시작; calibration JSON 만 확인)
@@ -173,7 +200,7 @@ prompt_menu() {
   q) 종료
 EOF
   local choice
-  read -rp "선택 [1/2/3/s/d/q]: " choice >&2
+  read -rp "선택 [0/1/2/3/s/d/q]: " choice >&2
   echo "$choice"
 }
 
@@ -182,6 +209,10 @@ if [[ -z "$ACTION" ]]; then
 fi
 
 case "$ACTION" in
+  0|setup|motors)
+    require_env
+    stage_setup_motors
+    ;;
   1|check)
     require_env
     stage_check
@@ -228,7 +259,7 @@ case "$ACTION" in
     ;;
   *)
     echo "알 수 없는 선택: $ACTION" >&2
-    echo "usage: $0 [1|2|3|check|calibrate|up|down|status]" >&2
+    echo "usage: $0 [0|1|2|3|setup|check|calibrate|up|down|status]" >&2
     exit 2
     ;;
 esac
