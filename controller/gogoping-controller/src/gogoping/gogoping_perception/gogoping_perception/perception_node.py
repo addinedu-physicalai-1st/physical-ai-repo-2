@@ -31,9 +31,13 @@ from gogoping_perception.config import (
     TRACKING_STATE_HZ,
     YOLO_CONF_THRESHOLD,
     YOLO_DEVICE,
+    YOLO_HALF,
     YOLO_MODEL_NAME,
     YOLO_PERSON_CLASS,
+    YOLO_WARMUP_ITERS,
 )
+from gogoping_perception.yolo_runner import YoloRunner
+from gogoping_perception.proximity import ProximityCfg, nearest_person_distance_m
 from gogoping_perception.reid_engine import ReIDEngine
 from gogoping_perception.shm_reader import ShmReader
 from gogoping_perception.target_tracker import TargetTracker
@@ -167,6 +171,11 @@ class PerceptionNode(Node):
         self._person_proximity_pub = self.create_publisher(
             Float32, "/gogoping/person_proximity", 10,
         )
+        self._prox_cfg = ProximityCfg(
+            fx=config.CAMERA_FX_PX, cx=config.CAMERA_CX_PX,
+            forward_m=config.PERSON_FRONT_DIST_M,
+            lateral_m=config.PERSON_LATERAL_LIMIT_M,
+        )
         self.create_subscription(
             String, "/gogoping/state_str", self._on_state_str, 10,
             callback_group=self._target_cbg,
@@ -207,12 +216,16 @@ class PerceptionNode(Node):
         if self._yolo is not None and self._reid is not None and self._tracker is not None:
             return True
         try:
-            from ultralytics import YOLO  # noqa: WPS433 — lazy
-            self._yolo = YOLO(YOLO_MODEL_NAME)
+            self._yolo = YoloRunner.load(
+                YOLO_MODEL_NAME, device=YOLO_DEVICE, imgsz=self._imgsz,
+                conf=YOLO_CONF_THRESHOLD, person_class=YOLO_PERSON_CLASS,
+                tracker_name=TRACKER_NAME, half=YOLO_HALF,
+                warmup_iters=YOLO_WARMUP_ITERS,
+            )
             self._reid = ReIDEngine(device=YOLO_DEVICE)
             self._tracker = TargetTracker(self._reid)
             self.get_logger().info(
-                f"Engines ready: YOLO={YOLO_MODEL_NAME} device={YOLO_DEVICE}, "
+                f"Engines ready: YOLO={YOLO_MODEL_NAME} device={self._yolo.device}, "
                 f"ReID=OSNet, tracker={TRACKER_NAME}"
             )
             return True
@@ -315,38 +328,6 @@ class PerceptionNode(Node):
                 continue
             self._process_frame(snap.color, snap.depth, snap.cap_ns)
 
-    def _publish_person_proximity(self, results, depth: np.ndarray) -> None:
-        """정면 박스 안 가장 가까운 사람 거리 publish.
-
-        graph_router_node 의 사람 감지 정지 로직 (person_close) 트리거.
-        결과 없거나 박스 밖이면 +inf publish.
-        """
-        from std_msgs.msg import Float32
-        from gogoping_perception.frontal_box import nearest_person_in_box
-        try:
-            if not results:
-                d_m = float("inf")
-            else:
-                r = results[0]
-                if r.boxes is None or len(r.boxes.xyxy) == 0:
-                    d_m = float("inf")
-                else:
-                    boxes_xyxy = r.boxes.xyxy.cpu().numpy()
-                    detections = [
-                        tuple(map(int, bbox.tolist())) for bbox in boxes_xyxy
-                    ]
-                    d_m = nearest_person_in_box(
-                        detections=detections,
-                        depth=depth,
-                        fx=config.CAMERA_FX_PX,
-                        cx=config.CAMERA_CX_PX,
-                        box_forward_m=config.PERSON_FRONT_DIST_M,
-                        box_lateral_m=config.PERSON_LATERAL_LIMIT_M,
-                    )
-            self._person_proximity_pub.publish(Float32(data=float(d_m)))
-        except Exception as e:
-            self.get_logger().warn(f"person_proximity publish failed: {e}")
-
     def _publish_debug_image(self, color: np.ndarray, depth: np.ndarray, results) -> None:
         """YOLO 박스를 그린 프레임을 /gogoping/perception/debug_image 로 publish.
 
@@ -437,32 +418,15 @@ class PerceptionNode(Node):
         # (ByteTrack 비용은 화면 내 사람 수에 비례 — 빈 화면에선 predict≈track 이지만
         #  사람 여럿일 때만큼 절약. device 명시는 silent CPU 폴백 차단이 주목적.)
         try:
-            if self._tracker.has_target():
-                results = self._yolo.track(
-                    color,
-                    persist=True,
-                    classes=[YOLO_PERSON_CLASS],
-                    conf=YOLO_CONF_THRESHOLD,
-                    imgsz=self._imgsz,
-                    tracker=TRACKER_NAME,
-                    device=YOLO_DEVICE,
-                    verbose=False,
-                )
-            else:
-                results = self._yolo.predict(
-                    color,
-                    classes=[YOLO_PERSON_CLASS],
-                    conf=YOLO_CONF_THRESHOLD,
-                    imgsz=self._imgsz,
-                    device=YOLO_DEVICE,
-                    verbose=False,
-                )
+            results = self._yolo.infer(color, track=self._tracker.has_target())
         except Exception as e:  # noqa: BLE001
             self.get_logger().warn(f"yolo inference failed: {e}")
             return
 
         # ── person_proximity publish — target 유무 무관 (graph_router 용) ──
-        self._publish_person_proximity(results, depth)
+        dist = nearest_person_distance_m(results, depth, self._prox_cfg)
+        from std_msgs.msg import Float32
+        self._person_proximity_pub.publish(Float32(data=float(dist)))
 
 
         # ── debug image publish — subscriber 있을 때만 (target 유무 무관) ──

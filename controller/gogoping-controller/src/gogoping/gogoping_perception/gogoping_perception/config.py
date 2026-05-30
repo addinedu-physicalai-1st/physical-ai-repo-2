@@ -17,6 +17,10 @@ YOLO_IMG_SIZE = 640
 # 작동 못 함. "cuda:0" 고정으로 silent fallback 차단 (GPU 부재 시엔 load 에러로 즉시
 # 드러나는 편이 0.8fps 로 조용히 도는 것보다 낫다). CPU 강제 디버깅 시에만 "cpu".
 YOLO_DEVICE: str | None = "cuda:0"
+# FP16 추론 — 속도↑ 정확도 약간↓ (ultralytics 문서). 발표 후 평가, 기본 off.
+YOLO_HALF: bool = False
+# warm-up 추론 횟수 — 첫 프레임 setup 지연 스파이크 제거 (ultralytics 권장).
+YOLO_WARMUP_ITERS: int = 2
 
 # ---------- MediaPipe Pose validation (사물 오인식 2차 차단) ----------
 # YOLO bbox crop 안에서 Pose 추론 → visible landmark ≥ MIN 이면 사람, 아니면 사물.
