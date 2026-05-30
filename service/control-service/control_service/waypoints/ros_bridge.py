@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from typing import Any
 
 TOPIC_PLAN = "/plan"
+# graph_router 가 latch(TRANSIENT_LOCAL) 로 publish 하는 L1 vertex sequence (map 좌표).
+# RViz Path display 와 동일 소스 — BT 자율주행이든 navigate 호출이든 항상 여기로 나온다.
+TOPIC_ROUTE_PATH = "/graph_router/route_path"
 TOPIC_INITIAL_POSE = "/initialpose"
 ACTION_NAV_TO_POSE = "/navigate_to_pose"
 ACTION_FOLLOW_WAYPOINTS = "/follow_waypoints"
@@ -79,6 +82,7 @@ class WaypointsRosBridge:
         from rclpy.executors import SingleThreadedExecutor
         from rclpy.node import Node
         from rclpy.action import ActionClient
+        from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
         from nav_msgs.msg import Path
         from nav2_msgs.action import NavigateToPose, FollowWaypoints
         from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -99,6 +103,23 @@ class WaypointsRosBridge:
             self._emit({"type": "plan", "points": pts})
 
         node.create_subscription(Path, TOPIC_PLAN, _on_plan, 10)
+
+        # L1 vertex sequence (graph_router 의 latch 토픽) — admin UI 의 코랄 경로선.
+        # graph_router 의 publisher QoS (depth=1, TRANSIENT_LOCAL, RELIABLE) 와 맞춰야
+        # latch 된 최신 path 를 늦게 붙어도 받는다. 빈 Path → 경로 clear.
+        def _on_route_path(msg: Path) -> None:
+            pts = [(float(ps.pose.position.x), float(ps.pose.position.y))
+                   for ps in msg.poses]
+            self._emit({"type": "route_path", "points": pts})
+
+        route_path_qos = QoSProfile(
+            depth=1,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        node.create_subscription(
+            Path, TOPIC_ROUTE_PATH, _on_route_path, route_path_qos
+        )
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, node)

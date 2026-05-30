@@ -16,6 +16,8 @@ import { onBeforeUnmount } from 'vue';
 import { useModeStore } from '@/stores/mode';
 import { useHideseekPhaseStore, type HideseekPhase } from '@/gogoping/stores/hideseekPhase';
 import { useProximityStore, type ProximityLevel } from '@/gogoping/stores/proximity';
+import { useErrorStore } from '@/gogoping/stores/error';
+import { useGogopingFsmStore } from '@/gogoping/stores/fsm';
 
 interface SnapshotPatrol {
   vertices?: string[];
@@ -33,6 +35,7 @@ interface GogopingSnapshot {
   hideseek_phase?: string;  // BT blackboard 의 hideseek_phase (Task 7 에서 추가)
   patrol?: SnapshotPatrol | null;  // BT blackboard 의 search_waypoints + patrol_current_index
   proximity?: SnapshotProximity | null;  // 근접 상황 (person_close/wall_close) — 미지원 서버면 없음
+  error_reason?: string;  // fault 사유 (ERROR 상태일 때만 의미). 미지원 서버면 없음.
   // 평탄화 (2026-05-25): assist_task / play_task 필드 제거. fsm_state 자체가 task.
   // 그 외 필드는 본 composable 에서 사용 안 함 (main_tree / sub_tree / battery_level 등)
 }
@@ -62,6 +65,8 @@ export function useGogopingStateWs(): { stop: () => void } {
   const mode = useModeStore();
   const hideseekPhaseStore = useHideseekPhaseStore();
   const proximityStore = useProximityStore();
+  const errorStore = useErrorStore();
+  const fsmStore = useGogopingFsmStore();
 
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${protocol}://${window.location.host}/ws/robot-state`;
@@ -112,6 +117,16 @@ export function useGogopingStateWs(): { stop: () => void } {
           level: lvl,
           personDistM: typeof px?.person_dist_m === 'number' ? px.person_dist_m : null,
         });
+
+        // ERROR(고장) → errorStore. terminal — 재시작 시 fsm_state 가 바뀌어 active=false.
+        const isError = snap.fsm_state === 'ERROR';
+        errorStore.setError({
+          active: isError,
+          reason: isError ? (snap.error_reason ?? '') : '',
+        });
+
+        // raw FSM state → fsmStore (App.vue 우상단 영문 상태 배지용). 미지원 서버면 '' 유지.
+        fsmStore.setFsmState(snap.fsm_state ?? '');
       } catch {
         // JSON 파싱 실패는 무시 (서버 측 포맷 변경 등 — 다음 메시지에서 회복)
       }

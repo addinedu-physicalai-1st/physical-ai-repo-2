@@ -37,6 +37,10 @@ import { useFollowStateWs } from '@/gogoping/composables/useFollowStateWs';
 import { useTtsSay } from '@/composables/useTtsSay';
 import HideAndSeekGame from '@/gogoping/HideAndSeekGame.vue';
 import FollowMode from '@/gogoping/FollowMode.vue';
+import { useErrorStore } from '@/gogoping/stores/error';
+import { useGogopingFsmStore } from '@/gogoping/stores/fsm';
+import { ERROR_CHILD_MESSAGE } from '@/gogoping/errorReason';
+import { gogopingStateMessage } from '@/gogoping/stateMessage';
 import AdminOpenArmEmbed from '@/admin/AdminOpenArmEmbed.vue';
 import AdminOpenArmCompare from '@/admin/AdminOpenArmCompare.vue';
 import AdminGogopingVideo from '@/admin/AdminGogopingVideo.vue';
@@ -61,6 +65,28 @@ const mode = useModeStore();
 const voice = useVoiceStore();
 const { robot, currentEmotion, currentMode } = storeToRefs(mode);
 const { lastError } = storeToRefs(voice);
+
+// gogoping ERROR(고장) — 별도 오버레이/버튼 없이 기존 로봇 얼굴 + 말풍선으로 안내.
+// errorStore.active 는 useGogopingStateWs 가 snapshot.fsm_state==='ERROR' 일 때 set.
+const errorStore = useErrorStore();
+const gogopingErrorMsg = computed(() =>
+  robot.value.id === 'gogoping' && errorStore.active ? ERROR_CHILD_MESSAGE : ''
+);
+// 고장 중엔 자는(sleep) 표정 — ShaderFace 의 Zzz 효과와 함께 "잠깐 쉬는 중" 느낌.
+const faceEmotion = computed(() => (gogopingErrorMsg.value ? 'sleep' : currentEmotion.value));
+// 고장 중엔 조작 버튼(하단 독·모드 FAB)을 숨겨 추가 조작을 막는다 — 얼굴 + 말풍선만 남긴다.
+const isGogopingError = computed(() => robot.value.id === 'gogoping' && errorStore.active);
+
+// gogoping 은 모드 버튼이 없고(admin/BT/음성이 모드 제어) 말풍선이 상태를 항상 알려준다.
+// 현재 mode 라벨 → 상냥한 한 마디. ERROR 는 gogopingErrorMsg(override) 가 우선.
+const isGogoping = computed(() => robot.value.id === 'gogoping');
+const gogopingBubbleDefault = computed(() =>
+  isGogoping.value ? gogopingStateMessage(currentMode.value) : ''
+);
+// 우상단 아주 작은 영문 FSM 상태 배지 — 디버그/교사 확인용.
+const fsmStore = useGogopingFsmStore();
+const { fsmState } = storeToRefs(fsmStore);
+const showFsmBadge = computed(() => isGogoping.value && !!fsmState.value);
 
 function clearVoiceError(): void {
   voice.setError(null);
@@ -307,10 +333,15 @@ function handleStart(): void {
   <AdminOpenArmCompare v-else-if="isAdminOpenArmCompare" />
   <AdminGogopingVideo v-else-if="isAdminGogopingVideo" />
   <div v-else class="app" :class="`bg-${robot.id}`">
-    <EmotionDisplay :emotion="currentEmotion" />
+    <EmotionDisplay
+      :emotion="faceEmotion"
+      :bubble-override="gogopingErrorMsg"
+      :bubble-default="gogopingBubbleDefault"
+    />
     <ArmDepthScreen v-if="showArmScreen" />
-    <BottomDock />
-    <ModeSelectorFab />
+    <BottomDock v-if="!isGogopingError" />
+    <ModeSelectorFab v-if="!isGogopingError" />
+    <div v-if="showFsmBadge" class="fsm-badge">{{ fsmState }}</div>
     <div class="brand">{{ robot.displayName }}</div>
     <AttendanceCamera :mode="attendanceMode" @highfive-request="startArrivalHighfive" />
     <HighfiveDetector
@@ -344,7 +375,7 @@ function handleStart(): void {
       @stop="onFollowStop"
     />
     <Transition name="err-fade">
-      <button v-if="lastError" class="voice-err" @click="clearVoiceError" :title="lastError">
+      <button v-if="lastError && !isGogopingError" class="voice-err" @click="clearVoiceError" :title="lastError">
         ⚠ {{ lastError }}
       </button>
     </Transition>
@@ -395,6 +426,24 @@ function handleStart(): void {
 }
 .bg-noriarm .brand {
   color: rgba(40, 110, 160, 0.7);
+}
+
+/* gogoping 우상단 아주 작은 FSM 영문 상태 배지 — 교사/디버그 확인용. */
+.fsm-badge {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  pointer-events: none;
+  z-index: 60;
 }
 
 .voice-err {

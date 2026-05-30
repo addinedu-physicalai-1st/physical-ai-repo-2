@@ -49,3 +49,21 @@ def test_sse_event_updates_goal_status(qtbot, card):
     assert "수면실" in card._status.text()
     d.handle({"type": "goal_status", "name": "수면실", "status": "succeeded"})
     assert card._status.text() == ""
+
+
+def test_sse_event_route_path_sets_points(qtbot, card):
+    """graph_router /route_path 중계 → 좌표 시퀀스 강조선. RViz 와 동일 소스라
+    BT 자율주행(navigate 미경유)에서도 admin 에 L1 경로가 표시된다."""
+    from widgets.waypoint_map_card import _SseDispatcher
+    d = _SseDispatcher(card)
+    d.handle({"type": "route_path", "points": [[1.0, 2.0], [3.5, 4.5]]})
+    assert card._map._route_points == [(1.0, 2.0), (3.5, 4.5)]
+
+
+def test_sse_event_route_path_empty_clears(qtbot, card):
+    """종료 시 graph_router 가 빈 Path 를 latch → 경로 해제."""
+    from widgets.waypoint_map_card import _SseDispatcher
+    d = _SseDispatcher(card)
+    d.handle({"type": "route_path", "points": [[1.0, 2.0], [3.5, 4.5]]})
+    d.handle({"type": "route_path", "points": []})
+    assert card._map._route_points == []

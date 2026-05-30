@@ -24,15 +24,17 @@ snapshot 구조::
         "level": "person_close",   # "ok" | "person_close"  (person-only)
         "person_dist_m": 0.5
       },                      # robot-web StatusBar 가 "앞에 친구가 있어요" 안내 표시
+      "error_reason": "out_of_map",  # fault 사유 (blackboard.error_reason). state 필터 없음 (robot-web 이 ERROR 일 때만 사용)
       "ts": 1730000035.123
     }
 
 ## 두 가지 flatten 정책
 
-- **main_tree.children**: root 의 모든 leaf 를 깊이 우선으로 평탄화 후 (name, status) 만.
+- **main_tree.children**: root 의 leaf 를 깊이 우선으로 평탄화 후 (name, status) 만.
   composite (Selector/Sequence/Parallel) 자체는 표시 안 함 — 자식만. RUNNING 가 아닌
   leaves (SUCCESS/FAILURE/INVALID) 도 포함해서 진행도 표시 (admin 위젯이 status 별
-  시각 차별 적용).
+  시각 차별 적용). **BT_*_sub composite 경계에서 멈춤** — SubTree 는 한 줄로만 표시;
+  상세는 sub_tree 블록 담당.
 - **sub_tree**: ``BT_*_sub`` naming convention 으로 식별. + 진짜 SubTree 가 생기면
   자동으로 잡힘. BT_*_sub 이름이 아닌 노드는 *main_tree.children* 에 그대로 평탄화됨.
 """
@@ -67,6 +69,7 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader.register_key(key=Keys.SEARCH_WAYPOINTS, access=Access.READ)
         _bb_reader.register_key(key=Keys.PATROL_CURRENT_INDEX, access=Access.READ)
         _bb_reader.register_key(key=Keys.HIDESEEK_PHASE, access=Access.READ)
+        _bb_reader.register_key(key=Keys.ERROR_REASON, access=Access.READ)
     return _bb_reader
 
 
@@ -193,7 +196,7 @@ def snapshot(
     """
     main_block = {
         "name": getattr(root_tree, "name", "?"),
-        "children": _flatten_leaves(root_tree, depth=0),
+        "children": _flatten_leaves(root_tree, depth=0, stop_at_subtree=True),
     }
 
     sub_root = _find_subtree(root_tree, depth=0)
@@ -201,7 +204,7 @@ def snapshot(
     if sub_root is not None:
         sub_block = {
             "name": sub_root.name,
-            "children": _flatten_leaves(sub_root, depth=0),
+            "children": _flatten_leaves(sub_root, depth=0),  # 경계 없음 — 상세 전부 표시
         }
 
     pose = _read_robot_pose()
@@ -238,12 +241,28 @@ def snapshot(
         # {"level": "ok"|"person_close", "person_dist_m"} 또는 None (person-only).
         # graph_router 가 구독하는 /gogoping/proximity_event 와 동일 소스 (main.py 가 전달).
         "proximity": proximity,
+        # fault 진입 사유 — robot-web ERROR 오버레이가 교사용 안내 매핑에 사용.
+        # blackboard.error_reason 를 state 필터 없이 그대로 통과. fault monitor 가 ERROR
+        # 진입 직전 W, 재시작 시 init_blackboard 가 "" 로 리셋 — 그래서 실질적으로 ERROR 일
+        # 때만 비어있지 않다. 소비자(robot-web)는 fsm_state==='ERROR' 일 때만 사용.
+        # (e.g. "out_of_map" / "lidar_timeout" / "")
+        "error_reason": _read_str_key(Keys.ERROR_REASON),
         "ts": time.time(),
     }
 
 
-def _flatten_leaves(node: Any, depth: int) -> list[dict]:
-    """node 의 모든 leaf 를 depth-first 로 평탄화. composite 자체는 제외."""
+def _is_subtree_node(node: Any) -> bool:
+    """BT_*_sub 네이밍 컨벤션 노드인지 — main 트리 평탄화의 경계."""
+    name = getattr(node, "name", "")
+    return name.startswith("BT_") and name.endswith("_sub")
+
+
+def _flatten_leaves(node: Any, depth: int, stop_at_subtree: bool = False) -> list[dict]:
+    """node 의 leaf 를 depth-first 로 평탄화. composite 자체는 제외.
+
+    stop_at_subtree=True 면 BT_*_sub composite 를 만났을 때 내부로 재귀하지 않고 그 노드
+    1줄만 emit — main 트리에서 SubTree 상세가 새지 않게(상세는 sub 블록 담당).
+    """
     if depth >= _MAX_DEPTH:
         return [_leaf_dict(node)]
     children = getattr(node, "children", None)
@@ -252,9 +271,13 @@ def _flatten_leaves(node: Any, depth: int) -> list[dict]:
     out: list[dict] = []
     for child in children:
         cls_name = type(child).__name__
-        if cls_name in _COMPOSITE_CLASS_NAMES and getattr(child, "children", None):
+        is_composite = cls_name in _COMPOSITE_CLASS_NAMES and getattr(child, "children", None)
+        if is_composite and stop_at_subtree and _is_subtree_node(child):
+            # SubTree 경계 — main 에선 한 줄로만 (상세는 sub 블록).
+            out.append(_leaf_dict(child))
+        elif is_composite:
             # composite — 재귀 (composite 본인은 안 표시)
-            out.extend(_flatten_leaves(child, depth + 1))
+            out.extend(_flatten_leaves(child, depth + 1, stop_at_subtree))
         else:
             out.append(_leaf_dict(child))
     return out
@@ -285,8 +308,7 @@ def _find_subtree(node: Any, depth: int) -> Any | None:
     """
     if depth >= _MAX_DEPTH:
         return None
-    name = getattr(node, "name", "")
-    if name.startswith("BT_") and name.endswith("_sub"):
+    if _is_subtree_node(node):
         # status 가 RUNNING 일 때만 — 비활성 SubTree 는 표시 안 함
         from py_trees.common import Status
         if getattr(node, "status", None) == Status.RUNNING:

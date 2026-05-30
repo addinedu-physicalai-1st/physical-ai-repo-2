@@ -89,6 +89,23 @@ _NORIARM_FOOD_KEYWORDS = "딸기, 포도, 키위, 브로콜리, 파인애플 줘
 _KO_PROMPT_COMMON_TAIL = "인사, 사진, 출석, 자장가."
 
 
+def _gogoping_waypoint_keywords() -> str:
+    """gogoping 목적지(방) 이름 — "놀이방으로 가" 류 발화의 방 이름 STT 정확도.
+
+    waypoints.yaml 의 vertex 이름 중 사람이 부르는 방 이름만 주입한다. 내부 경로
+    노드 (`놀-1`/`수-3`/`복-4`/`놀이방입구-상` 등 hyphen 포함) 는 발화 대상이 아니라
+    prompt 노이즈가 되므로 제외 → `놀이방, 수면실, 충전소, 출입구, 복도 ...` 만 남는다.
+    yaml read 는 가벼움 (< 1ms) 이라 매 utterance 갱신 — yaml 편집이 재배포 없이 반영.
+    """
+    try:
+        from control_service.waypoints import yaml_store as ys
+        wps, _ = ys.load()
+        names = [w.name for w in wps if w.name and "-" not in w.name]
+    except Exception:
+        names = []
+    return ", ".join(names)
+
+
 def _ko_prompt_for(
     robot: "str | None",
     extra_keywords: "list[str] | None" = None,
@@ -113,6 +130,11 @@ def _ko_prompt_for(
         # 가게놀이 음식 요청 ("딸기 줘" 등) STT 정확도 — noriarm 일 때 음식 단어 주입.
         if robot == "noriarm":
             parts.append(_NORIARM_FOOD_KEYWORDS)
+        # "놀이방으로 가" 류 발화 — gogoping 일 때 목적지(방) 이름 주입.
+        if robot == "gogoping":
+            waypoints = _gogoping_waypoint_keywords()
+            if waypoints:
+                parts.append(waypoints)
     if extra_keywords:
         cleaned = [k.strip() for k in extra_keywords if k and k.strip()]
         if cleaned:

@@ -7,7 +7,16 @@ import { useModeStore } from '@/stores/mode';
 import { useVoiceStore } from '@/stores/voice';
 import ShaderFace from '@/common/ShaderFace.vue';
 
-defineProps<{ emotion: EmotionId }>();
+const props = defineProps<{
+  emotion: EmotionId;
+  /** 우선 표시할 말풍선 텍스트(예: gogoping ERROR 안내). 있으면 voice 상태와 무관하게 계속 표시. */
+  bubbleOverride?: string;
+  /**
+   * idle 기본 안내(wake 호출 문구)를 대체하는 상시 메시지(예: gogoping 상태별 안내).
+   * override 와 달리 발화 응답(robotReply)·듣는 중 표시는 그대로 우선하고, 그 외 평소엔 항상 표시.
+   */
+  bubbleDefault?: string;
+}>();
 
 const voice = useVoiceStore();
 const { state, voiceMode, robotReply, sttText } = storeToRefs(voice);
@@ -50,15 +59,19 @@ const liveUserText = computed(() => {
 /** 말풍선 텍스트 — idle 음성 모드: 호출 안내. listening: '듣고 있어요'.
  *  speaking/cooldown 동안 robotReply 가 있으면 그걸 표시 (TTS). */
 const bubbleText = computed(() => {
+  // override(고장 안내 등) 가 있으면 voice 상태와 무관하게 항상 우선 표시.
+  if (props.bubbleOverride) return props.bubbleOverride;
+  // idle 음성 모드 — bubbleDefault(상태 안내) 가 있으면 wake 문구 대신 그것을 표시.
   if (state.value === 'idle' && voiceMode.value === 'voice') {
-    return wakePromptText.value;
+    return props.bubbleDefault || wakePromptText.value;
   }
   const reply = robotReply.value.trim();
   if (reply) return reply;
   if (state.value === 'listening' || state.value === 'wake_detected') {
     return '듣고 있어요…';
   }
-  return '';
+  // 평소(텍스트 모드/대기 등) — bubbleDefault 가 있으면 항상 상태 안내를 띄운다.
+  return props.bubbleDefault || '';
 });
 const showBubble = computed(() => !!bubbleText.value);
 </script>

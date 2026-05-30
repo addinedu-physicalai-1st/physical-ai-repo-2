@@ -44,10 +44,10 @@ amcl:
     scan_topic: /gogoping/scan_filtered
     set_initial_pose: true
     initial_pose:
-      x: 0.0
-      y: 0.0
+      x: 0.2796
+      y: 12.0307
       z: 0.0
-      yaw: 0.0
+      yaw: -1.5708   # -90° — map 기준 아래쪽(-Y) 방향
 bt_navigator:
   ros__parameters:
     use_sim_time: true

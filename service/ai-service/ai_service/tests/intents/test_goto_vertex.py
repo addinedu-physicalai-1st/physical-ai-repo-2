@@ -28,3 +28,32 @@ async def test_goto_vertex_no_match() -> None:
             make_req(text, robot="gogoping"), make_ctx(text, robot="gogoping")
         )
     assert r is None
+
+
+import pytest
+
+
+# 사용자 핵심 발화 + STT 오인식 변형 → 모두 놀이방 라우팅.
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("놀이방으로 가자", GotoVertex(name="놀이방")),
+        ("놀이방으로 이동해줘", GotoVertex(name="놀이방")),
+        ("놀이방으로 가서 자장가틀어줘", GotoVertex(name="놀이방", then_mode="자장가")),
+        ("놀이방 가서 재워줘", GotoVertex(name="놀이방", then_mode="자장가")),
+        ("놀이반으로 가자", GotoVertex(name="놀이방")),       # STT 오인식
+        ("노리방으로 이동", GotoVertex(name="놀이방")),       # STT 오인식
+        ("놀이 방으로 가줘", GotoVertex(name="놀이방")),      # 띄어쓰기
+        ("수면시로 가", GotoVertex(name="수면실")),          # STT 오인식
+    ],
+)
+async def test_goto_vertex_user_sentences(text: str, expected: GotoVertex) -> None:
+    names = ["놀이방", "수면실", "충전소", "복도", "출입구"]
+    with patch(
+        "ai_service.intents.gogoping.goto_vertex._load_vertex_names",
+        return_value=names,
+    ):
+        r = await GotoVertexHandler().try_handle(
+            make_req(text, robot="gogoping"), make_ctx(text, robot="gogoping")
+        )
+    assert r == expected

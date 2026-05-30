@@ -58,7 +58,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `hideseek_play_area_key` | `str` | `command_listener` / `goal_reconciler` | `BT_hide_and_seek_sub` | named pose (= 운동장2) |
+| `hideseek_play_area_key` | `str` | `command_listener` / `goal_reconciler` | `BT_hide_and_seek_sub` | named pose (= 출입구) |
 | `hideseek_registered_ids` | `list[int]` | control-service (recruit-complete API → `SetBlackboard.srv`) | `HideSeekCaughtMonitor`, `AwaitRecruitComplete` | 모집 종료 시. control-service `bridge.write_hideseek_registered_ids()` → `blackboard_service` 서버가 set |
 | `hideseek_caught_ids` | `list[int]` | control-service (caught API → `SetBlackboard.srv`) | `HideSeekCaughtMonitor` | 발견 시마다 추가. control-service 가 in-process 누적 set 유지 → 매 호출마다 sorted list 전체 셋팅. recruit-complete 호출 시 캐시 reset |
 | `hideseek_phase` | `str` | `SetHideseekPhase` | `tree_inspector.snapshot`, robot-web hideseek phase store | UI 라우팅. `"move_to_play"`/`"recruit"`/`"countdown"`/`"patrol"`/`"return"`/`"end"`/`""` |
@@ -67,7 +67,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `error_reason` | `str` | (fault trigger 호출한 monitor), `command_listener` (emergency_stop 시 `"user_emergency_stop"`) | `notify_admin_ui`, `log_error_to_db` | ERROR 진입 사유 (e.g., `"lidar_timeout"`, `"out_of_map"`, `"user_emergency_stop"`) |
+| `error_reason` | `str` | (fault trigger 호출한 monitor), `command_listener` (emergency_stop 시 `"user_emergency_stop"`) | `notify_admin_ui`, `log_error_to_db`, `tree_inspector.snapshot` | ERROR 진입 사유 (e.g., `"lidar_timeout"`, `"out_of_map"`, `"user_emergency_stop"`). `snapshot()` 의 `error_reason` 필드로 노출 — robot-web ERROR 오버레이가 교사용 안내 매핑에 사용 |
 | `error_source` | `str` | (fault trigger 호출한 monitor), `command_listener` (`"emergency_stop_service"`) | `notify_admin_ui`, `log_error_to_db` | 발화 주체 식별 (e.g., `"HardwareHealthMonitor"`, `"emergency_stop_service"`) — multi-writer 디버깅용 |
 
 ### 수동 모드 (manual_torque_hold 가 W)

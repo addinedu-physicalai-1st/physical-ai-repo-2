@@ -179,7 +179,7 @@ def test_patrol_goal_passes_full_vertex_list_to_bridge(app_and_bridge):
     # 평탄화 이후 (commit 1f19e35): mode/task 두 축 → target_state 단일.
     assert goal.target_state == "HIDEANDSEEK"
     # Task 8 이후: HIDEANDSEEK 진입 시 play_area_key 필수 — reconciler 가 검증.
-    # waypoints.yaml 의 실제 등록 vertex (Task 8 후 nav graph 와 일치 fix)
-    assert goal.play_area_key == "운동장2"
+    # waypoints.yaml 의 실제 등록 vertex (운동장 제거 후 출입구로 변경).
+    assert goal.play_area_key == "출입구"
     assert list(goal.search_waypoints) == r.json()["vertices"]
     assert len(goal.search_waypoints) == 6

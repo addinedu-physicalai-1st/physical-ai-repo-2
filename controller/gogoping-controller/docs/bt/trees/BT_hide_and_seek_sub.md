@@ -1,7 +1,7 @@
 # BT_hide_and_seek_sub
 
 HIDEANDSEEK state MainTree (BT_hide_and_seek_main) 의 body. **6-step Sequence** —
-유치원 운동장으로 이동 → 모집 → 카운트다운 → 순찰 (탐색) → 복귀 → end idle 의 전체 hideseek 워크플로우.
+출입구(play_area)로 이동 → 모집 → 카운트다운 → 순찰 (탐색) → 복귀 → end idle 의 전체 hideseek 워크플로우.
 
 [bt/trees/sub_trees/BT_hide_and_seek_sub.py](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/sub_trees/BT_hide_and_seek_sub.py)
 
