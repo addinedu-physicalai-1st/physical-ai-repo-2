@@ -218,7 +218,11 @@ class OutboundTTSTrack(MediaStreamTrack):
     def __init__(self) -> None:
         super().__init__()
         self._buffer = bytearray()
-        self._lock = asyncio.Lock()
+        # 부모(pyee EventEmitter) 의 self._lock(threading.Lock) 을 덮어쓰면 안 됨 →
+        # 부모는 emit() 내부에서 sync `with self._lock:` 호출. asyncio.Lock 으로 덮으면
+        # TypeError("'Lock' object does not support the context manager protocol") 로
+        # track.stop() 시 RTCRtpSender._run_rtp 가 죽고 WebRTC 즉시 close.
+        self._buffer_lock = asyncio.Lock()
         self._pts = 0
         self._time_base = fractions.Fraction(1, self.SAMPLE_RATE)
         self._silence_frame = bytes(self.BYTES_PER_FRAME)
@@ -228,12 +232,12 @@ class OutboundTTSTrack(MediaStreamTrack):
         """48kHz mono int16 LE PCM 누적. push 자체는 빠름 (frame pacing 은 recv 가 담당)."""
         if not pcm_int16_le:
             return
-        async with self._lock:
+        async with self._buffer_lock:
             self._buffer.extend(pcm_int16_le)
 
     async def clear(self) -> None:
         """현재 버퍼 비움 — barge-in 시 즉시 TTS 끊기 용."""
-        async with self._lock:
+        async with self._buffer_lock:
             self._buffer.clear()
 
     def buffered_ms(self) -> int:
@@ -262,7 +266,7 @@ class OutboundTTSTrack(MediaStreamTrack):
         if self.readyState != "live":
             raise MediaStreamError
 
-        async with self._lock:
+        async with self._buffer_lock:
             if len(self._buffer) >= self.BYTES_PER_FRAME:
                 chunk = bytes(self._buffer[: self.BYTES_PER_FRAME])
                 del self._buffer[: self.BYTES_PER_FRAME]

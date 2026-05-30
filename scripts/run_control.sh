@@ -75,8 +75,15 @@ case "$ACTION" in
 
     CONTROL_CMD="$(_runlib::wrap_cmd uvicorn control_service.main:app --host 0.0.0.0 --port 8000 --reload --reload-exclude '*/ros_bridge.py')"
 
+    # noriarm store_play 의 runner subprocess 는 별도 venv(store_play) 의 python 으로 spawn.
+    # control_service(pingdergarten venv)와 runner(store_play venv) 분리 — lerobot bi_omx_*
+    # 커스텀 코드가 store_play venv 의 lerobot-upstream 에 editable 설치돼 있음.
+    # NORIARM_STOREPLAY_PYTHON / _PYTHONPATH 가 없으면 runner 가 pingdergarten venv 로 spawn 돼서
+    # ModuleNotFoundError: lerobot.robots.bi_omx_follower 로 죽음 (메모리 noriarm_venv_deployment.md).
+    STOREPLAY_PYTHON="/home/kyle/venv/store_play/bin/python"
+
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -n control -c "$REPO_ROOT" \
-      "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; [ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
+      "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; export NORIARM_STOREPLAY_PYTHON=\"$STOREPLAY_PYTHON\"; export NORIARM_STOREPLAY_PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH\"; [ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
     tmux set-option -t "$SESSION" -g remain-on-exit on
 
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \

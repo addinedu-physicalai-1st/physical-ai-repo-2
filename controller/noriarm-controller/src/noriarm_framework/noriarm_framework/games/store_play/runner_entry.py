@@ -64,16 +64,18 @@ _CAMERA_DEVICES: dict[str, str] = {
 }
 
 # UI 미리보기 — runner 가 카메라를 V4L2 점유하므로 브라우저가 직접 못 잡음.
-# ROI masked 프레임을 5fps 로 /tmp 에 JPEG 저장 → control_service 가 서빙 → UI 표시.
+# ROI masked 프레임을 5fps 로 /tmp 에 JPEG 저장 → control_service /preview/{cam} 이 서빙.
+# (rerun 으로 대체 가능하지만 dev 의 control_service 가 이 파일을 읽으므로 호환 유지.)
 _PREVIEW_DIR = "/tmp"
 _PREVIEW_PREFIX = "storeplay_preview"
-_PREVIEW_INTERVAL_S = 0.2  # 5fps — 모니터링용이라 추론 30Hz 다 안 보냄.
+_PREVIEW_INTERVAL_S = 0.2  # 5fps
 _preview_last_write: list[float] = [0.0]
 
 
 def _save_preview(images_rgb: dict[str, np.ndarray]) -> None:
     """ROI masked RGB 프레임을 5fps throttle 로 /tmp 에 JPEG 저장 (UI 미리보기).
-    실패해도 추론에 영향 없게 조용히 무시. 키는 모델 cam key (top/wrist_left/wrist_right).
+    실패해도 추론 무관. 키는 모델 cam key (top/wrist_left/wrist_right).
+    control_service.noriarm.store_play 의 /sessions/{sid}/preview/{cam} endpoint 가 이 JPG 를 서빙.
     """
     now = time.monotonic()
     if now - _preview_last_write[0] < _PREVIEW_INTERVAL_S:
@@ -81,7 +83,6 @@ def _save_preview(images_rgb: dict[str, np.ndarray]) -> None:
     _preview_last_write[0] = now
     try:
         import cv2
-        import os
 
         for cam, img in images_rgb.items():
             bgr = img[:, :, ::-1]  # RGB → BGR (cv2.imwrite 는 BGR 기대)
@@ -90,6 +91,54 @@ def _save_preview(images_rgb: dict[str, np.ndarray]) -> None:
             # 임시 파일에 쓴 뒤 atomic rename — control_service 가 부분 쓰기 읽는 것 방지.
             if cv2.imwrite(tmp, bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 70]):
                 os.replace(tmp, dst)
+    except Exception:
+        pass
+
+
+# rerun 시각화 — 모델이 보는 ROI masked 프레임 + 관절상태 + 게이트 상태를 네이티브
+# rerun 창에 스트리밍. runner 1 프로세스당 1회 spawn (DISPLAY 필요). 실패해도 추론 무관.
+_RR_ON: list[bool] = [False]
+# rerun 로깅 throttle — 매 frame 카메라 3장 풀 전송하면 CPU/RAM 폭주(뷰어 14GB+, provider
+# 40→100ms)라서 모니터링용으로 ~5fps 만. 추론 루프(30Hz)는 그대로, rerun 만 솎아냄.
+_RR_INTERVAL_S = 0.033  # ~30fps 풀로깅. 뷰어 부담 큼 — 떨림 / spike 늘면 0.1 로 복귀.
+_rr_last: list[float] = [0.0]
+
+
+def _rr_init() -> None:
+    """rerun 네이티브 뷰어 spawn + 연결 (runner 당 1회). 실패 시 조용히 비활성 — 추론은 계속.
+    memory_limit 로 뷰어 RAM 상한 — 안 걸면 history 누적으로 수십 GB 까지 부풀어 CPU 포화."""
+    try:
+        import rerun as rr
+
+        rr.init("storeplay_inference")
+        rr.spawn(memory_limit="2GB")  # 네이티브 뷰어 창 (DISPLAY 필요), RAM 상한 2GB
+        _RR_ON[0] = True
+        logger.info("rerun 뷰어 spawn 완료 — cam/state/status 스트리밍 (~10fps throttle)")
+    except Exception as e:
+        logger.warning("rerun 비활성 (spawn 실패: %s) — 추론은 계속", e)
+
+
+def _rr_log(seq: int, masked: dict[str, np.ndarray] | None, state, status: str, detected) -> None:
+    """ROI masked 프레임(모델 입력) + 관절상태 + 상태텍스트를 rerun 에 로그. _RR_ON 일 때만.
+    masked 키는 모델 cam key (top/wrist_left/wrist_right), RGB HWC uint8.
+    """
+    if not _RR_ON[0]:
+        return
+    now = time.monotonic()
+    if now - _rr_last[0] < _RR_INTERVAL_S:  # ~5fps throttle — CPU/RAM 보호
+        return
+    _rr_last[0] = now
+    try:
+        import rerun as rr
+
+        rr.set_time("frame", sequence=seq)
+        for cam, img in (masked or {}).items():
+            rr.log(f"cam/{cam}", rr.Image(img))  # RGB
+        if state is not None:
+            for name, v in zip(MOTOR_ORDER, state, strict=False):
+                rr.log(f"state/{name}", rr.Scalars(float(v)))
+        det = sorted(detected) if detected else []
+        rr.log("status", rr.TextLog(f"{status} | detected={det}"))
     except Exception:
         pass
 
@@ -114,7 +163,9 @@ def _build_robot():
             height=480,
             fps=30,
             fourcc="MJPG",
-            warmup_s=5,
+            # warmup_s 작게 — connect 후 모델로드+wake+홈+핸드셰이크로 10s+ 스트리밍하며
+            # 노출 자동 안정화됨. 5s×3 순차(=15s) 는 부팅의 최대 죽은시간이라 1.5s 로 단축.
+            warmup_s=1.5,
         )
         for key, path in _CAMERA_DEVICES.items()
     }
@@ -125,6 +176,125 @@ def _build_robot():
         cameras=cameras,
     )
     return BiOmxFollower(cfg)
+
+
+# ──────────────────────────── wake 모션 (부팅 애니메이션) ────────────────────────────
+# 모델 로드(추론 준비) 동안 녹화 trajectory 를 백그라운드로 루프 재생 → 준비되면 home 이동.
+# trajectory 는 scripts/record_wake_trajectory.py 로 녹화한 npz {poses:(N,12), fps}.
+
+def _arm_state_vec(robot) -> list[float]:
+    """카메라 없이 양팔 관절 pose 만 읽어 MOTOR_ORDER 12-vec 반환.
+    wake 모션은 팔 연결 직후(카메라 미연결) 시작하므로 get_observation(카메라 포함) 대신 사용."""
+    obs: dict[str, Any] = {}
+    obs.update({f"left_{k}": v for k, v in robot.left_arm.get_observation().items()})
+    obs.update({f"right_{k}": v for k, v in robot.right_arm.get_observation().items()})
+    return [float(obs[k]) for k in MOTOR_ORDER]
+
+
+# 카메라 read 병렬화용 스레드풀 (3대 async_read 동시 호출 — bg thread 대기 누적 제거).
+# BiOmxFollower.get_observation 은 팔 → 3캠 순차라 누적 대기로 ~40ms. 3캠을 동시에 부르면
+# max(개별 대기)로 줄어 ~15ms 절감. 팔 read 는 빠르고 순차로 두고, 카메라만 병렬.
+_cam_pool: Any | None = None  # ThreadPoolExecutor — 첫 호출 시 lazy 생성
+
+def _fast_get_observation(robot) -> dict[str, Any]:
+    """robot.get_observation 의 카메라 병렬 read 버전. dict format 은 동일.
+    팔: 순차 (빠름). 카메라 3대: ThreadPoolExecutor 로 동시 async_read."""
+    global _cam_pool
+    if _cam_pool is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _cam_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="cam-read")
+    obs: dict[str, Any] = {}
+    obs.update({f"left_{k}": v for k, v in robot.left_arm.get_observation().items()})
+    obs.update({f"right_{k}": v for k, v in robot.right_arm.get_observation().items()})
+    # 카메라 3대 동시 read
+    futures = {key: _cam_pool.submit(cam.async_read) for key, cam in robot.cameras.items()}
+    for key, fut in futures.items():
+        obs[key] = fut.result()
+    return obs
+
+
+def _load_wake_traj(cfg: dict) -> tuple[np.ndarray | None, int]:
+    """wake_motion config 에서 trajectory 로드. (poses Nx12, fps). 없으면 (None, 30)."""
+    fps = int(cfg.get("fps", 30)) if cfg else 30
+    if not cfg or not cfg.get("enabled"):
+        return None, fps
+    path = cfg.get("trajectory_path")
+    if not path or not Path(path).exists():
+        logger.warning("wake 모션 trajectory 파일 없음 (%s) — 모션 스킵, home 이동만", path)
+        return None, fps
+    try:
+        d = np.load(path)
+        poses = np.asarray(d["poses"], dtype=np.float32)
+        if "fps" in d:
+            fps = int(d["fps"])
+        if poses.ndim != 2 or poses.shape[1] != len(MOTOR_ORDER):
+            logger.warning("wake trajectory shape 이상 %s — 스킵", poses.shape)
+            return None, fps
+        return poses, fps
+    except Exception as e:
+        logger.warning("wake trajectory 로드 실패: %s — 스킵", e)
+        return None, fps
+
+
+# 모터 버스에 per-step 이동 상한(max_relative_target)이 없어서(=None), wake/home 이동의
+# 부드러움은 전적으로 _ramp 의 step 크기에 의존. 관절당 한 frame 이동을 이 값으로 cap —
+# 멀리 이동해도(임의 위치→home) step 을 늘려 항상 느리고 부드럽게. (추론 serve 는 _ramp 안 씀)
+_WAKE_MAX_STEP_DELTA = 2.5  # 관절 단위/frame (@30Hz ≈ 75/s 상한)
+
+
+def _ramp(robot, start: np.ndarray, end: np.ndarray, n_steps: int, dt: float,
+          stop_event=None) -> None:
+    """start→end 선형 보간 송신 (부드러운 이동, jerk 방지). 관절당 per-step 이동이
+    _WAKE_MAX_STEP_DELTA 를 넘지 않도록 n_steps 를 거리에 맞게 자동 증가 (먼 이동=느리게)."""
+    max_delta = float(np.abs(end - start).max())
+    min_steps = int(np.ceil(max_delta / _WAKE_MAX_STEP_DELTA)) if max_delta > 0 else 1
+    n_steps = max(1, n_steps, min_steps)
+    for s in range(1, n_steps + 1):
+        if (stop_event is not None and stop_event.is_set()) or (
+            _SHUTDOWN is not None and _SHUTDOWN.is_set()
+        ):
+            return
+        a = s / n_steps
+        pose = (1.0 - a) * start + a * end
+        t0 = time.perf_counter()
+        robot.send_action(_action_vec_to_dict(pose.tolist()))
+        el = time.perf_counter() - t0
+        if el < dt:
+            time.sleep(dt - el)
+
+
+def _play_wake_motion(robot, traj: np.ndarray, fps: int, stop_event) -> None:
+    """trajectory 루프 재생 (stop_event 까지). 시작 시 현재→traj[0] 부드럽게 ramp.
+    별도 스레드에서 실행 — 모델 로드 중 모터 serial 은 이 스레드만 접근 (동시 접근 없음).
+    예외는 삼켜서 부팅을 막지 않음."""
+    dt = 1.0 / max(1, fps)
+    try:
+        def _stopped() -> bool:
+            return stop_event.is_set() or (_SHUTDOWN is not None and _SHUTDOWN.is_set())
+
+        cur = np.asarray(_arm_state_vec(robot), dtype=np.float32)  # 카메라 없이 팔 pose
+        _ramp(robot, cur, traj[0], fps, dt, stop_event)  # 현재→첫 frame (부드럽게)
+        while not _stopped():
+            for pose in traj:
+                if _stopped():
+                    break
+                t0 = time.perf_counter()
+                robot.send_action(_action_vec_to_dict(pose.tolist()))
+                el = time.perf_counter() - t0
+                if el < dt:
+                    time.sleep(dt - el)
+    except Exception as e:
+        logger.warning("wake 모션 재생 중 예외 (무시): %s", e)
+
+
+def _move_to_home(robot, home_pose: np.ndarray, *, fps: int, move_s: float) -> None:
+    """현재 pose → home_pose 부드럽게 이동 (보간). 추론 준비 완료 후 호출."""
+    try:
+        cur = np.asarray(_arm_state_vec(robot), dtype=np.float32)
+        _ramp(robot, cur, home_pose, max(1, int(fps * move_s)), 1.0 / max(1, fps))
+        logger.info("홈 포지션 이동 완료")
+    except Exception as e:
+        logger.warning("홈 이동 실패 (무시): %s", e)
 
 
 def _obs_to_state_vec(obs: dict[str, Any]) -> list[float]:
@@ -260,8 +430,24 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
     # closed-loop 재추론 주기. game.yaml n_action_steps (없으면 모델 chunk_size).
     # roi_inference.py 와 동일하게 매 frame predict_action 호출하되, lerobot 가
     # n_action_steps 마다만 실제 추론하고 그 사이는 캐시 action 을 pop.
-    n_action_steps = int(extra.get("n_action_steps") or policy.config.n_action_steps)
-    policy.config.n_action_steps = n_action_steps
+    # temporal_ensemble_coeff 가 설정되면 n_action_steps=1 강제 + ACTTemporalEnsembler 수동 생성
+    # (roi_inference.py 와 동일). 액션을 시간평균(지수가중)해서 떨림 줄임 — 0.01=강한 smoothing.
+    tec = extra.get("temporal_ensemble_coeff")
+    if tec is not None:
+        from lerobot.policies.act.modeling_act import ACTTemporalEnsembler
+        policy.config.temporal_ensemble_coeff = float(tec)
+        policy.config.n_action_steps = 1   # temporal ensemble 은 매 step 추론 필수
+        policy.temporal_ensembler = ACTTemporalEnsembler(
+            float(tec), policy.config.chunk_size,
+        )
+        policy.reset()
+        n_action_steps = 1
+        logger.info("temporal_ensemble_coeff=%.3f 활성 → n_action_steps=1 강제, chunk_size=%d",
+                    float(tec), policy.config.chunk_size)
+    else:
+        # closed-loop 재추론 주기. game.yaml n_action_steps (없으면 모델 chunk_size).
+        n_action_steps = int(extra.get("n_action_steps") or policy.config.n_action_steps)
+        policy.config.n_action_steps = n_action_steps
     preprocessor, postprocessor = make_pre_post_processors(
         policy_cfg=policy.config,
         pretrained_path=str(repo_id),
@@ -304,8 +490,9 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
         if masker is not None:
             remapped = masker.mask_images(remapped, task)
             provider.last_detected = masker.last_detected  # runner 가 missing 판단에 사용.
-        # 2.5) UI 미리보기 — 모델이 실제 보는 ROI masked 프레임을 5fps 로 저장.
-        _save_preview(remapped)
+            provider.last_masked = remapped  # rerun 로깅용 (loop 에서 _rr_log 가 읽음).
+        # UI 미리보기는 끔 — 우리 StorePlay UI 가 안 씀, cv2.imwrite IO blocking spike 회피.
+        # 함수 정의는 유지 — 다른 팀원이 dev /preview/{cam} 쓰면 호출 재추가하면 됨.
         observation: dict[str, Any] = {
             "observation.state": np.asarray(state, dtype=np.float32),
         }
@@ -325,10 +512,25 @@ def _make_act_local_provider(config: GameConfig) -> ChunkProvider:
         )
         return [action.detach().cpu().numpy().reshape(-1).tolist()]
 
+    def detect(images: dict[str, np.ndarray], task: str) -> set:
+        """게이트용 — ROI mask 만 돌려 YOLO 검출 class 갱신 (ACT 미실행, 가벼움).
+        검출된 class 집합 반환. last_masked 도 갱신(rerun 로깅용)."""
+        if masker is None:
+            return set()
+        remapped = {
+            image_key_map.get(hw_key, hw_key): images[hw_key] for hw_key in CAMERA_KEYS
+        }
+        remapped = masker.mask_images(remapped, task)
+        provider.last_detected = masker.last_detected
+        provider.last_masked = remapped
+        return masker.last_detected
+
     # _run_one_task 가 task 시작 시 호출 — PROMPT 마다 무조건 reset (동일 prompt 연속도 포함).
+    provider.detect = detect  # type: ignore[attr-defined]  # 게이트 검출용 (ACT 미실행)
     provider.reset = _reset  # type: ignore[attr-defined]
     # runner 가 missing(target/plate 미검출) 판단에 읽음. masker 있을 때만 갱신.
     provider.last_detected = set()  # type: ignore[attr-defined]
+    provider.last_masked = {}  # type: ignore[attr-defined]  # rerun 로깅용 직전 masked 프레임
     provider.roi_active = masker is not None  # type: ignore[attr-defined]
     return provider
 
@@ -344,6 +546,7 @@ def _run_one_task(
     episode_s: int,
     home: dict[str, float] | None = None,
     bell: dict | None = None,
+    gate: dict | None = None,
 ) -> None:
     """단일 task — obs → provider → action 루프.
 
@@ -378,6 +581,14 @@ def _run_one_task(
     cam_fail = 0
     CAM_FAIL_ABORT = fps * 3
 
+    # ── 추론 루프 timing stats (1초마다 집계 → 로그) ──
+    # loop_dt = obs+provider+send_action 한 사이클 시간. 30Hz 면 target dt=33.3ms.
+    # over_budget = 33.3ms 초과 frame 수. fps_actual = 실제 처리율 (sleep 포함 평균).
+    loop_max_ms = 0.0
+    loop_sum_s = 0.0
+    over_budget = 0
+    last_inf_ms = 0.0  # 마지막 provider 시간 (chunk 사이엔 같은 값 유지)
+
     # 벨 누름 감지 — bell_pose 근접 시 EVENT bell_rung (task 당 1회) → UI "주문 나왔습니다".
     b = bell or {}
     bell_enabled = bool(b.get("enabled", False))
@@ -388,19 +599,72 @@ def _run_one_task(
     bell_thresh = float(b.get("thresh", 14.0))
     bell_rung = False
 
-    # 객체없음 감지 — serve 첫 1초간 target(과일)/plate 한 번도 검출 안 되면 EVENT missing.
-    # ACT + roi 일 때만 (provider.roi_active). "멘트만, serve 는 계속" 정책.
+    # target(과일) class — 서빙 시작 게이트가 접시와 함께 검출 확인에 사용. ACT+roi 일 때만.
     from noriarm_framework.games.store_play.roi_masker import prompt_to_target
     roi_active = bool(getattr(provider, "roi_active", False))
     target_cls = prompt_to_target(task) if roi_active else None
-    detected_acc: set[str] = set()
-    missing_checked = False
-    MISSING_CHECK_FRAME = 30  # 1초 @30fps 누적 후 판정.
 
     # task 시작 시 정책 reset — 이전 episode 의 stale action queue 제거 (closed-loop 정합).
     reset_fn = getattr(provider, "reset", None)
     if callable(reset_fn):
         reset_fn()
+
+    # ── 서빙 시작 게이트 (start-only) — 접시+target 둘 다 검출될 때까지 robot 정지(hold) ──
+    # 사용자 요청: 접시/객체 안 보이면 "보일 때까지 강제로 못 움직이게". roi_active + target +
+    # gate.enabled 일 때만. 게이트 중엔 send_action 안 함 → torque on 으로 home 유지. 검출되면
+    # EVENT gate_ready 로 UI 배너 해제 후 서빙 루프 진입. 서빙 중 occlusion 은 게이트 안 함.
+    detect_fn = getattr(provider, "detect", None)
+    if roi_active and target_cls and gate and gate.get("enabled", True) and callable(detect_fn):
+        gate_stable = int(gate.get("stable_frames", 5))
+        ready_count = 0
+        last_missing: list | None = None
+        gate_aborted = False
+        gi = 0
+        while gi < n_frames:  # 안전 cap = episode_s. 평소엔 검출되면 즉시 통과.
+            if _SHUTDOWN.is_set() or _ABORT_TASK.is_set():
+                logger.info("gate 중 중단 신호 — 탈출")
+                gate_aborted = True
+                break
+            t0 = time.perf_counter()
+            try:
+                obs = _fast_get_observation(robot)
+            except Exception as e:
+                cam_fail += 1
+                logger.warning("gate get_observation 실패 (연속 %d): %s", cam_fail, e)
+                if cam_fail >= CAM_FAIL_ABORT:
+                    logger.error("gate: 카메라 연속 끊김 — task 종료")
+                    gate_aborted = True
+                    break
+                time.sleep(dt)
+                continue
+            cam_fail = 0
+            images = {k: obs[k] for k in CAMERA_KEYS}
+            detected = detect_fn(images, task)
+            missing = [c for c in (target_cls, "plate") if c not in detected]
+            _rr_log(gi, getattr(provider, "last_masked", {}), _obs_to_state_vec(obs),
+                    "GATE 대기" if missing else "GATE 통과", detected)
+            if not missing:
+                ready_count += 1
+                if ready_count >= gate_stable:
+                    logger.info("gate 통과 — 접시+%s 검출 → 서빙 시작", target_cls)
+                    print(f'EVENT {json.dumps({"type": "gate_ready"})}', flush=True)
+                    break
+            else:
+                ready_count = 0
+                if missing != last_missing:  # 변할 때만 emit (throttle)
+                    last_missing = missing
+                    logger.info("gate 대기 — 미검출: %s", missing)
+                    print(f'EVENT {json.dumps({"type": "gate_waiting", "missing": missing})}', flush=True)
+            gi += 1
+            loop_dt = time.perf_counter() - t0
+            if loop_dt < dt:
+                time.sleep(dt - loop_dt)
+        if gate_aborted:
+            return
+        if gi >= n_frames:
+            logger.warning("gate timeout (%ds) — 접시/target 끝내 미검출, task 종료", episode_s)
+            print(f'EVENT {json.dumps({"type": "gate_timeout"})}', flush=True)
+            return
 
     for i in range(n_frames):
         if _SHUTDOWN.is_set() or _ABORT_TASK.is_set():
@@ -408,7 +672,7 @@ def _run_one_task(
             break
         t0 = time.perf_counter()
         try:
-            obs = robot.get_observation()
+            obs = _fast_get_observation(robot)
         except Exception as e:
             cam_fail += 1
             logger.warning("get_observation 실패 (frame %d, 연속 %d): %s — frame skip",
@@ -469,21 +733,15 @@ def _run_one_task(
                 time.sleep(0.2)
                 continue
             queue.extend(chunk)
+            last_inf_ms = inf_ms
             # ACT closed-loop 는 매 frame 1개 반환 → 로그 1초마다. SmolVLA chunk(>1) 는 매번.
             if len(chunk) > 1 or i % fps == 0:
                 logger.info("frame %d: +%d action, provider=%.0fms", i, len(chunk), inf_ms)
 
-        # ── 객체없음 감지 (serve 첫 1초 누적 후 1회 판정, 멘트만) ──
-        if roi_active and not missing_checked:
-            detected_acc |= getattr(provider, "last_detected", set())
-            if i >= MISSING_CHECK_FRAME:
-                missing_checked = True
-                if target_cls and target_cls not in detected_acc:
-                    logger.info("객체없음: target %s 미검출", target_cls)
-                    print(f'EVENT {json.dumps({"type": "missing", "what": target_cls})}', flush=True)
-                if "plate" not in detected_acc:
-                    logger.info("객체없음: plate 미검출")
-                    print(f'EVENT {json.dumps({"type": "missing", "what": "plate"})}', flush=True)
+        # rerun 로깅 — 모델이 보는 ROI masked 프레임 + 관절상태 + 검출 class (UI 카메라 대체).
+        # 객체없음은 이제 서빙 시작 게이트가 담당 (서빙 중엔 occlusion 무시).
+        _rr_log(i, getattr(provider, "last_masked", {}), state_vec, "서빙중",
+                getattr(provider, "last_detected", set()))
 
         action_vec = queue.popleft()
         try:
@@ -493,6 +751,23 @@ def _run_one_task(
             break
 
         loop_dt = time.perf_counter() - t0
+        # stats 집계: 매 frame loop_dt 적산 → 1초마다 (i % fps == 0) 한 줄 로그.
+        loop_dt_ms = loop_dt * 1e3
+        if loop_dt_ms > loop_max_ms:
+            loop_max_ms = loop_dt_ms
+        loop_sum_s += loop_dt
+        if loop_dt > dt:
+            over_budget += 1
+        if i > 0 and i % fps == 0:
+            actual_fps = fps / max(0.001, loop_sum_s)
+            logger.info(
+                "stats: provider=%.0fms loop avg=%.0fms max=%.0fms over_budget=%d/%d fps≈%.1f/%d",
+                last_inf_ms, loop_sum_s * 1e3 / fps, loop_max_ms,
+                over_budget, fps, actual_fps, fps,
+            )
+            loop_max_ms = 0.0
+            loop_sum_s = 0.0
+            over_budget = 0
         if loop_dt < dt:
             time.sleep(dt - loop_dt)
 
@@ -566,25 +841,84 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     config = load_store_play_config()
+    _wake_cfg = config.policy.extra.get("wake_motion") or {}
 
-    # 1) chunk provider 빌드 (모델 로드 / health probe 포함 — 시간 걸리는 단계, 1회만).
+    # 1) 양팔 먼저 연결 (빠름). wake 모션은 팔만 있으면 되므로 여기서 바로 시작 가능 —
+    #    카메라(warmup 4.5s) + 모델 로드는 wake 가 도는 동안 뒤에서 진행. → UI "깨어나고 있어"
+    #    뜨자마자(팔 연결 ~1s 후) 로봇이 움직이기 시작 (이전엔 카메라 connect 까지 ~5s 기다렸음).
+    logger.info("양팔 연결 중...")
+    robot = _build_robot()
+    try:
+        robot.left_arm.connect(True)
+        robot.right_arm.connect(True)
+    except Exception as e:
+        print(f"[runner_entry] 양팔 connect 실패: {e}", flush=True)
+        return 4
+    logger.info("양팔 연결됨 — wake 모션 시작")
+
+    # signal handlers — 팔 연결 직후 (부팅 중 SIGTERM/SIGINT → _SHUTDOWN → wake 즉시 정지 +
+    # 체크포인트에서 disconnect). 부팅 중에도 모터가 살아 움직이므로 kill 시 정지/torque OFF 필요.
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+    signal.signal(signal.SIGINT, _handle_sigterm)
+    signal.signal(signal.SIGUSR1, _handle_sigusr1)
+
+    # 2) wake 모션 즉시 시작 — 팔만으로 (카메라 미연결, _arm_state_vec 로 pose 읽음).
+    import threading
+    _wake_stop = threading.Event()
+    _wake_thread = None
+    _wake_traj, _wake_fps = _load_wake_traj(_wake_cfg)
+    if _wake_traj is not None:
+        _wake_thread = threading.Thread(
+            target=_play_wake_motion, args=(robot, _wake_traj, _wake_fps, _wake_stop),
+            daemon=True)
+        _wake_thread.start()
+        logger.info("wake 모션 재생 시작 (%d frame @%dHz)", len(_wake_traj), _wake_fps)
+
+    def _boot_cleanup() -> None:
+        _wake_stop.set()
+        if _wake_thread is not None:
+            _wake_thread.join(timeout=2.0)
+        try:
+            robot.disconnect()
+        except Exception:
+            pass
+
+    # 3) 카메라 연결 (wake 재생되는 동안 — wake 는 팔 bus 만 쓰고 카메라 접근 안 함).
+    try:
+        for cam in robot.cameras.values():
+            cam.connect()
+    except Exception as e:
+        _boot_cleanup()
+        print(f"[runner_entry] 카메라 connect 실패: {e}", flush=True)
+        return 4
+    logger.info("카메라 3대 연결됨")
+
+    # 4) chunk provider 빌드 (모델 로드 — wake 모션과 병렬). 모터 serial 은 wake 스레드만 접근.
     try:
         provider = _build_chunk_provider(config)
     except Exception as e:
+        _boot_cleanup()
         print(f"[runner_entry] chunk_provider 빌드 실패: {e}", flush=True)
         return 3
 
-    # 2) 로봇 연결 (1회만 — 양팔 + 카메라 3대).
-    logger.info("BiOmxFollower 연결 중...")
-    robot = _build_robot()
-    try:
-        robot.connect()
-    except Exception as e:
-        print(f"[runner_entry] robot.connect 실패: {e}", flush=True)
-        return 4
-    logger.info("BiOmxFollower 연결됨 (12 motors + 3 cameras)")
+    # 4) 추론 준비 완료 → wake 모션 정지 + 홈 포지션으로 부드럽게 이동.
+    if _wake_thread is not None:
+        _wake_stop.set()
+        _wake_thread.join(timeout=2.0)
+    # 부팅 중 SIGTERM/SIGINT 받았으면 (wake 는 이미 멈춤) READY 안 보내고 정리 후 종료.
+    if _SHUTDOWN.is_set():
+        logger.info("부팅 중 종료 신호 — disconnect 후 종료")
+        try:
+            robot.disconnect()
+        except Exception:
+            pass
+        print("EXIT", flush=True)
+        return 0
+    if _wake_cfg.get("enabled") and _wake_cfg.get("home_pose"):
+        _move_to_home(robot, np.asarray(_wake_cfg["home_pose"], dtype=np.float32),
+                      fps=_wake_fps, move_s=float(_wake_cfg.get("home_move_s", 2.0)))
 
-    # 3) READY → Control Server 가 START 보냄 (초기 핸드셰이크 1회).
+    # 5) READY → Control Server 가 START 보냄 (초기 핸드셰이크 1회).
     print("READY", flush=True)
     line = sys.stdin.readline()
     if not line or line.strip() != "START":
@@ -595,20 +929,24 @@ def main(argv: list[str] | None = None) -> int:
             pass
         return 2
 
-    # 4) signal handlers — START 직후 부착 (그 전엔 default 동작).
-    signal.signal(signal.SIGTERM, _handle_sigterm)
-    signal.signal(signal.SIGINT, _handle_sigterm)
-    signal.signal(signal.SIGUSR1, _handle_sigusr1)
+    # (signal handlers 는 connect 직후 부착됨 — 부팅 윈도우 보호)
 
     # fps / episode_s — CLI 명시값 우선, 없으면 game.yaml runtime (단일 진실원).
     _fps = args.fps if args.fps is not None else int(config.runtime.rate_hz)
     _episode_s = args.episode_s if args.episode_s is not None else int(config.runtime.episode_timeout_s)
 
-    # 홈 복귀 / 벨 감지 설정 (game.yaml policy.*) — 매 task 에 전달.
+    # rerun 네이티브 뷰어 — game.yaml rerun.enabled 일 때만 spawn. 기본 OFF: 뷰어가 CPU/RAM
+    # 을 크게 잡아먹어 추론·wake 재생을 느리게 만들어서. 시각화 필요할 때만 켤 것.
+    if (config.policy.extra.get("rerun") or {}).get("enabled"):
+        _rr_init()
+
+    # 홈 복귀 / 벨 / 서빙 게이트 설정 (game.yaml policy.*) — 매 task 에 전달.
     _home_cfg = config.policy.extra.get("home_detect") or {}
     _bell_cfg = config.policy.extra.get("bell_detect") or {}
-    logger.info("idle — PROMPT 대기 (kind=%s, fps=%d, episode_s=%d, home=%s, bell=%s)",
-                config.policy.kind, _fps, _episode_s, bool(_home_cfg), bool(_bell_cfg.get("enabled")))
+    _gate_cfg = config.policy.extra.get("serve_gate") or {}
+    logger.info("idle — PROMPT 대기 (kind=%s, fps=%d, episode_s=%d, home=%s, bell=%s, gate=%s)",
+                config.policy.kind, _fps, _episode_s, bool(_home_cfg),
+                bool(_bell_cfg.get("enabled")), bool(_gate_cfg.get("enabled")))
 
     # 5) 명령 loop — PROMPT 받을 때마다 task 1회 실행.
     try:
@@ -634,7 +972,7 @@ def main(argv: list[str] | None = None) -> int:
                 _run_one_task(
                     robot, provider, task,
                     fps=_fps, episode_s=_episode_s,
-                    home=_home_cfg, bell=_bell_cfg,
+                    home=_home_cfg, bell=_bell_cfg, gate=_gate_cfg,
                 )
                 logger.info("task 종료: %r (%.1fs)", task, time.perf_counter() - t0)
                 print("TASK_DONE", flush=True)
