@@ -130,5 +130,6 @@ export function useMugunghwaPerception(handlers: PerceptionHandlers) {
     observeStart: () => send({ type: 'observe_start' }),
     observeStop: () => send({ type: 'observe_stop' }),
     reset: () => send({ type: 'reset' }),
+    idle: () => send({ type: 'idle' }),
   };
 }

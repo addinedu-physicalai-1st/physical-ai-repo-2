@@ -6,6 +6,8 @@ mugunghwa_perception_node 가 import 한다. rclpy / cv2 / ultralytics 를 impor
 """
 from __future__ import annotations
 
+import numpy as np
+
 Bbox = tuple[float, float, float, float]  # x1, y1, x2, y2
 
 
@@ -84,34 +86,84 @@ def max_displacement(tracks: list[dict], baseline: dict[int, tuple[float, float]
     return best
 
 
+# ---- SAD(프레임 차분) 기반 모션 ----------------------------------------------
+# centroid 변위는 사람 bbox 중심만 봐서 "팔만 흔들기"(몸 정지) 같은 국소 동작·정면 접근을
+# 못 잡는다. 원래 브라우저(SAD) 처럼 bbox 영역의 프레임 간 픽셀 변화를 직접 본다.
+
+def bbox_motion(
+    prev_gray: np.ndarray,
+    cur_gray: np.ndarray,
+    bbox: Bbox,
+    *,
+    delta: int = 25,
+    ignore_mask: np.ndarray | None = None,
+) -> float:
+    """bbox 영역에서 |cur-prev| > delta 인 픽셀 비율(0..1).
+
+    평균차 대신 변화-픽셀 비율 — 팔 흔들기처럼 국소적으로만 변해도 민감하게 잡는다.
+    ignore_mask(전체 프레임 bool, True=제외)가 주어지면 그 픽셀(로봇 자기 팔 등)은
+    분자·분모 모두에서 빠진다 → 떼기 모션으로 팔이 움직여도 거짓 탈락 안 남.
+    prev/cur 해상도가 다르거나 bbox(유효 픽셀)가 비면 0.
+    """
+    if prev_gray.shape != cur_gray.shape:
+        return 0.0
+    h, w = cur_gray.shape
+    x1 = max(0, int(bbox[0]))
+    y1 = max(0, int(bbox[1]))
+    x2 = min(w, int(bbox[2]))
+    y2 = min(h, int(bbox[3]))
+    if x2 <= x1 or y2 <= y1:
+        return 0.0
+    a = cur_gray[y1:y2, x1:x2].astype(np.int16)
+    b = prev_gray[y1:y2, x1:x2].astype(np.int16)
+    changed = np.abs(a - b) > delta
+    if ignore_mask is not None and ignore_mask.shape == cur_gray.shape:
+        keep = ~ignore_mask[y1:y2, x1:x2]
+        changed &= keep
+        denom = int(keep.sum())
+        return float(changed.sum()) / denom if denom > 0 else 0.0
+    return float(changed.mean())
+
+
+def select_movers_sad(
+    motion_by_tid: dict[int, float],
+    bindings: dict[int, int],
+    strict: float,
+) -> list[int]:
+    """SAD 모션이 strict 이상인 bound track 전원 탈락.
+
+    바인딩(track_id→child_id)된 track 만 후보. **loose 단일-최대 fallback 없음** — 탈락은
+    오직 strict 로만 판정(이게 없으면 loose 가 실질 임계가 돼 strict 튜닝이 무력화됨). loose
+    는 미식별 motion flash 전용(노드가 max_motion 으로 따로 비교).
+    """
+    return list(dict.fromkeys(
+        bindings[tid] for tid, m in motion_by_tid.items()
+        if tid in bindings and m >= strict
+    ))
+
+
+def max_motion(motion_by_tid: dict[int, float]) -> float:
+    """전체 track 중 최대 SAD 모션 — 미식별 motion flash 판정용."""
+    return max(motion_by_tid.values(), default=0.0)
+
+
 def select_movers(
     tracks: list[dict],
     baseline: dict[int, tuple[float, float]],
     bindings: dict[int, int],
     strict_px: float,
-    loose_px: float,
 ) -> list[int]:
-    """관찰 중 baseline 대비 변위로 탈락 child_id 선정.
+    """baseline 대비 centroid 변위가 strict_px 이상인 bound track 전원 탈락.
 
-    strict_px 이상 변위 track 전원 탈락. 없으면 loose_px 이상 중 최대 변위 1명.
-    바인딩(track_id→child_id) + baseline 둘 다 있는 track 만 후보.
-    반환: child_id 리스트 (중복 제거).
+    바인딩 + baseline 둘 다 있는 track 만 후보. **loose 단일-최대 fallback 없음** — 탈락은
+    strict_px 로만. 반환: child_id 리스트(중복 제거).
     """
-    cand: list[tuple[int, float]] = []
+    out: list[int] = []
     for t in tracks:
         tid = t["track_id"]
         if tid not in bindings:
             continue
         d = _displacement(t, baseline)
-        if d is None:
-            continue
-        cand.append((bindings[tid], d))
-    if not cand:
-        return []
-    strict = [cid for cid, d in cand if d >= strict_px]
-    if strict:
-        return list(dict.fromkeys(strict))
-    max_d = max(d for _cid, d in cand)
-    if max_d >= loose_px:
-        return list(dict.fromkeys([cid for cid, d in cand if d == max_d]))
-    return []
+        if d is not None and d >= strict_px:
+            out.append(bindings[tid])
+    return list(dict.fromkeys(out))

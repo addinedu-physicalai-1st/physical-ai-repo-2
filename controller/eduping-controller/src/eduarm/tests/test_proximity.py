@@ -49,6 +49,21 @@ def test_person_distance_median_rejects_minority_near_arm():
     assert person_distance_mm(d, bbox, percentile=50) >= 1000  # median 은 사람
 
 
+def test_person_distance_self_floor_excludes_arm():
+    # 팔(250mm)이 bbox 의 60% 를 덮어 median 도 오염되는 경우 — self_floor 로 팔 제외.
+    d = _depth(shape=(100, 100), fill=1200)
+    d[:, :60] = 250  # 60% = 로봇 팔(아주 가까움)
+    bbox = (0, 0, 100, 100)
+    assert person_distance_mm(d, bbox, percentile=50) < 600          # 팔이 과반 → median 오염
+    assert person_distance_mm(d, bbox, percentile=50, self_floor_mm=400) >= 1000  # 팔 제외 → 사람
+
+
+def test_person_distance_self_floor_none_when_person_fully_occluded():
+    # bbox 가 전부 팔(300mm) — self_floor 후 남는 픽셀 없음 → 측정 불가(None), 도달 아님.
+    d = _depth(shape=(100, 100), fill=300)
+    assert person_distance_mm(d, (0, 0, 100, 100), self_floor_mm=400) is None
+
+
 def test_no_persons_not_blocked():
     assert decide_block([], prev_blocked=False) is False
 

@@ -504,13 +504,16 @@ function restartGame(): void {
     p.reached = false;
     p.place = null;
   }
+  perception.reset();  // 노드 bindings 초기화 — 새 게임에서 다시 바인딩 (end 에서 idle 였음)
   setStage('entry');
 }
 
-// 모든 등록된 친구가 도착 OR 탈락 → 자동으로 종료 단계로. entry/ready 에서는 발동 안 함.
-watch([aliveCount, registeredCount], ([alive, reg]) => {
+// 게임 종료 조건: (1) 1명이라도 도달 → onPhysicalReach 가 setStage('end'). (2) 전원 탈락
+// (등록자 전원 eliminated) → 아래 watcher. 부분 탈락(일부만)으론 안 끝남 — 나머지는 계속.
+// (이전엔 alive===0 으로 "도달자 포함" 이라, 등록자가 적으면 한 명 탈락에 끝나버렸음.)
+watch([eliminatedCount, registeredCount], ([elim, reg]) => {
   if (
-    reg > 0 && alive === 0
+    reg > 0 && elim === reg
     && stage.value !== 'end'
     && stage.value !== 'entry'
     && stage.value !== 'ready'
@@ -591,30 +594,22 @@ const perception = useMugunghwaPerception({
   onReached: (childId) => { onPhysicalReach(childId); },
 });
 
-// 근접 도달 — perception 노드가 사람이 0.6m 이내(디바운스됨)로 다가오면 보내는 신호.
-// 게임 진행 중(song/observation/eliminationWait)일 때만 "로봇 도달"로 인정 → 도달한 아이
-// (바인딩됐으면)를 골인 처리하고 게임 종료. ready/entry/end 단계의 신호는 무시.
+// 근접 도달 — perception 노드가 사람이 1m 이내(디바운스됨)로 다가오면 보내는 신호.
+// **노래(song) 단계에서만** "로봇 도달=승리"로 인정. 관찰(freeze) 중엔 움직여서 다가가면
+// 그건 도달이 아니라 탈락이어야 하므로 도달 신호를 무시한다. ready/entry/observation/end 무시.
 function onPhysicalReach(childId: number | null): void {
-  if (
-    stage.value !== 'song'
-    && stage.value !== 'observation'
-    && stage.value !== 'eliminationWait'
-  ) return;
-  let name: string | null = null;
-  if (childId != null) {
-    const p = participants.value.find((x) => x.id === childId);
-    if (p && p.registered && !p.eliminated) {
-      name = p.name;
-      if (!p.reached) {
-        p.reached = true;
-        const maxPlace = participants.value.reduce((m, x) => Math.max(m, x.place ?? 0), 0);
-        p.place = maxPlace + 1;
-      }
-    }
-  }
+  if (stage.value !== 'song') return;
+  // 무궁화 규칙: 1명이라도 로봇에 도달하면 잡히지 않은 생존자 전원 승리. 도달한 아이를
+  // 1등으로, 나머지 생존자도 순서대로 승자 처리. (탈락자는 그대로 패.)
+  const survivors = participants.value.filter((p) => p.registered && !p.eliminated);
+  const reacher = childId != null ? survivors.find((p) => p.id === childId) : undefined;
+  const ordered = reacher ? [reacher, ...survivors.filter((p) => p !== reacher)] : survivors;
+  ordered.forEach((p, i) => { p.reached = true; p.place = i + 1; });
+  const name = reacher?.name ?? null;
   playTouchdownSound();
-  pushToast(name ? `${name} 로봇 도착! 게임 끝!` : '로봇 도착! 게임 끝!');
-  void tts.speak(name ? `${name} 도착! 게임 끝!` : '로봇에 도착했어요! 게임 끝!').catch(() => { /* noop */ });
+  pushToast(name ? `${name} 로봇 도착! 생존자 전원 승리!` : '로봇 도착! 생존자 전원 승리!');
+  void tts.speak(name ? `${name} 도착! 생존자 전원 승리!` : '로봇에 도착했어요! 생존자 전원 승리!')
+    .catch(() => { /* noop */ });
   setStage('end');
 }
 
@@ -628,8 +623,9 @@ watch(stage, (s, prev) => {
   if (s === 'observation') perception.observeStart();
   else if (prev === 'observation') perception.observeStop();
   if (s === 'end') {
-    perception.reset();
-    void returnArmHome();  // 종료 화면 — 실물 팔 부드럽게 제자리 복귀
+    // 놀이 끝 — perception 노드 idle 로(YOLO/recognize·attendance POST 정지). 팔 복귀는
+    // 모드 이탈(onUnmounted)에서 하므로 여기선 안 함. bindings reset 은 다시하기(restart)에서.
+    perception.idle();
   }
 });
 

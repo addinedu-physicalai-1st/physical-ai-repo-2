@@ -796,7 +796,11 @@ class EdupingRosBridge:
             sample_hz=50,
             joint_names=joint_names,
         )
-        ramp_s = 0.0  # 첫 keyframe 이 이미 현재 pose
+        # 첫 keyframe 은 현재 pose 지만, 진행 중 모션(예: 무궁화 떼기)을 preempt 하며 호출되면
+        # 팔이 "움직이는" 상태다. ramp_s=0(첫 point t=0, v=0)이면 속도가 즉시 0 으로 꺾여 덜컹.
+        # 작은 ramp 로 첫 point 를 미뤄 JTC 가 현재 속도에서 부드럽게 감속하게 한다(정지
+        # 상태에서 호출돼도 무해 — 시작이 약간 부드러워질 뿐).
+        ramp_s = PLAYBACK_RAMP_MIN_S
 
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
