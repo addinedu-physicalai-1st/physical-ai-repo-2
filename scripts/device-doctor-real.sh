@@ -49,6 +49,14 @@ build_rviz_cmd() {
   echo "source $ROOT/install/setup.bash && \
         exec ros2 launch eduarm doctor_rviz.launch.py"
 }
+build_stetho_cmd() {
+  # 청진기 압전(FSR) 브리지 — Arduino(/dev/ttyACM0) → /eduping/stethoscope/fsr_raw.
+  # ros/rviz 와 독립. 하드웨어 없이 doctor UI 검증: STETHO_FAKE=1 → 합성 sine 값 publish.
+  local fake="false"
+  case "${STETHO_FAKE:-}" in 1|true|yes|on) fake="true" ;; esac
+  echo "source $ROOT/install/setup.bash && \
+        exec ros2 launch eduping_stethoscope stethoscope.launch.py fake:=$fake"
+}
 
 start_bg() {
   local rviz_flag="$1"
@@ -56,6 +64,11 @@ start_bg() {
   echo "[ros] starting → $logf"
   setsid bash -c "$(build_ros_cmd) >\"$logf\" 2>&1" &
   echo $! >"$PID_DIR/ros.pid"
+  # 청진기 FSR 브리지 — ros 와 독립 (Arduino 미연결/오류와 무관).
+  local stethof="$PID_DIR/stetho.log"
+  echo "[stetho] starting → $stethof"
+  setsid bash -c "$(build_stetho_cmd) >\"$stethof\" 2>&1" &
+  echo $! >"$PID_DIR/stetho.pid"
   if [ "$rviz_flag" = "true" ]; then
     local rvizf="$PID_DIR/rviz.log"
     echo "[rviz] starting → $rvizf"
@@ -76,9 +89,14 @@ start_tmux() {
   fi
   echo "[tmux] starting session '$TMUX_SESSION' (자동 attach — Ctrl+B D 로 detach)"
   # ROS setup.bash 는 BASH_SOURCE 가 필요 → bash 로 명시적 실행.
-  # window 'ros' = move_group + D435 + JTC + leader_passthrough.
+  # window 'ros'  = move_group + D435 + JTC + leader_passthrough (위 pane)
+  #                 + 청진기 FSR 브리지 (하단 작은 pane — 같은 윈도, 별도 윈도 X).
   # window 'rviz' = RViz 만 (분리 — 따로 죽이거나 재시작 가능).
   tmux new-session -d -s "$TMUX_SESSION" -n ros bash -c "$(build_ros_cmd)"
+  # 청진기 FSR 브리지를 'ros' 윈도 하단 pane 으로 합침. 노드는 serial 실패 시 2s 재시도라
+  # Arduino 미연결이어도 pane 이 닫히지 않음.
+  tmux split-window -v -l 8 -t "$TMUX_SESSION:ros" bash -c "$(build_stetho_cmd)"
+  tmux select-pane -t "$TMUX_SESSION:ros.0"
   if [ "$rviz_flag" = "true" ]; then
     tmux new-window -t "$TMUX_SESSION" -n rviz bash -c "$(build_rviz_cmd)"
   fi
@@ -133,6 +151,9 @@ stop_all() {
   echo "[cleanup] forcing kill of any leftover ROS nodes from doctor_teleop"
   pkill -KILL -f "ros2 launch eduarm doctor_teleop" 2>/dev/null || true
   pkill -KILL -f "doctor_teleop.launch.py"          2>/dev/null || true
+  pkill -KILL -f "ros2 launch eduping_stethoscope"  2>/dev/null || true
+  pkill -KILL -f "stethoscope.launch.py"            2>/dev/null || true
+  pkill -KILL -f "fsr_bridge_node"                  2>/dev/null || true
   pkill -KILL -f "ros2_control_node"                 2>/dev/null || true
   pkill -KILL -f "lib/moveit_ros_move_group/move_group" 2>/dev/null || true
   pkill -KILL -f "lib/moveit_servo/servo_node"       2>/dev/null || true
