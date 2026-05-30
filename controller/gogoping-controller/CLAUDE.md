@@ -28,7 +28,7 @@ ROS 서비스 / 메시지 계약은 `src/gogoping/gogoping_msgs/{srv,msg,action}
 
 - **폴더 구조** — `src/gogoping/` 하위 패키지 추가/삭제/이름변경, `gogoping_modes/gogoping_modes/{fsm,bt,interfaces,utils}` 의 하위 구조 변경
 - **FSM state** — 10 states (IDLE / CHARGING / GOTO / FOLLOW / LULLABY / HIDEANDSEEK / MANUAL / RETURNING / LOW_BATTERY_RETURNING / ERROR) 추가/삭제/이름변경, transition 규칙 변경
-- **BT 구조** — MainTree 10개 / SubTree 5개 의 구성 변경, behavior 카테고리 (common / navigation / perception / follow / manual / recovery) 추가/삭제
+- **BT 구조** — MainTree 10개 / SubTree 5개 의 구성 변경, behavior 카테고리 (common / navigation / perception / follow / manual / recovery / hide_and_seek / lullaby / patrol) 추가/삭제. 모드 전용 leaf 는 해당 모드 폴더(hide_and_seek/lullaby/patrol), 횡단 leaf 만 common/.
 
 위 세 가지는 6명 코드베이스의 뼈대다. 한 명이 조용히 바꾸면 다른 사람 코드가 다 깨진다. 작은 추가 (behavior 한 개 추가, blackboard 키 한 개 추가 등) 는 사용자 확인 없이 진행해도 OK 지만 문서 (docs/blackboard-schema.md 등) 는 같이 갱신할 것.
 

@@ -22,6 +22,9 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | [behaviors/follow.md](behaviors/follow.md) | 카메라 pan + 추종 (face tracking, sweep, raise) |
 | [behaviors/manual.md](behaviors/manual.md) | 수동 모드 (ManualTorqueHold — torque ON/OFF) |
 | [behaviors/recovery.md](behaviors/recovery.md) | 안전 정지 + alert + log (BT_error_main 전용) |
+| [behaviors/hide_and_seek.md](behaviors/hide_and_seek.md) | HIDEANDSEEK 전용 — recruit/countdown/phase/destination/caught monitor |
+| [behaviors/lullaby.md](behaviors/lullaby.md) | LULLABY 전용 — lullaby_audio |
+| [behaviors/patrol.md](behaviors/patrol.md) | PATROL 전용 — select_vertex (+ set_patrol_index, 문서 미작성) |
 
 ## Trees
 

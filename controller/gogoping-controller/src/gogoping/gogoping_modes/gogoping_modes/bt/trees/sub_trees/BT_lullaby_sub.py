@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 
 import py_trees
 
-from ...behaviors.common.lullaby_audio import LullabyAudio
+from ...behaviors.lullaby.lullaby_audio import LullabyAudio
 
 if TYPE_CHECKING:
     from ....context import Context

@@ -131,28 +131,6 @@ Nav2 Collision Monitor 비정상 → `"fault"` trigger.
 
 도킹 접점 전류 흐름 감시. 끊김 시 fault.
 
-## select_vertex  *(구현됨)*
-
-고정된 vertex 이름을 `blackboard.target_vertex_name` 에 W 한 뒤 즉시 SUCCESS. NavigateToVertex 가 같은 키를 R 하므로 SubTree 빌드 시 vertex 마다 `SelectVertex → NavigateToVertex` Sequence 를 동적으로 생성하면 N 개 vertex 순회 가능.
-
-| 항목 | 값 |
-|---|---|
-| Blackboard | W: `target_vertex_name` (string literal, NavigateToVertex.DEFAULT_TARGET_KEY 와 일치) |
-| 인자 | `name`, `vertex_name`, `target_key="target_vertex_name"` |
-| Status | SUCCESS (즉시) |
-| terminate | no-op |
-| Used in | BT_patrol_sub — 각 `visit_<vertex>` Sequence 의 첫 자식. 추후 BT_hide_and_seek_sub 의 search 단계에서도 동일 패턴 가능. |
-| 파일 | [`bt/behaviors/common/select_vertex.py`](../../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/select_vertex.py) |
-| 테스트 | [tests/test_gogoping_select_vertex.py](../../../../../tests/test_gogoping_select_vertex.py) — 5 케이스 (SUCCESS / BB write / overwrite / multi-instance no conflict / custom_target_key) |
-
-```python
-visit_A = py_trees.composites.Sequence("visit_A", memory=True, children=[
-    SelectVertex("select_A", vertex_name="A"),
-    NavigateToVertex("nav_A"),
-    PanCameraSweep("sweep_A", ctx),
-])
-```
-
 ## ui_publish  *(구현됨)*
 
 범용 UI 알림 publish — `message: dict` 1회 publish 후 즉시 SUCCESS. `update()` 가
@@ -165,7 +143,7 @@ visit_A = py_trees.composites.Sequence("visit_A", memory=True, children=[
   UIPublish("AnnounceFound", ctx, message={"event": "announce", "text": "찾았다!"})
   UIPublish("StartCountdown", ctx, message={"event": "countdown_start", "seconds": 30})
   ```
-- 자장가 stop 같은 cleanup-시점 publish 는 ❌ — 그건 [`lullaby_audio`](#lullaby_audio) 처럼
+- 자장가 stop 같은 cleanup-시점 publish 는 ❌ — 그건 [`lullaby_audio`](lullaby.md#lullaby_audio) 처럼
   `terminate()` 책임을 가진 behavior 가 처리.
 - "1회" 는 단일 활성화당 1회 — Selector(memory=False) 재진입 시 다시 publish (의도된 동작).
 
@@ -174,95 +152,7 @@ visit_A = py_trees.composites.Sequence("visit_A", memory=True, children=[
 | Topic publish | `/gogoping/ui_event` (`std_msgs/String` JSON) — via `ctx.ui.publish_event()` |
 | Status | SUCCESS (즉시) |
 | terminate(INVALID) | no-op |
-| Used in | BT_lullaby_sub (간접 — LullabyAudio 사용), BT_goto_sub (AnnounceArrival). BT_hide_and_seek_sub 는 UIPublish 대신 [`countdown`](#countdown) + [`set_hideseek_phase`](#set_hideseek_phase) 조합으로 단계 알림 — robot-web 의 phase watcher 가 직접 챈트/타이머 처리 |
+| Used in | BT_lullaby_sub (간접 — LullabyAudio 사용), BT_goto_sub (AnnounceArrival). BT_hide_and_seek_sub 는 UIPublish 대신 [`countdown`](hide_and_seek.md#countdown) + [`set_hideseek_phase`](hide_and_seek.md#set_hideseek_phase) 조합으로 단계 알림 — robot-web 의 phase watcher 가 직접 챈트/타이머 처리 |
 | 파일 | [`bt/behaviors/common/ui_publish.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/ui_publish.py) |
 | 테스트 | 5 시나리오 (update=SUCCESS / publish_event 1회 호출 / initialise no-op / 임의 message dict 통과 / 재활성화 시 다시 publish) |
 
----
-
-## countdown  *(구현됨)*
-
-지정한 `seconds` 만큼 RUNNING 후 SUCCESS — 순수 시간 게이트.
-
-- `initialise()` 가 `time.monotonic()` 을 anchor 로 잡고, `update()` 마다 경과 시간 확인.
-- `terminate()` 가 anchor 를 `None` 으로 리셋 — interrupt 후 재진입 시 새 N 초 카운트 시작.
-- read/write 없음 (블랙보드 의존 X). UI 단계 알림 (countdown_start / 챈트) 은 [`set_hideseek_phase`](#set_hideseek_phase) 와 클라이언트 타이머 책임.
-
-| 항목 | 값 |
-|---|---|
-| 인자 | `name`, `seconds: float` |
-| Status | RUNNING → SUCCESS (elapsed ≥ seconds) |
-| terminate | anchor None 으로 리셋 |
-| Used in | BT_hide_and_seek_sub 의 countdown step (30초) |
-| 파일 | [`bt/behaviors/common/countdown.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/countdown.py) |
-| 테스트 | [tests/test_gogoping_countdown_behavior.py](../../../../../tests/test_gogoping_countdown_behavior.py) |
-
-## await_recruit_complete  *(구현됨)*
-
-`blackboard.HIDESEEK_REGISTERED_IDS` 가 빈 리스트가 아니면 SUCCESS, 아니면 RUNNING — control-service 의 모집 종료 API 게이트.
-
-- read: `Keys.HIDESEEK_REGISTERED_IDS`
-- 진입 흐름: UI 의 recruit phase "출발" 버튼 → POST `/api/gogoping/play/hideseek/recruit-complete {child_ids: [...]}` → ros_bridge 가 `HIDESEEK_REGISTERED_IDS = child_ids` 세팅 → 본 behaviour SUCCESS → Sequence 다음 ([`countdown`](#countdown)).
-- reconciler 가 HIDEANDSEEK 진입 시마다 본 키를 `[]` 로 reset — "다시 하기" 재진입 시 처음엔 RUNNING 으로 시작.
-
-| 항목 | 값 |
-|---|---|
-| 인자 | `name` |
-| Status | RUNNING (registered_ids 비어있음) / SUCCESS (1개 이상) |
-| Used in | BT_hide_and_seek_sub 의 recruit step |
-| 파일 | [`bt/behaviors/common/await_recruit_complete.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/await_recruit_complete.py) |
-| 테스트 | [tests/test_gogoping_await_recruit_complete.py](../../../../../tests/test_gogoping_await_recruit_complete.py) |
-
-## set_hideseek_phase  *(구현됨)*
-
-`blackboard.HIDESEEK_PHASE = phase` 문자열 셋 후 즉시 SUCCESS — UI 에 현재 숨바꼭질 단계 알림.
-
-- write: `Keys.HIDESEEK_PHASE`
-- snapshot 의 `hideseek_phase` 필드로 흘러나가 robot-web 의 `useHideseekPhaseStore` → `HideAndSeekGame.syncFromBtPhase` 로 전이.
-- phase 값: `"move_to_play"` / `"recruit"` / `"countdown"` / `"patrol"` / `"return"` / `"end"` / `""` (비활성).
-- BT_hide_and_seek_sub Sequence 의 각 step 진입 직전에 끼워 넣음. 같은 값 재셋팅은 무해.
-
-| 항목 | 값 |
-|---|---|
-| 인자 | `name`, `phase: str` |
-| Status | SUCCESS (즉시) |
-| Used in | BT_hide_and_seek_sub — 각 step 의 첫 자식 |
-| 파일 | [`bt/behaviors/common/set_hideseek_phase.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/set_hideseek_phase.py) |
-
-## set_destination_key  *(구현됨)*
-
-`blackboard.DESTINATION_KEY = key` 후 즉시 SUCCESS — `build_goto_subtree(ctx)` 가 인자를 안 받고 `Keys.DESTINATION_KEY` 만 R 하므로, hideseek 처럼 한 sequence 안에서 goto 를 여러 번 호출하려면 매 진입 시 destination 을 미리 셋팅한다.
-
-- write: `Keys.DESTINATION_KEY`
-- 블랙보드 키 자체는 GOTO state 의 reconciler 가 다른 흐름에서 W (state 동시 진입 불가라 충돌 없음). 본 behaviour 는 그 키를 다른 state 안에서도 셋팅하기 위한 helper.
-
-| 항목 | 값 |
-|---|---|
-| 인자 | `name`, `key: str` |
-| Status | SUCCESS (즉시) |
-| Used in | BT_hide_and_seek_sub — `play_area` / patrol_* 진입 직전 |
-| 파일 | [`bt/behaviors/common/set_destination_key.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/set_destination_key.py) |
-
----
-
-## lullaby_audio  *(구현됨)*
-
-자장가 SubTree 본체. `initialise()` 에 play publish, `update()` 영구 RUNNING, `terminate()`
-에 stop publish (idempotent).
-
-- read: 없음
-- write: 없음
-- mp3 재생 자체는 robot-web frontend 의 `<audio>` element 가 담당 (별도 PR) — BT 는
-  `/gogoping/ui_event` 에 이벤트만 publish.
-- `_stop_published` flag — `__init__` 초기값 `True` (cold terminate 시 publish 안 함).
-  `initialise()` 가 `False` 로 리셋 → play publish 된 lifetime 안에서만 stop publish 보장.
-
-| 항목 | 값 |
-|---|---|
-| Topic publish | `/gogoping/ui_event` (`std_msgs/String` JSON) — via `ctx.ui.publish_event()` |
-| Messages | `PLAY_MSG = {"event": "lullaby_play", "src": "lullaby.mp3", "loop": True}` / `STOP_MSG = {"event": "lullaby_stop"}` |
-| Status | initialise=play publish 1회 / update=RUNNING 영구 / terminate=stop publish (idempotent) |
-| terminate(INVALID) | stop publish (`_stop_published` flag) |
-| Used in | BT_lullaby_sub (단일 leaf) |
-| 파일 | [`bt/behaviors/common/lullaby_audio.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/lullaby_audio.py) |
-| 테스트 | 7 시나리오 (play publish / update RUNNING / stop publish / idempotent / 재진입 flag 리셋 / 메시지 상수 / cold terminate no-op) |

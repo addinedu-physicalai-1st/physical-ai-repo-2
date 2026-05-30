@@ -28,8 +28,8 @@ import py_trees
 from py_trees.decorators import FailureIsSuccess
 
 from ....context import Context
-from ...behaviors.common.select_vertex import SelectVertex
-from ...behaviors.common.set_patrol_index import SetPatrolIndex
+from ...behaviors.patrol.select_vertex import SelectVertex
+from ...behaviors.patrol.set_patrol_index import SetPatrolIndex
 from ...behaviors.follow.pan_camera_sweep import PanCameraSweep
 from ...behaviors.navigation.brake_and_wait import BrakeAndWait
 from ...behaviors.navigation.navigate_to_vertex import NavigateToVertex

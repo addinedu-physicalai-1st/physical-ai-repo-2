@@ -34,7 +34,7 @@ BT_patrol_sub (Sequence, memory=True)
 
 ## 사용 behavior
 
-- [common/select_vertex](../behaviors/common.md#select_vertex)  *(구현됨)*
+- [patrol/select_vertex](../behaviors/patrol.md#select_vertex)  *(구현됨)*
 - [navigation/navigate_to_vertex](../behaviors/navigation.md#navigate_to_vertex)  *(구현됨)*
 - [follow/pan_camera_sweep](../behaviors/follow.md#pan_camera_sweep)  *(구현됨)*
 
