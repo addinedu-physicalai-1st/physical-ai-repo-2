@@ -24,6 +24,8 @@ const error = ref<string | null>(null);
 let eventSource: EventSource | null = null;
 let phaseTimer: number | null = null;
 let rpsDetectAbort: AbortController | null = null;
+let _rpsVoiceTimer: number | null = null;
+let _rpsVoiceGen = 0;
 
 function exitToIdle(): void {
   mode.setMode('대기');
@@ -57,6 +59,7 @@ function clearTimers(): void {
 }
 
 async function startSession(): Promise<void> {
+  if (sessionId.value) return; // 이미 세션 있으면 중복 생성 방지
   error.value = null;
   homeEventCount.value = 0;
   try {
@@ -76,7 +79,20 @@ function subscribeEvents(sid: string): void {
   eventSource.onmessage = (ev) => {
     try {
       const payload = JSON.parse(ev.data);
-      if (payload.type === 'home_event') {
+      if (payload.type === 'rps_traj_start') {
+        _rpsVoiceGen++; // 대기 중인 fallback 타이머 무효화
+        if (_rpsVoiceTimer !== null) { window.clearTimeout(_rpsVoiceTimer); _rpsVoiceTimer = null; }
+        void (async () => {
+          if (phase.value !== 'rps') return;
+          void tts.speak('가위');
+          await new Promise<void>(r => setTimeout(r, 1000));
+          if (phase.value !== 'rps') return;
+          void tts.speak('바위');
+          await new Promise<void>(r => setTimeout(r, 1000));
+          if (phase.value !== 'rps') return;
+          void tts.speak('보');
+        })();
+      } else if (payload.type === 'home_event') {
         homeEventCount.value = payload.count;
         if (payload.count === 1) {
           void tts.speak('잘했어! 이번엔 초록색 블록을 쌓아봐!');
@@ -114,11 +130,10 @@ async function playRps(): Promise<void> {
   detectedGesture.value = null;
   robotGesture.value = null;
   humanWon.value = null;
-  void tts.speak('가위바위보!');
 
   const sid = sessionId.value;
 
-  // 로봇 동작 시작 — robot_gesture 받아옴
+  // 로봇 동작 시작 — robot_gesture 받아옴 (이 동안 "블럭쌓기" 모드 선언음 재생됨)
   try {
     const r = await fetch(`/api/noriarm/games/block-stacking/sessions/${sid}/rps`, { method: 'POST' });
     const d = (await r.json()) as { robot_gesture: string | null };
@@ -127,15 +142,32 @@ async function playRps(): Promise<void> {
     return;
   }
 
-  // 감지 — 백엔드가 손 인식될 때까지 블로킹
+  // 감지 즉시 시작 + 음성 동시 진행
   clearTimers();
   rpsDetectAbort = new AbortController();
+  const detectFetch = fetch(`/api/noriarm/games/block-stacking/sessions/${sid}/rps-detect`, {
+    method: 'POST',
+    signal: rpsDetectAbort.signal,
+  });
+
+  // SSE(rps_traj_start)가 오면 SSE 핸들러에서 voice 재생. 안 오면 fallback
+  const myVoiceGen = ++_rpsVoiceGen;
+  _rpsVoiceTimer = window.setTimeout(async () => {
+    _rpsVoiceTimer = null;
+    if (phase.value !== 'rps' || _rpsVoiceGen !== myVoiceGen) return;
+    void tts.speak('가위');
+    await new Promise<void>(r => setTimeout(r, 1000));
+    if (phase.value !== 'rps') return;
+    void tts.speak('바위');
+    await new Promise<void>(r => setTimeout(r, 1000));
+    if (phase.value !== 'rps') return;
+    void tts.speak('보');
+  }, 6000);
+
+  // 감지 결과 대기
   let humanGesture: string | null = null;
   try {
-    const r = await fetch(`/api/noriarm/games/block-stacking/sessions/${sid}/rps-detect`, {
-      method: 'POST',
-      signal: rpsDetectAbort.signal,
-    });
+    const r = await detectFetch;
     const data = (await r.json()) as { gesture: string | null };
     humanGesture = data.gesture;
   } catch {
@@ -300,6 +332,8 @@ onUnmounted(() => {
         </div>
 
         <div v-if="error" class="error">{{ error }}</div>
+        <!-- 프론트 카메라 (RPS·추론 공용 프리뷰) -->
+        <img :src="'/api/noriarm/camera/front/stream'" class="cam-preview" alt="front cam" />
       </div>
     </Transition>
   </Teleport>
@@ -368,6 +402,16 @@ onUnmounted(() => {
 .counter { font-size: 1.1rem; }
 .hint { color: #666; }
 .error { color: #dc2626; margin-top: 16px; }
+.cam-preview {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 240px;
+  height: 180px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.5);
+}
 .bs-fade-enter-active,
 .bs-fade-leave-active {
   transition: opacity 0.3s;

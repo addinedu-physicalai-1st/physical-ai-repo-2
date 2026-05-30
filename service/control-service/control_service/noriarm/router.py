@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 from typing import AsyncIterator, Literal
 
+import cv2
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -25,6 +26,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from urllib.parse import urlparse, urlunparse
 
 from control_service.config import settings
+from control_service.noriarm.front_camera import front_camera
 from control_service.noriarm.block_stacking import router as block_stacking_router
 from control_service.noriarm.store_play import router as store_play_router
 from control_service.noriarm.ros_bridge import NoriarmRosBridge, ros_available
@@ -37,6 +39,41 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/noriarm", tags=["noriarm"])
 router.include_router(block_stacking_router)
 router.include_router(store_play_router)
+
+async def _mjpeg_gen() -> AsyncIterator[bytes]:
+    # 공유 카메라에서 프레임을 가져온다 — rps_detector 와 디바이스를 다투지 않음.
+    front_camera.acquire()
+    try:
+        while True:
+            # 평상시엔 공유 카메라 프레임, 추론 중엔 runner 릴레이 JPEG.
+            jpeg = front_camera.latest_jpeg()
+            if jpeg is None:
+                await asyncio.sleep(0.05)
+                continue
+            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+            await asyncio.sleep(1 / 15)
+    finally:
+        front_camera.release()
+
+@router.get("/camera/front/stream")
+async def front_camera_stream(req: Request) -> StreamingResponse:
+    """프론트 카메라 MJPEG 스트림 (RPS·추론 공용)."""
+    async def gen():
+        async for chunk in _mjpeg_gen():
+            if await req.is_disconnected():
+                break
+            yield chunk
+    return StreamingResponse(
+        gen(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            # 웹(robot-web)이 COEP require-corp(cross-origin isolated) 라서
+            # CORP 헤더 없으면 <img> 로드가 차단됨.
+            "Cross-Origin-Resource-Policy": "cross-origin",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",  # 프록시 버퍼링 방지 (스트림 즉시 전달)
+        },
+    )
 
 
 class AnswerRequest(BaseModel):

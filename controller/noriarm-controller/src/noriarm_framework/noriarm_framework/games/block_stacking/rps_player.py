@@ -80,6 +80,8 @@ def main() -> int:
 
         # 2. 루프: trajectory 재생 → 5초 유지 → 반복 (--once 시 1회만)
         while not _stop:
+            print("TRAJ_START", flush=True)
+            time.sleep(0.5)
             for frame in frames:
                 if _stop:
                     break
