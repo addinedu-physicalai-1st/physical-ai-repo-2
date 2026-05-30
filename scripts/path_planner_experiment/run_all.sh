@@ -63,6 +63,8 @@ fi
 
 # ───────────────────────────── 인자 ─────────────────────────────
 REPS=3
+ROUTE="수면실,놀이방,놀이방입구-하"          # 다단계 GOTO 순서 (run_scenario.py)
+RESULTS_DIR="/home/leekt/발표자료/실험 결과물"  # per-run txt/json/bags + 로그 (= /tmp 아님)
 LABEL="dense"
 DESTINATION="수면실"
 SIM_BOOT_WAIT=20           # device-gogoping-sim.sh up 후 tmux 세션 + nav2 부팅 대기
@@ -72,7 +74,9 @@ CONTROLLER_FILTER=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --reps) REPS="$2"; shift 2;;
+        --reps|--steps) REPS="$2"; shift 2;;
+        --route) ROUTE="$2"; shift 2;;
+        --results-dir) RESULTS_DIR="$2"; shift 2;;
         --label) LABEL="$2"; shift 2;;
         --destination) DESTINATION="$2"; shift 2;;
         --sim-wait) SIM_BOOT_WAIT="$2"; shift 2;;
@@ -89,11 +93,12 @@ done
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 RUN_ONE="${HERE}/run_one.py"
+RUN_SCENARIO="${HERE}/run_scenario.py"
 PARAMS_DIR="${HERE}/params"
 NAV2_DEST="$REPO_ROOT/controller/gogoping-controller/src/gogoping/gogoping_navigation/params/nav2_params_sim.yaml"
 SIM_SCRIPT="$REPO_ROOT/scripts/device-gogoping-sim.sh"
 BACKUP="/tmp/nav2_params_sim_run_all_backup.yaml"
-OUT_BASE="/tmp/runs/${LABEL}"
+OUT_BASE="${RESULTS_DIR}"            # run_all 로그/요약 + (run_scenario 가) per-run txt/json/bags
 TMUX_SESSION="gogoping-sim"
 
 mkdir -p "$OUT_BASE"
@@ -285,7 +290,7 @@ for P in "${PLANNERS[@]}"; do
 
         # reps 마다 sim 재시작 — 깨끗한 환경 보장
         for ((R=1; R<=REPS; R++)); do
-            RUN_ID="${P}_${C}_rep${R}"
+            RUN_ID="${P}-${C}-${R}"   # = run_scenario 출력 파일명 ({planner}-{controller}-{rep})
             log ""
             log "──── rep ${R}/${REPS} : ${RUN_ID} ────"
 
@@ -315,10 +320,10 @@ for P in "${PLANNERS[@]}"; do
 
             # 3. 1 run
             START=$(date +%s)
-            python3 "$RUN_ONE" \
-                --run-id "$RUN_ID" \
-                --output-dir "$OUT_BASE" \
-                --destination "$DESTINATION" \
+            python3 "$RUN_SCENARIO" \
+                --planner "$P" --controller "$C" --rep "$R" \
+                --route "$ROUTE" \
+                --results-dir "$RESULTS_DIR" \
                 --skip-teleport \
                 2>&1 | tee -a "$LOG"
             RC=${PIPESTATUS[0]}

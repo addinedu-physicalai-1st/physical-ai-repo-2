@@ -22,12 +22,14 @@ const emit = defineEmits<{
 }>();
 
 const voiceController = inject(VOICE_CONTROLLER_KEY);
-const cameraViewRef = ref<{ getImgEl: () => HTMLImageElement | null } | null>(null);
+// CameraView 는 getVideoEl()(<video> WebRTC)만 expose — getImgEl 은 없어 늘 null 이었음
+// (PatrolPhase 와 동일 패턴. HideSeekRecognitionOptions 가 imgEl→videoEl 로 바뀐 것 반영).
+const cameraViewRef = ref<{ getVideoEl: () => HTMLVideoElement | null } | null>(null);
 const captureCanvasRef = ref<HTMLCanvasElement | null>(null);
-const cameraImgEl = computed(() => cameraViewRef.value?.getImgEl() ?? null);
+const cameraVideoEl = computed(() => cameraViewRef.value?.getVideoEl() ?? null);
 
 const recognition = useHideSeekRecognition({
-  imgEl: cameraImgEl,
+  videoEl: cameraVideoEl,
   captureCanvas: captureCanvasRef,
   isRegistered: (id) => props.participants.find((p) => p.id === id)?.registered ?? false,
   isCaught: (id) => props.participants.find((p) => p.id === id)?.caught ?? false,

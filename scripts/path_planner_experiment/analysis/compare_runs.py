@@ -21,22 +21,29 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 import re
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 from statistics import mean, stdev
+
+DEFAULT_OUT_DIR = "/home/leekt/발표자료/실험 결과물"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from extract_metrics import analyze_bag  # noqa
 
 
-# run_id 패턴 : {Planner}_{Controller}_rep{N}  e.g., "NavFn_DWB_rep1"
+# run_id 패턴 :
+#   run_one.py      : {Planner}_{Controller}_rep{N}   e.g., "NavFn_DWB_rep1"
+#   run_scenario.py : {Planner}-{Controller}-{N}       e.g., "NavFn-DWB-1"
 RUN_ID_RE = re.compile(r"^([A-Za-z0-9]+)_([A-Za-z0-9]+)_rep(\d+)$")
+RUN_ID_RE_HYPHEN = re.compile(r"^([A-Za-z0-9]+)-([A-Za-z0-9]+)-(\d+)$")
 
 
 def parse_run_id(run_id: str) -> tuple[str, str, int] | None:
-    m = RUN_ID_RE.match(run_id)
+    m = RUN_ID_RE.match(run_id) or RUN_ID_RE_HYPHEN.match(run_id)
     if not m:
         return None
     return m.group(1), m.group(2), int(m.group(3))
@@ -293,6 +300,11 @@ def write_csv(results: list[dict], agg: dict) -> None:
         "obs_min_m", "obs_p10_m", "obs_p50_m", "obs_mean_m",
         # AMCL drift (Step D)
         "amcl_drift_rms", "amcl_drift_p95", "amcl_drift_yaw_rms", "amcl_jump_count",
+        # M14 — L1(레인) vs L2(실주행) 경로 유사도
+        "lane_dev_mean_m", "lane_dev_p95_m", "lane_dev_max_m", "lane_frechet_m",
+        # M15 — costmap 민감도
+        "cost_at_robot_mean", "cost_at_robot_p95", "cost_at_robot_max",
+        "high_cost_ratio", "vel_clearance_corr",
         # Legacy / 기타
         "bt_failure_n", "plan_pubs",
         "reliability_score", "reliability_grade",
@@ -321,6 +333,11 @@ def write_csv(results: list[dict], agg: dict) -> None:
             m["M6_obs_min_m"], m["M6_obs_p10_m"], m["M6_obs_p50_m"], m["M6_obs_mean_m"],
             m["M13_amcl_drift_rms"], m["M13_amcl_drift_p95"],
             m["M13_amcl_drift_yaw_rms"], m["M13_amcl_jump_count"],
+            m["M14_lane_dev_mean_m"], m["M14_lane_dev_p95_m"],
+            m["M14_lane_dev_max_m"], m["M14_lane_frechet_m"],
+            m["M15_cost_at_robot_mean"], m["M15_cost_at_robot_p95"],
+            m["M15_cost_at_robot_max"], m["M15_high_cost_ratio"],
+            m["M15_vel_clearance_corr"],
             m["M7_bt_failure_n"], m["plan_pubs"],
             rel["score"], rel["grade"],
             raw["odom_hz"], raw["sim_rt_factor"],
@@ -340,6 +357,13 @@ def main() -> int:
         "--failure-report", action="store_true",
         help="실패한 run 의 forensics 출력 (stdout, table 대신)",
     )
+    parser.add_argument(
+        "--out-dir", type=Path, default=Path(DEFAULT_OUT_DIR),
+        help=f"비교 결과 저장 디렉토리 (default: {DEFAULT_OUT_DIR})",
+    )
+    parser.add_argument(
+        "--no-save", action="store_true", help="파일 저장 생략 (stdout 만)",
+    )
     args = parser.parse_args()
 
     if not args.runs_dir.is_dir():
@@ -357,11 +381,11 @@ def main() -> int:
 
     agg = aggregate(results, completed_only=args.completed_only)
 
+    # ── stdout 출력 (기존 동작 유지) ──
     if args.json:
-        # JSON serializable 으로 변환 (tuple key → string key)
         agg_json = {f"{p}__{c}": v for (p, c), v in agg.items()}
         print(json.dumps({"runs": results, "aggregate": agg_json},
-                          ensure_ascii=False, indent=2, default=str))
+                         ensure_ascii=False, indent=2, default=str))
     elif args.csv:
         write_csv(results, agg)
     else:
@@ -372,6 +396,27 @@ def main() -> int:
         else:
             print_per_run_table(results)
         print_aggregate_table(agg)
+
+    # ── 발표자료 파일 저장 (comparison.txt 표 + .csv + .json) ──
+    if not args.no_save:
+        out_dir = args.out_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_per_run_table(results)
+            print_aggregate_table(agg)
+            print_failure_report(results)
+        (out_dir / "comparison.txt").write_text(buf.getvalue(), encoding="utf-8")
+        with (out_dir / "comparison.csv").open("w", newline="", encoding="utf-8") as f:
+            with redirect_stdout(f):
+                write_csv(results, agg)
+        agg_json = {f"{p}__{c}": v for (p, c), v in agg.items()}
+        (out_dir / "comparison.json").write_text(
+            json.dumps({"runs": results, "aggregate": agg_json},
+                       ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+        print(f"\n✅ 비교 결과 저장 → {out_dir}/comparison.{{txt,csv,json}}", file=sys.stderr)
 
     return 0
 

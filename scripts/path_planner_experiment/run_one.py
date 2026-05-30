@@ -60,6 +60,8 @@ BAG_TOPICS = [
     "/behavior_tree_log",
     "/gogoping/debug/nav_events",
     "/gogoping/state_str",
+    "/graph_router/route_path",   # L1 — graph_router 레인 경로 (M14: L1 vs L2 유사도)
+    "/local_costmap/costmap",     # M15 — costmap 민감도 (로봇 위치 cost 샘플)
     "/rosout",
 ]
 
