@@ -150,7 +150,9 @@ const showHealthCheck = computed(() => robot.value.id === 'eduping' && currentMo
 const showHighfive = computed(() => robot.value.id === 'eduping' && currentMode.value === '뎁스카메라 뷰');
 
 const showGogopingManual = computed(
-  () => robot.value.id === 'gogoping' && currentMode.value === '수동'
+  // ERROR(고장) 중엔 수동 카메라 뷰를 내려 얼굴+말풍선 UI 로 복귀 (말풍선·버튼숨김과 동일하게
+  // ERROR 에 반응 — 수동 카메라만 errorStore 를 안 봐서 ERROR 떠도 떠 있던 버그 fix).
+  () => robot.value.id === 'gogoping' && currentMode.value === '수동' && !errorStore.active
 );
 // 디버그 패널 토글 — URL 에 ?debug=1 (대소문자 무관) 명시할 때만 표시.
 // 검증 필요 시: localhost:5173/?debug=1 (또는 ?Debug=1) 식으로 접속.
@@ -160,7 +162,8 @@ const showDebug = computed(() => {
   return params.get('debug') === '1';
 });
 const showGogopingHideAndSeek = computed(
-  () => robot.value.id === 'gogoping' && currentMode.value === '숨바꼭질'
+  // ERROR 중엔 숨바꼭질 오버레이도 내려 얼굴+말풍선 UI 로 복귀 (수동과 동일).
+  () => robot.value.id === 'gogoping' && currentMode.value === '숨바꼭질' && !errorStore.active
 );
 
 // Voice-guided search — follow_node mode 전이 감지 → TTS 발화.
@@ -210,7 +213,8 @@ const DEVICE_TOKEN = import.meta.env.VITE_ROBOT_TOKEN ?? 'dev-robot-token-change
 // 추종 모드 동안 FollowFaceAuth 가 항상 mount — 인증 전엔 중앙 모달, 인증 후엔 좌상단 PiP 로
 // 디버그용 카메라 뷰를 유지. 모드를 벗어나면 unmount 되며 카메라 정지.
 const showGogopingFollowAuth = computed(
-  () => robot.value.id === 'gogoping' && currentMode.value === '추종'
+  // ERROR 중엔 추종 인증 오버레이도 내려 얼굴+말풍선 UI 로 복귀 (수동과 동일).
+  () => robot.value.id === 'gogoping' && currentMode.value === '추종' && !errorStore.active
 );
 
 // 인증 완료 여부를 별도 ref 로 관리 — FollowFaceAuth 내부 상태(succeeded)를 직접 알 수 없으므로
@@ -218,7 +222,7 @@ const showGogopingFollowAuth = computed(
 const followAuthenticated = ref(false);
 
 const showGogopingFollowMode = computed(
-  () => robot.value.id === 'gogoping' && currentMode.value === '추종' && followAuthenticated.value
+  () => robot.value.id === 'gogoping' && currentMode.value === '추종' && followAuthenticated.value && !errorStore.active
 );
 
 async function onFollowAuthenticated(payload: { name: string; teacher_id: string }): Promise<void> {

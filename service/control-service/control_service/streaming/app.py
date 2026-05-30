@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from control_service.streaming import config as scfg
 from control_service.streaming.admin_router import make_admin_router
 from control_service.streaming.client_registry import ClientRegistry
+from control_service.streaming.debug_router import make_debug_router, start_tracemalloc
 from control_service.streaming.depth_hub import DepthHub
 from control_service.streaming.depth_ws_router import make_depth_ws_router
 from control_service.streaming.frame_hub import FrameHub
@@ -49,6 +50,8 @@ app.include_router(make_ws_router(_registry, _hub))
 app.include_router(make_depth_ws_router(_registry, _depth_hub))
 # WebRTC signaling — /ws/webrtc/signaling (gogoping D435 RTSP-less stream)
 app.include_router(webrtc_router)
+# /debug/mem* — RAM 누수 추적 (2026-05-30 OOM). STREAMING_TRACEMALLOC=0 으로 끔.
+app.include_router(make_debug_router())
 
 # admin-app (PyQt QWebEngineView) 의 OpenSSL 1.x ↔ 시스템 3.x 호환성 문제로 vite
 # (mkcert https) self-signed cert 검증 실패. 우회 path: robot-web 의 production
@@ -85,6 +88,8 @@ async def _on_startup() -> None:
         level=os.environ.get("STREAMING_LOG_LEVEL", "INFO"),
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
+    # RAM 누수 추적 baseline (2026-05-30 OOM). /debug/memtop 으로 diff 확인.
+    start_tracemalloc()
     loop = asyncio.get_running_loop()
 
     # 로봇별 UDP 수신 스레드 시작 — 이번 SR 은 IP 등록된 로봇의 primary stream 만
