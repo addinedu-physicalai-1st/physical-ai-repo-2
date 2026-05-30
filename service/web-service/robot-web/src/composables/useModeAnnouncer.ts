@@ -77,9 +77,12 @@ export function useModeAnnouncer(
           prevEl.currentTime = 0;
         }
       }
-      // 진행 중 server TTS 가 있으면 비우고 새 모드 안내. WebRTC 가 즉시 buffer clear.
+      // 진행 중 server TTS 가 있으면 비움 (겹침 방지). WebRTC 가 즉시 buffer clear.
       voiceController.cancelSpeak();
-      voiceController.speak(ttsOverrideByMode[next] ?? next);
+      // 모드명 자동 발화. 단 override 가 빈 문자열이면 생략 — 모드가 자체 음성 안내를
+      // 하는 경우(예: 가게놀이는 voice_intro.mp3 재생) TTS 와 겹치지 않게.
+      const tts = ttsOverrideByMode[next] ?? next;
+      if (tts) voiceController.speak(tts);
 
       const config = audioByMode[next];
       if (!config) return;
