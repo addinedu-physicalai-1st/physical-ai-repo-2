@@ -172,7 +172,10 @@ async def lifespan(app: FastAPI):
             while True:
                 await asyncio.sleep(1.0 / 30)
                 state = doctor_bridge.latest_state()
-                fsr_raw = doctor_bridge.latest_fsr_raw()
+                # FSR: 2-머신(a-2)은 WS hub 로, 단일 머신은 ROS sub 로 들어옴 — WS 우선.
+                fsr_raw = stetho_hub.latest_raw
+                if fsr_raw is None:
+                    fsr_raw = doctor_bridge.latest_fsr_raw()
                 ids = doctor_hub.active_eduping_ids()
                 for eid in ids:
                     doctor_hub.publish_state(eid, state)
@@ -341,6 +344,10 @@ from control_service.doctor.eduping_rgb_relay import (  # noqa: E402
     EdupingRgbHub,
     build_router as build_eduping_rgb_router,
 )
+from control_service.doctor.stetho_relay import (  # noqa: E402
+    StethoHub,
+    build_router as build_stetho_router,
+)
 from control_service.doctor.webrtc_signaling import (  # noqa: E402
     SignalingHub,
     build_router as build_doctor_signal_router,
@@ -378,6 +385,12 @@ app.include_router(build_doctor_router(doctor_hub))
 eduping_rgb_hub = EdupingRgbHub()
 app.state.eduping_rgb_hub = eduping_rgb_hub
 app.include_router(build_eduping_rgb_router(eduping_rgb_hub))
+
+# 청진기 FSR — producer 는 eduping_stethoscope fsr_ws_uploader (WS client).
+# a-2 cross-machine 에서 ROS DDS 대신 WS 로 받음. doctor push loop 가 latest_raw polling.
+stetho_hub = StethoHub()
+app.state.stetho_hub = stetho_hub
+app.include_router(build_stetho_router(stetho_hub))
 
 # 무궁화 device-local perception relay — JSON 이벤트(robot↔ui) + JPEG 영상(producer→consumers).
 from control_service.eduping.mugunghwa_relay import (  # noqa: E402
