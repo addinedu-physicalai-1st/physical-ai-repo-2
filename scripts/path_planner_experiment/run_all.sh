@@ -63,6 +63,7 @@ fi
 
 # ───────────────────────────── 인자 ─────────────────────────────
 REPS=3
+START_REP=1                # 이어쌓기: rep 시작번호 (--start-rep 2 면 rep2~REPS → 기존 rep1 보존)
 ROUTE="수면실,놀이방,놀이방입구-하"          # 다단계 GOTO 순서 (run_scenario.py)
 RESULTS_DIR="/home/leekt/발표자료/실험 결과물"  # per-run txt/json/bags + 로그 (= /tmp 아님)
 LABEL="dense"
@@ -75,6 +76,7 @@ CONTROLLER_FILTER=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --reps|--steps) REPS="$2"; shift 2;;
+        --start-rep) START_REP="$2"; shift 2;;
         --route) ROUTE="$2"; shift 2;;
         --results-dir) RESULTS_DIR="$2"; shift 2;;
         --label) LABEL="$2"; shift 2;;
@@ -247,19 +249,23 @@ verify_plugin() {
 
 # ───────────────────────────── 시작 ─────────────────────────────
 log "================================================="
-log "run_all.sh — label=${LABEL}, reps=${REPS}"
+log "run_all.sh — label=${LABEL}, reps=${START_REP}..${REPS}"
 log "planners   : ${PLANNERS[*]}"
 log "controllers: ${CONTROLLERS[*]}"
-log "총 ${#PLANNERS[@]} × ${#CONTROLLERS[@]} × ${REPS} = $(( ${#PLANNERS[@]} * ${#CONTROLLERS[@]} * REPS )) runs"
+log "총 ${#PLANNERS[@]} × ${#CONTROLLERS[@]} × $(( REPS - START_REP + 1 )) = $(( ${#PLANNERS[@]} * ${#CONTROLLERS[@]} * (REPS - START_REP + 1) )) runs"
 log "================================================="
 
 # 백업
 cp "$NAV2_DEST" "$BACKUP"
 log "yaml backup → $BACKUP"
 
-# 요약 헤더
-echo "# run_summary — label=${LABEL}, reps=${REPS}, started=$(date)" > "$SUMMARY"
-echo "# planner,controller,rep,exit_code,duration_s,run_id" >> "$SUMMARY"
+# 요약 헤더 — 이어쌓기(파일 이미 있음)면 append, 처음이면 새로 생성
+if [[ -f "$SUMMARY" ]]; then
+    echo "# ── append batch: reps ${START_REP}..${REPS}, started=$(date)" >> "$SUMMARY"
+else
+    echo "# run_summary — label=${LABEL}, reps=${REPS}, started=$(date)" > "$SUMMARY"
+    echo "# planner,controller,rep,exit_code,duration_s,run_id" >> "$SUMMARY"
+fi
 
 CELL_IDX=0
 TOTAL_CELLS=$(( ${#PLANNERS[@]} * ${#CONTROLLERS[@]} ))
@@ -289,7 +295,7 @@ for P in "${PLANNERS[@]}"; do
         esac
 
         # reps 마다 sim 재시작 — 깨끗한 환경 보장
-        for ((R=1; R<=REPS; R++)); do
+        for ((R=START_REP; R<=REPS; R++)); do
             RUN_ID="${P}-${C}-${R}"   # = run_scenario 출력 파일명 ({planner}-{controller}-{rep})
             log ""
             log "──── rep ${R}/${REPS} : ${RUN_ID} ────"
