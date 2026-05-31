@@ -24,20 +24,20 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `target_person_id` | `str` | `command_listener` | `detect_target_person`, `child_face_tracker` | follow/hide-and-seek 추적 대상 (ReID/face_id). FOLLOW / HIDEANDSEEK 진입 시 세팅 |
+| `target_person_id` | `str` | `command_listener`, `FollowTrack` | `detect_target_person`, `child_face_tracker` | follow/hide-and-seek 추적 대상 (ReID/face_id). FOLLOW/HIDEANDSEEK 진입 시 command_listener 가, FOLLOW 추적 중 FollowTrack 이 `tracking_state.teacher_id` 로 (동일 대상이라 일관) |
 
 > 취소·복귀 등의 명령은 blackboard 플래그 없이 **`cancel` / `return_request` trigger 만 사용** — trigger ↔ blackboard 중복 방지.
 >
 > 이전 `assist_task` / `play_task` 키는 2026-05-25 평탄화 리팩터링으로 삭제됨 — GOTO/FOLLOW/LULLABY/HIDEANDSEEK 각 state 가 독립 BT 를 가지므로 task 분기 키 불필요.
 
-### Perception (vision 토픽 어댑터가 W)
+### Perception (`FollowTrack` leaf 가 `/gogoping/tracking_state` 어댑터로 W)
 
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
-| `target_visible` | `bool` | `detect_target_person` | `is_target_visible`, `wait_for_reappear` | follow 대상 보임 |
-| `target_pose` | `geometry_msgs/PoseStamped` | `detect_target_person` | `maintain_distance` | base_link 기준 대상 pose |
-| `target_face_bbox` | `tuple[int,int,int,int]` | `detect_target_person` | `face_tracking` | 카메라 frame px (x,y,w,h) |
-| `target_seen_at` | `float` (epoch sec) | `detect_target_person` | `wait_for_reappear`, `face_tracking` | 마지막 감지 시각 — staleness 판정용 |
+| `target_visible` | `bool` | `FollowTrack` | `is_target_visible`, `wait_for_reappear` | follow 대상 보임 (= tracking_state.matched) |
+| `target_pose` | `geometry_msgs/PoseStamped` | (미구현 — `FollowTrack` 미작성, map pose 변환 필요) | `maintain_distance` | base_link 기준 대상 pose |
+| `target_face_bbox` | `tuple[int,int,int,int]` | `FollowTrack` | `face_tracking` | 카메라 frame px (x1,y1,x2,y2) — matched 일 때 |
+| `target_seen_at` | `float` (epoch sec) | `FollowTrack` | `wait_for_reappear`, `face_tracking` | 마지막 감지 시각 — matched 일 때 갱신 |
 | `found` | `bool` | `child_face_tracker` | `found_child` | 숨바꼭질 — 아이 발견 |
 
 ### Navigation 타겟 (config 또는 `command_listener` 가 W)
