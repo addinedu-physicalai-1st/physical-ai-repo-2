@@ -5,29 +5,22 @@ waypoints:
   yaw: 0.0
   id: 18
   group: null
-  can_rotate: true
+  can_rotate: false
 - name: 복도입구
   x: 0.5746856331825256
   y: 1.1677498817443848
   yaw: 1.5973387645462938
   id: 19
-  group: 복도
+  group: null
   can_rotate: false
 - name: 놀-7
   x: -0.5131705923
   y: 3.3549065589904785
   yaw: 0.0
   id: 20
-  group: null   # 술래잡기 패트롤 그룹에서 제외 (vertex 는 graph 에 유지 — 이동/lane 가능)
-  can_rotate: false
-- name: 놀이방입구-상
-  x: 0.025310031
-  y: 9.969625473022461
-  yaw: 0.0
-  id: 21
   group: null
   can_rotate: false
-- name: 수-8
+- name: 수면실입구
   x: -0.5409778478
   y: 11.062299728393555
   yaw: -0.07130746478529032
@@ -46,45 +39,45 @@ waypoints:
   y: 3.3549065589904785
   yaw: 0.0
   id: 23
-  group: 복도
+  group: null
   can_rotate: false
 - name: 복-2
   x: 0.3685901000773679
   y: 4.9868455494170245
   yaw: 1.4432867685796584
   id: 24
-  group: 복도
+  group: null
   can_rotate: false
 - name: 복-3
   x: 0.3685901000773679
   y: 6.594151485490084
   yaw: 1.7063240407803975
   id: 25
-  group: 복도
+  group: null
   can_rotate: false
 - name: 복-4
   x: 0.3685901000773679
   y: 8.308191012508978
   yaw: 0.0
   id: 26
-  group: 복도
+  group: null
   can_rotate: false
 - name: 복-5
-  x: 0.53
-  y: 9.91319274902343
+  x: 0.2796
+  y: 9.969625473022461
   yaw: 0.0
   id: 27
-  group: 복도
+  group: null
   can_rotate: false
 - name: 복-6
-  x: 0.53
+  x: 0.2796
   y: 11.062299728393555
   yaw: 0.0
   id: 28
   group: null
   can_rotate: false
 - name: 충전소입구
-  x: 0.5297559089
+  x: 0.2796
   y: 11.852758055015384
   yaw: -1.5707963267948966
   id: 29
@@ -96,55 +89,55 @@ waypoints:
   yaw: 0.0
   id: 30
   group: null
-  can_rotate: true
+  can_rotate: false
 - name: 놀이방
   x: -3.75
   y: 9.91319274902343
   yaw: 0.0
   id: 30
-  group: 놀이방
+  group: null
   can_rotate: false
 - name: 놀-1
   x: -2.3322
   y: 9.91319274902343
   yaw: 0.0
   id: 31
-  group: 놀이방
+  group: null
   can_rotate: false
 - name: 놀-5
   x: -3.75
   y: 3.3549065589904785
   yaw: 0.0
   id: 32
-  group: 놀이방
+  group: null
   can_rotate: false
 - name: 놀-6
   x: -2.3322
   y: 3.3549065589904785
   yaw: 0.0
   id: 33
-  group: 놀이방
+  group: null
   can_rotate: false
 - name: 수-1
   x: -4.8322
   y: 12.133442249758824
   yaw: 0.0
   id: 34
-  group: 수면실
+  group: null
   can_rotate: false
 - name: 수면실
   x: -3.5821659912
   y: 12.133442249758824
   yaw: 0.0
   id: 35
-  group: 수면실
+  group: null
   can_rotate: false
 - name: 수-2
   x: -2.3322
   y: 12.133442249758824
   yaw: 0.0
   id: 36
-  group: 수면실
+  group: null
   can_rotate: false
 - name: 수-3
   x: -4.8322
@@ -165,20 +158,13 @@ waypoints:
   y: 11.062299728393555
   yaw: 0.0
   id: 36
-  group: 수면실
+  group: null
   can_rotate: false
 - name: 충전소
-  x: 0.53
+  x: 0.2796
   y: 12.834519743089727
   yaw: -1.5502512727614963
   id: 41
-  group: 복도
-  can_rotate: true
-- name: 수면실입구
-  x: 0.025310031
-  y: 11.062299728393555
-  yaw: -3.061305838306777
-  id: 43
   group: null
   can_rotate: false
 - name: 놀이방입구-하
@@ -188,26 +174,26 @@ waypoints:
   id: 44
   group: null
   can_rotate: false
-- name: 놀-2
+- name: 놀이방입구-상
   x: -0.5409778478
   y: 9.969625473022461
   yaw: 3.1360678479241204
   id: 45
-  group: null   # 술래잡기 패트롤 그룹에서 제외 (vertex 는 graph 에 유지 — 이동/lane 가능)
+  group: null
   can_rotate: false
 - name: 놀-3
   x: -3.75
   y: 7.740664855468848
   yaw: 1.6447353644528369
   id: 46
-  group: 놀이방
+  group: null
   can_rotate: false
 - name: 놀-4
   x: -3.75
   y: 4.9821512569861195
   yaw: 1.4486011561035417
   id: 47
-  group: 놀이방
+  group: null
   can_rotate: false
 - name: 복-4-1
   x: 0.9559504978046434
@@ -236,12 +222,12 @@ waypoints:
   yaw: 0.0
   id: 51
   group: null
-  can_rotate: true
+  can_rotate: false
 - name: 수-회
   x: -5.59
   y: 11.062299728393555
   yaw: 0.0
   id: 52
   group: null
-  can_rotate: true
+  can_rotate: false
 patrols: {}
