@@ -17,7 +17,7 @@ from ...blackboard import Keys
 
 
 _ARRIVAL_MSG = {"event": "announce", "text": "도착했습니다"}
-_DEFAULT_DESTINATION = "운동장-단상"   # force_state(GOTO) fallback (2026-05-28)
+_DEFAULT_DESTINATION = "복도"   # force_state(GOTO) fallback (운동장 제거됨 → 복도로 변경)
 
 
 def build_goto_subtree(ctx: Context) -> py_trees.behaviour.Behaviour:
