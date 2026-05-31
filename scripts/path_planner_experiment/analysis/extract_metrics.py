@@ -624,18 +624,33 @@ def compute_lane_similarity(
 
 
 # ───────────────────────── M15: costmap 민감도 ─────────────────────────
-def _sample_costmap(cm, x: float, y: float):
-    """local costmap (odom frame) 의 (x,y) cost. 범위 밖/unknown(-1) 이면 None."""
+def _sample_costmap(cm, x: float, y: float, radius_cells: int = 8):
+    """로봇 (x,y) 주변 radius 윈도우의 **최대** cost (local costmap, odom frame).
+
+    로봇 자기 셀은 항상 free(0)라 단일 셀 샘플은 무의미 → 주변 윈도우를 본다.
+    radius_cells=8 ≈ 0.4m (res 0.05). 의미:
+      높음 = 로봇이 고cost(inflation/벽) 가까이 붙어 달림 = costmap 둔감
+      낮음 = 여유 두고 회피 = costmap 민감
+    범위 밖/unknown(-1)만 있으면 None.
+    """
     w, h, res, ox, oy, data = cm
     if res <= 0:
         return None
-    col = int((x - ox) / res)
-    row = int((y - oy) / res)
-    if 0 <= col < w and 0 <= row < h:
-        v = data[row * w + col]
-        if v >= 0:
-            return float(v)
-    return None
+    cc = int((x - ox) / res)
+    cr = int((y - oy) / res)
+    best = -1
+    for dr in range(-radius_cells, radius_cells + 1):
+        row = cr + dr
+        if not (0 <= row < h):
+            continue
+        base = row * w
+        for dc in range(-radius_cells, radius_cells + 1):
+            col = cc + dc
+            if 0 <= col < w:
+                v = data[base + col]
+                if v > best:
+                    best = v
+    return float(best) if best >= 0 else None
 
 
 def compute_vel_clearance_corr(
@@ -1069,8 +1084,8 @@ def print_summary(results: list[dict]) -> None:
         ("M14 lane dev max (m)", "M14_lane_dev_max_m", "{:.3f}"),
         ("M14 lane frechet (m)", "M14_lane_frechet_m", "{:.3f}"),
         # M15 — costmap 민감도
-        ("M15 cost mean", "M15_cost_at_robot_mean", "{:.1f}"),
-        ("M15 cost p95", "M15_cost_at_robot_p95", "{:.1f}"),
+        ("M15 cost-near mean", "M15_cost_at_robot_mean", "{:.1f}"),
+        ("M15 cost-near p95", "M15_cost_at_robot_p95", "{:.1f}"),
         ("M15 high-cost ratio", "M15_high_cost_ratio", "{:.2%}"),
         ("M15 vel-clr corr", "M15_vel_clearance_corr", "{:+.3f}"),
     ]

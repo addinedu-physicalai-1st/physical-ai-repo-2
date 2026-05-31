@@ -75,6 +75,16 @@ def analyze_all(runs_dir: Path) -> list[dict]:
             else:
                 res["planner"], res["controller"], res["rep"] = "?", "?", 0
             res["run_id"] = run_id
+            # CPU 부하 — run_scenario 가 <run_dir>/metadata.json 에 기록 (bag 엔 없음)
+            meta_path = bag_path.parent.parent / "metadata.json"
+            cpu = {}
+            if meta_path.exists():
+                try:
+                    cpu = (json.loads(meta_path.read_text(encoding="utf-8"))
+                           .get("cpu", {}) or {})
+                except Exception:
+                    cpu = {}
+            res["cpu"] = cpu
             results.append(res)
         except Exception as e:
             print(f"❌ {run_id}: {e}", file=sys.stderr)
@@ -144,6 +154,14 @@ def aggregate(results: list[dict], completed_only: bool = False) -> dict:
         agg["completed_n"] = sum(
             1 for r in runs if is_completed(r.get("state_history", []))
         )
+        # CPU 부하 집계 (신뢰성)
+        cpu_means = [r.get("cpu", {}).get("cpu_pct", {}).get("mean", 0.0) for r in runs]
+        cpu_maxes = [r.get("cpu", {}).get("cpu_pct", {}).get("max", 0.0) for r in runs]
+        load_means = [r.get("cpu", {}).get("load1", {}).get("mean", 0.0) for r in runs]
+        agg["cpu_pct_mean"] = mean(cpu_means) if cpu_means else 0.0
+        agg["cpu_pct_max"] = max(cpu_maxes) if cpu_maxes else 0.0
+        agg["load1_mean"] = mean(load_means) if load_means else 0.0
+        agg["n_cores"] = runs[0].get("cpu", {}).get("n_cores", 0)
         aggregated[(p, c)] = agg
     return aggregated
 
@@ -239,8 +257,8 @@ def print_aggregate_table(agg: dict) -> None:
     print("═══ Aggregate (mean ± std per planner × controller) ═══")
     headers = ["P", "C", "n", "ok", "rel",
                "dur(s)", "XTE", "j_ang", "yaw", "obs", "lat(ms)", "stuck",
-               "drift(mm/s)"]
-    widths = [12, 8, 4, 4, 6, 14, 13, 13, 11, 11, 11, 6, 14]
+               "drift(mm/s)", "CPU%mn/mx", "load"]
+    widths = [12, 8, 4, 4, 6, 14, 13, 13, 11, 11, 11, 6, 14, 11, 6]
     fmt = "".join(f"{{:<{w}}}" for w in widths)
     print(fmt.format(*headers))
     print("─" * sum(widths))
@@ -267,6 +285,8 @@ def print_aggregate_table(agg: dict) -> None:
             f"{lat['mean']*1000:.0f}±{lat['std']*1000:.0f}",
             f"{stuck['mean']:.1f}",
             f"{drift['mean']*1000:.1f}±{drift['std']*1000:.1f}",
+            f"{a['cpu_pct_mean']:.0f}/{a['cpu_pct_max']:.0f}",
+            f"{a['load1_mean']:.1f}",
         ]
         print(fmt.format(*row))
 
@@ -309,6 +329,8 @@ def write_csv(results: list[dict], agg: dict) -> None:
         "bt_failure_n", "plan_pubs",
         "reliability_score", "reliability_grade",
         "odom_hz_raw", "sim_rt_factor_raw",
+        # CPU 부하 (신뢰성)
+        "cpu_pct_mean", "cpu_pct_max", "cpu_load1_mean", "n_cores",
     ])
     for r in results:
         m = r["metrics"]
@@ -341,6 +363,10 @@ def write_csv(results: list[dict], agg: dict) -> None:
             m["M7_bt_failure_n"], m["plan_pubs"],
             rel["score"], rel["grade"],
             raw["odom_hz"], raw["sim_rt_factor"],
+            r.get("cpu", {}).get("cpu_pct", {}).get("mean", 0.0),
+            r.get("cpu", {}).get("cpu_pct", {}).get("max", 0.0),
+            r.get("cpu", {}).get("load1", {}).get("mean", 0.0),
+            r.get("cpu", {}).get("n_cores", 0),
         ])
 
 
