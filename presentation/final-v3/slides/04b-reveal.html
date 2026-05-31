@@ -1,0 +1,43 @@
+<section class="title-slide">
+  <div class="bg-deco">
+    <!-- 큰 회전 글로우 (배경) -->
+    <div class="spin-slow" style="position:absolute;width:900px;height:900px;top:50%;left:50%;transform:translate(-50%,-50%);background:conic-gradient(from 0deg, var(--babypinkSoft), var(--lavenderSoft), var(--mintSoft), var(--butterSoft), var(--babypinkSoft));border-radius:50%;opacity:0.35;filter:blur(60px);z-index:0"></div>
+
+    <!-- 떠다니는 블롭 -->
+    <div class="blob drift-1" style="width:380px;height:380px;background:var(--babypinkSoft);top:-100px;left:-80px"></div>
+    <div class="blob drift-2" style="width:320px;height:320px;background:var(--mintSoft);bottom:-90px;right:-60px"></div>
+    <div class="blob pulse-glow" style="width:240px;height:240px;background:var(--lavenderSoft);top:80px;right:120px;border-radius:50%"></div>
+    <div class="blob pulse-glow" style="width:160px;height:160px;background:var(--butterSoft);bottom:120px;left:140px;border-radius:50%;animation-delay:1.5s"></div>
+
+    <div class="dots"></div>
+
+    <!-- 작은 액센트 (별·점) -->
+    <span style="position:absolute;top:120px;right:200px;width:18px;height:18px;background:var(--babypink);border-radius:50%;animation:pulse-glow 3s ease-in-out infinite"></span>
+    <span style="position:absolute;top:200px;left:180px;width:12px;height:12px;background:var(--mintInk);border-radius:50%;animation:pulse-glow 3s ease-in-out infinite;animation-delay:0.8s"></span>
+    <span style="position:absolute;bottom:160px;right:260px;width:10px;height:10px;background:var(--butter);border-radius:50%;animation:pulse-glow 3s ease-in-out infinite;animation-delay:1.4s"></span>
+    <span style="position:absolute;top:480px;left:100px;width:36px;height:36px;border:3px solid var(--lavInk);border-radius:50%;opacity:0.7;animation:pulse-glow 5s ease-in-out infinite"></span>
+    <span style="position:absolute;bottom:80px;right:140px;width:46px;height:46px;border:3px dashed var(--skyInk);border-radius:50%;opacity:0.6;animation:spin-slow 18s linear infinite"></span>
+  </div>
+
+  <div class="layer flex flex-col items-center justify-center text-center" style="min-height:680px;padding:0 80px;position:relative;z-index:2">
+
+    <p class="r font-display" style="--i:0;font-size:0.95em;color:var(--inkSoft);margin:0;letter-spacing:0.4em">━━  소개합니다  ━━</p>
+
+    <h1 class="r font-display shine-text" style="--i:1;font-size:7em;line-height:1.05;margin:32px 0 0;letter-spacing:-0.03em;display:inline-block">
+      pingdergarten
+    </h1>
+
+    <p class="r font-display" style="--i:2;font-size:1.6em;color:var(--ink);margin:38px 0 0;line-height:1.4">
+      유치원에 들어온 <span style="color:var(--babypink)">세 친구</span>
+    </p>
+
+    <div class="r" style="--i:3;margin-top:42px;display:flex;align-items:center;gap:18px;font-size:0.85em;font-family:'Jua';color:var(--inkSoft);letter-spacing:0.05em">
+      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--babypink);border-radius:50%"></span>EduPing</span>
+      <span style="opacity:0.4">·</span>
+      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--mintInk);border-radius:50%"></span>GogoPing</span>
+      <span style="opacity:0.4">·</span>
+      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--lavInk);border-radius:50%"></span>NoriArm</span>
+    </div>
+
+  </div>
+</section>

@@ -8,13 +8,16 @@ var SLIDES = [
   // ── HOOK ──
   '01-title.html',
   '02-pov-video.html',
+  '02b-dev-question.html',
   '03-want.html',
-  '04-need.html',
+  '04b-reveal.html',
   '05-toc.html',
+  '04-need.html',
+  '04c-required.html',
   // ── SETUP ──
+  '07b-hardware.html',
   '06-system.html',
   '07-tech-stack.html',
-  '07b-hardware.html',
   // ── EDUPING ──
   '08-eduping-section.html',
   '09-eduping-arrival.html',
@@ -24,9 +27,6 @@ var SLIDES = [
   // ── GOGOPING ──
   '13-gogoping-section.html',
   '14-gogoping-follow.html',
-  '15-gogoping-move.html',
-  '16-gogoping-hide.html',
-  '17-gogoping-lullaby.html',
   // ── NORIARM ──
   '18-noriarm-section.html',
   '19-noriarm-blocks.html',
@@ -34,19 +34,33 @@ var SLIDES = [
   '21-noriarm-shop.html',
   // ── CLOSING ──
   '22-sprint-jira.html',
+  '22b-portal-report.html',
   '23-team.html',
   '24-ending.html',
+  // ── Q&A 부록 (클릭하면 점프) ──
+  'qa-1-act.html',
+  'qa-2-mugunghwa.html',
+  'qa-3-doctor.html',
+  'qa-4-safety.html',
+  'qa-5-follow.html',
+  'qa-6-wakeword.html',
+  'qa-7-nav.html',
+  'qa-8-portal.html',
+  'qa-9-architecture.html',
 ];
 
 var SLIDE_TITLES = [
   '핑더가든',
   'POV 영상 (1인칭)',
+  '무엇을 만들어야 했나 (Dev)',
   '하고 싶었던 것',
-  '필요했던 것',
+  '핑더가든 reveal',
   '목차',
+  'PART 01 — System',
+  '그래서 필요했던 것',
+  '로봇 하드웨어',
   '시스템 구성',
   '기술 스택',
-  '로봇 하드웨어',
   '— EduPing —',
   '에듀핑 · 등하원 + 하이파이브',
   '에듀핑 · 율동',
@@ -54,16 +68,23 @@ var SLIDE_TITLES = [
   '에듀핑 · 원격 진단',
   '— GogoPing —',
   '고고핑 · 교사 추종',
-  '고고핑 · 자율 운반',
-  '고고핑 · 숨바꼭질',
-  '고고핑 · 자장가',
   '— NoriArm —',
   '노리암 · 블럭쌓기',
   '노리암 · OX 퀴즈',
   '노리암 · 가게놀이',
   '스프린트 Jira',
+  'Portal · 일과 보고서',
   '팀',
-  '엔딩',
+  'Q&A',
+  'Q&A · 모방학습 (ACT)',
+  'Q&A · 무궁화 perception',
+  'Q&A · 원격 진찰',
+  'Q&A · 근접 안전정지',
+  'Q&A · 교사 추종',
+  'Q&A · 호출어',
+  'Q&A · 자율 주행 + BT',
+  'Q&A · Portal 보고서',
+  'Q&A · 아키텍처',
 ];
 
 async function loadSlides() {
@@ -86,9 +107,9 @@ async function initPresentation() {
     slideNumber: 'c/t',
     width: 1280,
     height: 720,
-    margin: 0.04,
-    minScale: 0.1,
-    maxScale: 2.0,
+    margin: 0,
+    minScale: 0.2,
+    maxScale: 5.0,
     transition: 'fade',
     transitionSpeed: 'fast',
     plugins: [RevealNotes, RevealHighlight],
@@ -98,8 +119,28 @@ async function initPresentation() {
       87: function () { toggleWebcam(); },     // W
       67: function () { toggleDraw(); },       // C
       88: function () { clearDraw(); },        // X
+      39: function () { advanceOrPlay(); },    // →
+      32: function () { advanceOrPlay(); },    // Space
+      34: function () { advanceOrPlay(); },    // PageDown
     },
   });
+
+  // 현재 슬라이드에 아직 안 재생된 [data-press-to-play] 영상이 있으면 재생, 없으면 다음 슬라이드.
+  function advanceOrPlay() {
+    var slide = Reveal.getCurrentSlide();
+    if (!slide) { Reveal.right(); return; }
+    var pending = slide.querySelectorAll('video[data-press-to-play]:not([data-played="1"])');
+    if (pending.length > 0) {
+      pending.forEach(function (v) {
+        v.dataset.played = '1';
+        v.currentTime = 0;
+        v.playbackRate = parseFloat(v.dataset.defaultRate || '2');
+        v.play().catch(function () {});
+      });
+      return;
+    }
+    Reveal.right();
+  }
 
   function forceCenterAlign() {
     var slideHeight = 720;
@@ -168,6 +209,7 @@ async function initPresentation() {
     initDraw();
     initImageZoom();
     injectGlows();
+    attachVideoSpeedControls();
     forceCenterAlign();
     replayMotion();
 
@@ -188,10 +230,53 @@ async function initPresentation() {
     if (panel && !panel.classList.contains('hidden')) {
       updateSlidePanelActive();
     }
-    event.currentSlide.querySelectorAll('video[autoplay]').forEach(function (v) {
+    attachVideoSpeedControls();
+    // 슬라이드 진입 시 — press-to-play 영상은 첫 프레임에서 멈추고 대기, 그 외는 자동 재생.
+    event.currentSlide.querySelectorAll('video').forEach(function (v) {
       v.currentTime = 0;
-      v.play().catch(function () {});
+      v.playbackRate = parseFloat(v.dataset.defaultRate || '2');
+      if (v.hasAttribute('data-press-to-play')) {
+        v.dataset.played = '0';
+        v.pause();
+      } else {
+        v.play().catch(function () {});
+      }
     });
+  });
+}
+
+/* ── Video speed controls (overlay on every video) ── */
+function attachVideoSpeedControls() {
+  document.querySelectorAll('.reveal video').forEach(function (v) {
+    if (v.dataset.speedBound) return;
+    v.dataset.speedBound = '1';
+    var rates = ['1', '1.5', '2', '3'];
+    var ctl = document.createElement('div');
+    ctl.className = 'video-speed show';
+    ctl.innerHTML = rates.map(function (s) {
+      return '<button data-rate="' + s + '">' + s + 'x</button>';
+    }).join('');
+    ctl.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var rate = parseFloat(b.dataset.rate);
+        v.playbackRate = rate;
+        ctl.querySelectorAll('button').forEach(function (x) {
+          x.classList.toggle('active', x === b);
+        });
+      });
+    });
+    var defaultRate = v.dataset.defaultRate || '2';
+    v.playbackRate = parseFloat(defaultRate);
+    var defBtn = ctl.querySelector('button[data-rate="' + defaultRate + '"]');
+    if (defBtn) defBtn.classList.add('active');
+    var parent = v.parentElement;
+    if (parent) {
+      if (getComputedStyle(parent).position === 'static') {
+        parent.style.position = 'relative';
+      }
+      parent.appendChild(ctl);
+    }
   });
 }
 

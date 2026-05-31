@@ -41,13 +41,14 @@
 }
 
 html, body {
-  background: var(--canvas);
+  background: var(--canvas) !important;
   color: var(--ink);
   font-family: 'Pretendard Variable', system-ui, sans-serif;
+  margin: 0;
 }
 
-/* Reveal overrides */
-.reveal-viewport, html.reveal-viewport { background: var(--canvas) !important; }
+/* Reveal overrides — letterbox 영역도 슬라이드와 동색 */
+.reveal-viewport, html.reveal-viewport, .reveal, .reveal .backgrounds { background: var(--canvas) !important; }
 .reveal {
   font-family: 'Pretendard Variable', system-ui, sans-serif;
   color: var(--ink);
@@ -57,6 +58,10 @@ html, body {
   background: var(--canvas);
   color: var(--ink);
   font-size: 28px;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
   font-family: 'Jua', 'Pretendard Variable', system-ui, sans-serif;
@@ -310,4 +315,39 @@ html, body {
 /* never hide content for print / PDF export */
 @media print {
   .r { opacity: 1 !important; transform: none !important; }
+}
+
+/* video speed controls overlay */
+.video-speed{
+  position:absolute; bottom:10px; right:14px; display:flex; gap:4px;
+  z-index:10; opacity:0; transition:opacity .15s;
+}
+.video-speed.show, *:hover > .video-speed { opacity:1; }
+.video-speed button{
+  background:rgba(20,16,28,0.78); color:#fff;
+  border:1px solid rgba(255,255,255,0.18); border-radius:6px;
+  padding:4px 9px; font-family:'Jua'; font-size:13px; cursor:pointer;
+  transition:background .12s;
+}
+.video-speed button:hover{ background:rgba(255,111,134,0.55); }
+.video-speed button.active{
+  background:var(--babypink); border-color:var(--babypink); color:#1a1622;
+}
+
+/* reveal slide — dynamic animations */
+@keyframes spin-slow { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes pulse-glow { 0%,100%{transform:scale(1);opacity:0.55} 50%{transform:scale(1.08);opacity:0.85} }
+@keyframes drift-1 { 0%,100%{transform:translate(0,0)} 33%{transform:translate(40px,-30px)} 66%{transform:translate(-30px,20px)} }
+@keyframes drift-2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-50px,40px)} }
+@keyframes shine { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+.spin-slow{animation:spin-slow 28s linear infinite}
+.pulse-glow{animation:pulse-glow 4s ease-in-out infinite}
+.drift-1{animation:drift-1 12s ease-in-out infinite}
+.drift-2{animation:drift-2 14s ease-in-out infinite}
+.shine-text{
+  background:linear-gradient(90deg,#FF6F86,#B98CFF,#3FD9A6,#FF6F86);
+  background-size:200% 100%;
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  animation:shine 6s linear infinite;
 }

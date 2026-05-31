@@ -1,42 +1,79 @@
 <section>
-  <div style="padding:36px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column">
-    <p style="color:var(--inkSoft);font-family:'Jua';letter-spacing:0.3em;font-size:0.7em">AGENDA</p>
-    <h2 class="font-display" style="font-size:2em;color:var(--ink);margin:6px 0 30px">이번 발표는 이렇게 흐릅니다</h2>
+  <div class="bg-deco">
+    <div class="blob" style="width:300px;height:300px;background:var(--babypinkSoft);top:-80px;right:-60px;opacity:0.4"></div>
+    <div class="blob" style="width:260px;height:260px;background:var(--mintSoft);bottom:-70px;left:-40px;opacity:0.35"></div>
+  </div>
 
-    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:18px;min-height:0">
+  <div class="layer" style="padding:42px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
 
-      <div style="background:var(--surface);border:1px solid var(--skySoft);border-radius:14px;padding:20px 24px">
-        <p style="font-family:'Jua';color:var(--skyInk);font-size:0.6em;letter-spacing:0.15em">PART 1</p>
-        <h3 class="font-display" style="font-size:1.1em;color:var(--ink);margin-top:6px">시스템 · 기술 스택</h3>
-        <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.6">전체 아키텍처 + 사용한 기술 한 장 정리</p>
+    <div style="border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:26px">
+      <p style="color:var(--inkSoft);font-family:'Jua';letter-spacing:0.4em;font-size:0.65em;margin:0">─ AGENDA ─</p>
+      <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:6px 0 0">오늘 보여드릴 6 파트</h2>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:18px 36px;min-height:0">
+
+      <div style="display:flex;align-items:center;gap:20px">
+        <span class="font-display" style="font-size:3.6em;line-height:0.85;color:transparent;-webkit-text-stroke:2.5px var(--skyInk);letter-spacing:-0.04em">01</span>
+        <span style="width:4px;height:50px;background:var(--skyInk);border-radius:999px;flex:0 0 auto"></span>
+        <div style="min-width:0">
+          <p style="color:var(--skyInk);font-family:'Jua';letter-spacing:0.18em;font-size:0.55em;margin:0">SYSTEM</p>
+          <h3 class="font-display" style="font-size:1.05em;color:var(--ink);margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">시스템 · 기술 스택</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin:0">하드웨어 · 아키텍처</p>
+        </div>
       </div>
 
-      <div style="background:var(--surface);border:1px solid var(--babypinkSoft);border-radius:14px;padding:20px 24px">
-        <p style="font-family:'Jua';color:var(--babypink);font-size:0.6em;letter-spacing:0.15em">PART 2</p>
-        <h3 class="font-display" style="font-size:1.1em;color:var(--ink);margin-top:6px">EduPing</h3>
-        <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.6">등하원 · 율동 · 무궁화꽃 · 원격 진찰</p>
+      <div style="display:flex;align-items:center;gap:20px">
+        <span class="font-display" style="font-size:3.6em;line-height:0.85;color:transparent;-webkit-text-stroke:2.5px var(--babypink);letter-spacing:-0.04em">02</span>
+        <span style="width:4px;height:50px;background:var(--babypink);border-radius:999px;flex:0 0 auto"></span>
+        <div style="min-width:0">
+          <p style="color:var(--babypink);font-family:'Jua';letter-spacing:0.18em;font-size:0.55em;margin:0">EDUPING</p>
+          <h3 class="font-display" style="font-size:1.05em;color:var(--ink);margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">환영 · 놀이 · 진찰</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin:0">등하원 · 율동 · 무궁화 · 진찰</p>
+        </div>
       </div>
 
-      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:20px 24px">
-        <p style="font-family:'Jua';color:var(--mintInk);font-size:0.6em;letter-spacing:0.15em">PART 3</p>
-        <h3 class="font-display" style="font-size:1.1em;color:var(--ink);margin-top:6px">GogoPing</h3>
-        <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.6">교사 추종 · 자율 운반 · 숨바꼭질 · 자장가</p>
+      <div style="display:flex;align-items:center;gap:20px">
+        <span class="font-display" style="font-size:3.6em;line-height:0.85;color:transparent;-webkit-text-stroke:2.5px var(--mintInk);letter-spacing:-0.04em">03</span>
+        <span style="width:4px;height:50px;background:var(--mintInk);border-radius:999px;flex:0 0 auto"></span>
+        <div style="min-width:0">
+          <p style="color:var(--mintInk);font-family:'Jua';letter-spacing:0.18em;font-size:0.55em;margin:0">GOGOPING</p>
+          <h3 class="font-display" style="font-size:1.05em;color:var(--ink);margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">동행 · 운반 · 자장가</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin:0">추종 · 운반 · 숨바꼭질 · 자장가</p>
+        </div>
       </div>
 
-      <div style="background:var(--surface);border:1px solid var(--lavenderSoft);border-radius:14px;padding:20px 24px">
-        <p style="font-family:'Jua';color:var(--lavInk);font-size:0.6em;letter-spacing:0.15em">PART 4</p>
-        <h3 class="font-display" style="font-size:1.1em;color:var(--ink);margin-top:6px">NoriArm</h3>
-        <p style="color:var(--inkSoft);font-size:0.7em;margin-top:6px;line-height:1.6">블럭쌓기 · OX 퀴즈 · 가게놀이</p>
+      <div style="display:flex;align-items:center;gap:20px">
+        <span class="font-display" style="font-size:3.6em;line-height:0.85;color:transparent;-webkit-text-stroke:2.5px var(--lavInk);letter-spacing:-0.04em">04</span>
+        <span style="width:4px;height:50px;background:var(--lavInk);border-radius:999px;flex:0 0 auto"></span>
+        <div style="min-width:0">
+          <p style="color:var(--lavInk);font-family:'Jua';letter-spacing:0.18em;font-size:0.55em;margin:0">NORIARM</p>
+          <h3 class="font-display" style="font-size:1.05em;color:var(--ink);margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">교실 놀이 친구</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin:0">블럭쌓기 · OX 퀴즈 · 가게놀이</p>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:20px">
+        <span class="font-display" style="font-size:3.6em;line-height:0.85;color:transparent;-webkit-text-stroke:2.5px var(--butterInk);letter-spacing:-0.04em">05</span>
+        <span style="width:4px;height:50px;background:var(--butterInk);border-radius:999px;flex:0 0 auto"></span>
+        <div style="min-width:0">
+          <p style="color:var(--butterInk);font-family:'Jua';letter-spacing:0.18em;font-size:0.55em;margin:0">SPRINT</p>
+          <h3 class="font-display" style="font-size:1.05em;color:var(--ink);margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">스프린트 관리</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin:0">Jira 보드 · 역할 분담</p>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:20px">
+        <span class="font-display" style="font-size:3.6em;line-height:0.85;color:transparent;-webkit-text-stroke:2.5px var(--inkSoft);letter-spacing:-0.04em">06</span>
+        <span style="width:4px;height:50px;background:var(--inkSoft);border-radius:999px;flex:0 0 auto"></span>
+        <div style="min-width:0">
+          <p style="color:var(--inkSoft);font-family:'Jua';letter-spacing:0.18em;font-size:0.55em;margin:0">ENDING</p>
+          <h3 class="font-display" style="font-size:1.05em;color:var(--ink);margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">팀 · 엔딩 · Q&amp;A</h3>
+          <p style="color:var(--inkSoft);font-size:0.6em;margin:0">팀 6명 · 마무리 · 질의응답</p>
+        </div>
       </div>
 
     </div>
 
-    <p style="color:var(--inkSoft);font-size:0.7em;margin-top:18px;text-align:center;font-style:italic">
-      마지막 — 스프린트 관리 · 팀 · Q&amp;A
-    </p>
-
   </div>
-  <aside class="notes">
-    오늘 발표 흐름. Part 1 시스템 + 기술 스택 (5분), Part 2-4 로봇 3종 demo (12분), 마지막 스프린트 + 팀 (3분).
-  </aside>
 </section>
