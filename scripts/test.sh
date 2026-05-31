@@ -103,6 +103,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_fsm_transitions.py \
   tests/test_gogoping_goal_reconciler.py \
   tests/test_gogoping_goto_subtree_builder.py \
+  tests/test_gogoping_navigate_to_vertex_redirect.py \
   tests/test_gogoping_idle_timeout_monitor.py \
   tests/test_gogoping_lullaby_audio.py \
   tests/test_gogoping_lullaby_subtree_builder.py \

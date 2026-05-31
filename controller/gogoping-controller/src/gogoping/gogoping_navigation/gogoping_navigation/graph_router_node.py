@@ -157,6 +157,11 @@ class GraphRouterNode(Node):
                 reliability=ReliabilityPolicy.RELIABLE,
             ),
         )
+        # route_path latch 의 현재 "주인" 토큰. _act_navigate 가 시작할 때마다 새 토큰을
+        # claim 한다. 이동 중 목적지 변경(redirect) 으로 옛 액션(취소)과 새 액션이
+        # 잠깐 겹칠 때, 죽는 옛 액션의 finally 가 빈 Path 로 새 경로를 덮어 지우지
+        # 않도록 — 자기가 여전히 주인일 때만 clear 한다.
+        self._route_token: object | None = None
 
         # ── graph_router 심화 (2026-05-28) — proximity 기반 pause/reroute (person-only) ──
         # 시연/디버그용 토글 — NO_PROXIMITY_SAFETY=1 → launch 가 disable_proximity_safety:=true
@@ -351,12 +356,21 @@ class GraphRouterNode(Node):
     def _act_navigate(
         self, gh: ServerGoalHandle
     ) -> NavigateToVertex.Result:
-        """thin wrapper — 도착/실패/취소 모두 RViz 의 파란 L1 path 를 비워줌."""
+        """thin wrapper — 도착/실패/취소 모두 RViz 의 파란 L1 path 를 비워줌.
+
+        단, 이동 중 목적지 변경(redirect) 으로 그 사이 *새* 액션이 시작돼 route 주인이
+        바뀌었으면 clear 하지 않는다 — 죽는 옛 액션이 새 액션의 L1 경로를 빈 Path 로
+        덮어 지우는 race 방지 (latch 토픽은 last-write-wins).
+        """
+        token = object()
+        self._route_token = token  # 시작 시 주인 claim
         try:
             return self._act_navigate_impl(gh)
         finally:
-            # 빈 Path publish → TRANSIENT_LOCAL latched 상태 clear → RViz 파란선 사라짐
-            self._publish_route_path([])
+            # 빈 Path publish → TRANSIENT_LOCAL latched 상태 clear → RViz 파란선 사라짐.
+            # 내가 여전히 주인일 때만 (그 사이 새 액션이 claim 안 했을 때만).
+            if self._route_token is token:
+                self._publish_route_path([])
 
     def _act_navigate_impl(
         self, gh: ServerGoalHandle

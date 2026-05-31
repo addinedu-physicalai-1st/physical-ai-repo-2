@@ -55,6 +55,9 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
         # admin UI NavDebugLogCard 용 — main.py 가 setup(kwargs) 로 주입. None 이면 no-op.
         self._debug_events: Any = None
         self._last_target: str = ""
+        # goal 세대 — 이동 중 목적지 변경(redirect) 시 ++ 하여 옛 goal 의 async 콜백을
+        # 무효화한다. 옛 콜백이 stale gen 이면 결과를 무시(필요 시 cancel)해 좀비 방지.
+        self._gen: int = 0
         self.blackboard = self.attach_blackboard_client(name=self.qualified_name)
         self.blackboard.register_key(
             key=self._target_key, access=py_trees.common.Access.READ
@@ -82,31 +85,54 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
         self._cancel_pending = False
         self._result_status = None
         self._failure_reason = ""
+        target = self._read_target()
+        if target is None:
+            return  # _read_target 가 실패 사유 세팅함
+        self._send_goal(target)
+
+    def _read_target(self) -> str | None:
         try:
             target = self.blackboard.get(self._target_key)
         except KeyError:
             self._result_status = "failed"
             self._failure_reason = f"blackboard.{self._target_key} not set"
-            return
+            return None
         if not isinstance(target, str) or not target:
             self._result_status = "failed"
             self._failure_reason = f"invalid target: {target!r}"
-            return
+            return None
+        return target
+
+    def _send_goal(self, target: str) -> None:
+        """target 으로 새 goal 전송 — 세대(_gen) 를 올려 옛 goal 콜백을 무효화한다."""
         if self._client is None or not self._client.server_is_ready():
             # action server 없으면 1회 짧은 wait
             if self._client is None or not self._client.wait_for_server(timeout_sec=0.5):
                 self._result_status = "failed"
                 self._failure_reason = "action server unavailable"
                 return
+        self._gen += 1
+        gen = self._gen
+        self._goal_handle = None
+        self._cancel_pending = False
         goal = NavigateToVertexAction.Goal()
         goal.target_name = target
         self._last_target = target
         send_future = self._client.send_goal_async(goal)
-        send_future.add_done_callback(self._on_goal_response)
+        send_future.add_done_callback(lambda fut: self._on_goal_response(fut, gen))
         self._dbg(f"send → {target!r}")
 
-    def _on_goal_response(self, fut: Any) -> None:
+    def _on_goal_response(self, fut: Any, gen: int) -> None:
         gh = fut.result()
+        # redirect/terminate 로 무효화된 옛 goal — 수락됐으면 cancel 만 하고 버림.
+        if gen != self._gen:
+            try:
+                if gh.accepted:
+                    gh.cancel_goal_async()
+            except Exception:
+                pass
+            self._dbg(f"stale goal dropped ({self._last_target!r})", level="warn")
+            return
         if not gh.accepted:
             self._result_status = "failed"
             self._failure_reason = "rejected"
@@ -127,9 +153,11 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
             return
         self._dbg(f"gh accepted ({self._last_target!r})")
         result_fut = gh.get_result_async()
-        result_fut.add_done_callback(self._on_result)
+        result_fut.add_done_callback(lambda f: self._on_result(f, gen))
 
-    def _on_result(self, fut: Any) -> None:
+    def _on_result(self, fut: Any, gen: int) -> None:
+        if gen != self._gen:
+            return  # 무효화된 옛 goal 의 결과 — 무시
         wrapper = fut.result()
         res = wrapper.result
         if getattr(res, "success", False):
@@ -144,6 +172,25 @@ class NavigateToVertex(py_trees.behaviour.Behaviour):
             )
 
     def update(self) -> py_trees.common.Status:
+        # 이동 중 목적지 변경 감지 — 아직 진행 중(result 미확정)인데 blackboard target 이
+        # 바뀌었으면(goal_reconciler 가 same_state 로 destination_key 만 갱신한 경우)
+        # 진행 중 goal 을 cancel 하고 새 target 으로 재전송한다. _send_goal 이 _gen 을
+        # 올려 옛 goal 의 콜백을 무효화하므로 stale 결과로 인한 오작동이 없다.
+        if self._result_status is None:
+            try:
+                live = self.blackboard.get(self._target_key)
+            except KeyError:
+                live = None
+            if isinstance(live, str) and live and live != self._last_target:
+                self._dbg(f"redirect {self._last_target!r} → {live!r} (mid-motion)")
+                if self._goal_handle is not None:
+                    try:
+                        self._goal_handle.cancel_goal_async()
+                    except Exception:
+                        pass
+                self._send_goal(live)
+                return py_trees.common.Status.RUNNING
+
         if self._result_status == "succeeded":
             return py_trees.common.Status.SUCCESS
         if self._result_status == "failed":
