@@ -20,7 +20,9 @@ woobuntu 는 start_active:=true 로 상시 active.
 
 Params:
   start_active     (bool,  default False)  True 면 부팅부터 active.
-  leader_smoothing (float, default 0.3)    EMA alpha (고정주기). 1.0=무필터, 작을수록 부드럽고 지연↑.
+  min_cutoff       (float, default 1.0)    One Euro 최소 컷오프(Hz). ↓ 정지 시 더 부드럽고 지연↑.
+  beta             (float, default 0.7)    One Euro 속도 계수. ↑ 빠른 동작에서 더 반응적(지연↓).
+  d_cutoff         (float, default 1.0)    One Euro 미분 컷오프(Hz).
   max_joint_vel    (float, default 1.0)    per-joint 최대 각속도 (rad/s).
   output_hz        (float, default 50.0)   JTC 출력 주기.
 """
@@ -99,11 +101,21 @@ class LeaderPassthrough(Node):
         self._active = bool(
             self.get_parameter("start_active").get_parameter_value().bool_value
         )
-        a = float(
-            self.declare_parameter("leader_smoothing", 0.3)
-            .get_parameter_value().double_value
-        )
-        self._smooth_a = min(1.0, max(0.01, a))
+        # One Euro Filter — 속도 적응형 저역통과. 느릴 때 강하게(떨림↓), 빠를 때 약하게(지연↓).
+        #   min_cutoff↓ → 정지 시 더 부드러움(떨림↓), 지연↑.
+        #   beta↑       → 빠른 동작에서 더 반응적(지연↓), 빠른 구간 떨림 약간↑.
+        self._min_cutoff = max(
+            0.01, float(self.declare_parameter("min_cutoff", 1.0)
+                        .get_parameter_value().double_value))
+        self._beta = max(
+            0.0, float(self.declare_parameter("beta", 0.7)
+                       .get_parameter_value().double_value))
+        self._d_cutoff = max(
+            0.01, float(self.declare_parameter("d_cutoff", 1.0)
+                        .get_parameter_value().double_value))
+        # One Euro 상태 — 직전 필터 위치 / 필터 미분 (per side, per joint).
+        self._oe_x: dict[str, list[float] | None] = {side: None for side in SIDES}
+        self._oe_dx: dict[str, list[float] | None] = {side: None for side in SIDES}
         self._max_vel = float(
             self.declare_parameter("max_joint_vel", 1.0)
             .get_parameter_value().double_value
@@ -123,16 +135,19 @@ class LeaderPassthrough(Node):
         self.create_timer(self._dt, self._tick, callback_group=self._cb_group)
 
         self.get_logger().info(
-            f"leader_passthrough ready (active={self._active}, smoothing={self._smooth_a}, "
+            f"leader_passthrough ready (active={self._active}, "
+            f"oneEuro min_cutoff={self._min_cutoff} beta={self._beta}, "
             f"max_vel={self._max_vel} rad/s, out={self._out_hz}Hz)"
         )
 
     def _on_set_active(self, request: SetBool.Request, response: SetBool.Response):
         active = bool(request.data)
         if not active:
-            # 정지 — EMA/cap 상태 리셋해 다음 시작 때 follower 에서 다시 seed.
+            # 정지 — 필터/cap 상태 리셋해 다음 시작 때 follower 에서 다시 seed.
             for side in SIDES:
                 self._cmd_pos[side] = None
+                self._oe_x[side] = None
+                self._oe_dx[side] = None
         self._active = active
         response.success = True
         response.message = f"active={self._active}"
@@ -168,38 +183,66 @@ class LeaderPassthrough(Node):
             {n: i for i, n in enumerate(follower.name)} if follower is not None else {}
         )
 
-        a = self._smooth_a
         max_step = self._max_vel * self._dt
         for side in SIDES:
             target = targets[side]
             if target is None:
                 continue
 
+            # One Euro 필터 — 속도 적응형 저역통과 (떨림 제거).
+            ft = self._one_euro(side, target)
+
             cmd = self._cmd_pos[side]
-            # 시작 — follower 현재 자세에서 출발 (점프 방지). 없으면 target 에서 시작.
+            # 시작 — follower 현재 자세에서 출발 (점프 방지). 없으면 ft 에서 시작.
             if cmd is None:
                 if follower is not None and all(j in follower_idx for j in ARM_JOINTS[side]):
                     cmd = [follower.position[follower_idx[j]] for j in ARM_JOINTS[side]]
                 else:
-                    cmd = list(target)
+                    cmd = list(ft)
 
+            # 속도 캡 — cmd 를 필터된 target(ft) 으로 max_step 만큼 이동 (안전).
             out: list[float] = []
-            for c, t in zip(cmd, target):
-                # EMA 저역통과 (고정 dt).
-                nxt = a * t + (1.0 - a) * c
-                # 속도 캡.
-                d = nxt - c
+            for c, t in zip(cmd, ft):
+                d = t - c
                 if d > max_step:
-                    nxt = c + max_step
+                    out.append(c + max_step)
                 elif d < -max_step:
-                    nxt = c - max_step
-                out.append(nxt)
+                    out.append(c - max_step)
+                else:
+                    out.append(t)
             self._cmd_pos[side] = out
             self._publish_jtc(side, out)
 
             grip = grips[side]
             if grip is not None:
                 self._send_gripper(side, grip)
+
+    # ── One Euro Filter ────────────────────────────────────────────────
+    def _alpha(self, cutoff: float) -> float:
+        tau = 1.0 / (2.0 * math.pi * cutoff)
+        return 1.0 / (1.0 + tau / self._dt)
+
+    def _one_euro(self, side: str, x: list[float]) -> list[float]:
+        """속도 적응형 저역통과 — 느릴 때 강한 필터(떨림↓), 빠를 때 약한 필터(지연↓)."""
+        xf_prev = self._oe_x[side]
+        if xf_prev is None or len(xf_prev) != len(x):
+            self._oe_x[side] = list(x)
+            self._oe_dx[side] = [0.0] * len(x)
+            return list(x)
+        dxf_prev = self._oe_dx[side]
+        a_d = self._alpha(self._d_cutoff)
+        out: list[float] = []
+        dxf: list[float] = []
+        for xi, xpi, dxpi in zip(x, xf_prev, dxf_prev):
+            dx = (xi - xpi) / self._dt
+            edx = a_d * dx + (1.0 - a_d) * dxpi        # 필터된 속도
+            dxf.append(edx)
+            cutoff = self._min_cutoff + self._beta * abs(edx)  # 속도↑ → cutoff↑ → 덜 필터
+            a = self._alpha(cutoff)
+            out.append(a * xi + (1.0 - a) * xpi)
+        self._oe_x[side] = out
+        self._oe_dx[side] = dxf
+        return out
 
     def _publish_jtc(self, side: str, positions: list[float]) -> None:
         jt = JointTrajectory()
