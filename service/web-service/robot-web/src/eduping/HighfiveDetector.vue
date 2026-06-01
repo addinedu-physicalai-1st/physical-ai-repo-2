@@ -9,7 +9,8 @@
  * 시각 출력은 가벼움 — 화면 하단 prompt 한 줄만. 3D 포인트클라우드는
  * DepthViewer (뎁스카메라 뷰 모드) 에서만 그림.
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
+import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import {
   HIGHFIVE_POST_INTERVAL_MS,
   palmFromFrame,
@@ -22,7 +23,7 @@ import { useHandTracker } from './useHandTracker';
 const props = defineProps<{
   /** 손이 안 보일 때 최대 대기 시간 (ms). 기본 12s. */
   timeoutMs?: number;
-  /** POST 후 모션 완료까지 대기 (ms). 기본 4s — highfive_node 의 2.5s 트래젝토리 + 마진. */
+  /** POST 후 모션 완료까지 대기 (ms). 기본 9s — highfive_node 의 4-phase 제스처 ~8.6s + 마진. */
   motionMs?: number;
 }>();
 
@@ -32,6 +33,8 @@ const emit = defineEmits<{
   /** 손이 안 나타나서 timeout. */
   timeout: [];
 }>();
+
+const voiceController = inject(VOICE_CONTROLLER_KEY);
 
 const stream = useDepthStream('eduping');
 const tracker = useHandTracker();
@@ -48,6 +51,11 @@ let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 let motionHandle: ReturnType<typeof setTimeout> | null = null;
 
 function handleFrame(frame: import('./useDepthStream').DecodedDepthFrame): void {
+  // 발사 후엔 추적·POST 중단 — 하이파이브 reach 중 팔이 D435 (body 0.05,0,0.62, 정면)
+  // 를 가리면 tracker 가 손을 놓쳐 red ball 이 corner 로 튀고, 계속 POST 하면 팔이 그
+  // 엉뚱한 target 을 쫓아 카메라를 더 가린다. 첫 valid target 으로 commit + 추적 종료
+  // (decode/detect 도 멈춰 제스처 중 CPU 부하 ↓).
+  if (posted) return;
   // 검출 throttle
   detectCounter = (detectCounter + 1) % DETECT_EVERY_N;
   if (detectCounter === 0) {
@@ -87,7 +95,11 @@ function handleFrame(frame: import('./useDepthStream').DecodedDepthFrame): void 
     if (posted) return;
     posted = true;
     if (timeoutHandle) { clearTimeout(timeoutHandle); timeoutHandle = null; }
-    motionHandle = setTimeout(() => emit('complete'), props.motionMs ?? 4000);
+    // 하이파이브 모션 완료 후 마무리 인사.
+    motionHandle = setTimeout(() => {
+      voiceController?.speak('오늘도 좋은 하루 보내요');
+      emit('complete');
+    }, props.motionMs ?? 9000);
   }).catch((e) => console.warn('hand-target POST error:', e));
 }
 

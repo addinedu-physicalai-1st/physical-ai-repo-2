@@ -68,6 +68,9 @@ dependencies = [
   # NoriArm 블럭쌓기 — ACT (Action Chunking Transformer) 모방학습 추론.
   # 첫 실행 시 PyTorch + torchvision 을 transitive 로 끌어옴 (~2GB).
   "lerobot>=0.1",
+  # EduPing sim — MuJoCo physics replacement for sim_twin (PD control + viewer).
+  # URDF 를 mujoco.MjModel.from_xml_path 로 직접 로드 (mujoco 3.x native URDF).
+  "mujoco>=3.2",
 ]
 
 [dependency-groups]

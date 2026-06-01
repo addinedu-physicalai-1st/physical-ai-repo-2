@@ -89,6 +89,45 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
       "bash -c 'export DATABASE_URL=\"$DATABASE_URL\"; export AI_HUB_URL=\"$AI_HUB_URL\"; exec $(_runlib::wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 --reload)'"
 
+    # EduPing depth view ROS 스택 — d435 카메라 + ROS→WS 스트리머 + highfive_sim
+    # (IK + sim_twin + depth_mask + move_group). DepthViewer 가 사용. 항상 떠 있어야
+    # control-service 의 bridge 가 stale handle 없이 깨끗하게 동작. depth_session.py
+    # 가 pgrep 로 감지해서 자동 attach. D435 미연결 시에도 window 만 에러 메시지 +
+    # remain-on-exit 로 보존 — 다른 stack 영향 없음.
+    #
+    # control window 와 WS_SOURCING 정책이 다른 이유:
+    #   control 은 root install (eduarm 만 있어도 OK) 하나만 source 해서 가벼움.
+    #   highfive_sim 은 openarm_description / openarm_bimanual_moveit_config 같은
+    #   controller/eduping-controller/install 의 추가 패키지가 반드시 필요 → 두
+    #   workspace 모두 source. 순서: root 먼저 → eduping overlay 위에.
+    # WS_SOURCING terminator 가 분기마다 일관성 없음 (root 하나만 = no ";", multi =
+    # 각 "; ") → 결합 시 ";; " 같은 syntax error 발생 가능. trailing ";" 정규화 후
+    # 결합.
+    DEPTH_WS_SOURCING="${WS_SOURCING%;}"
+    if [[ -f "$EDUPING_WS_SETUP" && "$WS_SOURCING" != *"$EDUPING_WS_SETUP"* ]]; then
+      if [[ -n "$DEPTH_WS_SOURCING" ]]; then
+        DEPTH_WS_SOURCING="$DEPTH_WS_SOURCING; source $EDUPING_WS_SETUP"
+      else
+        DEPTH_WS_SOURCING="source $EDUPING_WS_SETUP"
+      fi
+    fi
+    DEPTH_ROS_PREFIX="[ -f $ROS_SETUP ] && source $ROS_SETUP; $DEPTH_WS_SOURCING"
+
+    tmux new-window -t "$SESSION" -n d435 -c "$REPO_ROOT" \
+      "bash -c '$DEPTH_ROS_PREFIX; exec ros2 launch eduarm d435_camera.launch.py \
+         depth_width:=640 depth_height:=480 color_width:=640 color_height:=480 fps:=15'"
+
+    # streamer 는 system python (/usr/bin/python3) 강제 — eduarm install 의 ROS
+    # python 패키지 (cv_bridge 등) 가 numpy 1.x 로 빌드되어 conda pdg 의 numpy 2.x
+    # 와 ABI 충돌. depth_session.py 의 spawn 도 동일하게 /usr/bin/python3 사용.
+    tmux new-window -t "$SESSION" -n streamer -c "$REPO_ROOT" \
+      "bash -c '$DEPTH_ROS_PREFIX; \
+         export PYTHONPATH=\"$REPO_ROOT/service/control-service:\${PYTHONPATH:-}\"; \
+         exec /usr/bin/python3 -m eduarm.d435_depth_streamer --server-host 127.0.0.1'"
+
+    tmux new-window -t "$SESSION" -n highfive -c "$REPO_ROOT" \
+      "bash -c '$DEPTH_ROS_PREFIX; exec ros2 launch eduarm highfive_sim.launch.py'"
+
     tmux set-option -t "$SESSION" -g mouse on
     tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
     tmux set-option -t "$SESSION" -g window-status-current-style 'bg=colour33,fg=white,bold'

@@ -156,7 +156,10 @@ async def _make_child(db_session, name: str = "정우"):
     return child
 
 
-async def test_check_in_fires_morning_greeting(client: AsyncClient, db_session, fake_bridge):
+async def test_check_in_does_not_fire_greeting_replaced_by_highfive(
+    client: AsyncClient, db_session, fake_bridge
+):
+    """등원(IN) morning 율동은 하이파이브로 대체 — 서버 팔 인사 모션을 안 친다."""
     child = await _make_child(db_session)
     response = await client.post(
         "/api/attendance/check",
@@ -166,12 +169,9 @@ async def test_check_in_fires_morning_greeting(client: AsyncClient, db_session, 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["already"] is False
-    assert body["arm_status"] == "fired"
+    assert body["arm_status"] == "skipped:replaced_by_highfive"
     await _wait_for_bg_tasks()
-    fake_bridge.play_routine.assert_called_once()
-    args, kwargs = fake_bridge.play_routine.call_args
-    assert args[:2] == ("greeting", "morning")
-    assert kwargs.get("target") == "real"
+    fake_bridge.play_routine.assert_not_called()
 
 
 async def test_check_out_fires_evening_greeting(client: AsyncClient, db_session, fake_bridge):
@@ -217,8 +217,9 @@ async def test_duplicate_check_in_does_not_fire_greeting(
     fake_bridge.play_routine.assert_not_called()
 
 
-async def test_check_in_succeeds_when_bridge_missing(client: AsyncClient, db_session):
-    """eduping bridge 미초기화여도 출결은 정상 기록 — arm_status 로 사유 노출."""
+async def test_check_out_succeeds_when_bridge_missing(client: AsyncClient, db_session):
+    """eduping bridge 미초기화여도 출결은 정상 기록 — arm_status 로 사유 노출.
+    (등원은 하이파이브로 대체돼 인사 모션을 안 치므로 하원으로 bridge-missing 경로 검증.)"""
     from control_service.main import app
 
     prev = getattr(app.state, "eduping_bridge", None)
@@ -228,7 +229,7 @@ async def test_check_in_succeeds_when_bridge_missing(client: AsyncClient, db_ses
         child = await _make_child(db_session, name="지수")
         response = await client.post(
             "/api/attendance/check",
-            json={"child_id": child.id, "type": "IN"},
+            json={"child_id": child.id, "type": "OUT"},
             headers=_device_headers(),
         )
         assert response.status_code == 200, response.text
@@ -240,14 +241,15 @@ async def test_check_in_succeeds_when_bridge_missing(client: AsyncClient, db_ses
             app.state.eduping_bridge = prev
 
 
-async def test_check_in_skips_when_real_arm_inactive(
+async def test_check_out_skips_when_real_arm_inactive(
     client: AsyncClient, db_session, fake_bridge
 ):
+    # 등원은 하이파이브로 대체 — 하원(evening)으로 no-real-arm 스킵 경로 검증.
     fake_bridge.is_real_follower_active.return_value = False
     child = await _make_child(db_session, name="윤서")
     response = await client.post(
         "/api/attendance/check",
-        json={"child_id": child.id, "type": "IN"},
+        json={"child_id": child.id, "type": "OUT"},
         headers=_device_headers(),
     )
     assert response.status_code == 200, response.text
@@ -259,19 +261,20 @@ async def test_check_in_skips_when_real_arm_inactive(
     fake_bridge.play_routine.assert_not_called()
 
 
-async def test_check_in_skips_when_routine_missing(
+async def test_check_out_skips_when_routine_missing(
     client: AsyncClient, db_session, fake_bridge
 ):
-    # 픽스처가 만든 morning.yaml 을 지워 routine_missing 분기 검증.
-    (fake_bridge.routines_root / "openarm_greeting" / "morning.yaml").unlink()
+    # 등원(IN)은 하이파이브로 대체돼 서버 모션을 안 치므로 routine_missing 분기는
+    # 하원(OUT)=evening 으로 검증. 픽스처가 만든 evening.yaml 을 지운다.
+    (fake_bridge.routines_root / "openarm_greeting" / "evening.yaml").unlink()
     child = await _make_child(db_session, name="시우")
     response = await client.post(
         "/api/attendance/check",
-        json={"child_id": child.id, "type": "IN"},
+        json={"child_id": child.id, "type": "OUT"},
         headers=_device_headers(),
     )
     assert response.status_code == 200, response.text
-    assert response.json()["arm_status"] == "skipped:routine_missing:morning"
+    assert response.json()["arm_status"] == "skipped:routine_missing:evening"
     await _wait_for_bg_tasks()
     fake_bridge.play_routine.assert_not_called()
 
@@ -282,7 +285,9 @@ async def test_check_in_skips_when_routine_missing(
 async def test_delete_attendance_removes_row_and_allows_recheck(
     teacher_client: AsyncClient, db_session, fake_bridge
 ):
-    """교사가 등원 리셋 → 같은 자녀 같은 날 IN 을 다시 체크하면 already=False + 새 모션 trigger."""
+    """교사가 하원 리셋 → 같은 자녀 같은 날 OUT 을 다시 체크하면 already=False + 새 모션 trigger.
+
+    (등원=IN 은 하이파이브로 대체돼 서버 모션을 안 치므로 refire 검증은 OUT=evening 으로 한다.)"""
     from control_db.models import Attendance
 
     child = await _make_child(db_session, name="재이")
@@ -290,21 +295,21 @@ async def test_delete_attendance_removes_row_and_allows_recheck(
         Attendance(
             child_id=child.id,
             date=date.today(),
-            type="IN",
+            type="OUT",
             time=datetime.now(timezone.utc),
         )
     )
     await db_session.flush()
 
     response = await teacher_client.delete(
-        f"/api/attendance/{child.id}?date={date.today().isoformat()}&type=IN"
+        f"/api/attendance/{child.id}?date={date.today().isoformat()}&type=OUT"
     )
     assert response.status_code == 204, response.text
 
     # 재체크 시 새 row 가 생성되고 모션도 다시 fire.
     recheck = await teacher_client.post(
         "/api/attendance/check",
-        json={"child_id": child.id, "type": "IN"},
+        json={"child_id": child.id, "type": "OUT"},
         headers=_device_headers(),
     )
     assert recheck.status_code == 200, recheck.text
@@ -332,15 +337,17 @@ async def test_delete_attendance_requires_teacher(parent_client: AsyncClient, db
     assert response.status_code == 403
 
 
-async def test_check_in_succeeds_when_play_routine_raises(
+async def test_check_out_succeeds_when_play_routine_raises(
     client: AsyncClient, db_session, fake_bridge
 ):
-    """play_routine 이 예외를 던져도 출결 응답은 200 + 새 row 가 commit 돼야 한다."""
+    """play_routine 이 예외를 던져도 출결 응답은 200 + 새 row 가 commit 돼야 한다.
+
+    (등원=IN 은 하이파이브로 대체돼 play_routine 자체를 안 부르므로 OUT=evening 으로 검증.)"""
     fake_bridge.play_routine.side_effect = RuntimeError("real arm offline")
     child = await _make_child(db_session, name="하늘")
     response = await client.post(
         "/api/attendance/check",
-        json={"child_id": child.id, "type": "IN"},
+        json={"child_id": child.id, "type": "OUT"},
         headers=_device_headers(),
     )
     assert response.status_code == 200, response.text

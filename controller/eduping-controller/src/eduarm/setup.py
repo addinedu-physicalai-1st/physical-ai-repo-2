@@ -41,6 +41,9 @@ setup(
             'd435_depth_streamer = eduarm.d435_depth_streamer:main',
             # 하이파이브 hand_point → IK → JointTrajectory. highfive_sim.launch.py 가 호출.
             'highfive_node = eduarm.highfive_node:main',
+            # 하이파이브 obstacle 마스킹(depth) + MuJoCo twin (sim 관찰). eduping-highfive 추가.
+            'depth_mask_node = eduarm.depth_mask_node:main',
+            'mujoco_twin_node = eduarm.mujoco_twin_node:main',
             # 1Hz 로 /clear_octomap 서비스를 호출 — PointCloudOctomapUpdater stale voxel 제거.
             'clear_octomap_timer = eduarm.clear_octomap_timer:main',
             # 시뮬 부팅 시 양팔을 zero-pose (자연 singularity) → home pose 로 이동.

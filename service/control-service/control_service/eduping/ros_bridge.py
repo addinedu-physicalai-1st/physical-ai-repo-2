@@ -19,6 +19,7 @@ ROS 미설정 환경에서는 import 자체는 성공하되 NewBridge() 가 Brid
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
 import subprocess
@@ -42,9 +43,8 @@ try:
     from geometry_msgs.msg import PointStamped
     from rclpy.action import ActionClient
     from rclpy.node import Node
-    from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
     from sensor_msgs.msg import JointState
-    from std_msgs.msg import Bool, Float64MultiArray
+    from std_msgs.msg import Float64MultiArray
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
     _ROS_AVAILABLE = True
@@ -67,7 +67,6 @@ TOPIC_FOLLOWER = "/joint_states"
 TOPIC_TRAJECTORY = "/eduping/joint_trajectory"
 TOPIC_HIGHFIVE_HAND_POINT = "/eduping/highfive/hand_point"
 HIGHFIVE_HAND_FRAME = "d435_depth_optical_frame"
-TOPIC_PROXIMITY_BLOCK = "/eduping/proximity_block"  # proximity_safety_node → 근접 정지 신호
 
 # routine 타입
 KIND_DANCE = "dance"
@@ -79,11 +78,6 @@ KIND_MUGUNGHWA = "mugunghwa"  # 무궁화꽃이 피었습니다 (SR-PLAY-004) �
 PLAYBACK_RAMP_MIN_S = 0.3
 PLAYBACK_RAMP_MAX_S = 2.5
 PLAYBACK_RAMP_MAX_VEL = 1.5   # rad/s — 갭 / 이 값 = ramp 시간 (clamp 사이)
-# 전역 모션 속도 거버너 — 녹화 루틴 재생(greeting/dance/무궁화)의 시간축을 1/scale 로 늘려
-# 전체적으로 느리고 부드럽게. 시간 stretch 라 속도∝scale·가속도∝scale²·저크∝scale³ 로 함께
-# 감소(끝점 v=0 ease-in/out + JTC 100Hz 보간과 결합 → 느릴수록 더 매끄러움). teleop(live
-# mirror)·return_to_home(이미 느린 trapezoidal)에는 미적용. 1.0=원속도. 실물 보고 값만 조정.
-MOTION_TIME_SCALE = 0.6
 TELEOP_MAX_VEL_RAD_S = 2.0    # rad/s — SmoothDamp 의 catch-up 단계 속도 cap
 TELEOP_SMOOTH_TIME_S = 0.25   # SmoothDamp 시정수 — target 도달까지 nominal 시간
 TELEOP_TICK_DT_MAX = 0.04     # dt clamp 상한 — leader stale 시 단일 tick 점프 방지
@@ -164,15 +158,13 @@ class EdupingRosBridge:
         # return_to_home 중복 호출 dedup — 서버 사이드 (stream 종료) + 프론트 POST 가
         # 같은 정지 이벤트로 0.x 초 안에 두 번 들어오면 두 번째는 trajectory 재발행 skip.
         self._last_return_home_at: float = 0.0
-        # 근접 안전정지 — proximity_safety_node 의 /eduping/proximity_block 구독 결과.
-        # override(모드별 우회)가 True 면 block 무시. _proximity_paused 는 현재 정지 중 여부,
-        # _active_real_play 는 정지 시 이어서 재개할 진행 중 실물 재생 (routine/speed/ramp/start).
-        self._proximity_blocked: bool = False
-        self._proximity_override: bool = False
-        self._proximity_paused: bool = False
-        self._active_real_play: dict | None = None
         # Live teleop 독립 상태 — 녹화와 무관하게 leader → forward_position 패스스루 ON/OFF.
         self._teleop_active: bool = False
+        # Highfive → real 동기화 — DepthViewer 토글로 켜면 /eduping/joint_trajectory 를
+        # 받아서 양팔 follow_joint_trajectory action 으로 forward. teleop 과 controller
+        # 모드가 mutually exclusive (joint_trajectory_controller vs forward_position_controller)
+        # — 둘 다 동시에 ON 안 됨.
+        self._highfive_real_active: bool = False
         # Teleop SmoothDamp tracking — cmd + per-joint velocity 를 함께 유지.
         # set_live_teleop(True) 시 None → 첫 mirror 콜백에서 현재 follower 로 초기화.
         self._teleop_cmd_right: list[float] | None = None
@@ -209,21 +201,42 @@ class EdupingRosBridge:
         self._node = rclpy.create_node("control_eduping_bridge")
         self._js_pub = self._node.create_publisher(JointTrajectory, TOPIC_TRAJECTORY, 10)
         # Highfive hand-target — DepthViewer 가 POST 한 (x,y,z) 를 ROS PointStamped 로
-        # forward. highfive_node 가 이 topic 을 subscribe 해서 TF → IK → JointTrajectory.
+        # forward. highfive_node 가 subscribe → scripted gesture JointTrajectory publish.
         self._highfive_pub = self._node.create_publisher(
             PointStamped, TOPIC_HIGHFIVE_HAND_POINT, 10,
         )
+        # Highfive status — highfive_node 가 5Hz 로 publish 하는 JSON status (obstacle,
+        # reroute, gesture state). UI overlay polling 용 cache.
+        from std_msgs.msg import String as _String
+        from rclpy.qos import (
+            QoSProfile as _QoSProfile,
+            QoSDurabilityPolicy as _Durability,
+            QoSReliabilityPolicy as _Reliability,
+        )
+        self._highfive_status_json: str = '{"level":"ok"}'
+        self._node.create_subscription(
+            _String, "/eduping/highfive/status",
+            self._on_highfive_status, 10,
+        )
+        # Safe joint limits broadcast — 관리자 UI 가 좁힌 안전 범위를 highfive_node 가
+        # gesture clamp 에 사용. TRANSIENT_LOCAL latched QoS — 노드 늦게 join 해도 마지막
+        # 값 받음. set_limits 호출 시마다 republish.
+        self._safe_limits_pub = self._node.create_publisher(
+            _String, "/eduping/safe_joint_limits",
+            _QoSProfile(
+                depth=1,
+                reliability=_Reliability.RELIABLE,
+                durability=_Durability.TRANSIENT_LOCAL,
+            ),
+        )
+        self._republish_safe_limits()
         self._node.create_subscription(JointState, TOPIC_LEADER, self._on_leader, 50)
         self._node.create_subscription(JointState, TOPIC_FOLLOWER, self._on_follower, 50)
-        # 근접 안전정지 — proximity_safety_node 가 latched(transient_local) 로 송출하므로
-        # 같은 QoS 로 구독해야 마지막 상태를 즉시 받는다.
-        _prox_qos = QoSProfile(
-            depth=1,
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
-        )
+        # Highfive → real forwarder — flag 가 꺼져 있을 때는 callback 이 즉시 return.
+        # 항상 subscribe 해서 toggle 시 latency 없이 첫 trajectory 부터 forward.
         self._node.create_subscription(
-            Bool, TOPIC_PROXIMITY_BLOCK, self._on_proximity_block, _prox_qos,
+            JointTrajectory, TOPIC_TRAJECTORY,
+            self._on_highfive_trajectory, 10,
         )
         # Real follower action clients — server 가 아직 안 떠 있을 수 있으니 wait 은 send 시점.
         self._ac_right_arm = ActionClient(
@@ -263,6 +276,9 @@ class EdupingRosBridge:
 
     def stop(self) -> None:
         self._stopping.set()
+        # highfive→real forwarding 도 OFF (조용히 — controller 모드 변경 없음).
+        with self._lock:
+            self._highfive_real_active = False
         # teleop 켜져있으면 종료 전에 끔 — 컨트롤러를 joint_trajectory 로 복귀시켜야 다음 재생 정상.
         if self._teleop_active:
             try:
@@ -445,13 +461,22 @@ class EdupingRosBridge:
 
     def state_snapshot(self) -> dict:
         with self._lock:
+            status_json = self._highfive_status_json
+        # DepthViewer 가 별도 /api/eduping/highfive/status 폴링 (5Hz HTTP) 대신 본 WS
+        # snapshot 에서 받게 끼워넣음. _highfive_status_json 은 String topic 의 latest payload —
+        # 이미 json string 이므로 dict 로 parse 후 임베드 (실패 시 None — UI 가 fallback).
+        try:
+            highfive_status = json.loads(status_json) if status_json else None
+        except (ValueError, TypeError):
+            highfive_status = None
+        with self._lock:
             return {
                 "ts": time.time(),
                 "leader": _js_to_dict(self._leader),
                 "follower": _js_to_dict(self._follower),
                 "real_active": self.is_real_follower_active(),
-                "proximity_blocked": self._proximity_blocked,
-                "proximity_override": self._proximity_override,
+                "highfive_real_active": self._highfive_real_active,
+                "highfive_status": highfive_status,
             }
 
     # WS hub 가 broadcast 주기로 사용 — burst 활성 시 50Hz, 평소 10Hz.
@@ -464,18 +489,14 @@ class EdupingRosBridge:
         return self.STATE_TICK_NORMAL_S
 
     def is_real_follower_active(self) -> bool:
-        """tmux 의 eduping-device 세션에 hardware_type=real bringup 이 떠있는지 — 3s TTL 캐시.
-
-        세션의 모든 pane 을 스캔한다 (display-message 는 활성 윈도만 봐서, 같은 세션에
-        d435 같은 다른 윈도가 활성이면 bringup 윈도를 놓친다 — list-panes -s 로 전체 확인).
-        """
+        """tmux 의 eduping-device 세션에 hardware_type=real bringup 이 떠있는지 — 3s TTL 캐시."""
         now = time.monotonic()
         if now - self._real_active_at <= 3.0:
             return self._real_active_val
         active = False
         try:
             result = subprocess.run(
-                ["tmux", "list-panes", "-t", "eduping-device", "-s", "-F", "#{pane_start_command}"],
+                ["tmux", "display-message", "-t", "eduping-device", "-p", "#{pane_start_command}"],
                 capture_output=True,
                 text=True,
                 timeout=0.5,
@@ -533,9 +554,10 @@ class EdupingRosBridge:
     ) -> None:
         """DepthViewer 가 보낸 손 위치를 ROS PointStamped 로 forward.
 
-        highfive_node 가 /eduping/highfive/hand_point 을 subscribe → TF (frame_id →
-        world) → IK → JointTrajectory publish. frame_id 기본값은 D435 optical frame
-        (DepthViewer 의 unproject 결과 좌표계와 일치).
+        highfive_node 가 /eduping/highfive/hand_point 을 subscribe → 좌/우 arm 선택
+        (frame_id suffix `:left`/`:right` 또는 hand y 부호) → scripted gesture
+        JointTrajectory publish. frame_id 기본값은 D435 optical frame (DepthViewer 의
+        unproject 결과 좌표계와 일치).
         """
         if self._node is None:
             raise BridgeUnavailable("EdupingRosBridge not started")
@@ -547,7 +569,121 @@ class EdupingRosBridge:
         msg.point.z = float(z)
         self._highfive_pub.publish(msg)
 
+    def _on_highfive_status(self, msg) -> None:
+        # state_snapshot() 이 직접 읽어 WS broadcast 에 끼워넣음 — accessor 별도 없음.
+        self._highfive_status_json = msg.data
+
+    def _republish_safe_limits(self) -> None:
+        """현재 joint_limits.get_limits() 를 latched 토픽으로 broadcast.
+
+        ros_bridge 시작 시 1회 + router 의 POST /joint-limits 가 set_limits 호출
+        직후 1회. transient_local QoS 라 늦게 join 하는 highfive_node 도 마지막 값을
+        받는다.
+        """
+        if self._node is None or not hasattr(self, "_safe_limits_pub"):
+            return
+        try:
+            from . import joint_limits as _joint_limits
+            from std_msgs.msg import String as _String
+            payload = _String()
+            payload.data = json.dumps(_joint_limits.get_limits())
+            self._safe_limits_pub.publish(payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"safe_joint_limits republish 실패: {exc}")
+
+    def publish_safe_limits(self) -> None:
+        """router 에서 POST /joint-limits 처리 후 호출. _republish_safe_limits 공개판."""
+        self._republish_safe_limits()
+
     # ---------- live teleop (녹화 / 재생과 독립) -----------------------------
+
+    def set_highfive_real_sync(self, enabled: bool) -> dict:
+        """DepthViewer 의 high-five → 실물 OpenArm 전달 토글.
+
+        ON: /eduping/joint_trajectory 받을 때마다 양팔 follow_joint_trajectory action
+            으로 forward. teleop 과 mutually exclusive — teleop ON 상태면 거절.
+        OFF: forwarding 정지. controller 모드는 그대로 (joint_trajectory_controller).
+        """
+        if enabled:
+            with self._lock:
+                if self._teleop_active:
+                    return {
+                        "active": False,
+                        "switch": "failed",
+                        "hint": "leader teleop 이 켜져 있음 — 끄고 다시 시도",
+                    }
+                if self._highfive_real_active:
+                    return {"active": True, "switch": "noop"}
+            if not self.is_real_follower_active():
+                return {
+                    "active": False,
+                    "switch": "failed",
+                    "hint": "실물 bringup 미가동 — hardware_type:=real 로 띄워주세요",
+                }
+            with self._lock:
+                self._highfive_real_active = True
+            logger.info("highfive → real 동기화 ON")
+            return {"active": True, "switch": "ok"}
+        with self._lock:
+            if not self._highfive_real_active:
+                return {"active": False, "switch": "noop"}
+            self._highfive_real_active = False
+        logger.info("highfive → real 동기화 OFF")
+        return {"active": False, "switch": "ok"}
+
+    def _on_highfive_trajectory(self, msg: "JointTrajectory") -> None:
+        """/eduping/joint_trajectory 수신 → flag ON 시 양팔 action 으로 forward.
+
+        flag OFF 면 즉시 return. teleop ON 이면 controller 가 forward_position 모드라
+        action goal 거절될 것 — defensive 하게 skip.
+        """
+        with self._lock:
+            if not self._highfive_real_active or self._teleop_active:
+                return
+        if len(msg.points) == 0:
+            return
+        names = list(msg.joint_names)
+        right_arm = [f"openarm_right_joint{i}" for i in range(1, 8)]
+        left_arm = [f"openarm_left_joint{i}" for i in range(1, 8)]
+        try:
+            idx_right = [names.index(n) for n in right_arm]
+        except ValueError:
+            idx_right = []
+        try:
+            idx_left = [names.index(n) for n in left_arm]
+        except ValueError:
+            idx_left = []
+        if not idx_right and not idx_left:
+            return
+
+        for label, idxs, joints, client in (
+            ("right_arm", idx_right, right_arm, self._ac_right_arm),
+            ("left_arm", idx_left, left_arm, self._ac_left_arm),
+        ):
+            if not idxs or client is None:
+                continue
+            if not client.server_is_ready():
+                # action server discovery 가 느려 첫 frame 들은 drop 될 수 있음 —
+                # 다음 trajectory (highfive 는 한 gesture 마다 1 발) 가 곧 옴.
+                logger.debug("[%s] action server not ready — skip frame", label)
+                continue
+            goal = FollowJointTrajectory.Goal()
+            goal.trajectory.joint_names = joints
+            # highfive_node 가 per-joint 속도 프로파일(quintic 해석적 속도)을 같이 보냄.
+            # 그대로 전달하면 실물 JTC 가 waypoint 마다 감속·정지 안 하고 부드럽게 통과
+            # → raise 시작 시 whole-arm 떨림(shake) 제거. 없으면 (구버전) 첫·끝만 0.
+            has_vel = bool(msg.points) and len(msg.points[0].velocities) == len(names)
+            for src in msg.points:
+                pt = JointTrajectoryPoint()
+                pt.positions = [float(src.positions[i]) for i in idxs]
+                if has_vel:
+                    pt.velocities = [float(src.velocities[i]) for i in idxs]
+                pt.time_from_start = src.time_from_start
+                goal.trajectory.points.append(pt)
+            if goal.trajectory.points and not has_vel:
+                goal.trajectory.points[0].velocities = [0.0] * len(joints)
+                goal.trajectory.points[-1].velocities = [0.0] * len(joints)
+            client.send_goal_async(goal)
 
     def set_live_teleop(self, enabled: bool) -> dict:
         """leader → forward_position_controller passthrough 토글.
@@ -568,6 +704,11 @@ class EdupingRosBridge:
                 return {"active": False, "switch": "failed", "hint": "실물 bringup 가 떠 있는지 확인"}
             with self._lock:
                 self._teleop_active = True
+                # leader teleop 이 controller 모드를 forward_position 으로 바꿈 —
+                # joint_trajectory action goal 이 거절될 것이므로 highfive 동기화 자동 OFF.
+                if self._highfive_real_active:
+                    self._highfive_real_active = False
+                    logger.info("highfive → real 동기화 OFF (leader teleop 이 controller 가져감)")
                 # 새 추격 세션 — cmd/vel 을 None 으로 두면 첫 mirror 콜백에서 시드.
                 self._teleop_cmd_right = None
                 self._teleop_cmd_left = None
@@ -580,7 +721,6 @@ class EdupingRosBridge:
                 self._teleop_grip_left_last = None
                 self._teleop_grip_right_sent_s = 0.0
                 self._teleop_grip_left_sent_s = 0.0
-            self._apply_proximity()  # teleop 활성 → 근접 정지 자동 우회 (정지 중이면 재개)
             return {"active": True, "switch": "ok"}
         else:
             with self._lock:
@@ -599,7 +739,6 @@ class EdupingRosBridge:
                 activate=["right_joint_trajectory_controller", "left_joint_trajectory_controller"],
                 deactivate=["right_forward_position_controller", "left_forward_position_controller"],
             )
-            self._apply_proximity()  # teleop 종료 → 근접 정지 다시 적용
             return {"active": False, "switch": "ok"}
 
     def stop_recording(self, save: bool) -> dict:
@@ -701,11 +840,6 @@ class EdupingRosBridge:
 
         # 첫 keyframe 와 현재 follower pose 차이로 부드러운 ramp 시간 산출.
         ramp_s = self._compute_ramp_s(routine)
-        # 전역 속도 거버너 — 시간축을 1/MOTION_TIME_SCALE 로 stretch. speed↓·ramp↑ 둘 다 적용해
-        # keyframe 간격과 ease-in 을 균일하게 늘림. 이하 sim publish·_start_playback·실물 goal
-        # 전부 이 (speed, ramp_s) 를 쓰므로 sim·실물이 같은 속도. teleop 은 이 경로 밖이라 무관.
-        speed *= MOTION_TIME_SCALE
-        ramp_s /= MOTION_TIME_SCALE
 
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
@@ -796,11 +930,7 @@ class EdupingRosBridge:
             sample_hz=50,
             joint_names=joint_names,
         )
-        # 첫 keyframe 은 현재 pose 지만, 진행 중 모션(예: 무궁화 떼기)을 preempt 하며 호출되면
-        # 팔이 "움직이는" 상태다. ramp_s=0(첫 point t=0, v=0)이면 속도가 즉시 0 으로 꺾여 덜컹.
-        # 작은 ramp 로 첫 point 를 미뤄 JTC 가 현재 속도에서 부드럽게 감속하게 한다(정지
-        # 상태에서 호출돼도 무해 — 시작이 약간 부드러워질 뿐).
-        ramp_s = PLAYBACK_RAMP_MIN_S
+        ramp_s = 0.0  # 첫 keyframe 이 이미 현재 pose
 
         msg = JointTrajectory()
         msg.joint_names = list(routine.joint_names)
@@ -870,26 +1000,7 @@ class EdupingRosBridge:
 
         action server 가 미가동 (실물 bringup 안 됨) 이면 그 채널은 skip 하고 다른
         채널만 처리 — 부분 실패도 status 에 반영.
-
-        근접 안전정지: 진행 중 재생을 추적(_active_real_play)해 정지 시 이어서 재개할 수
-        있게 한다. 송출 시점에 이미 block 중이면 실물 goal 을 보내지 않고 보류 — 해제 시
-        _do_resume 이 처음부터 보낸다 (사람이 가까이 있는 동안 팔이 움직이지 않도록).
         """
-        with self._lock:
-            blocked = (
-                self._proximity_blocked
-                and not self._proximity_override
-                and not self._teleop_active
-            )
-            self._active_real_play = {
-                "routine": routine, "speed": speed, "ramp_s": ramp_s,
-                "start_mono": time.monotonic(), "paused_elapsed_s": 0.0,
-            }
-            if blocked:
-                self._proximity_paused = True
-        if blocked:
-            logger.info("proximity blocked — 실물 goal 송출 보류 (해제 시 재개)")
-            return {"right_arm": "proximity blocked", "left_arm": "proximity blocked"}
         names = list(routine.joint_names)
         right_arm = [f"openarm_right_joint{i}" for i in range(1, 8)]
         left_arm = [f"openarm_left_joint{i}" for i in range(1, 8)]
@@ -952,100 +1063,6 @@ class EdupingRosBridge:
             status[label] = "sent"
             logger.info("[%s] goal sent", label)
         return status
-
-    # --- 근접 안전정지 (proximity safety) -----------------------------------
-    def _on_proximity_block(self, msg: "Bool") -> None:
-        with self._lock:
-            self._proximity_blocked = bool(msg.data)
-        self._apply_proximity()
-
-    def set_proximity_override(self, enabled: bool) -> dict:
-        """모드별 우회 — True 면 근접 정지를 무시(원격진찰/건강검진/녹화 등). 즉시 반영."""
-        with self._lock:
-            self._proximity_override = bool(enabled)
-        self._apply_proximity()
-        return {"ok": True, "proximity_override": bool(enabled)}
-
-    def _apply_proximity(self) -> None:
-        """effective block(근접 & !override) 전환 시 팔 정지/재개. 플래그 전환은 lock
-        안에서 원자적으로 — 두 스레드(executor/HTTP)가 동시에 호출해도 중복 정지/재개 방지."""
-        action = None
-        with self._lock:
-            # 원격진찰(teleop) 중에는 의사가 팔을 의도적으로 아이 가까이 가져가므로 자동 우회.
-            effective = (
-                self._proximity_blocked
-                and not self._proximity_override
-                and not self._teleop_active
-            )
-            if effective and not self._proximity_paused:
-                self._proximity_paused = True
-                right, left = _extract_arm_pos(self._follower)
-                active = self._active_real_play
-                if active is not None:
-                    active["paused_elapsed_s"] = max(0.0, time.monotonic() - active["start_mono"])
-                action = ("pause", right, left)
-            elif not effective and self._proximity_paused:
-                self._proximity_paused = False
-                action = ("resume", None, None)
-        if action is None:
-            return
-        if action[0] == "pause":
-            self._do_pause(action[1], action[2])
-        else:
-            self._do_resume()
-
-    def _do_pause(self, right: "list[float] | None", left: "list[float] | None") -> None:
-        """현재 양팔 자세로 1-point hold goal 전송 → 진행 goal preempt → 정지."""
-        if right is None or left is None:
-            logger.warning("proximity pause: follower pose 없음 — hold goal skip")
-            return
-        hold_t = Duration(sec=0, nanosec=300_000_000)  # 0.3s 안에 현재 자세로 감속·정지
-        for client, side, pos in (
-            (self._ac_right_arm, "right", right),
-            (self._ac_left_arm, "left", left),
-        ):
-            if client is None or not client.wait_for_server(timeout_sec=0.5):
-                continue
-            goal = FollowJointTrajectory.Goal()
-            goal.trajectory.joint_names = [f"openarm_{side}_joint{i}" for i in range(1, 8)]
-            pt = JointTrajectoryPoint()
-            pt.positions = [float(x) for x in pos]
-            pt.velocities = [0.0] * 7
-            pt.time_from_start = hold_t
-            goal.trajectory.points.append(pt)
-            client.send_goal_async(goal)
-        logger.info("proximity pause — 팔 정지 (근접 감지)")
-
-    def _do_resume(self) -> None:
-        """정지 시점 이후 남은 keyframe 을 현재 자세에서 이어서 재전송."""
-        with self._lock:
-            active = self._active_real_play
-        if active is None:
-            logger.info("proximity resume — 재개할 진행 재생 없음")
-            return
-        routine = active["routine"]
-        speed = active["speed"]
-        # t_scaled = kf.t/speed + ramp 였으므로, 정지까지의 벽시계 경과에서 ramp 를 빼고
-        # speed 를 곱해 routine-time 으로 환산 → 그보다 뒤의 keyframe 만 남김.
-        routine_t = max(0.0, (active.get("paused_elapsed_s", 0.0) - active["ramp_s"]) * speed)
-        remaining = [kf for kf in routine.keyframes if float(kf.t) > routine_t]
-        if not remaining:
-            with self._lock:
-                self._active_real_play = None
-            logger.info("proximity resume — 남은 모션 없음 (이미 완료)")
-            return
-        from types import SimpleNamespace
-
-        from eduarm.routines_io import Keyframe  # type: ignore[import-not-found]
-        base_t = float(remaining[0].t)
-        shim = SimpleNamespace(
-            joint_names=routine.joint_names,
-            keyframes=[Keyframe(t=float(kf.t) - base_t, pos=list(kf.pos)) for kf in remaining],
-        )
-        ramp_s = self._compute_ramp_s(shim)
-        # _send_real_follower_goals 가 _active_real_play 를 남은 구간으로 재기록 → 다회 정지/재개 OK.
-        self._send_real_follower_goals(shim, speed, ramp_s)
-        logger.info("proximity resume — 남은 %d keyframe 재개", len(remaining))
 
     def _switch_controllers(self, *, activate: list[str], deactivate: list[str]) -> bool:
         """controller_manager 의 switch_controller 호출. 실물 bringup 안 떠 있으면 False."""

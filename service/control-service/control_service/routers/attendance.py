@@ -1,6 +1,8 @@
 """출결 조회 + robot 디바이스 face recognize / check-in/out."""
 import asyncio
 import logging
+
+import numpy as np
 from datetime import date as DateType, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -31,8 +33,8 @@ router = APIRouter(prefix="/api", tags=["attendance"])
 
 # 신규 등하원 체크 시 실물 팔로워가 자동 재생할 슬러그. 새 슬러그를 만들고 싶으면
 # shared/openarm_greeting/<slug>.yaml 으로 녹화 후 여기 매핑만 바꾸면 됨.
+# 등원(IN)=morning 율동은 하이파이브로 대체돼 제거 — 하원(OUT)=evening 만 유지.
 _GREETING_SLUG_BY_ATTENDANCE_TYPE: dict[str, str] = {
-    "IN": "morning",
     "OUT": "evening",
 }
 
@@ -50,6 +52,10 @@ def _fire_attendance_greeting(request: Request, attendance_type: str) -> str:
       - "skipped:routine_missing:<slug>": shared/openarm_greeting/<slug>.yaml 부재
       - "skipped:no_real_arm"           : tmux eduping-device 세션에 hardware_type=real bringup 없음
     """
+    # 등원(IN) 인사 모션(morning 율동)은 하이파이브 플로우로 대체됨 — 서버 팔 인사 생략.
+    # (하이파이브는 robot-web 등원 모드 + HighfiveDetector 가 트리거.)
+    if attendance_type == "IN":
+        return "skipped:replaced_by_highfive"
     bridge = getattr(request.app.state, "eduping_bridge", None)
     slug = _GREETING_SLUG_BY_ATTENDANCE_TYPE.get(attendance_type)
     if bridge is None:
@@ -190,44 +196,65 @@ async def recognize_faces_multi(
     면 matched=False 로 결과에 포함 (얼굴은 봤지만 누군지 모름).
     """
     content = await file.read()
-    # InsightFace 는 동기 CPU/GPU 추론 — 직접 호출하면 이벤트 루프를 블록해 같은 루프의
-    # 무궁화 영상 relay(/ws/eduping/mugunghwa/video) 가 멈춰 사람이 보일 때 PIP 가 프리징한다.
-    # 스레드로 오프로드 (recognize 단건은 line 85 에서 이미 동일 처리).
+    # InsightFace 는 동기 CPU 추론 — 직접 호출하면 이벤트 루프를 블록한다. 스레드로 오프로드
+    # (dev 8c452fe: 무궁화 video relay 프리징 방지).
     faces = await asyncio.to_thread(extract_embeddings_all, content)
     if not faces:
+        logger.info("recognize-multi: 프레임에서 얼굴 미검출")
         return FaceRecognizeMultiResult(matches=[])
 
-    matches: list[FaceRecognizeSingleMatch] = []
-    for face in faces:
-        emb = face["embedding"]
-        bbox = face["bbox"]
-        stmt = (
+    # child embedding 전체를 한 번에 로드해 numpy 로 in-memory cosine 매칭 (프레임당 1
+    # round-trip). pgvector cosine_distance = 1 − (a·b)/(‖a‖‖b‖) 재현 (저장 embedding 은
+    # L2-normalized). 매 호출 fresh 로드 — 캐시하지 않는다 (재등록 즉시 반영, stale 위험 없음).
+    rows = (
+        await session.execute(
             select(
                 ChildFaceEmbedding.child_id,
                 Child.name,
-                ChildFaceEmbedding.embedding.cosine_distance(emb).label("distance"),
-            )
-            .join(Child, Child.id == ChildFaceEmbedding.child_id)
-            .order_by("distance")
-            .limit(1)
+                ChildFaceEmbedding.embedding,
+            ).join(Child, Child.id == ChildFaceEmbedding.child_id)
         )
-        row = (await session.execute(stmt)).first()
-        if row is None:
-            matches.append(FaceRecognizeSingleMatch(matched=False, bbox=bbox))
-            continue
-        child_id, child_name, distance = row
-        if distance > settings.face_match_threshold:
-            matches.append(FaceRecognizeSingleMatch(matched=False, distance=float(distance), bbox=bbox))
-        else:
+    ).all()
+    if not rows:
+        logger.warning("recognize-multi: 얼굴 %d개 검출됐지만 DB 등록 embedding 0개", len(faces))
+        return FaceRecognizeMultiResult(
+            matches=[FaceRecognizeSingleMatch(matched=False, bbox=f["bbox"]) for f in faces]
+        )
+
+    child_ids = [r[0] for r in rows]
+    child_names = [r[1] for r in rows]
+    db_emb = np.asarray([r[2] for r in rows], dtype=np.float64)  # (M, 512)
+    db_norm = np.linalg.norm(db_emb, axis=1)
+    db_norm[db_norm == 0.0] = 1.0
+
+    matches: list[FaceRecognizeSingleMatch] = []
+    for face in faces:
+        emb = np.asarray(face["embedding"], dtype=np.float64)
+        bbox = face["bbox"]
+        q_norm = np.linalg.norm(emb) or 1.0
+        dist = 1.0 - (db_emb @ emb) / (db_norm * q_norm)  # cosine distance 벡터
+        best = int(np.argmin(dist))
+        distance = float(dist[best])
+        if distance <= settings.face_match_threshold:
             matches.append(
                 FaceRecognizeSingleMatch(
                     matched=True,
-                    child_id=child_id,
-                    child_name=child_name,
-                    distance=float(distance),
+                    child_id=child_ids[best],
+                    child_name=child_names[best],
+                    distance=distance,
                     bbox=bbox,
                 )
             )
+        else:
+            matches.append(FaceRecognizeSingleMatch(matched=False, distance=distance, bbox=bbox))
+
+    # 진단 로그 — 인식 실패 원인 분리용 (faces=0? embeddings=0? distance>thr?).
+    logger.info(
+        "recognize-multi: faces=%d embeddings=%d children=%d best_distances=%s matched=%d thr=%.2f",
+        len(faces), len(rows), len(set(child_ids)),
+        [round(m.distance, 3) for m in matches if m.distance is not None],
+        sum(1 for m in matches if m.matched), settings.face_match_threshold,
+    )
     return FaceRecognizeMultiResult(matches=matches)
 
 

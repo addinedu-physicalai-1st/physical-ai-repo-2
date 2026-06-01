@@ -5,7 +5,7 @@
   <version>0.1.0</version>
   <description>
     Pingdergarten OpenArm 노드 — eduping persona (율동 / 등하원 인사 / 원격 진찰).
-    leader joint_states 녹화·재생, sim twin, 추후 admittance · EE teleop.
+    leader joint_states 녹화·재생, sim twin, 하이파이브 scripted gesture.
   </description>
   <maintainer email="dev@pingdergarten.local">pingdergarten</maintainer>
   <license>Proprietary</license>
@@ -16,7 +16,24 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
-  <!-- feetech leader 노드 (실물 mini leader) 는 후속 PR — scservo_sdk 의존 추가 예정 -->
+
+  <!-- highfive_sim.launch.py 가 띄우는 외부 노드들 -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>moveit_ros_move_group</exec_depend>
+  <exec_depend>moveit_configs_utils</exec_depend>
+  <exec_depend>openarm_bimanual_moveit_config</exec_depend>
+  <!-- 실 D435 깊이 토픽 publish. apt install ros-jazzy-realsense2-camera 필요. -->
+  <exec_depend>realsense2_camera</exec_depend>
+  <!-- highfive_node 의 TF 변환 (hand_point camera → world). -->
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <!-- 7-DOF redundant IK 안정성을 위해 KDL → TRAC-IK 교체.
+       eduarm/config/kinematics_trac_ik.yaml 이 MoveItConfigsBuilder 에 주입. -->
+  <exec_depend>trac_ik_kinematics_plugin</exec_depend>
+  <!-- d435_depth_streamer 가 realsense2_camera_node 의 토픽을 WS 로 forward. -->
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>message_filters</exec_depend>
 
   <!-- octomap_demo.launch.py 가 띄우는 외부 노드들 -->
   <exec_depend>robot_state_publisher</exec_depend>

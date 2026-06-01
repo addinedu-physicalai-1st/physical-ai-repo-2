@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depth View — High-five</title>
+  </head>
+  <body>
+    <!-- 메인 robot-web UI 와 분리된 standalone — 음성/모드 셀렉터/wake word 미로드.
+         DepthViewer + OpenarmViewer 만 마운트, CPU 부담 최소화 ↓ 하이파이브 latency ↓. -->
+    <div id="app"></div>
+    <script type="module" src="/src/depth-main.ts"></script>
+  </body>
+</html>

@@ -13,12 +13,24 @@ export interface JointSnapshot {
   age_s: number;
 }
 
+export interface HighfiveStatusPayload {
+  ts?: number;
+  level?: 'ok' | 'warn' | 'danger';
+  static_obstacle?: boolean;
+  static_px?: number;
+  dyn_closest_m?: number;
+  dyn_x_norm?: number;
+  active_arms?: string[];
+  aborted_arms?: string[];
+}
+
 export interface StateSnapshot {
   ts: number;
   leader: JointSnapshot | null;
   follower: JointSnapshot | null;
   real_active?: boolean;
-  proximity_blocked?: boolean;
+  highfive_real_active?: boolean;
+  highfive_status?: HighfiveStatusPayload | null;
 }
 
 export interface UseEdupingStateWs {
@@ -26,8 +38,11 @@ export interface UseEdupingStateWs {
   leader: Ref<JointSnapshot | null>;
   follower: Ref<JointSnapshot | null>;
   realActive: Ref<boolean>;
-  /** 근접 안전정지 — depth 로 사람이 0.6m 이내. true 면 팔 정지 + (율동/무궁화) 음악 정지. */
-  proximityBlocked: Ref<boolean>;
+  /** highfive → 실물 forward 활성 — DepthViewer 토글 + bridge 상태. */
+  highfiveRealActive: Ref<boolean>;
+  /** DCP-RMP obstacle overlay 상태 — bridge 가 /eduping/highfive/status (5Hz) 를 그대로
+   *  WS snapshot 에 끼워서 전달. 기존 5Hz HTTP 폴링 대체 (control 서버 로그 spam 제거). */
+  highfiveStatus: Ref<HighfiveStatusPayload | null>;
   /** leader 토픽이 최근 2초 내에 들어왔는지 — leader bringup 가동 여부. */
   leaderActive: ComputedRef<boolean>;
   start: () => void;
@@ -44,7 +59,8 @@ export function useEdupingStateWs(): UseEdupingStateWs {
   const leader = ref<JointSnapshot | null>(null);
   const follower = ref<JointSnapshot | null>(null);
   const realActive = ref(false);
-  const proximityBlocked = ref(false);
+  const highfiveRealActive = ref(false);
+  const highfiveStatus = ref<HighfiveStatusPayload | null>(null);
 
   const leaderActive = computed(() => {
     const l = leader.value;
@@ -82,7 +98,8 @@ export function useEdupingStateWs(): UseEdupingStateWs {
         leader.value = snap.leader;
         follower.value = snap.follower;
         realActive.value = !!snap.real_active;
-        proximityBlocked.value = !!snap.proximity_blocked;
+        highfiveRealActive.value = !!snap.highfive_real_active;
+        highfiveStatus.value = snap.highfive_status ?? null;
       } catch (err) {
         console.warn('[edupingState] parse 실패', err);
       }
@@ -131,5 +148,8 @@ export function useEdupingStateWs(): UseEdupingStateWs {
 
   onBeforeUnmount(stop);
 
-  return { connected, leader, follower, realActive, proximityBlocked, leaderActive, start, stop };
+  return {
+    connected, leader, follower, realActive, highfiveRealActive,
+    highfiveStatus, leaderActive, start, stop,
+  };
 }

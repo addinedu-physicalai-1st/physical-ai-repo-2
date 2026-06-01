@@ -15,6 +15,8 @@ import AttendanceCamera from '@/eduping/AttendanceCamera.vue';
 import DanceManager from '@/eduping/DanceManager.vue';
 import DancePlayPopup from '@/eduping/DancePlayPopup.vue';
 import DepthViewer from '@/eduping/DepthViewer.vue';
+import HighfiveDetector from '@/eduping/HighfiveDetector.vue';
+import ArmDepthScreen from '@/eduping/ArmDepthScreen.vue';
 import GreetingManager from '@/eduping/GreetingManager.vue';
 import HealthCheckCamera from '@/eduping/HealthCheckCamera.vue';
 import MugunghwaArmManager from '@/eduping/MugunghwaArmManager.vue';
@@ -70,6 +72,43 @@ const attendanceMode = computed<'IN' | 'OUT' | null>(() => {
   if (currentMode.value === '하원') return 'OUT';
   return null;
 });
+
+// 등원 신규 인식 → "하이파이브" 멘트 후 AttendanceCamera 가 보내는 highfive-request 로
+// HighfiveDetector 를 띄움. 손 감지·하이파이브 완료/timeout 시 닫힘.
+const arrivalHighfive = ref<{ name: string } | null>(null);
+// 등원 하이파이브 동안만 high-five → 실물 OpenArm relay 를 켠다. 백엔드 갱신은
+// 자체 guard (실물 bringup 없음 / teleop 켜짐 → no-op) 가 있어 sim-only 환경엔 무해.
+// HighfiveDetector 는 성공·timeout (기본 ~9s) 모두 complete 를 emit → 항상 다시 꺼져
+// relay 가 한 번 등원당 최대 ~9s 만 켜져 있고 평소 상태로 복원된다.
+async function setArrivalHighfiveRealSync(enabled: boolean): Promise<void> {
+  try {
+    await fetch('/api/eduping/highfive/sync', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+  } catch {
+    /* sim-only / 백엔드 미가동 — 무시 (MuJoCo twin 은 그대로 동작) */
+  }
+}
+function startArrivalHighfive(name: string): void {
+  if (arrivalHighfive.value) return;   // 한 번에 한 명
+  arrivalHighfive.value = { name };
+  void setArrivalHighfiveRealSync(true);
+}
+function endArrivalHighfive(): void {
+  arrivalHighfive.value = null;
+  void setArrivalHighfiveRealSync(false);
+}
+
+// 하원/율동 — 로봇 팔 + depth cloud 를 view-only 배경 (ArmDepthScreen). 등원 은 제외 —
+// depth cloud/URDF 3js 렌더가 무거워(lagging) 등원엔 안 띄운다. 등원 화면은
+// EmotionDisplay(에듀핑 얼굴) + 좌상단 AttendanceCamera PiP 만, 팔 하이파이브는 MuJoCo 창에서 관찰.
+const showArmScreen = computed(
+  () => robot.value.id === 'eduping'
+    && (currentMode.value === '하원'
+      || currentMode.value === '율동'),
+);
 
 const showOXQuiz = computed(() => robot.value.id === 'noriarm');
 const showDanceManager = computed(() => robot.value.id === 'eduping' && currentMode.value === '율동 등록');
@@ -269,10 +308,16 @@ function handleStart(): void {
   <AdminGogopingVideo v-else-if="isAdminGogopingVideo" />
   <div v-else class="app" :class="`bg-${robot.id}`">
     <EmotionDisplay :emotion="currentEmotion" />
+    <ArmDepthScreen v-if="showArmScreen" />
     <BottomDock />
     <ModeSelectorFab />
     <div class="brand">{{ robot.displayName }}</div>
-    <AttendanceCamera :mode="attendanceMode" />
+    <AttendanceCamera :mode="attendanceMode" @highfive-request="startArrivalHighfive" />
+    <HighfiveDetector
+      v-if="arrivalHighfive"
+      @complete="endArrivalHighfive"
+      @timeout="endArrivalHighfive"
+    />
     <OXQuiz v-if="showOXQuiz" />
     <BlockStacking v-if="showOXQuiz" />
     <StorePlay v-if="showOXQuiz" />
