@@ -1,0 +1,52 @@
+# MoveIt 양팔용 TRAC-IK overlay — Phase 3 후속작.
+#
+# KDL plugin (openarm_bimanual_moveit_config 기본값) 은 7-DOF redundancy + OpenArm 의
+# 90°-rotated shoulder geometry 에서 reach envelope 이 매우 좁다 — 실측 결과 right_arm
+# 은 (x ≈ 0.2–0.4m, z ≈ 0.5–0.6m) 만 IK 성공. forward 0.45m+ 또는 centerline 부근은
+# 어떤 orientation 으로 시도해도 NO_IK_SOLUTION (-31). 이 때문에 D435 시야 중앙에
+# 들어오는 어린이 손 (world 좌표로 0.5–0.6m forward) 이 거의 다 reach 불가.
+#
+# TRAC-IK 는 Newton + SQP + random restart 를 같이 돌려 KDL 이 못 푸는 7DOF redundant
+# IK 를 빨리 푼다 (논문 + 실사용 보고).
+#
+# solve_type 'Distance' — 현재 seed (호출자가 robot_state 로 넘긴 pose) 와 가장 가까운
+# 해를 반환. highfive_node 가 항상 current_joint_state 를 seed 로 넘기므로 자연스러운
+# motion 이 나옴 (joint 가 wildly 점프하지 않음).
+#
+# position_only_ik:true — 6-DOF (orientation 강제) 를 시도했으나 (slap-face 를
+# down-forward 로 일관되게) LEFT arm 이 그 orientation+position 을 못 풀어 -31
+# (narrow reach envelope). RIGHT 는 됨. 양팔 일관 불가라 position-only 로 복귀.
+#
+# 사용: highfive_sim.launch.py 에서
+#   MoveItConfigsBuilder("openarm", package_name="openarm_bimanual_moveit_config")
+#     .robot_description_kinematics(file_path=<this yaml>)
+#     .to_moveit_configs()
+# 로 KDL default 를 override.
+
+left_arm:
+  kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
+  kinematics_solver_timeout: 0.03
+  kinematics_solver_attempts: 3
+  solve_type: Distance
+  position_only_ik: true
+  epsilon: 0.005
+
+right_arm:
+  kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin
+  kinematics_solver_timeout: 0.03
+  kinematics_solver_attempts: 3
+  solve_type: Distance
+  position_only_ik: true
+  epsilon: 0.005
+
+# Gripper group 들은 single-DOF 라 KDL 로 충분. trac-ik 가 1-DOF 도 처리하지만
+# 굳이 plugin 바꿀 이유 없음.
+left_gripper:
+  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver_timeout: 0.005
+  kinematics_solver_search_resolution: 0.005
+
+right_gripper:
+  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver_timeout: 0.005
+  kinematics_solver_search_resolution: 0.005
