@@ -169,17 +169,19 @@ case "$ACTION" in
 
     # source 전략: root install 이 있으면 그것만 (모든 패키지 통합). 없으면 per-workspace 폴백.
     # 둘 다 source 하면 stale per-workspace 의 미완성 setup.bash 가 "not found" 경고를 다발시킨다.
+    # 각 항목은 자체적으로 trailing "; " 를 포함하는 완결된 statement 로 만든다 — WS_SOURCING 이
+    # 비어있어도 (워크스페이스 미빌드) 명령이 깨지지 않도록. (과거: 빈 값일 때 "; ;" syntax error)
     if [[ -f "$ROOT_WS_SETUP" ]]; then
-      WS_SOURCING="source $ROOT_WS_SETUP"
+      WS_SOURCING="source $ROOT_WS_SETUP; "
     else
       WS_SOURCING=""
-      [[ -f "$EDUPING_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $EDUPING_WS_SETUP;"
-      [[ -f "$NORIARM_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $NORIARM_WS_SETUP;"
-      [[ -f "$GOGOPING_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $GOGOPING_WS_SETUP;"
+      [[ -f "$EDUPING_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $EDUPING_WS_SETUP; "
+      [[ -f "$NORIARM_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $NORIARM_WS_SETUP; "
+      [[ -f "$GOGOPING_WS_SETUP" ]] && WS_SOURCING="$WS_SOURCING source $GOGOPING_WS_SETUP; "
     fi
 
     tmux new-window -t "$SESSION" -n control -c "$REPO_ROOT" \
-      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING; export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
+      "bash -c '[ -f $ROS_SETUP ] && source $ROS_SETUP; ${WS_SOURCING}export PYTHONPATH=\"$NORIARM_FRAMEWORK_PATH:\${PYTHONPATH:-}\"; exec $CONTROL_CMD'"
 
     # window 4: streaming :8100 (WS /ws/video-stream + UDP 9013 영상 수신, SR-CAM-002)
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
