@@ -1,7 +1,7 @@
 /**
  * OpenarmViewer scene 에 D435 depth point cloud 를 합성.
  *
- * THREE.Points 를 robot URDF 의 d435_depth_optical_frame link 자식으로 붙임 — 부모 chain
+ * THREE.Points 를 robot URDF 의 d435_color_optical_frame link 자식으로 붙임 — 부모 chain
  * (optical → d435_link → body → world → wrapper rotation -pi/2 about X) 이 자동으로
  * 좌표 변환. 셰이더는 optical frame native (Z forward, X right, Y down) 으로 출력.
  *
@@ -23,7 +23,9 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float u_max_depth_m;
   uniform float u_world_bound_xz;
   uniform float u_world_min_y;
-  uniform int u_color_mode;   // 0 = RGB (JPEG), 1 = depth jet colormap
+  uniform int u_color_mode;   // 0=RGB, 1=jet, 2=silhouette (depth band → solid white)
+  uniform float u_band_min_m; // silhouette mode 의 z band 하단 (m)
+  uniform float u_band_max_m; // silhouette mode 의 z band 상단 (m)
   uniform int u_use_hand_bbox;   // 1 = 손 bbox 안만 렌더 (cloud 필터링)
   uniform vec2 u_hand_uv_min;
   uniform vec2 u_hand_uv_max;
@@ -54,6 +56,16 @@ const VERTEX_SHADER = /* glsl */ `
       return;
     }
 
+    // Silhouette mode: depth band 밖 픽셀 즉시 cull. GPU 한 번에 모든 픽셀 병렬
+    // 처리 — Gemini suggestion 의 "GPU fragment shader silhouette" 와 동일 원리.
+    if (u_color_mode == 2 && (d_m < u_band_min_m || d_m > u_band_max_m)) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      v_color = vec3(0.0);
+      v_valid = 0;
+      return;
+    }
+
     // 손 bbox 필터링 — DepthViewer 의 toggle 이 ON 일 때만 활성.
     if (u_use_hand_bbox == 1) {
       if (uv.x < u_hand_uv_min.x || uv.x > u_hand_uv_max.x ||
@@ -71,7 +83,7 @@ const VERTEX_SHADER = /* glsl */ `
     float z = d_m;
 
     // y flip 제거 — D435 정상 장착 시 optical y-down 그대로 사용. URDF 의
-    // d435_depth_optical_frame rpy 가 parent chain 에서 자동 변환.
+    // d435_color_optical_frame rpy 가 parent chain 에서 자동 변환.
     vec4 modelPos = vec4(x, y, z, 1.0);
 
     vec4 worldPos = modelMatrix * modelPos;
@@ -91,6 +103,12 @@ const VERTEX_SHADER = /* glsl */ `
     if (u_color_mode == 1) {
       // Depth jet colormap — near=blue, mid=green, far=red.
       v_color = jetColor(d_m / u_max_depth_m);
+    } else if (u_color_mode == 2) {
+      // Banded jet — band 안 픽셀만 jet 컬러 (가까운=blue, 먼=red). RViz octomap
+      // 의 OccupancyGrid voxel 컬러와 동일 톤. band 밖은 위 cull 분기에서 이미
+      // discard 되므로 사람 silhouette 만 다채색 블롭으로 남는다.
+      float t = clamp((d_m - u_band_min_m) / max(1e-3, (u_band_max_m - u_band_min_m)), 0.0, 1.0);
+      v_color = jetColor(t);
     } else {
       vec2 norm_uv = (uv + 0.5) / u_size;
       v_color = texture(u_color, norm_uv).rgb;
@@ -116,6 +134,10 @@ export interface UseDepthCloudInSceneOpts {
   maxDepthM?: number;
   /** 포인트 사이즈 (px). OpenarmViewer 카메라 거리 (~2m) 에서는 4.0+ 권장. 기본 4.0. */
   pointSize?: number;
+  /** Decimation stride — N px 마다 1 점만 렌더 (point cloud 비용 ≈ 1/stride²). depth
+   *  texture 는 full-res 유지, shader 가 각 점의 (u,v) texel 을 texelFetch 하므로
+   *  geometry 만 솎으면 정확. 큰 pointSize 가 gap 을 메워 시각 손실 적음. 기본 1 (full). */
+  stride?: number;
   /** OpenarmViewer GridHelper 반-크기 (m). 이 박스 밖 포인트는 cull. 기본 1.0 (=grid 2.0m). */
   worldBoundXZ?: number;
   /** 그리드 평면 y (m). 이 아래 포인트는 cull. 기본 -0.05 (작은 여유). */
@@ -129,8 +151,15 @@ export interface UseDepthCloudInSceneOpts {
   frustumNearM?: number;
   /** Frustum far plane (m). 기본 maxDepthM 와 동일. */
   frustumFarM?: number;
-  /** 색 모드: 'rgb' = JPEG 컬러 / 'depth' = jet colormap (near 파랑 → far 빨강). 기본 'depth'. */
-  colorMode?: 'rgb' | 'depth';
+  /** 색 모드:
+   *   'rgb'        = JPEG 컬러
+   *   'depth'      = jet colormap (near 파랑 → far 빨강)
+   *   'silhouette' = band 안 (bandMinM~bandMaxM) 솔리드 흰색, 그 외 cull. 사람만 분리해
+   *                  보고싶을 때 (Gemini 의 GPU shader silhouette 패턴 그대로). */
+  colorMode?: 'rgb' | 'depth' | 'silhouette';
+  /** Silhouette mode 의 z band — 사람이 서있을 거리 범위 (m). 기본 0.5~2.5. */
+  bandMinM?: number;
+  bandMaxM?: number;
   /** Parent-owned stream — omit to create a private WS (prefer one shared instance). */
   depthStream?: UseDepthStream;
 }
@@ -154,10 +183,10 @@ export interface UseDepthCloudInScene {
 export function useDepthCloudInScene(
   opts: UseDepthCloudInSceneOpts,
 ): UseDepthCloudInScene {
-  const opticalLink = opts.robot.links?.['d435_depth_optical_frame'];
+  const opticalLink = opts.robot.links?.['d435_color_optical_frame'];
   if (!opticalLink) {
     console.warn(
-      '[useDepthCloudInScene] d435_depth_optical_frame link not in URDF tree — skipping',
+      '[useDepthCloudInScene] d435_color_optical_frame link not in URDF tree — skipping',
     );
     return { dispose: () => {}, setVisible: () => {}, setHandBbox: () => {} };
   }
@@ -171,16 +200,22 @@ export function useDepthCloudInScene(
   let dims = { w: 0, h: 0 };
   let disposed = false;
   let frustum: THREE.LineSegments | null = null;
+  // RGB 모드의 JPEG decode 비용 (createImageBitmap + texture upload, ~3~5ms) 절약 —
+  // 매 2 frame 마다 1 번만 색 갱신. depth 는 매 frame (geometry 정확도). 사람 눈에
+  // 7.5Hz 색 변화는 거의 구분 안 됨 — 15fps 풀 RGB 보다 부드러운 cloud 가 더 중요.
+  const COLOR_UPDATE_EVERY_N = 2;
+  let colorUpdateCounter = 0;
 
   function ensureGeometry(w: number, h: number): void {
     if (dims.w === w && dims.h === h && points) return;
     teardownGeometry();
 
-    const count = w * h;
+    const stride = Math.max(1, Math.floor(opts.stride ?? 1));
+    const count = Math.ceil(w / stride) * Math.ceil(h / stride);
     const positions = new Float32Array(count * 3);
     let idx = 0;
-    for (let v = 0; v < h; v++) {
-      for (let u = 0; u < w; u++) {
+    for (let v = 0; v < h; v += stride) {
+      for (let u = 0; u < w; u += stride) {
         positions[idx++] = u;
         positions[idx++] = v;
         positions[idx++] = 0;
@@ -220,7 +255,12 @@ export function useDepthCloudInScene(
         u_max_depth_m: { value: opts.maxDepthM ?? 3.0 },
         u_world_bound_xz: { value: opts.worldBoundXZ ?? 1.0 },
         u_world_min_y: { value: opts.worldMinY ?? -0.05 },
-        u_color_mode: { value: opts.colorMode === 'rgb' ? 0 : 1 },
+        u_color_mode: {
+          value: opts.colorMode === 'rgb' ? 0
+            : opts.colorMode === 'silhouette' ? 2 : 1,
+        },
+        u_band_min_m: { value: opts.bandMinM ?? 0.5 },
+        u_band_max_m: { value: opts.bandMaxM ?? 2.5 },
         u_use_hand_bbox: { value: 0 },
         u_hand_uv_min: { value: new THREE.Vector2(0, 0) },
         u_hand_uv_max: { value: new THREE.Vector2(0, 0) },
@@ -324,14 +364,22 @@ export function useDepthCloudInScene(
     depthTexture.image.data = depthCopy;
     depthTexture.needsUpdate = true;
 
-    void createImageBitmap(frame.colorBlob).then((bm) => {
-      if (disposed || !colorTexture) { bm.close(); return; }
-      if (colorTexture.image && (colorTexture.image as ImageBitmap).close) {
-        try { (colorTexture.image as ImageBitmap).close(); } catch { /* ignore */ }
+    // colorMode === 'rgb' 일 때만 JPEG decode + 텍스처 업로드 (silhouette/depth 는
+    // shader 가 u_color sampler 안 씀). RGB 모드도 매 N frame 마다 1번 — 7.5Hz 면
+    // 충분 (사람 눈은 색 변화 < 10Hz 면 구분 어려움). depth geometry 는 매 frame 갱신.
+    if (opts.colorMode === 'rgb') {
+      colorUpdateCounter = (colorUpdateCounter + 1) % COLOR_UPDATE_EVERY_N;
+      if (colorUpdateCounter === 0) {
+        void createImageBitmap(frame.colorBlob).then((bm) => {
+          if (disposed || !colorTexture) { bm.close(); return; }
+          if (colorTexture.image && (colorTexture.image as ImageBitmap).close) {
+            try { (colorTexture.image as ImageBitmap).close(); } catch { /* ignore */ }
+          }
+          colorTexture.image = bm;
+          colorTexture.needsUpdate = true;
+        }).catch((e) => console.warn('[useDepthCloudInScene] color decode:', e));
       }
-      colorTexture.image = bm;
-      colorTexture.needsUpdate = true;
-    }).catch((e) => console.warn('[useDepthCloudInScene] color decode:', e));
+    }
 
     const u = (points.material as THREE.ShaderMaterial).uniforms;
     u.u_fx.value = frame.fx;

@@ -1,114 +1,145 @@
 /**
- * MediaPipe Hands wrapper — 손 1개 (max) lite 모델 트래커.
+ * MediaPipe Tasks Vision HandLandmarker wrapper — GPU-delegated, on the MAIN thread.
  *
- * 결과는 reactive ref `hand` 에 푸시. 매 frame send 안 함 — 이미 처리 중이면 skip
- * (`detect` 가 false 반환). DepthViewer 가 자체 throttle (3frame 마다 호출) + busy
- * guard 의 이중 안전망.
+ * ⚠ A Web-Worker offload was attempted twice (2026-06-01) and FAILS both ways:
+ *   - delegate:'GPU'  → "worker init FAILED" (no usable GL context in a worker)
+ *   - delegate:'CPU'  → "ModuleFactory not set" (MediaPipe's Emscripten WASM glue
+ *                        does not load inside a Vite module worker)
+ * So MediaPipe stays on the main thread with the GPU delegate (fastest per-detect →
+ * smallest main-thread block). The depth-view lag is reduced INSTEAD by offloading
+ * the zstd depth-decompress to a worker (pure JS, works fine) — see useDepthStream.
  *
- * locateFile 은 noriarm/OXVisionPreview.vue 와 동일 CDN.
+ * Migrated from @mediapipe/hands (2026-05-27): the old full-model TFLite GPU delegate
+ * fought three.js's WebGL context → WASM hard-abort. tasks-vision's `delegate:'GPU'`
+ * runs its own isolated GL context. detectForVideo() is SYNCHRONOUS (returns the
+ * result directly). Landmarks are normalized [0..1] → convert with image dims.
  */
 import { ref, type Ref } from 'vue';
-import { Hands, type Results } from '@mediapipe/hands';
+import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 export interface HandPoint {
-  /** palm center pixel u (0..imageW) — landmark 9 (middle MCP). */
+  /** palm center pixel u (0..imageW). */
   u: number;
   /** palm center pixel v (0..imageH). */
   v: number;
   /** all 21 landmarks in pixel space. */
   landmarks: Array<{ u: number; v: number }>;
-  /** detection confidence (left/right handedness score). */
+  /** Left/right handedness classification confidence (0..1) — NOT presence score. */
   score: number;
+  /** MediaPipe's left/right classification (SUBJECT view, mirrored). */
+  handedness: 'Left' | 'Right' | 'Unknown';
 }
 
 export interface UseHandTracker {
+  /** First detected hand (back-compat for existing single-hand consumers). */
   hand: Ref<HandPoint | null>;
-  /** MediaPipe 가 `onResults` 를 최소 1회 호출했는지 — model 다운로드 + WebGL 컨텍스트
-   *  초기화가 끝났다는 신호. 손이 실제로 검출됐는지와는 무관. UI 의 'loading…' 표시
-   *  해제용으로 사용한다 (손이 안 보여도 트래커는 살아있음). */
+  /** All detected hands (max 2). Always present, possibly empty. */
+  hands: Ref<HandPoint[]>;
+  /** True once the WASM + model finished loading. */
   ready: Ref<boolean>;
-  /** Returns false if previous detect still pending (skip). */
+  /** Returns false if the tracker isn't ready / is dead. */
   detect(img: ImageBitmap | HTMLCanvasElement | HTMLVideoElement): boolean;
   close(): Promise<void>;
 }
 
+// CDN paths — same source as the old @mediapipe/hands. WASM + model files.
+const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10/wasm';
+const MODEL_PATH =
+  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
 export function useHandTracker(): UseHandTracker {
-  console.log('[useHandTracker] constructing Hands instance');
-  const hands = new Hands({
-    locateFile: (file) => {
-      const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`;
-      console.log('[useHandTracker] locateFile →', url);
-      return url;
-    },
-  });
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 0,         // 0=lite (5–10ms/frame on mid laptop)
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5,
-  });
-
+  console.log('[useHandTracker] constructing HandLandmarker (tasks-vision, GPU, main thread)');
   const hand = ref<HandPoint | null>(null);
+  const hands = ref<HandPoint[]>([]);
   const ready = ref(false);
-  let busy = false;
+  let landmarker: HandLandmarker | null = null;
+  let initFailed = false;
+  // detectForVideo requires monotonically-increasing timestamps.
+  let lastTimestampMs = 0;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 5;
+  let dead = false;
 
-  // Force the WASM + model download up-front via initialize(). Otherwise the first
-  // hands.send() implicitly triggers init but if WASM fails to load (CDN block,
-  // network), send() never resolves and onResults never fires → loading 무한.
-  // initialize() returns a Promise we can hook up to set ready independently of
-  // actual hand detections.
-  hands
-    .initialize()
-    .then(() => {
-      console.log('[useHandTracker] MediaPipe Hands ready (WASM + model loaded)');
-      if (!ready.value) ready.value = true;
-    })
-    .catch((err) => {
-      console.error('[useHandTracker] MediaPipe Hands init FAILED:', err);
-      // ready 그대로 false — UI 'loading…' 으로 남아 사용자에게 시각 신호.
-    });
-
-  hands.onResults((results: Results) => {
-    busy = false;
-    if (!ready.value) ready.value = true;
-    const lms = results.multiHandLandmarks?.[0];
-    if (!lms || lms.length === 0) {
-      hand.value = null;
-      return;
+  (async () => {
+    try {
+      const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
+      landmarker = await HandLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL_PATH, delegate: 'GPU' },
+        runningMode: 'VIDEO',
+        numHands: 2,
+        minHandDetectionConfidence: 0.35,
+        minHandPresenceConfidence: 0.35,
+        minTrackingConfidence: 0.35,
+      });
+      ready.value = true;
+      console.log('[useHandTracker] HandLandmarker ready (GPU delegate, main thread)');
+    } catch (err) {
+      initFailed = true;
+      console.error('[useHandTracker] init FAILED:', err);
     }
-    const img = results.image as ImageBitmap | HTMLCanvasElement;
-    const w = (img as { width: number }).width;
-    const h = (img as { height: number }).height;
-    const palm = lms[9];
-    const score = results.multiHandedness?.[0]?.score ?? 0;
-    hand.value = {
-      u: palm.x * w,
-      v: palm.y * h,
-      landmarks: lms.map((l) => ({ u: l.x * w, v: l.y * h })),
-      score,
-    };
-  });
+  })();
 
-  let firstSendLogged = false;
   function detect(img: ImageBitmap | HTMLCanvasElement | HTMLVideoElement): boolean {
-    if (busy) return false;
-    if (!firstSendLogged) {
-      console.log('[useHandTracker] first detect() call — passing image to MediaPipe');
-      firstSendLogged = true;
+    if (dead || initFailed || landmarker === null) return false;
+    let ts = Math.floor(performance.now());
+    if (ts <= lastTimestampMs) ts = lastTimestampMs + 1;
+    lastTimestampMs = ts;
+    try {
+      const result = landmarker.detectForVideo(img as unknown as HTMLVideoElement, ts);
+      consecutiveFailures = 0;
+      const w = (img as { width: number }).width;
+      const h = (img as { height: number }).height;
+      const N = result.landmarks?.length ?? 0;
+      const out: HandPoint[] = [];
+      for (let i = 0; i < N; i++) {
+        const lms = result.landmarks[i];
+        if (!lms || lms.length === 0) continue;
+        // Palm center = centroid of the 5 palm-base landmarks (0,5,9,13,17).
+        const wrist = lms[0];
+        const idxMcp = lms[5];
+        const midMcp = lms[9];
+        const ringMcp = lms[13];
+        const pinkyMcp = lms[17];
+        const px = (wrist.x + idxMcp.x + midMcp.x + ringMcp.x + pinkyMcp.x) / 5;
+        const py = (wrist.y + idxMcp.y + midMcp.y + ringMcp.y + pinkyMcp.y) / 5;
+        const cat = result.handednesses?.[i]?.[0];
+        const score = cat?.score ?? 0;
+        const handednessLabel = cat?.categoryName === 'Left'
+          ? 'Left'
+          : cat?.categoryName === 'Right' ? 'Right' : 'Unknown';
+        out.push({
+          u: px * w,
+          v: py * h,
+          landmarks: lms.map((l) => ({ u: l.x * w, v: l.y * h })),
+          score,
+          handedness: handednessLabel,
+        });
+      }
+      hands.value = out;
+      hand.value = out[0] ?? null;
+      return true;
+    } catch (err) {
+      consecutiveFailures += 1;
+      console.warn(
+        `[useHandTracker] detect failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`,
+        err,
+      );
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        dead = true;
+        hand.value = null;
+        hands.value = [];
+        console.error('[useHandTracker] tracker dead — reload page');
+      }
+      return false;
     }
-    busy = true;
-    // MediaPipe runtime accepts ImageBitmap (verified in shipped solutions API)
-    // but the TS types only allow HTMLImageElement | HTMLVideoElement | HTMLCanvasElement.
-    hands.send({ image: img as unknown as HTMLImageElement }).catch((e) => {
-      console.warn('hands.send failed:', e);
-      busy = false;
-    });
-    return true;
   }
 
   async function close(): Promise<void> {
-    await hands.close();
+    if (landmarker !== null) {
+      landmarker.close();
+      landmarker = null;
+    }
   }
 
-  return { hand, ready, detect, close };
+  return { hand, hands, ready, detect, close };
 }

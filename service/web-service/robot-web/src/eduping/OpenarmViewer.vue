@@ -21,6 +21,10 @@ import {
   type HandBbox,
   type UseDepthCloudInScene,
 } from './useDepthCloudInScene';
+import {
+  useDepthVoxelInScene,
+  type UseDepthVoxelInScene,
+} from './useDepthVoxelInScene';
 import type { UseDepthStream } from './useDepthStream';
 
 interface CameraSyncState {
@@ -51,11 +55,32 @@ const props = withDefaults(
      *  cloud 용으로 별도 WS 안 띄우게. */
     depthStream?: UseDepthStream | null;
     depthPointSize?: number;
+    /** Cloud decimation stride (N px 마다 1 점). 2 = 점 1/4 = ~4배 가벼움. 기본 1 (full). */
+    depthStride?: number;
     depthCloudScale?: number;
     depthMaxM?: number;
-    depthColorMode?: 'rgb' | 'depth';
+    /** D435 FoV frustum 의 near plane (m). 기본 0.3 (D435 minZ). 더 크게 잡으면
+     *  카메라 바로 앞 빈 공간 시각화 — high-five zone 을 frustum 뒤쪽으로 밀어낼 때. */
+    depthFrustumNearM?: number;
+    /** D435 FoV frustum 의 far plane (m). 미지정 시 depthMaxM 와 동일. 분리 옵션 —
+     *  point cloud 는 멀리까지 렌더 (큰 maxDepthM) 하면서 frustum (=hand-accept 영역)
+     *  만 좁게 그릴 때 사용. cloud 는 frustum 밖에서도 보이지만 hand POST 는 frustum
+     *  안에서만 발사 (DepthViewer 의 HIGHFIVE_MAX_Z_M 으로 별도 게이트). */
+    depthFrustumFarM?: number;
+    depthColorMode?: 'rgb' | 'depth' | 'silhouette';
+    /** Silhouette mode 의 z band — 사람 거리 범위 (m). default 0.5~2.5. */
+    depthBandMinM?: number;
+    depthBandMaxM?: number;
+    /** Cloud cull 범위 (m, world XZ). 1.0 = grid 안만 렌더. 손을 옆으로 넓게 벌리면
+     *  한 쪽 손이 cull 되어 silhouette 에서 안 보임 → 2.0 정도로 키워 lateral 범위 확장. */
+    depthWorldBoundXZ?: number;
     /** 손 bbox (image-uv 좌표) — null 이면 전체 cloud, 값 있으면 그 안만. */
     handBbox?: HandBbox | null;
+    /** Client-side voxelizer (octomap-like cube grid) 표시. moveit-ros-perception
+     *  미설치 환경에서 RViz octomap 시각 효과 흉내. cloud + voxel 둘 다 켜도 됨. */
+    showDepthVoxels?: boolean;
+    /** Voxel 한 변 (m). default 0.05 (5cm). */
+    depthVoxelSize?: number;
   }>(),
   {
     source: 'leader',
@@ -68,10 +93,18 @@ const props = withDefaults(
     showDepthCloud: false,
     depthStream: null,
     depthPointSize: 4.0,
+    depthStride: 1,
     depthCloudScale: 1.0,
     depthMaxM: 3.0,
+    depthFrustumNearM: 0.3,
+    depthFrustumFarM: undefined,
     depthColorMode: 'rgb',
+    depthBandMinM: 0.5,
+    depthBandMaxM: 2.5,
+    depthWorldBoundXZ: 1.0,
     handBbox: null,
+    showDepthVoxels: false,
+    depthVoxelSize: 0.05,
   },
 );
 
@@ -108,6 +141,7 @@ let camera: THREE.PerspectiveCamera | null = null;
 let controls: OrbitControls | null = null;
 let robot: any = null;
 let depthCloud: UseDepthCloudInScene | null = null;
+let depthVoxels: UseDepthVoxelInScene | null = null;
 let animationId = 0;
 let resizeObserver: ResizeObserver | null = null;
 /** False until URDF + STL meshes are in GPU — blocks pose apply during compare warmup. */
@@ -739,15 +773,34 @@ function loadUrdf(): void {
           robot,
           depthStream: props.depthStream,
           pointSize: props.depthPointSize,
+          stride: props.depthStride,
           cloudScale: props.depthCloudScale,
           maxDepthM: props.depthMaxM,
           colorMode: props.depthColorMode,
-          // D435 FoV wireframe pyramid — near=0.3m, far=depthMaxM. 녹색 lines, opt 0.5.
-          // useDepthCloudInScene 가 default true 라 적었지만 실제 함수는 undefined 면
-          // 그리지 않음 (`if (frustum || !opts.showFrustum) return;`). 명시 true 로 강제.
+          bandMinM: props.depthBandMinM,
+          bandMaxM: props.depthBandMaxM,
+          worldBoundXZ: props.depthWorldBoundXZ,
+          // D435 FoV wireframe pyramid. far 가 별도 지정되면 cloud 의 maxDepthM 와
+          // 분리 — cloud 는 멀리까지 점군 렌더, frustum (hand-accept 영역) 만 좁게.
           showFrustum: true,
+          frustumNearM: props.depthFrustumNearM,
+          frustumFarM: props.depthFrustumFarM,
         });
         if (props.handBbox) depthCloud.setHandBbox(props.handBbox);
+      }
+      // Voxel grid (octomap-like) — same depth stream, voxelized to cubes.
+      // moveit-ros-perception 미설치라 /octomap_full 토픽이 없어도 시각 효과 동일.
+      if (props.showDepthVoxels && props.depthStream && !depthVoxels) {
+        depthVoxels = useDepthVoxelInScene({
+          robot,
+          depthStream: props.depthStream,
+          voxelSize: props.depthVoxelSize,
+          maxDepthM: props.depthMaxM,
+          // D435 FoV 와이어프레임 — cloud frustum 과 동일 prop 재사용.
+          showFrustum: true,
+          frustumNearM: props.depthFrustumNearM,
+          frustumFarM: props.depthFrustumFarM ?? props.depthMaxM,
+        });
       }
       // STL loads are async — viewer-ready only after mesh poll passes.
       window.setTimeout(() => waitForMeshesThenFinish(), 50);
@@ -856,6 +909,8 @@ onBeforeUnmount(() => {
   _highlightMaterial = null;
   depthCloud?.dispose();
   depthCloud = null;
+  depthVoxels?.dispose();
+  depthVoxels = null;
   stateWs.stop();
   cancelAnimationFrame(animationId);
   resizeObserver?.disconnect();

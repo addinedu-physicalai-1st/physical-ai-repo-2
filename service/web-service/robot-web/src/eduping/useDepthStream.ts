@@ -8,11 +8,8 @@
  * three.js 렌더 루프가 가장 최근에 받은 frame 을 매 RAF 마다 텍스처 업로드.
  */
 import { ref, type Ref } from 'vue';
-import { decompress as zstdDecompress } from 'fzstd';
 
 const PATH = '/ws/depth-stream';
-const HEADER_SIZE = 60;
-const MAGIC = 0x44505448; // "DPTH" big-endian as uint32
 
 export type DepthStreamStatus = 'connecting' | 'open' | 'streaming' | 'closed';
 
@@ -59,7 +56,27 @@ export function useDepthStream(
   const status = ref<DepthStreamStatus>('connecting');
   const lastFrameAtMs = ref(0);
   const clientId = `depth-${uuid()}`;
-  let frameCb: ((frame: DecodedDepthFrame) => void) | null = null;
+  // Multiple subscribers (DepthViewer.handleFrame + useDepthCloudInScene + useDepthVoxelInScene
+  // 등) 가 같은 stream 을 공유하므로 listener 배열로 fan-out. 이전 single-callback
+  // 구조는 새 onFrame 호출이 기존 callback 을 덮어써서 hand 추적 + cloud 가 동시에
+  // 살아있지 못했음 (마지막 mount 만 frame 수신).
+  const frameListeners: Array<(frame: DecodedDepthFrame) => void> = [];
+
+  // zstd decode runs in a worker (off the main thread) — see depthDecode.worker.ts.
+  // The raw WS ArrayBuffer is transferred in; the decoded frame (depth buffer
+  // transferred back) is fanned out to the render listeners here on the main thread.
+  const decodeWorker = new Worker(
+    new URL('./depthDecode.worker.ts', import.meta.url),
+    { type: 'module' },
+  );
+  decodeWorker.onmessage = (e: MessageEvent<{ ok: boolean; frame?: DecodedDepthFrame }>) => {
+    if (!e.data.ok || !e.data.frame) return;
+    status.value = 'streaming';
+    lastFrameAtMs.value = Date.now();
+    for (const cb of frameListeners) {
+      try { cb(e.data.frame); } catch (err) { console.error('depth onFrame cb:', err); }
+    }
+  };
 
   const wsUrl = (() => {
     const loc = (globalThis as { location?: Location }).location;
@@ -113,13 +130,9 @@ export function useDepthStream(
         return;
       }
       if (!(data instanceof ArrayBuffer)) return;
-      const frame = decodeFrame(data);
-      if (frame === null) return;
-      status.value = 'streaming';
-      lastFrameAtMs.value = Date.now();
-      if (frameCb) {
-        try { frameCb(frame); } catch (e) { console.error('depth onFrame cb:', e); }
-      }
+      // Hand the raw frame to the decode worker (transfer → zero-copy). The decoded
+      // frame comes back via decodeWorker.onmessage and is fanned out there.
+      decodeWorker.postMessage(data, [data]);
     };
   }
 
@@ -129,73 +142,14 @@ export function useDepthStream(
     stopped = true;
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     try { currentWs?.close(); } catch { /* ignore */ }
-    frameCb = null;
+    try { decodeWorker.terminate(); } catch { /* ignore */ }
+    frameListeners.length = 0;
   }
 
   function onFrame(cb: (frame: DecodedDepthFrame) => void): void {
-    frameCb = cb;
+    if (!frameListeners.includes(cb)) frameListeners.push(cb);
   }
 
   return { status, lastFrameAtMs, onFrame, stop };
 }
 
-function decodeFrame(buf: ArrayBuffer): DecodedDepthFrame | null {
-  if (buf.byteLength < HEADER_SIZE) return null;
-  const dv = new DataView(buf);
-  const magic = dv.getUint32(0, false);
-  if (magic !== MAGIC) return null;
-  const version = dv.getUint8(4);
-  if (version !== 1) return null;
-  // robotId at offset 5 — 클라이언트가 subscribe 한 robot 만 흘러오므로 검증 생략.
-  const frameSeq = dv.getUint32(8, false);
-  // ts_ms uint64 BE — JS Number 안전 범위는 2^53 까지, unix ms 는 2^53 안 ok.
-  const tsHi = dv.getUint32(12, false);
-  const tsLo = dv.getUint32(16, false);
-  const tsMs = tsHi * 0x1_0000_0000 + tsLo;
-  const depthW = dv.getUint16(20, false);
-  const depthH = dv.getUint16(22, false);
-  const colorW = dv.getUint16(24, false);
-  const colorH = dv.getUint16(26, false);
-  const fx = dv.getFloat32(28, false);
-  const fy = dv.getFloat32(32, false);
-  const cx = dv.getFloat32(36, false);
-  const cy = dv.getFloat32(40, false);
-  const depthScale = dv.getFloat32(44, false);
-  const depthMinMm = dv.getUint16(48, false);
-  const depthMaxMm = dv.getUint16(50, false);
-  const depthSize = dv.getUint32(52, false);
-  const colorSize = dv.getUint32(56, false);
-
-  if (HEADER_SIZE + depthSize + colorSize !== buf.byteLength) return null;
-
-  const depthZstd = new Uint8Array(buf, HEADER_SIZE, depthSize);
-  const colorBytes = new Uint8Array(buf, HEADER_SIZE + depthSize, colorSize);
-
-  let depthRaw: Uint8Array;
-  try {
-    depthRaw = zstdDecompress(depthZstd);
-  } catch (e) {
-    console.warn('zstd decompress failed:', e);
-    return null;
-  }
-  if (depthRaw.byteLength !== depthW * depthH * 2) {
-    console.warn(
-      `depth size mismatch: got ${depthRaw.byteLength}, expected ${depthW * depthH * 2}`,
-    );
-    return null;
-  }
-  // wire format = uint16 LE (Python np.uint16 default)
-  const depth = new Uint16Array(
-    depthRaw.buffer, depthRaw.byteOffset, depthW * depthH,
-  );
-
-  const colorBlob = new Blob([colorBytes], { type: 'image/jpeg' });
-
-  return {
-    frameSeq, tsMs,
-    depthW, depthH, colorW, colorH,
-    fx, fy, cx, cy, depthScale,
-    depthMinMm, depthMaxMm,
-    depth, colorBlob,
-  };
-}
