@@ -1,43 +1,32 @@
-"""Leader → Follower 직결 passthrough — 고정주기 출력 + EMA + 속도 캡.
+"""Leader → Follower 단순 직결 passthrough (JTC).
 
-leader 와 follower 가 동일 URDF — joint 1:1 매핑. move_group FK/IK 호출 0.
+아주 단순한 teleop — leader 관절을 받는 즉시 JTC goal 로 publish. 1:1 매핑.
+필터 / 고정주기 타이머 / 충돌 감속 없음 (단순화). 안전용 **최대 속도 제한만** 유지.
 
-떨림 대책 (핵심):
-  - **출력 = 고정주기 타이머** (output_hz). WS 로 들어오는 leader 는 도착 타이밍이
-    불규칙(버스트)해서, 받을 때마다 publish 하면 velocity cap 의 dt 가 들쭉날쭉 →
-    버스트 땐 안 움직이고 갭 뒤엔 튐 = 떨림. 출력을 도착과 분리해 일정 dt 로 publish.
-  - **EMA 저역통과** — 고정 주기로 최신 leader 를 향해 수렴 (센서 노이즈/지터 흡수).
-  - **속도 캡** — per-joint 최대 각속도 (안전 핵심). 고정 dt 라 step 이 균일.
-  vision(D435 voxel) 거리 속도 제어는 제거 — 단순화.
+부드러움은 **JTC 보간창 (interp_s)** 하나로만 조절:
+  - leader frame 이 들어올 때마다 "현재→leader" 를 interp_s 에 걸쳐 가도록 goal 을 던짐.
+  - JTC(100Hz) 가 그 사이를 보간 → interp_s 가 클수록 부드럽지만 지연↑.
 
-흐름:
-  /eduping/leader/joint_states (불규칙) → on_leader → 최신 target 저장 (publish 안 함)
-  timer (output_hz, 균일)               → EMA → 속도 캡 → JTC publish
-  /joint_states                          → 시작 위치 seed (첫 명령 점프 방지)
+속도 제한 (안전): per-joint |Δ| ≤ max_joint_vel × dt 로 캡. 정상 teleop 모션은 캡
+아래라 그대로 통과 — 큰 점프(시작/글리치)만 제한하므로 떨림과 무관.
 
 active gate — control-service teleop relay 가 leader 프레임 forward 를 ON/OFF.
 woobuntu 는 start_active:=true 로 상시 active.
 
 Params:
-  start_active     (bool,  default False)  True 면 부팅부터 active.
-  min_cutoff       (float, default 1.0)    One Euro 최소 컷오프(Hz). ↓ 정지 시 더 부드럽고 지연↑.
-  beta             (float, default 0.7)    One Euro 속도 계수. ↑ 빠른 동작에서 더 반응적(지연↓).
-  d_cutoff         (float, default 1.0)    One Euro 미분 컷오프(Hz).
-  max_joint_vel    (float, default 1.0)    per-joint 최대 각속도 (rad/s).
-  output_hz        (float, default 50.0)   JTC 출력 주기.
+  start_active  (bool,  default False)  True 면 부팅부터 active.
+  interp_s      (float, default 0.12)   JTC time_from_start(보간창, s). ↑ 부드럽고 지연↑.
+  max_joint_vel (float, default 1.0)    per-joint 최대 각속도(rad/s) — 안전 캡.
 """
 from __future__ import annotations
 
 import math
-import threading
 import time
 
 import rclpy
 from builtin_interfaces.msg import Duration as DurMsg
 from control_msgs.action import GripperCommand
 from rclpy.action import ActionClient
-from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_srvs.srv import SetBool
@@ -64,193 +53,91 @@ class LeaderPassthrough(Node):
     def __init__(self) -> None:
         super().__init__("leader_passthrough")
 
-        self._cb_group = ReentrantCallbackGroup()
+        self.declare_parameter("start_active", False)
+        self._active = bool(
+            self.get_parameter("start_active").get_parameter_value().bool_value
+        )
+        self._interp_s = max(
+            0.02,
+            float(self.declare_parameter("interp_s", 0.12)
+                  .get_parameter_value().double_value),
+        )
+        self._max_vel = float(
+            self.declare_parameter("max_joint_vel", 1.0)
+            .get_parameter_value().double_value
+        )
 
         self.create_subscription(
-            JointState, "/eduping/leader/joint_states", self._on_leader, 10,
-            callback_group=self._cb_group,
+            JointState, "/eduping/leader/joint_states", self._on_leader, 10
         )
-        # 현재 follower — 첫 명령을 follower 자세에서 시작 (시작 점프 방지) 용.
-        self.create_subscription(
-            JointState, "/joint_states", self._on_follower, 10,
-            callback_group=self._cb_group,
-        )
-        self._latest_follower: JointState | None = None
-        self._lock = threading.Lock()
-
-        # on_leader 가 저장하는 최신 target (raw). timer 가 읽어 EMA+cap 후 publish.
-        self._target_pos: dict[str, list[float] | None] = {side: None for side in SIDES}
-        self._target_grip: dict[str, float | None] = {side: None for side in SIDES}
-
         self._jtc_pub = {
             side: self.create_publisher(JointTrajectory, JTC_TOPIC[side], 10)
             for side in SIDES
         }
         self._gripper_clients = {
-            side: ActionClient(
-                self, GripperCommand, GRIPPER_ACTION[side],
-                callback_group=self._cb_group,
-            )
+            side: ActionClient(self, GripperCommand, GRIPPER_ACTION[side])
             for side in SIDES
         }
         self._last_gripper_cmd = {side: math.nan for side in SIDES}
-        # 직전 출력 위치 (EMA 상태 + velocity cap 출발점).
-        self._cmd_pos: dict[str, list[float] | None] = {side: None for side in SIDES}
+        # 속도 캡용 — 직전 publish 위치/시각.
+        self._last_pos: dict[str, list[float] | None] = {side: None for side in SIDES}
+        self._last_ts: dict[str, float] = {side: 0.0 for side in SIDES}
 
-        self.declare_parameter("start_active", False)
-        self._active = bool(
-            self.get_parameter("start_active").get_parameter_value().bool_value
-        )
-        # One Euro Filter — 속도 적응형 저역통과. 느릴 때 강하게(떨림↓), 빠를 때 약하게(지연↓).
-        #   min_cutoff↓ → 정지 시 더 부드러움(떨림↓), 지연↑.
-        #   beta↑       → 빠른 동작에서 더 반응적(지연↓), 빠른 구간 떨림 약간↑.
-        self._min_cutoff = max(
-            0.01, float(self.declare_parameter("min_cutoff", 1.0)
-                        .get_parameter_value().double_value))
-        self._beta = max(
-            0.0, float(self.declare_parameter("beta", 0.7)
-                       .get_parameter_value().double_value))
-        self._d_cutoff = max(
-            0.01, float(self.declare_parameter("d_cutoff", 1.0)
-                        .get_parameter_value().double_value))
-        # One Euro 상태 — 직전 필터 위치 / 필터 미분 (per side, per joint).
-        self._oe_x: dict[str, list[float] | None] = {side: None for side in SIDES}
-        self._oe_dx: dict[str, list[float] | None] = {side: None for side in SIDES}
-        self._max_vel = float(
-            self.declare_parameter("max_joint_vel", 1.0)
-            .get_parameter_value().double_value
-        )
-        self._out_hz = max(
-            5.0,
-            float(self.declare_parameter("output_hz", 50.0)
-                  .get_parameter_value().double_value),
-        )
-        self._dt = 1.0 / self._out_hz
-
-        self.create_service(
-            SetBool, "~/set_active", self._on_set_active,
-            callback_group=self._cb_group,
-        )
-        # 고정주기 출력 타이머 — 도착 지터와 분리.
-        self.create_timer(self._dt, self._tick, callback_group=self._cb_group)
+        self.create_service(SetBool, "~/set_active", self._on_set_active)
 
         self.get_logger().info(
             f"leader_passthrough ready (active={self._active}, "
-            f"oneEuro min_cutoff={self._min_cutoff} beta={self._beta}, "
-            f"max_vel={self._max_vel} rad/s, out={self._out_hz}Hz)"
+            f"interp_s={self._interp_s}, max_vel={self._max_vel} rad/s)"
         )
 
     def _on_set_active(self, request: SetBool.Request, response: SetBool.Response):
-        active = bool(request.data)
-        if not active:
-            # 정지 — 필터/cap 상태 리셋해 다음 시작 때 follower 에서 다시 seed.
-            for side in SIDES:
-                self._cmd_pos[side] = None
-                self._oe_x[side] = None
-                self._oe_dx[side] = None
-        self._active = active
+        self._active = bool(request.data)
         response.success = True
         response.message = f"active={self._active}"
         self.get_logger().info(f"leader_passthrough {response.message}")
         return response
 
-    def _on_follower(self, msg: JointState) -> None:
-        with self._lock:
-            self._latest_follower = msg
-
     def _on_leader(self, msg: JointState) -> None:
-        # publish 안 함 — 최신 target 만 저장. 출력은 _tick (고정주기) 이 담당.
-        leader_idx = {n: i for i, n in enumerate(msg.name)}
-        with self._lock:
-            for side in SIDES:
-                try:
-                    self._target_pos[side] = [
-                        msg.position[leader_idx[j]] for j in ARM_JOINTS[side]
-                    ]
-                except (KeyError, IndexError):
-                    continue
-                if GRIPPER_JOINT[side] in leader_idx:
-                    self._target_grip[side] = msg.position[leader_idx[GRIPPER_JOINT[side]]]
-
-    def _tick(self) -> None:
         if not self._active:
             return
-        with self._lock:
-            follower = self._latest_follower
-            targets = {s: self._target_pos[s] for s in SIDES}
-            grips = {s: self._target_grip[s] for s in SIDES}
-        follower_idx = (
-            {n: i for i, n in enumerate(follower.name)} if follower is not None else {}
-        )
-
-        max_step = self._max_vel * self._dt
+        leader_idx = {n: i for i, n in enumerate(msg.name)}
         for side in SIDES:
-            target = targets[side]
-            if target is None:
+            try:
+                pos = [msg.position[leader_idx[j]] for j in ARM_JOINTS[side]]
+            except (KeyError, IndexError):
                 continue
-
-            # One Euro 필터 — 속도 적응형 저역통과 (떨림 제거).
-            ft = self._one_euro(side, target)
-
-            cmd = self._cmd_pos[side]
-            # 시작 — follower 현재 자세에서 출발 (점프 방지). 없으면 ft 에서 시작.
-            if cmd is None:
-                if follower is not None and all(j in follower_idx for j in ARM_JOINTS[side]):
-                    cmd = [follower.position[follower_idx[j]] for j in ARM_JOINTS[side]]
-                else:
-                    cmd = list(ft)
-
-            # 속도 캡 — cmd 를 필터된 target(ft) 으로 max_step 만큼 이동 (안전).
-            out: list[float] = []
-            for c, t in zip(cmd, ft):
-                d = t - c
-                if d > max_step:
-                    out.append(c + max_step)
-                elif d < -max_step:
-                    out.append(c - max_step)
-                else:
-                    out.append(t)
-            self._cmd_pos[side] = out
-            self._publish_jtc(side, out)
-
-            grip = grips[side]
-            if grip is not None:
-                self._send_gripper(side, grip)
-
-    # ── One Euro Filter ────────────────────────────────────────────────
-    def _alpha(self, cutoff: float) -> float:
-        tau = 1.0 / (2.0 * math.pi * cutoff)
-        return 1.0 / (1.0 + tau / self._dt)
-
-    def _one_euro(self, side: str, x: list[float]) -> list[float]:
-        """속도 적응형 저역통과 — 느릴 때 강한 필터(떨림↓), 빠를 때 약한 필터(지연↓)."""
-        xf_prev = self._oe_x[side]
-        if xf_prev is None or len(xf_prev) != len(x):
-            self._oe_x[side] = list(x)
-            self._oe_dx[side] = [0.0] * len(x)
-            return list(x)
-        dxf_prev = self._oe_dx[side]
-        a_d = self._alpha(self._d_cutoff)
-        out: list[float] = []
-        dxf: list[float] = []
-        for xi, xpi, dxpi in zip(x, xf_prev, dxf_prev):
-            dx = (xi - xpi) / self._dt
-            edx = a_d * dx + (1.0 - a_d) * dxpi        # 필터된 속도
-            dxf.append(edx)
-            cutoff = self._min_cutoff + self._beta * abs(edx)  # 속도↑ → cutoff↑ → 덜 필터
-            a = self._alpha(cutoff)
-            out.append(a * xi + (1.0 - a) * xpi)
-        self._oe_x[side] = out
-        self._oe_dx[side] = dxf
-        return out
+            self._publish_jtc(side, pos)
+            if GRIPPER_JOINT[side] in leader_idx:
+                self._send_gripper(side, msg.position[leader_idx[GRIPPER_JOINT[side]]])
 
     def _publish_jtc(self, side: str, positions: list[float]) -> None:
+        # 속도 캡 (안전) — per-joint |Δ| ≤ max_vel × dt. 정상 모션은 캡 아래라 무영향.
+        now = time.monotonic()
+        last = self._last_pos[side]
+        if last is not None and len(last) == len(positions):
+            dt = min(0.1, max(1e-3, now - self._last_ts[side]))
+            max_step = self._max_vel * dt
+            capped: list[float] = []
+            for prev, tgt in zip(last, positions):
+                d = tgt - prev
+                if d > max_step:
+                    capped.append(prev + max_step)
+                elif d < -max_step:
+                    capped.append(prev - max_step)
+                else:
+                    capped.append(tgt)
+            positions = capped
+        self._last_pos[side] = list(positions)
+        self._last_ts[side] = now
+
         jt = JointTrajectory()
         jt.joint_names = ARM_JOINTS[side]
         pt = JointTrajectoryPoint()
         pt.positions = [float(p) for p in positions]
-        # 한 tick hold — 다음 tick 에 새 goal 이 덮어씀.
-        pt.time_from_start = DurMsg(sec=0, nanosec=int(self._dt * 1e9))
+        pt.time_from_start = DurMsg(
+            sec=int(self._interp_s),
+            nanosec=int((self._interp_s % 1.0) * 1e9),
+        )
         jt.points = [pt]
         self._jtc_pub[side].publish(jt)
 
@@ -271,12 +158,9 @@ class LeaderPassthrough(Node):
 def main() -> None:
     rclpy.init()
     node = LeaderPassthrough()
-    executor = MultiThreadedExecutor(num_threads=3)
-    executor.add_node(node)
     try:
-        executor.spin()
+        rclpy.spin(node)
     finally:
-        executor.shutdown()
         node.destroy_node()
         rclpy.shutdown()
 
