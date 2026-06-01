@@ -348,6 +348,10 @@ from control_service.doctor.stetho_relay import (  # noqa: E402
     StethoHub,
     build_router as build_stetho_router,
 )
+from control_service.doctor.teleop_relay import (  # noqa: E402
+    TeleopRelayHub,
+    build_router as build_teleop_relay_router,
+)
 from control_service.doctor.webrtc_signaling import (  # noqa: E402
     SignalingHub,
     build_router as build_doctor_signal_router,
@@ -362,6 +366,15 @@ doctor_bridge = DoctorRosBridge(left_joints=_DOCTOR_LEFT_JOINTS, right_joints=_D
 # doctor_hub → bridge: 타겟 프레임을 ROS 로 publish
 doctor_hub.on_target(lambda eid, frame: doctor_bridge.publish_target(frame))
 
+# Leader ↔ follower 양방향 teleop relay (cross-machine, 2-머신 a-2).
+#   leader_src (doctor uploader) → robot (woobuntu) 로 leader 프레임 forward (active 시).
+#   robot → on_follower → doctor_bridge.update_follower_state → three.js StateFrame.
+teleop_relay_hub = TeleopRelayHub()
+teleop_relay_hub.on_follower(doctor_bridge.update_follower_state)
+app.state.teleop_relay_hub = teleop_relay_hub
+app.include_router(build_teleop_relay_router(teleop_relay_hub))
+
+
 # doctor_hub → bridge: 이벤트 처리
 def _on_doctor_event(eid: str, msg: dict) -> None:
     msg_type = msg.get("type")
@@ -370,8 +383,11 @@ def _on_doctor_event(eid: str, msg: dict) -> None:
     elif msg_type == "teleop":
         action = msg.get("action")
         active = action == "start"
+        # 2-머신: relay 가 leader 프레임 게이트 (woobuntu leader_passthrough 는 항상 active).
+        teleop_relay_hub.set_active(active)
+        # 단일 머신 (로컬 leader_passthrough mock): ROS 서비스 게이트도 시도 (없으면 no-op).
         ok = doctor_bridge.set_leader_active(active)
-        logger.info("doctor teleop %s from %s → leader_passthrough active=%s (ok=%s)",
+        logger.info("doctor teleop %s from %s → relay active=%s, local passthrough ok=%s",
                     action, eid, active, ok)
     # 기타 메시지는 무시.
 
