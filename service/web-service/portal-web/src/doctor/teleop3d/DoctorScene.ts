@@ -40,8 +40,8 @@ export function createDoctorScene(canvas: HTMLCanvasElement): DoctorScene {
     0.05,
     20,
   );
-  // 양팔 robot 앞쪽 위에서 살짝 내려다보는 각도.
-  camera.position.set(1.2, -1.2, 0.8);
+  // 로봇 뒤에서 살짝 위에서 내려다보는 각도.
+  camera.position.set(-0.893, 0.003, 2.726);
   camera.up.set(0, 0, 1);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -50,7 +50,7 @@ export function createDoctorScene(canvas: HTMLCanvasElement): DoctorScene {
 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
-  controls.target.set(0, 0, 0.3); // 양팔 가운데 살짝 위
+  controls.target.set(0.174, 0.008, 0.473);
 
   function onResize(): void {
     const w = canvas.clientWidth;
