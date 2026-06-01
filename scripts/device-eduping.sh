@@ -288,21 +288,18 @@ stage_bringup() {
       -p control_url:=${CONTROL_URL:-ws://localhost:8000}'"
   tmux new-window -t "$SESSION" -n teleop -c "$WS_DIR" "$TELEOP_WS_CMD"
 
-  # ── teleop 떨림 튜닝 (아래 값만 바꿔 device-eduping.sh 재기동) ──────────────
-  # One Euro Filter — 속도 적응형 저역통과: 느릴 때 강하게(떨림↓), 빠를 때 약하게(지연↓).
-  PASS_MIN_CUTOFF=1.0    # 최소 컷오프(Hz). ↓ 정지 시 더 부드럽게(떨림↓) 대신 지연↑
-  PASS_BETA=0.7          # 속도 계수. ↑ 빠르게 움직일 때 더 반응적(지연↓) 대신 빠른구간 떨림 약간↑
+  # ── teleop 튜닝 (아래 값만 바꿔 device-eduping.sh 재기동) ──────────────────
+  # 단순 직결 passthrough — leader 를 받는 즉시 JTC publish, 부드러움은 보간창으로.
+  PASS_INTERP_S=0.12     # JTC 보간창(s). ↑ 더 부드럽지만 지연↑ (떨림 시 0.15~0.25 로)
   PASS_MAX_VEL=1.0       # per-joint 최대 각속도(rad/s) — 안전 캡
-  PASS_OUTPUT_HZ=50.0    # JTC 출력 주기(Hz)
   PASSTHROUGH_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
     ros2 run eduarm leader_passthrough_node --ros-args -p start_active:=true \
-      -p min_cutoff:=$PASS_MIN_CUTOFF -p beta:=$PASS_BETA \
-      -p max_joint_vel:=$PASS_MAX_VEL -p output_hz:=$PASS_OUTPUT_HZ'"
+      -p interp_s:=$PASS_INTERP_S -p max_joint_vel:=$PASS_MAX_VEL'"
   tmux new-window -t "$SESSION" -n pass -c "$WS_DIR" "$PASSTHROUGH_CMD"
 
   log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)  + [teleop] WS 브리지  + [pass] leader_passthrough"
   log "/joint_states 토픽이 살아나면 sim twin / Control Server 가 구독 가능. d435 윈도엔 카메라/bridge/perception, stetho 윈도엔 /eduping/stethoscope/fsr_raw."
-  log "telehealth: doctor UI '시작' → leader → [teleop]수신 → [pass]JTC+속도조절 → 실물 follower. 실물 자세는 [teleop]→서버→doctor three.js 로 반영."
+  log "telehealth: doctor UI '시작' → leader → [teleop]수신 → [pass]단순 JTC(속도캡) → 실물 follower. 실물 자세는 [teleop]→서버→doctor three.js 로 반영."
   exec tmux attach -t "$SESSION"
 }
 
