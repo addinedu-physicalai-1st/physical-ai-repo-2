@@ -277,10 +277,11 @@ stage_bringup() {
       control_url:=${CONTROL_URL:-ws://localhost:8000}'"
   tmux new-window -t "$SESSION" -n stetho -c "$WS_DIR" "$STETHO_CMD"
 
-  # Doctor telehealth — 양방향 teleop WS 브리지 + leader_passthrough (고정주기 + One Euro + 속도캡).
+  # Doctor telehealth — 양방향 teleop WS 브리지 + leader_passthrough (고정주기 + EMA + 속도캡).
   #   [teleop] teleop_ws_robot_node: control 서버 WS ↔ 로컬. leader 수신 → /eduping/leader/joint_states,
   #            실물 /joint_states → 서버 (doctor three.js 가 실제 자세로 움직이게).
-  #   [pass]   leader_passthrough_node: leader → One Euro 필터(떨림 제거) + 속도 캡 → JTC.
+  #   [pass]   leader_passthrough_node: leader 최신 target 저장 → 고정주기 타이머가 EMA + 속도 캡 → JTC.
+  #            WS 도착이 버스트라 받을 때마다 publish 하면 떨림 → 출력을 도착과 분리(고정 dt)해 잡음.
   #            start_active:=true — 게이트는 control-service teleop relay 가 담당 (telehealth 정지 시
   #            leader 프레임 forward 안 됨).
   TELEOP_WS_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
@@ -289,12 +290,18 @@ stage_bringup() {
   tmux new-window -t "$SESSION" -n teleop -c "$WS_DIR" "$TELEOP_WS_CMD"
 
   # ── teleop 튜닝 (아래 값만 바꿔 device-eduping.sh 재기동) ──────────────────
-  # 단순 직결 passthrough — leader 를 받는 즉시 JTC publish, 부드러움은 보간창으로.
-  PASS_INTERP_S=0.12     # JTC 보간창(s). ↑ 더 부드럽지만 지연↑ (떨림 시 0.15~0.25 로)
-  PASS_MAX_VEL=1.0       # per-joint 최대 각속도(rad/s) — 안전 캡
+  # 고정주기 출력 passthrough — 도착(버스트)과 출력을 분리. EMA + 속도 캡으로 떨림 제거.
+  PASS_SMOOTHING=0.3     # EMA alpha (고정주기). ↓ 더 부드럽지만 지연↑ (떨림 시 0.2~0.15 로). 1.0=무필터
+  PASS_OUT_HZ=50.0       # JTC 출력 주기(Hz). leader 소스(50Hz)와 맞춤
+  PASS_MAX_VEL=1.0       # per-joint 최대 각속도(rad/s) — 안전 캡 (고정 dt 라 step 균일)
+  # 장애물 방향성 차단 — forearm(link4)-장애물 거리로 전진 막고 후퇴 허용. /eduping/world_voxels (d435 윈도) 필요.
+  PASS_OBSTACLE_BLOCK=true   # 차단 on/off. d435 미연결/voxel 없으면 자동 fail-open
+  PASS_BLOCK_DIST=0.06       # 이 거리(m) 내로 들어가면 차단 ON. self-filter 반경(0.10m)보다 작게
+  PASS_RELEASE_DIST=0.10     # 이 거리(m) 밖으로 회복되면 차단 OFF (히스테리시스)
   PASSTHROUGH_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
     ros2 run eduarm leader_passthrough_node --ros-args -p start_active:=true \
-      -p interp_s:=$PASS_INTERP_S -p max_joint_vel:=$PASS_MAX_VEL'"
+      -p leader_smoothing:=$PASS_SMOOTHING -p output_hz:=$PASS_OUT_HZ -p max_joint_vel:=$PASS_MAX_VEL \
+      -p obstacle_block:=$PASS_OBSTACLE_BLOCK -p obstacle_block_dist:=$PASS_BLOCK_DIST -p obstacle_release_dist:=$PASS_RELEASE_DIST'"
   tmux new-window -t "$SESSION" -n pass -c "$WS_DIR" "$PASSTHROUGH_CMD"
 
   log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)  + [teleop] WS 브리지  + [pass] leader_passthrough"
