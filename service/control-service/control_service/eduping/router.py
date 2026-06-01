@@ -62,6 +62,7 @@ from control_service.eduping.ros_bridge import (
 
 from .dance_stream import iter_dance_frames, iter_home_ramp_frames
 from . import joint_limits as _joint_limits
+from .depth_session import get_session as _get_depth_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/eduping", tags=["eduping"])
@@ -323,12 +324,20 @@ async def get_joint_limits() -> dict:
 
 
 @router.post("/joint-limits")
-async def set_joint_limits(body: JointLimitsIn) -> dict:
+async def set_joint_limits(req: Request, body: JointLimitsIn) -> dict:
     """관리자 UI 의 저장 — 한계 dict 를 JSON 파일에 영구화 + 메모리 캐시 갱신.
 
     다음 dance / greeting replay 부터 모든 motion frame 이 새 한계로 clip 된다.
+    추가로 ros_bridge 가 /eduping/safe_joint_limits (latched) 로 broadcast 해
+    highfive_node 가 즉시 새 범위로 high-five 를 clip.
     """
     cleaned = _joint_limits.set_limits(body.limits)
+    bridge = getattr(req.app.state, "eduping_bridge", None)
+    if bridge is not None:
+        try:
+            bridge.publish_safe_limits()
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"safe_joint_limits broadcast 실패: {e}")
     return {"ok": True, "limits": cleaned}
 
 
@@ -345,21 +354,6 @@ async def arm_return_home(req: Request, body: ReturnHomeIn) -> dict:
         raise HTTPException(400, str(e)) from e
 
 
-class ProximityOverrideIn(BaseModel):
-    enabled: bool
-
-
-@router.post("/arm/proximity-override")
-async def arm_proximity_override(req: Request, body: ProximityOverrideIn) -> dict:
-    """근접 안전정지 모드별 우회 — 원격진찰/건강검진/녹화 등 진입 시 enabled=true,
-    이탈 시 false. true 면 사람이 가까워도 팔이 멈추지 않는다 (안전 OFF)."""
-    bridge = _bridge(req)
-    try:
-        return bridge.set_proximity_override(body.enabled)
-    except (ValueError, BridgeUnavailable) as e:
-        raise HTTPException(400, str(e)) from e
-
-
 class HighfiveHandTargetIn(BaseModel):
     """DepthViewer 가 보낸 손 3D 위치 (d435 optical frame, meters)."""
     x: float = Field(..., description="optical X (right, m)")
@@ -369,22 +363,72 @@ class HighfiveHandTargetIn(BaseModel):
         default=None,
         description="기본 d435_depth_optical_frame. 다른 frame 사용 시 명시 — TF 트리에 존재해야 함.",
     )
+    arm: str | None = Field(
+        default=None,
+        description="브라우저 hint — 'left' 또는 'right'. MediaPipe handedness 기반 mirror "
+                    "지정. 미지정 시 highfive_node 가 world Y 로 자동 선택.",
+    )
+
+
+@router.post("/depth/session/start")
+async def depth_session_start() -> dict:
+    """DepthViewer mount 시 호출 — d435_camera + streamer + highfive_sim subprocess 기동.
+    idempotent: 이미 떠있으면 spawn 안 함, status 만 반환.
+    """
+    return _get_depth_session().start()
+
+
+@router.post("/depth/session/stop")
+async def depth_session_stop() -> dict:
+    """DepthViewer unmount 시 호출 — SIGTERM (process group), 3s 후 SIGKILL fallback."""
+    return _get_depth_session().stop()
+
+
+@router.get("/depth/session/status")
+async def depth_session_status() -> dict:
+    return _get_depth_session().status()
 
 
 @router.post("/highfive/hand-target")
 async def highfive_hand_target(req: Request, body: HighfiveHandTargetIn) -> dict:
     """DepthViewer (또는 외부 트리거) → ROS PointStamped /eduping/highfive/hand_point.
 
-    highfive_node 가 이 topic 을 subscribe — TF (frame_id → world) → IK → JointTrajectory.
-    본 endpoint 는 publish 만 하고 반환 (fire-and-forget); 실제 모션 완료는 player 측에서.
+    arm hint 가 있으면 frame_id 에 인코딩 ("d435_depth_optical_frame:left" 또는 ":right"
+    suffix). highfive_node 가 이를 파싱해서 world Y 추측 대신 명시적 arm 선택. 없으면
+    기존 world-Y 휴리스틱 사용.
     """
     bridge = _bridge(req)
-    frame_id = body.frame_id or "d435_depth_optical_frame"
+    base_frame = body.frame_id or "d435_depth_optical_frame"
+    arm = body.arm
+    if arm in ("left", "right"):
+        frame_id = f"{base_frame}:{arm}"
+    else:
+        frame_id = base_frame
+        arm = None
     try:
         bridge.publish_highfive_target(body.x, body.y, body.z, frame_id=frame_id)
     except BridgeUnavailable as e:
         raise HTTPException(503, str(e)) from e
-    return {"ok": True, "frame_id": frame_id, "point": {"x": body.x, "y": body.y, "z": body.z}}
+    return {"ok": True, "frame_id": frame_id, "arm": arm,
+            "point": {"x": body.x, "y": body.y, "z": body.z}}
+
+
+class HighfiveSyncIn(BaseModel):
+    enabled: bool
+
+
+@router.post("/highfive/sync")
+async def highfive_sync(req: Request, body: HighfiveSyncIn) -> dict:
+    """DepthViewer 의 high-five → 실물 OpenArm 동기화 토글.
+
+    ON: bridge 가 /eduping/joint_trajectory 받을 때마다 양팔 follow_joint_trajectory
+        action 으로 forward. leader teleop 과 mutually exclusive.
+    """
+    bridge = _bridge(req)
+    try:
+        return bridge.set_highfive_real_sync(body.enabled)
+    except BridgeUnavailable as e:
+        raise HTTPException(503, str(e)) from e
 
 
 @router.websocket("/dance/stream")
