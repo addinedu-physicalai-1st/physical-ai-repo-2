@@ -383,12 +383,11 @@ def _on_doctor_event(eid: str, msg: dict) -> None:
     elif msg_type == "teleop":
         action = msg.get("action")
         active = action == "start"
-        # 2-머신: relay 가 leader 프레임 게이트 (woobuntu leader_passthrough 는 항상 active).
+        # 게이트: relay 가 leader 프레임 forward 를 ON/OFF (woobuntu leader_passthrough 는
+        # start_active:=true 로 상시 가동). ROS 서비스 게이트는 도메인 분리(a-2)라 도달
+        # 못 하고 혼란만 줘서 사용 안 함.
         teleop_relay_hub.set_active(active)
-        # 단일 머신 (로컬 leader_passthrough mock): ROS 서비스 게이트도 시도 (없으면 no-op).
-        ok = doctor_bridge.set_leader_active(active)
-        logger.info("doctor teleop %s from %s → relay active=%s, local passthrough ok=%s",
-                    action, eid, active, ok)
+        logger.info("doctor teleop %s from %s → relay active=%s", action, eid, active)
     # 기타 메시지는 무시.
 
 doctor_hub.on_event(_on_doctor_event)
