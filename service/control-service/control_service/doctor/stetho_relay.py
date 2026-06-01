@@ -23,10 +23,15 @@ Wire format: 텍스트 10진 정수 (raw ADC, 0..1023). consumer fan-out 없음 
 from __future__ import annotations
 
 import logging
+import time
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 
 log = logging.getLogger(__name__)
+
+# producer(uploader) WS 가 잠깐 끊겼다 재연결해도 doctor UI 가 깜빡이지 않도록,
+# 마지막 값을 이 시간만큼 유지(grace). 이 시간 넘게 갱신 없으면 None (진짜 끊김).
+STETHO_STALE_S = 3.0
 
 
 class StethoHub:
@@ -35,9 +40,15 @@ class StethoHub:
     def __init__(self) -> None:
         self._producer: WebSocket | None = None
         self._latest_raw: int | None = None
+        self._updated_at: float = 0.0
 
     @property
     def latest_raw(self) -> int | None:
+        # 마지막 갱신이 grace 안이면 값 유지 — 짧은 WS 재연결에 UI 안 깜빡임.
+        if self._latest_raw is None:
+            return None
+        if time.monotonic() - self._updated_at > STETHO_STALE_S:
+            return None
         return self._latest_raw
 
     async def register_producer(self, ws: WebSocket) -> None:
@@ -53,12 +64,13 @@ class StethoHub:
     async def unregister_producer(self, ws: WebSocket) -> None:
         if self._producer is ws:
             self._producer = None
-            # producer 끊기면 stale 값을 계속 보내지 않도록 clear.
-            self._latest_raw = None
+            # 값은 지우지 않음 — STETHO_STALE_S grace 동안 유지해 짧은 재연결 깜빡임 방지.
+            # grace 넘으면 latest_raw property 가 자동으로 None 반환.
             log.info("eduping_stetho producer gone")
 
     def update(self, raw: int) -> None:
         self._latest_raw = raw
+        self._updated_at = time.monotonic()
 
 
 def build_router(hub: StethoHub) -> APIRouter:
