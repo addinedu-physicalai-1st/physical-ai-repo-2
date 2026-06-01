@@ -122,14 +122,21 @@ class LeaderPassthrough(Node):
         self._last_pub_ts: dict[str, float] = {side: 0.0 for side in SIDES}
 
         self._slow_warned_at: float = 0.0
-        self._active = False
+        # start_active=True (woobuntu 2-머신): leader 스트림 게이트는 control-service
+        # teleop relay 가 담당 (telehealth 정지 시 leader 프레임 forward 안 됨) →
+        # 이 노드는 항상 active. start_active=False (doctor mock): UI 서비스로 게이트.
+        self.declare_parameter("start_active", False)
+        self._active = bool(
+            self.get_parameter("start_active").get_parameter_value().bool_value
+        )
         self.create_service(
             SetBool, "~/set_active", self._on_set_active,
             callback_group=self._cb_group,
         )
 
         self.get_logger().info(
-            "leader_passthrough ready (idle — call ~/set_active {data:true} to start)"
+            f"leader_passthrough ready (active={self._active} — "
+            "~/set_active {data:bool} to toggle)"
         )
 
     def _on_set_active(self, request: SetBool.Request, response: SetBool.Response):

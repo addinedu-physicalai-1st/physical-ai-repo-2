@@ -47,6 +47,10 @@ setup(
             'home_pose_setter = eduarm.home_pose_setter:main',
             # Leader → Follower 직결 passthrough — IK 없이 joint 1:1 매핑.
             'leader_passthrough_node = eduarm.leader_passthrough_node:main',
+            # Leader joint_states → control-service WS (doctor 머신, cross-machine).
+            'leader_ws_uploader_node = eduarm.leader_ws_uploader_node:main',
+            # 양방향 teleop WS 브리지 (woobuntu) — leader 수신 + follower /joint_states 송신.
+            'teleop_ws_robot_node = eduarm.teleop_ws_robot_node:main',
             # D435 RGB → control-service WebSocket producer (cross-machine ready).
             'd435_rgb_uploader_node = eduarm.d435_rgb_uploader_node:main',
             # D435 depth pointcloud → 1m filter + decimate + world transform → control-service WS.

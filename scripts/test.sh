@@ -71,6 +71,7 @@ if ! conda run -n jazzy pytest \
   service/control-service/control_service/tests/test_teleop_protocol.py \
   service/control-service/control_service/tests/test_doctor_teleop_ws.py \
   service/control-service/control_service/tests/test_doctor_ros_bridge.py \
+  service/control-service/control_service/tests/test_teleop_relay.py \
   -v "$@"; then
   EXIT=1
 fi

@@ -277,8 +277,24 @@ stage_bringup() {
       control_url:=${CONTROL_URL:-ws://localhost:8000}'"
   tmux new-window -t "$SESSION" -n stetho -c "$WS_DIR" "$STETHO_CMD"
 
-  log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)"
+  # Doctor telehealth — 양방향 teleop WS 브리지 + leader_passthrough (JTC + 충돌 속도조절).
+  #   [teleop] teleop_ws_robot_node: control 서버 WS ↔ 로컬. leader 수신 → /eduping/leader/joint_states,
+  #            실물 /joint_states → 서버 (doctor three.js 가 실제 자세로 움직이게).
+  #   [pass]   leader_passthrough_node: leader → JTC + D435 voxel 거리 기반 velocity scaling.
+  #            start_active:=true — 게이트는 control-service teleop relay 가 담당 (telehealth 정지 시
+  #            leader 프레임 forward 안 됨). 충돌 속도조절은 d435 윈도의 /eduping/world_voxels 사용.
+  TELEOP_WS_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
+    ros2 run eduarm teleop_ws_robot_node --ros-args \
+      -p control_url:=${CONTROL_URL:-ws://localhost:8000}'"
+  tmux new-window -t "$SESSION" -n teleop -c "$WS_DIR" "$TELEOP_WS_CMD"
+
+  PASSTHROUGH_CMD="bash -lc 'source $ROS_SETUP && source $WS_SETUP && \
+    ros2 run eduarm leader_passthrough_node --ros-args -p start_active:=true'"
+  tmux new-window -t "$SESSION" -n pass -c "$WS_DIR" "$PASSTHROUGH_CMD"
+
+  log "세션 '$SESSION' 시작 — [bringup] arm_type=$ARM_TYPE hardware_type=$HARDWARE_TYPE right=$RIGHT_CAN left=$LEFT_CAN  + [d435] 카메라 상시 세트  + [stetho] 청진기 FSR (fake=$stetho_fake)  + [teleop] WS 브리지  + [pass] leader_passthrough"
   log "/joint_states 토픽이 살아나면 sim twin / Control Server 가 구독 가능. d435 윈도엔 카메라/bridge/perception, stetho 윈도엔 /eduping/stethoscope/fsr_raw."
+  log "telehealth: doctor UI '시작' → leader → [teleop]수신 → [pass]JTC+속도조절 → 실물 follower. 실물 자세는 [teleop]→서버→doctor three.js 로 반영."
   exec tmux attach -t "$SESSION"
 }
 

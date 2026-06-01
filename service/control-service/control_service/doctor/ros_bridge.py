@@ -20,6 +20,10 @@ import threading
 import time
 from typing import Optional
 
+# WS 로 실물 follower 프레임이 이 시간 안에 들어온 동안엔 로컬 /joint_states (mock)
+# 를 무시 — three.js 가 실제 로봇 자세로만 움직이도록. 끊기면 자동 로컬 fallback.
+_REMOTE_FOLLOWER_TIMEOUT_S = 1.0
+
 from control_service.streaming.teleop_protocol import (
     ArmState, ArmTarget, StateFrame, TargetFrame,
     SERVO_STATUS_OK, SERVO_STATUS_SLOWED, SERVO_STATUS_STOPPED, SERVO_STATUS_ERROR,
@@ -58,6 +62,10 @@ class DoctorRosBridge:
         self._node = None
         self._pubs: dict[str, object] = {}
         self._latest_fsr_raw: int | None = None
+        # 2-머신 (a-2): 실물 follower 는 woobuntu — /joint_states 가 cross-machine 못
+        # 옴. teleop relay 가 WS 로 받은 follower 를 update_follower_state 로 주입.
+        # 최신 수신 시각 — WS 가 살아있는 동안 로컬 mock /joint_states 를 무시한다.
+        self._remote_follower_ts = 0.0
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._spin, name="DoctorRosBridge", daemon=True)
@@ -94,30 +102,12 @@ class DoctorRosBridge:
         self._pubs["right_grip"] = node.create_publisher(Float32, "/doctor_teleop/right/gripper_cmd", 10)
 
         def on_joint_states(msg: JointState) -> None:
-            name_idx = {n: i for i, n in enumerate(msg.name)}
-            l_grip_key = "openarm_left_finger_joint1"
-            r_grip_key = "openarm_right_finger_joint1"
-            l_grip = (
-                msg.position[name_idx[l_grip_key]]
-                if l_grip_key in name_idx
-                else self._latest_left.gripper
-            )
-            r_grip = (
-                msg.position[name_idx[r_grip_key]]
-                if r_grip_key in name_idx
-                else self._latest_right.gripper
-            )
-            with self._lock:
-                self._latest_left = ArmState(
-                    joints=[msg.position[name_idx[j]] if j in name_idx else 0.0 for j in self._left_joints],
-                    gripper=l_grip,
-                    servo_status=self._latest_left.servo_status,
-                )
-                self._latest_right = ArmState(
-                    joints=[msg.position[name_idx[j]] if j in name_idx else 0.0 for j in self._right_joints],
-                    gripper=r_grip,
-                    servo_status=self._latest_right.servo_status,
-                )
+            # WS 로 실물 follower (woobuntu) 가 들어오는 동안엔 로컬 mock 무시 —
+            # three.js 가 실제 자세로만 움직이도록. WS 끊기면 자동 로컬 fallback →
+            # 단일 머신 (로컬 mock) 도 별도 설정 없이 그대로 동작.
+            if time.monotonic() - self._remote_follower_ts < _REMOTE_FOLLOWER_TIMEOUT_S:
+                return
+            self._apply_joint_states(list(msg.name), list(msg.position))
 
         node.create_subscription(JointState, "/joint_states", on_joint_states, 10)
 
@@ -306,6 +296,47 @@ class DoctorRosBridge:
                 f = Float32()
                 f.data = float(frame.right.gripper)
                 self._pubs["right_grip"].publish(f)
+
+    def _apply_joint_states(self, names: list[str], positions: list[float]) -> None:
+        """names/positions → _latest_left/_latest_right (three.js StateFrame 소스).
+
+        로컬 /joint_states 콜백과 WS 로 온 원격 follower(update_follower_state)가
+        공유. 양팔 7 joint + finger gripper 추출, servo_status 는 기존값 유지.
+        """
+        name_idx = {n: i for i, n in enumerate(names)}
+        l_grip_key = "openarm_left_finger_joint1"
+        r_grip_key = "openarm_right_finger_joint1"
+        l_grip = (
+            positions[name_idx[l_grip_key]]
+            if l_grip_key in name_idx
+            else self._latest_left.gripper
+        )
+        r_grip = (
+            positions[name_idx[r_grip_key]]
+            if r_grip_key in name_idx
+            else self._latest_right.gripper
+        )
+        with self._lock:
+            self._latest_left = ArmState(
+                joints=[positions[name_idx[j]] if j in name_idx else 0.0 for j in self._left_joints],
+                gripper=l_grip,
+                servo_status=self._latest_left.servo_status,
+            )
+            self._latest_right = ArmState(
+                joints=[positions[name_idx[j]] if j in name_idx else 0.0 for j in self._right_joints],
+                gripper=r_grip,
+                servo_status=self._latest_right.servo_status,
+            )
+
+    def update_follower_state(self, names: list[str], positions: list[float]) -> None:
+        """woobuntu 실물 follower /joint_states (WS) → three.js StateFrame.
+
+        teleop relay 의 on_follower 콜백이 호출. 2-머신 (a-2) 에서 doctor 3D 가
+        로컬 mock 대신 실제 로봇 자세로 움직이게 하는 진입점. 수신 시각을 찍어
+        on_joint_states 가 그 동안 로컬 mock 을 무시하도록 한다.
+        """
+        self._remote_follower_ts = time.monotonic()
+        self._apply_joint_states(names, positions)
 
     def latest_state(self) -> StateFrame:
         with self._lock:

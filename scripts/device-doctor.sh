@@ -80,6 +80,16 @@ build_leader_cmd() {
             -p rate_hz:=$rate \
             -p calibration_path:=$cal"
 }
+build_leader_uploader_cmd() {
+  # leader /eduping/leader/joint_states → control-service WS (role=leader_src).
+  # 2-머신 (a-2): leader 가 ROS DDS 로 woobuntu 에 못 감 → WS 우회. control-service 가
+  # 이 머신에 같이 떠 있으므로 localhost. relay 가 active 일 때 woobuntu 로 forward.
+  # ros2 run = install shebang (system python3) — websockets 는 system python 에 필요.
+  local url="${CONTROL_URL:-ws://localhost:8000}"
+  echo "source $ROOT/install/setup.bash && \
+        exec ros2 run eduarm leader_ws_uploader_node --ros-args \
+            -p control_url:=$url"
+}
 # leader 윈도가 import 에러로 즉사하기 전에 미리 경고 — 나머지 노드는 그대로 기동.
 preflight_leader_env() {
   if ! python -c "import scservo_sdk" >/dev/null 2>&1; then
@@ -102,6 +112,11 @@ start_bg() {
   echo "[leader] starting → $leaderf"
   setsid bash -c "$(build_leader_cmd) >\"$leaderf\" 2>&1" &
   echo $! >"$PID_DIR/leader.pid"
+  # leader → control-service WS uploader (telehealth cross-machine).
+  local lupf="$PID_DIR/leader_uploader.log"
+  echo "[lup] starting → $lupf"
+  setsid bash -c "$(build_leader_uploader_cmd) >\"$lupf\" 2>&1" &
+  echo $! >"$PID_DIR/leader_uploader.pid"
   if [ "$rviz_flag" = "true" ]; then
     local rvizf="$PID_DIR/rviz.log"
     echo "[rviz] starting → $rvizf"
@@ -132,6 +147,9 @@ start_tmux() {
   # 실물 mini leader — 호출 셸의 활성 env (feetech-servo-sdk) 를 그대로 상속.
   tmux new-window -t "$TMUX_SESSION" -n leader bash -c "$(build_leader_cmd)"
   tmux set-option -t "$TMUX_SESSION:leader" remain-on-exit on
+  # leader → control-service WS uploader (telehealth cross-machine forward).
+  tmux new-window -t "$TMUX_SESSION" -n lup bash -c "$(build_leader_uploader_cmd)"
+  tmux set-option -t "$TMUX_SESSION:lup" remain-on-exit on
   tmux select-window -t "$TMUX_SESSION:ros"
   if [ "$rviz_flag" = "true" ]; then
     tmux new-window -t "$TMUX_SESSION" -n rviz bash -c "$(build_rviz_cmd)"
@@ -190,6 +208,7 @@ stop_all() {
   # 실물 mini leader (별도 윈도/백그라운드) — python -m eduarm.feetech_leader_node.
   pkill -KILL -f "eduarm.feetech_leader_node"       2>/dev/null || true
   pkill -KILL -f "feetech_leader_node"              2>/dev/null || true
+  pkill -KILL -f "leader_ws_uploader_node"          2>/dev/null || true
   pkill -KILL -f "ros2_control_node"                 2>/dev/null || true
   pkill -KILL -f "lib/moveit_ros_move_group/move_group" 2>/dev/null || true
   pkill -KILL -f "lib/moveit_servo/servo_node"       2>/dev/null || true
