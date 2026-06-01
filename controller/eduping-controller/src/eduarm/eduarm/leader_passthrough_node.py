@@ -1,21 +1,23 @@
-"""Leader → Follower 직결 passthrough + 거리 기반 velocity scaling.
+"""Leader → Follower 직결 passthrough + EMA 스무딩 + 속도 캡.
 
 leader 와 follower 가 동일 URDF — joint 1:1 매핑. move_group FK/IK 호출 0.
 
-D435 octomap voxel 까지 거리 d 기반 v_scale:
-  d ≥ D_SLOW  → 1.0
-  d ≤ D_STOP  → V_FLOOR (최소 속도, 0 아님 — 멀어질 때 자연스럽게 따라감)
-  사이        → 선형 보간
-
-publish: scaled_target = current_follower + (leader - current_follower) × v_scale
+vision(D435 voxel) 기반 거리 속도 제어는 **제거** — teleop 떨림 원인이라 단순화.
+안전은 MAX_JOINT_VEL 속도 캡만으로 담보 (per-joint 최대 각속도 제한).
 
 흐름:
-  /eduping/leader/joint_states (30~50Hz) → on_leader
-  /eduping/world_voxels        (15Hz)   → voxel numpy array
-  /joint_states                          → current follower
-  /tf                                    → follower 링크 world 좌표
+  /eduping/leader/joint_states (30~50Hz) → on_leader → EMA 저역통과 → 속도 캡 → JTC
+  /joint_states                          → 시작 위치 seed (첫 명령 점프 방지)
 
-active gate — UI 의 "Telehealth 시작" 버튼 (`~/set_active` SetBool).
+publish: JTC (joint_trajectory_controller). gripper 는 액션.
+
+active gate — control-service teleop relay 가 leader 프레임 forward 를 ON/OFF.
+woobuntu 는 start_active:=true 로 상시 active (게이트는 relay 가 담당).
+
+Params:
+  start_active     (bool,  default False)  True 면 부팅부터 active.
+  leader_smoothing (float, default 0.4)    EMA alpha. 1.0=무필터, 작을수록 부드럽고 지연↑.
+  max_joint_vel    (float, default 1.0)    per-joint 최대 각속도 (rad/s).
 """
 from __future__ import annotations
 
@@ -23,7 +25,6 @@ import math
 import threading
 import time
 
-import numpy as np
 import rclpy
 from builtin_interfaces.msg import Duration as DurMsg
 from control_msgs.action import GripperCommand
@@ -32,9 +33,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float32MultiArray
 from std_srvs.srv import SetBool
-from tf2_ros import Buffer, TransformListener, TransformException
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
@@ -49,32 +48,10 @@ JTC_TOPIC = {
 GRIPPER_ACTION = {
     side: f"/{side}_gripper_controller/gripper_cmd" for side in SIDES
 }
-# IK 가 사용하던 full robot joint 순서 (양팔 + gripper) — RobotState 합성용.
-ALL_ROBOT_JOINTS = [
-    "openarm_left_finger_joint1",
-    *ARM_JOINTS["left"],
-    "openarm_right_finger_joint1",
-    *ARM_JOINTS["right"],
-]
 
 JTC_HOLD_S = 0.05               # 다음 leader frame 들어오기 전까지 hold.
 GRIPPER_DELTA_THRESHOLD = 0.001
 GRIPPER_MAX_EFFORT = 10.0
-
-# Telehealth 최대 joint 속도 — 안전 우선 (~57°/s, 사람 팔 속도). 7 joint 공통.
-MAX_JOINT_VEL = 1.0             # rad/s
-
-# Collision-aware velocity scaling.
-D_STOP = 0.03      # 3cm 이내면 V_FLOOR — 청진기 접촉 직전까지 허용.
-D_SLOW = 0.20      # 20cm 이내부터 감속 시작.
-V_FLOOR = 0.05     # 최소 속도 — leader 따라가는 능력 유지.
-TRACKED_LINKS = {
-    # 팔뚝 (link4) 만 — 손목/그리퍼는 환자 접촉 (청진기 등) 위해 자유롭게.
-    # 팔뚝 본체가 환자 몸통/얼굴 충돌하는 것만 방지.
-    "left":  ["openarm_left_link4"],
-    "right": ["openarm_right_link4"],
-}
-WORLD_FRAME = "world"
 
 
 class LeaderPassthrough(Node):
@@ -87,23 +64,13 @@ class LeaderPassthrough(Node):
             JointState, "/eduping/leader/joint_states", self._on_leader, 10,
             callback_group=self._cb_group,
         )
-        # 현재 follower 위치 — collision blending 의 출발점.
+        # 현재 follower 위치 — 첫 명령을 follower 현재 자세에서 시작 (시작 점프 방지) 용.
         self.create_subscription(
             JointState, "/joint_states", self._on_follower, 10,
             callback_group=self._cb_group,
         )
-        # D435 voxel 좌표 (world frame, m) — collision 거리 계산 입력.
-        self.create_subscription(
-            Float32MultiArray, "/eduping/world_voxels", self._on_voxels, 1,
-            callback_group=self._cb_group,
-        )
         self._latest_follower: JointState | None = None
-        self._voxels: np.ndarray | None = None   # (N, 3) world frame.
         self._lock = threading.Lock()
-
-        # TF 로 follower 링크 좌표 lookup.
-        self._tf_buffer = Buffer()
-        self._tf_listener = TransformListener(self._tf_buffer, self)
 
         self._jtc_pub = {
             side: self.create_publisher(JointTrajectory, JTC_TOPIC[side], 10)
@@ -121,30 +88,33 @@ class LeaderPassthrough(Node):
         self._last_pub_pos: dict[str, list[float] | None] = {side: None for side in SIDES}
         self._last_pub_ts: dict[str, float] = {side: 0.0 for side in SIDES}
 
-        self._slow_warned_at: float = 0.0
-        # start_active=True (woobuntu 2-머신): leader 스트림 게이트는 control-service
-        # teleop relay 가 담당 (telehealth 정지 시 leader 프레임 forward 안 됨) →
-        # 이 노드는 항상 active. start_active=False (doctor mock): UI 서비스로 게이트.
+        # start_active=True (woobuntu 2-머신): 게이트는 control-service relay 담당 →
+        # 항상 active. False (mock/단일머신): ~/set_active 서비스로 게이트.
         self.declare_parameter("start_active", False)
         self._active = bool(
             self.get_parameter("start_active").get_parameter_value().bool_value
         )
-        # 떨림 완화 — leader 위치에 EMA 저역통과. alpha=1.0 무필터(원본), 작을수록 더
-        # 부드럽지만 지연↑. WS 전송 지터 + feetech 양자화 노이즈를 흡수. 0.0<alpha≤1.0.
+        # 떨림 완화 — leader 위치 EMA 저역통과. alpha=1.0 무필터, 작을수록 부드럽고 지연↑.
         a = float(
             self.declare_parameter("leader_smoothing", 0.4)
             .get_parameter_value().double_value
         )
         self._smooth_a = min(1.0, max(0.01, a))
         self._leader_smooth: dict[str, list[float] | None] = {side: None for side in SIDES}
+        # 속도 캡 — per-joint 최대 각속도 (rad/s). 안전 핵심.
+        self._max_vel = float(
+            self.declare_parameter("max_joint_vel", 1.0)
+            .get_parameter_value().double_value
+        )
+
         self.create_service(
             SetBool, "~/set_active", self._on_set_active,
             callback_group=self._cb_group,
         )
 
         self.get_logger().info(
-            f"leader_passthrough ready (active={self._active} — "
-            "~/set_active {data:bool} to toggle)"
+            f"leader_passthrough ready (active={self._active}, smoothing={self._smooth_a}, "
+            f"max_vel={self._max_vel} rad/s)"
         )
 
     def _on_set_active(self, request: SetBool.Request, response: SetBool.Response):
@@ -158,34 +128,15 @@ class LeaderPassthrough(Node):
         with self._lock:
             self._latest_follower = msg
 
-    def _on_voxels(self, msg: Float32MultiArray) -> None:
-        data = msg.data
-        if not data:
-            with self._lock:
-                self._voxels = None
-            return
-        try:
-            arr = np.asarray(data, dtype=np.float32).reshape(-1, 3)
-        except ValueError:
-            return
-        with self._lock:
-            self._voxels = arr
-
     def _on_leader(self, msg: JointState) -> None:
         if not self._active:
             return
         with self._lock:
             follower = self._latest_follower
-            voxels = self._voxels
 
-        # 1) v_scale 계산 — follower 링크와 voxel 의 최소 거리 기반.
-        v_scale = self._compute_v_scale(voxels)
-
-        # 2) follower current 가 없으면 v_scale=1 (= 옛 passthrough 와 동일).
         follower_idx = (
             {n: i for i, n in enumerate(follower.name)} if follower is not None else {}
         )
-
         leader_idx = {n: i for i, n in enumerate(msg.name)}
         for side in SIDES:
             try:
@@ -202,75 +153,28 @@ class LeaderPassthrough(Node):
                 leader_pos = [a * cur + (1.0 - a) * p for cur, p in zip(leader_pos, prev)]
             self._leader_smooth[side] = leader_pos
 
-            # current follower joints — 없으면 leader 그대로 사용.
-            if follower is not None and all(j in follower_idx for j in ARM_JOINTS[side]):
-                cur_pos = [follower.position[follower_idx[j]] for j in ARM_JOINTS[side]]
-                blended = [
-                    cur + (lead - cur) * v_scale for cur, lead in zip(cur_pos, leader_pos)
+            # 첫 명령은 follower 현재 자세에서 시작 (시작 점프 방지) — velocity cap seed.
+            if self._last_pub_pos[side] is None and follower is not None and all(
+                j in follower_idx for j in ARM_JOINTS[side]
+            ):
+                self._last_pub_pos[side] = [
+                    follower.position[follower_idx[j]] for j in ARM_JOINTS[side]
                 ]
-            else:
-                blended = leader_pos
-            self._publish_jtc(side, blended)
+                self._last_pub_ts[side] = time.monotonic()
+
+            self._publish_jtc(side, leader_pos)
 
             if GRIPPER_JOINT[side] in leader_idx:
                 grip = msg.position[leader_idx[GRIPPER_JOINT[side]]]
                 self._send_gripper(side, grip)
 
-    # ── velocity scaling ────────────────────────────────────────────────
-    def _compute_v_scale(self, voxels: np.ndarray | None) -> float:
-        """V_FLOOR ~ 1.0. 거리 기반 선형 스케일.
-
-        d ≥ D_SLOW  → 1.0
-        d ≤ D_STOP  → V_FLOOR
-        사이        → 선형
-        """
-        if voxels is None or voxels.shape[0] == 0:
-            return 1.0
-
-        min_d = float("inf")
-        for side in SIDES:
-            for link in TRACKED_LINKS[side]:
-                p = self._lookup_link_position(link)
-                if p is None:
-                    continue
-                diffs = voxels - p[None, :]
-                d = float(np.sqrt((diffs * diffs).sum(axis=1).min()))
-                if d < min_d:
-                    min_d = d
-        if min_d == float("inf"):
-            return 1.0
-
-        # 선형 보간 후 V_FLOOR 절대 하한 보장 — 뚫고 들어가 d < D_STOP 이 되거나
-        # 음수가 되는 edge case 에서도 최소 속도 유지.
-        if min_d >= D_SLOW:
-            interp = 1.0
-        else:
-            interp = V_FLOOR + (1.0 - V_FLOOR) * (min_d - D_STOP) / (D_SLOW - D_STOP)
-        scale = max(V_FLOOR, min(1.0, interp))
-
-        now = time.monotonic()
-        if scale < 0.99 and now - self._slow_warned_at > 1.0:
-            self.get_logger().info(f"slowdown — min_d={min_d:.3f}m v_scale={scale:.2f}")
-            self._slow_warned_at = now
-        return scale
-
-    def _lookup_link_position(self, link: str) -> np.ndarray | None:
-        try:
-            t = self._tf_buffer.lookup_transform(
-                WORLD_FRAME, link, rclpy.time.Time(),
-            )
-        except TransformException:
-            return None
-        p = t.transform.translation
-        return np.array([p.x, p.y, p.z], dtype=np.float32)
-
     def _publish_jtc(self, side: str, positions: list[float]) -> None:
-        # velocity cap — per-joint |delta| ≤ MAX_JOINT_VEL × dt.
+        # velocity cap — per-joint |delta| ≤ max_joint_vel × dt.
         now = time.monotonic()
         last = self._last_pub_pos[side]
         if last is not None:
             dt = max(1e-3, now - self._last_pub_ts[side])
-            max_step = MAX_JOINT_VEL * dt
+            max_step = self._max_vel * dt
             capped: list[float] = []
             for prev, target in zip(last, positions):
                 d = target - prev
@@ -309,7 +213,6 @@ class LeaderPassthrough(Node):
 def main() -> None:
     rclpy.init()
     node = LeaderPassthrough()
-    # ReentrantCallbackGroup + _validity_tick 안에서 future polling → MultiThreaded 필요.
     executor = MultiThreadedExecutor(num_threads=3)
     executor.add_node(node)
     try:
