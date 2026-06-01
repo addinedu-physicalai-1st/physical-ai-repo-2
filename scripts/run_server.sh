@@ -3,7 +3,8 @@
 #
 # 동작:
 #   - postgres + pgweb docker 컨테이너 자동 기동 (없으면 띄우고, healthy 까지 대기)
-#   - tmux 세션 'pingdergarten' 안에 window 5개 (postgres / pgweb / ai-hub / control / streaming)
+#   - tmux 세션 'pingdergarten' 안에 window 8개 (postgres / pgweb / ai-hub / control / streaming /
+#     d435 / streamer / highfive) — 마지막 3개는 DepthViewer 가 사용하는 ROS 스택
 #   - 한 화면엔 1개 window 만 표시. 하단 status bar 의 window 이름을 마우스 클릭으로 전환
 #   - pgweb DB 뷰어: http://localhost:8081
 #   - streaming WS: ws://localhost:8100/ws/video-stream (SR-CAM-002, 영상 fan-out)
@@ -187,6 +188,25 @@ case "$ACTION" in
     tmux new-window -t "$SESSION" -n streaming -c "$REPO_ROOT" \
       "$(wrap_cmd uvicorn control_service.streaming.app:app --host 0.0.0.0 --port 8100 --reload)"
 
+    # window 5-7: EduPing depth view ROS 스택 — d435 카메라 + ROS→WS 스트리머 +
+    # highfive_sim (IK + sim_twin + depth_mask + move_group). DepthViewer 가 사용.
+    # 항상 떠 있어야 control-service 의 bridge 가 stale handle 없이 깨끗하게 동작.
+    # remain-on-exit on (위에서 set) — D435 가 안 꽂혀있어도 window 만 에러 메시지
+    # 보여주고 다른 stack 은 그대로. depth_session.py 가 pgrep 로 감지해서 자동 attach.
+    DEPTH_ROS_PREFIX="[ -f $ROS_SETUP ] && source $ROS_SETUP; $WS_SOURCING"
+
+    tmux new-window -t "$SESSION" -n d435 -c "$REPO_ROOT" \
+      "bash -c '$DEPTH_ROS_PREFIX; exec ros2 launch eduarm d435_camera.launch.py \
+         depth_width:=640 depth_height:=480 color_width:=640 color_height:=480 fps:=15'"
+
+    tmux new-window -t "$SESSION" -n streamer -c "$REPO_ROOT" \
+      "bash -c '$DEPTH_ROS_PREFIX; \
+         export PYTHONPATH=\"$REPO_ROOT/service/control-service:\${PYTHONPATH:-}\"; \
+         exec python3 -m eduarm.d435_depth_streamer --server-host 127.0.0.1'"
+
+    tmux new-window -t "$SESSION" -n highfive -c "$REPO_ROOT" \
+      "bash -c '$DEPTH_ROS_PREFIX; exec ros2 launch eduarm highfive_sim.launch.py'"
+
     # 마우스 + status bar 설정 (window 이름 클릭으로 전환 가능)
     tmux set-option -t "$SESSION" -g mouse on
     tmux set-option -t "$SESSION" -g status-style 'bg=colour235,fg=colour250'
@@ -198,7 +218,7 @@ case "$ACTION" in
     tmux select-window -t "$SESSION:control"
 
     echo "[run_server] 세션 '$SESSION' 시작 — attach"
-    echo "[run_server] 하단 status bar 의 'postgres / pgweb / ai-hub / control / streaming' 클릭으로 전환"
+    echo "[run_server] 하단 status bar 의 'postgres / pgweb / ai-hub / control / streaming / d435 / streamer / highfive' 클릭으로 전환"
     exec tmux attach -t "$SESSION"
     ;;
   down)
