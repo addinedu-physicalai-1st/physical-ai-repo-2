@@ -129,6 +129,14 @@ class LeaderPassthrough(Node):
         self._active = bool(
             self.get_parameter("start_active").get_parameter_value().bool_value
         )
+        # 떨림 완화 — leader 위치에 EMA 저역통과. alpha=1.0 무필터(원본), 작을수록 더
+        # 부드럽지만 지연↑. WS 전송 지터 + feetech 양자화 노이즈를 흡수. 0.0<alpha≤1.0.
+        a = float(
+            self.declare_parameter("leader_smoothing", 0.4)
+            .get_parameter_value().double_value
+        )
+        self._smooth_a = min(1.0, max(0.01, a))
+        self._leader_smooth: dict[str, list[float] | None] = {side: None for side in SIDES}
         self.create_service(
             SetBool, "~/set_active", self._on_set_active,
             callback_group=self._cb_group,
@@ -184,6 +192,15 @@ class LeaderPassthrough(Node):
                 leader_pos = [msg.position[leader_idx[j]] for j in ARM_JOINTS[side]]
             except (KeyError, IndexError):
                 continue
+
+            # EMA 저역통과 — 떨림(WS 지터 + 센서 노이즈) 완화. alpha=1 이면 무필터.
+            a = self._smooth_a
+            prev = self._leader_smooth[side]
+            if prev is None or a >= 1.0:
+                leader_pos = list(leader_pos)
+            else:
+                leader_pos = [a * cur + (1.0 - a) * p for cur, p in zip(leader_pos, prev)]
+            self._leader_smooth[side] = leader_pos
 
             # current follower joints — 없으면 leader 그대로 사용.
             if follower is not None and all(j in follower_idx for j in ARM_JOINTS[side]):
