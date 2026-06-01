@@ -4,7 +4,7 @@ from __future__ import annotations
 import py_trees
 from py_trees.common import Access
 
-from gogoping_modes.bt.behaviors.perception.hide_seek_caught_monitor import (
+from gogoping_modes.bt.behaviors.hide_and_seek.hide_seek_caught_monitor import (
     HideSeekCaughtMonitor,
 )
 from gogoping_modes.bt.blackboard import Keys, init_blackboard

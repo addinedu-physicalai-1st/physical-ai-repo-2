@@ -15,7 +15,7 @@ from py_trees.common import Status
 _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "controller" / "gogoping-controller" / "src" / "gogoping" / "gogoping_modes"))
 
-from gogoping_modes.bt.behaviors.common.select_vertex import (  # noqa: E402
+from gogoping_modes.bt.behaviors.patrol.select_vertex import (  # noqa: E402
     TARGET_VERTEX_KEY,
     SelectVertex,
 )

@@ -55,7 +55,7 @@ RESUME_GRACE_S = 1.0               # 사람이 이 시간 이상 확실히 비�
 # can_rotate vertex 에서 다음 lane 향한 in-place 회전 파라미터
 IN_PLACE_ROTATE_TOLERANCE_RAD = 0.10   # ~5.7° 이내면 회전 skip
 IN_PLACE_ROTATE_SPEED_RAD_S = 0.5      # 회전 속도 (약 30°/s)
-IN_PLACE_ROTATE_TIMEOUT_S = 6.0        # 안전 timeout
+IN_PLACE_ROTATE_TIMEOUT_S = 25.0       # 안전 timeout — 최악 180°(0.35rad/s=8.98s) + 넉넉한 여유
 
 # action_msgs/GoalStatus — admin UI 에 raw int 대신 사람 말로 표시.
 # (STATUS_UNKNOWN=0 / ACCEPTED=1 / EXECUTING=2 / CANCELING=3 / SUCCEEDED=4 / CANCELED=5 / ABORTED=6)
@@ -449,6 +449,24 @@ class GraphRouterNode(Node):
 
         last_idx = 0
         self._publish_feedback(gh, seq, last_idx)
+
+        # ── src vertex 가 can_rotate면 첫 segment 방향으로 출발 전 제자리 회전 ──
+        # 노드 위에서 방향 틀어진 채 출발하면 nav2 가 곡선 박는 문제 회피 (2026-06-01).
+        # 도착-회전(아래 can_rotate 도착 분기)과 대칭 — can_rotate = "도착·출발 모두
+        # 그 자리서 회전". nav goal 전송 전 단계라 cancel chain/preempt 와 충돌 없음.
+        src_v = self._graph.vertices.get(src)
+        if src_v is not None and src_v.can_rotate and len(seq) >= 2:
+            nv = self._graph.vertices.get(seq[1])
+            if nv is not None:
+                face_yaw = math.atan2(nv.y - src_v.y, nv.x - src_v.x)
+                cur_yaw = self._current_yaw()
+                d = (face_yaw - cur_yaw + math.pi) % (2 * math.pi) - math.pi
+                if abs(d) > IN_PLACE_ROTATE_TOLERANCE_RAD:
+                    self._dbg(
+                        f"src {src!r} can_rotate → 출발 전 제자리 회전 "
+                        f"{math.degrees(d):+.1f}° (→{seq[1]!r})"
+                    )
+                    self._do_rotate_in_place(face_yaw)
 
         # graph_router 심화 (2026-05-28) — pause/reroute state (per action)
         pause_start_ts: float | None = None

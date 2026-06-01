@@ -47,12 +47,6 @@ lanes:
 - from: 복-6
   to: 충전소입구
   bidirectional: true
-- from: 출입구
-  to: 복도입구
-  bidirectional: true
-- from: 복도입구
-  to: 복도
-  bidirectional: true
 - from: 충전소입구
   to: 충전소
   bidirectional: true

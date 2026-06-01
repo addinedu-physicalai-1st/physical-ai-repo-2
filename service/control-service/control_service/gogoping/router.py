@@ -264,7 +264,7 @@ def _build_hideseek_goal_dynamic(bridge: GogopingRosBridge, base: Goal) -> Goal:
     `/debug/patrol` 과 동일 로직 (``_build_group_patrol_order``). 모든 grouped
     vertex 를 한 번씩 순회 — group 수 = 사용자가 보는 카테고리 수.
 
-    play_area_key 는 base.play_area_key (state_to_goal 의 "출입구") 그대로 유지 —
+    play_area_key 는 base.play_area_key (state_to_goal 의 "복도") 그대로 유지 —
     모집/카운트다운/복귀 도착점.
 
     yaml 에 grouped vertex 가 없으면 base 의 hardcoded search_waypoints 그대로
@@ -597,8 +597,8 @@ def install(
             target_id="patrol_debug",
             search_waypoints=ordered,
             # reconciler 가 HIDEANDSEEK 진입 시 필수 필드 (missing_play_area_key 방지).
-            # /debug/patrol 은 nav 검증용 — 출입구 default 로 충분.
-            play_area_key="출입구",
+            # /debug/patrol 은 nav 검증용 — 복도 default 로 충분.
+            play_area_key="복도",
         )
         # patrol_only=True 셋 — SetGoal 보다 먼저 셋팅해야 BT builder 가 정확히 읽음.
         # builder 가 이 flag 보면 6-step 전체 대신 SetHideseekPhase("patrol") + patrol_sub 만 반환.

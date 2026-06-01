@@ -1,4 +1,18 @@
 waypoints:
+- name: 출입구
+  x: 0.5746856331825256
+  y: 0.03668039426028358
+  yaw: 0.0
+  id: 18
+  group: null
+  can_rotate: true
+- name: 복도입구
+  x: 0.5746856331825256
+  y: 1.1677498817443848
+  yaw: 1.5973387645462938
+  id: 19
+  group: 복도
+  can_rotate: false
 - name: 놀-7
   x: -0.5131705923
   y: 3.3549065589904785
@@ -19,7 +33,7 @@ waypoints:
   yaw: 0.0
   id: 38
   group: null
-  can_rotate: true
+  can_rotate: false
 - name: 복-1
   x: 0.53
   y: 3.3549065589904785
@@ -39,7 +53,7 @@ waypoints:
   y: 6.594151485490084
   yaw: 1.7063240407803975
   id: 25
-  group: null
+  group: 복도
   can_rotate: false
 - name: 복-4
   x: 0.3685901000773679
@@ -53,14 +67,14 @@ waypoints:
   y: 9.969625473022461
   yaw: 0.0
   id: 27
-  group: null
+  group: 복도
   can_rotate: false
 - name: 복-6
   x: 0.2796
   y: 11.062299728393555
   yaw: 0.0
   id: 28
-  group: 복도
+  group: null
   can_rotate: false
 - name: 충전소입구
   x: 0.2796
@@ -81,49 +95,49 @@ waypoints:
   y: 9.771592505905703
   yaw: 0.0
   id: 30
-  group: null
+  group: 놀이방
   can_rotate: false
 - name: 놀-1
   x: -2.3319063791633683
   y: 9.788511409819089
   yaw: 0.0
   id: 31
-  group: null
+  group: 놀이방
   can_rotate: false
 - name: 놀-5
   x: -3.75
   y: 3.3549065589904785
   yaw: 0.0
   id: 32
-  group: null
+  group: 놀이방
   can_rotate: false
 - name: 놀-6
   x: -2.3322
   y: 3.3549065589904785
   yaw: 0.0
   id: 33
-  group: null
+  group: 놀이방
   can_rotate: false
 - name: 수-1
   x: -4.8322
   y: 12.133442249758824
   yaw: 0.0
   id: 34
-  group: null
+  group: 수면실
   can_rotate: false
 - name: 수면실
   x: -3.5821659912
   y: 12.133442249758824
   yaw: 0.0
   id: 35
-  group: null
+  group: 수면실
   can_rotate: false
 - name: 수-2
   x: -2.3322
   y: 12.133442249758824
   yaw: 0.0
   id: 36
-  group: null
+  group: 수면실
   can_rotate: false
 - name: 수-3
   x: -4.8322
@@ -144,14 +158,14 @@ waypoints:
   y: 11.062299728393555
   yaw: 0.0
   id: 36
-  group: null
+  group: 수면실
   can_rotate: false
 - name: 충전소
   x: 0.2796
   y: 12.834519743089727
   yaw: -1.5502512727614963
   id: 41
-  group: 복도
+  group: null
   can_rotate: true
 - name: 놀이방입구-하
   x: -0.0340039256
@@ -172,14 +186,14 @@ waypoints:
   y: 7.740664855468848
   yaw: 1.6447353644528369
   id: 46
-  group: null
+  group: 놀이방
   can_rotate: false
 - name: 놀-4
   x: -3.75
   y: 4.9821512569861195
   yaw: 1.4486011561035417
   id: 47
-  group: null
+  group: 놀이방
   can_rotate: false
 - name: 복-4-1
   x: 0.9559504978046434

@@ -1,19 +1,5 @@
 waypoints:
-- name: 출입구
-  x: 0.5746856331825256
-  y: 0.03668039426028358
-  yaw: 0.0
-  id: 18
-  group: null
-  can_rotate: true
-- name: 복도입구
-  x: 0.5746856331825256
-  y: 1.1677498817443848
-  yaw: 1.5973387645462938
-  id: 19
-  group: null
-  can_rotate: false
-- name: 놀-7
+- name: 놀이방입구-하
   x: -0.5131705923
   y: 3.3549065589904785
   yaw: 0.0
@@ -28,14 +14,14 @@ waypoints:
   group: null
   can_rotate: false
 - name: 복도
-  x: 0.53
+  x: 0.465
   y: 2.331
   yaw: 0.0
   id: 38
   group: null
   can_rotate: false
 - name: 복-1
-  x: 0.53
+  x: 0.465
   y: 3.3549065589904785
   yaw: 0.0
   id: 23
@@ -89,7 +75,7 @@ waypoints:
   yaw: 0.0
   id: 30
   group: null
-  can_rotate: true
+  can_rotate: false
 - name: 놀이방
   x: -3.7521214232882105
   y: 9.771592505905703
@@ -166,13 +152,6 @@ waypoints:
   yaw: -1.5502512727614963
   id: 41
   group: null
-  can_rotate: true
-- name: 놀이방입구-하
-  x: -0.0340039256
-  y: 3.3549065589904785
-  yaw: 3.1323336589276702
-  id: 44
-  group: null
   can_rotate: false
 - name: 놀이방입구-상
   x: -0.5409778478
@@ -222,12 +201,12 @@ waypoints:
   yaw: 0.0
   id: 51
   group: null
-  can_rotate: true
+  can_rotate: false
 - name: 수-회
   x: -5.59
   y: 11.062299728393555
   yaw: 0.0
   id: 52
   group: null
-  can_rotate: true
+  can_rotate: false
 patrols: {}
