@@ -4,7 +4,7 @@ from __future__ import annotations
 import py_trees
 from py_trees.common import Access
 
-from gogoping_modes.bt.behaviors.common.await_recruit_complete import (
+from gogoping_modes.bt.behaviors.hide_and_seek.await_recruit_complete import (
     AwaitRecruitComplete,
 )
 from gogoping_modes.bt.blackboard import Keys, init_blackboard

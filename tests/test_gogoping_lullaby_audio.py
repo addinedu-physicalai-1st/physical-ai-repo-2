@@ -14,7 +14,7 @@ sys.path.insert(0, str(_REPO / "controller" / "gogoping-controller" / "src" / "g
 
 from py_trees.common import Status  # noqa: E402
 
-from gogoping_modes.bt.behaviors.common.lullaby_audio import LullabyAudio  # noqa: E402
+from gogoping_modes.bt.behaviors.lullaby.lullaby_audio import LullabyAudio  # noqa: E402
 
 
 def _ctx_with_mock_ui():

@@ -14,7 +14,7 @@ from py_trees.common import Access, Status
 _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "controller" / "gogoping-controller" / "src" / "gogoping" / "gogoping_modes"))
 
-from gogoping_modes.bt.behaviors.common.set_patrol_index import SetPatrolIndex  # noqa: E402
+from gogoping_modes.bt.behaviors.patrol.set_patrol_index import SetPatrolIndex  # noqa: E402
 from gogoping_modes.bt.blackboard import Keys  # noqa: E402
 
 

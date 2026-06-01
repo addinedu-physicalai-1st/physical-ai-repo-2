@@ -1,0 +1,35 @@
+# GogoPing LiDAR scan_to_scan_filter_chain 설정 — /gogoping/scan → /gogoping/scan_filtered
+#
+# 체인 순서 (위에서 아래로 순차 적용):
+#   1. ScanShadowsFilter      — 벽/모서리의 "유령점"(mixed-pixel / veiling) 제거
+#   2. LaserScanSpeckleFilter — 떠다니는 외딴 노이즈 점(speckle) 제거
+#   3. LaserScanPolygonFilter — 로봇 자기 footprint(몸체) 안쪽 점 제거
+#
+# `/**` 와일드카드 — 노드 이름/namespace(/gogoping) 무관하게 적용.
+# 파라미터 스키마: /opt/ros/jazzy/share/laser_filters/examples/*.yaml 기준 (검증됨).
+/**:
+  ros__parameters:
+    filter1:
+      name: shadows
+      type: laser_filters/ScanShadowsFilter
+      params:
+        min_angle: 10.0      # 인접점과 이루는 수직각 임계 — 이보다 작으면 shadow
+        max_angle: 170.0
+        neighbors: 1         # 검출 시 주변 제거 개수 (보수적: 1)
+        window: 1
+    filter2:
+      name: speckle
+      type: laser_filters/LaserScanSpeckleFilter
+      params:
+        filter_type: 0           # 0 = Range(인접점 거리 기반), 1 = Euclidean radius outlier
+        max_range: 16.0          # 이 거리 이내 점만 검사 (C1 range_max)
+        max_range_difference: 0.2  # 인접점과 0.2m 이상 떨어진 고립점 = speckle 로 제거
+        filter_window: 2         # 연속 검사 점 수
+    filter3:
+      name: polygon_filter
+      type: laser_filters/LaserScanPolygonFilter
+      params:
+        polygon_frame: base_link
+        polygon: '[[0.2, -0.4], [0.2, 0.4], [-0.6, 0.4], [-0.6, -0.4]]'
+        invert: false
+        footprint_topic: base_footprint_exclude

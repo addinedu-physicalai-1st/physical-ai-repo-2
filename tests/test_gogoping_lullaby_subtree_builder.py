@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 _REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO / "controller" / "gogoping-controller" / "src" / "gogoping" / "gogoping_modes"))
 
-from gogoping_modes.bt.behaviors.common.lullaby_audio import LullabyAudio  # noqa: E402
+from gogoping_modes.bt.behaviors.lullaby.lullaby_audio import LullabyAudio  # noqa: E402
 from gogoping_modes.bt.trees.sub_trees.BT_lullaby_sub import build_lullaby_subtree  # noqa: E402
 
 

@@ -210,7 +210,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
         # LOCAL: 좁은 문 (0.885m) 통과 가능 위해 작게
-        inflation_radius: 0.18
+        inflation_radius: 0.10
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
@@ -232,7 +232,7 @@ local_costmap:
           raytrace_max_range: 5.0
           raytrace_min_range: 0.0
           obstacle_max_range: 4.5
-          obstacle_min_range: 0.0
+          obstacle_min_range: 0.35
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
@@ -250,9 +250,24 @@ global_costmap:
       footprint: '[[0.10, -0.2625], [0.10, 0.2625], [-0.50, 0.2625], [-0.50, -0.2625]]'
       resolution: 0.05
       track_unknown_space: true
-      # 동적 장애물 (사람 등) 이 map frame 에 흔적으로 누적되는 것 방지 — global 은
-      # static_layer 만. 동적 회피는 local_costmap/voxel_layer (rolling_window) 가 전담.
+      # obstacle_layer 제외 — global 은 static 맵(벽)만으로 경로계획. 사람/동적 장애물이
+      # 전역 지도에 마킹되어 "발자국 trail"(1Hz 갱신이라 느리게 지워짐) + 불필요한 전역
+      # 재계획을 유발하던 문제 제거. 동적 회피는 local costmap(10Hz) + ProximitySafetyMonitor 담당.
       plugins: ["static_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /gogoping/scan_filtered
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.35
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true

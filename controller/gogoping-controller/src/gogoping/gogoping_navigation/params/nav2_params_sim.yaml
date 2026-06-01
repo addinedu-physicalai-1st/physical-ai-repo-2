@@ -131,7 +131,7 @@ local_costmap:
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
         cost_scaling_factor: 4.0
-        inflation_radius: 0.18
+        inflation_radius: 0.10
       voxel_layer:
         plugin: nav2_costmap_2d::VoxelLayer
         enabled: true
@@ -167,9 +167,10 @@ global_costmap:
       footprint: '[[0.10, -0.2625], [0.10, 0.2625], [-0.50, 0.2625], [-0.50, -0.2625]]'
       resolution: 0.05
       track_unknown_space: true
+      # obstacle_layer 제외 — global 은 static 맵(벽)만으로 경로계획 (real 과 동기화).
+      # 동적 장애물(사람) trail/재계획 제거. 동적 회피는 local + ProximitySafetyMonitor.
       plugins:
       - static_layer
-      - obstacle_layer
       - inflation_layer
       obstacle_layer:
         plugin: nav2_costmap_2d::ObstacleLayer

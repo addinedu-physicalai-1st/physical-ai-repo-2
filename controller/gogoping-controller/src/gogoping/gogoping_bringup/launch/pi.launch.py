@@ -64,15 +64,15 @@ def generate_launch_description() -> LaunchDescription:
     # 상대 토픽 "battery" 사용 → GroupAction 의 PushRosNamespace 가 /gogoping/ prefix.
     # source=voltage_topic: vic_pinky_bringup 이 발행하는 /gogoping/battery_voltage (Float32)
     # 를 구독해서 voltage_min ~ voltage_max 로 0~100% 선형 변환.
-    # Vic Pinky: 만충 24V / cutoff 18V (실측). 다른 배터리면 launch arg 로 override.
+    # Vic Pinky: 만충 26V / cutoff 22V (실측). 다른 배터리면 launch arg 로 override.
     battery_publisher = Node(
         package="gogoping_bringup",
         executable="battery_publisher_node",
         parameters=[{
             "source": "voltage_topic",
             "voltage_topic": "battery_voltage",   # 상대 — gogoping namespace 자동 prefix
-            "voltage_min": 18.0,
-            "voltage_max": 24.0,
+            "voltage_min": 22.0,
+            "voltage_max": 26.0,
             "level": 100.0,                       # voltage 미수신 시 fallback
         }],
     )

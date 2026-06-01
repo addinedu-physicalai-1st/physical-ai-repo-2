@@ -15,6 +15,10 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'),
             glob(os.path.join('launch', '*.launch.py'))),
+        # pi.launch 의 laser_filter 노드가 get_package_share_directory()+/config/laser_filter.yaml
+        # 로 참조 — config/ 를 설치하지 않으면 그 경로가 install 에 없어 필터 설정 누락.
+        (os.path.join('share', package_name, 'config'),
+            glob(os.path.join('config', '*.yaml'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

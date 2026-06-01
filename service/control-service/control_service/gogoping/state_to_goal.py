@@ -57,7 +57,7 @@ _LABEL_TO_GOAL = {
         # → _build_group_patrol_order 로 yaml 의 group 셔플된 vertex 리스트로 동적 교체.
         # 빈 list 로 두면 yaml 로드 실패 시 reconciler 의 missing_search_waypoints 로 거부 —
         # hardcoded fallback 없음 (운영자가 yaml 정합성 확인하라는 의도).
-        play_area_key="출입구",
+        play_area_key="복도",
     ),
 }
 

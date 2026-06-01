@@ -8,7 +8,7 @@
         ├─ SelectVertex          → BB.target_vertex_name = <name>
         ├─ NavigateToVertex      → graph_router 호출
         ├─ BrakeAndWait          → cmd_vel=0 publish + 0.5s 대기 (잔여 관성 정리)
-        └─ PanCameraSweep        → 90 → 30 → 150 → 90
+        └─ PanCameraSweep        → tilt 130° → pan 90→10→170→90 (20°/s) → tilt 90° 원복
 
 마지막 자식으로 ``SetPatrolIndex(len(waypoints))`` 추가 — 모든 vertex 완료 표시.
 
@@ -76,7 +76,17 @@ def build_patrol_sub(
                 SelectVertex(name=f"select_{name}", vertex_name=name),
                 NavigateToVertex(name=f"nav_{name}"),
                 BrakeAndWait(name=f"brake_{name}", context=ctx),
-                PanCameraSweep(name=f"sweep_{name}", context=ctx),
+                # 숨바꼭질: tilt 130° 내린 뒤 pan 을 20°/s 로 천천히 sweep.
+                # 정면90 → 좌10(4초) → 5초 hold → 우170(8초) → 5초 hold → 정면90(4초)
+                # → tilt 90° 원복. 좌·우만 hold, 중앙은 hold 0. vertex 당 ~26초.
+                PanCameraSweep(
+                    name=f"sweep_{name}",
+                    context=ctx,
+                    steps_deg=(90.0, 10.0, 170.0, 90.0),
+                    hold_secs=(0.0, 5.0, 5.0, 0.0),
+                    tilt_deg=130.0,
+                    rest_tilt_deg=90.0,
+                ),
             ],
         )
         # 한 vertex 실패 시 다음 vertex 계속 — root Sequence 가 멈추지 않도록.
