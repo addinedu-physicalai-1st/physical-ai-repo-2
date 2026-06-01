@@ -370,7 +370,17 @@ export function useWakeWord(options: UseWakeWordOptions): UseWakeWordReturn {
           autoGainControl: true,
         },
       });
-      audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+      // webkit prefix fallback (Safari) + autoplay-suspended 해제. 일부 환경에서
+      // `new AudioContext(...)` 가 null 처럼 보이는 createMediaStreamSource 에러를
+      //낸 사례 — Ctor 미존재면 명확한 에러로 끊고, suspended 면 resume 후 진행.
+      const AudioCtxCtor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtxCtor) throw new Error('AudioContext 미지원 브라우저');
+      audioContext = new AudioCtxCtor({ sampleRate: SAMPLE_RATE });
+      if (audioContext.state === 'suspended') {
+        try { await audioContext.resume(); } catch { /* user gesture 없으면 다음 step 에서 */ }
+      }
       await audioContext.audioWorklet.addModule(WORKLET_PATH);
       sourceNode = audioContext.createMediaStreamSource(stream);
       workletNode = new AudioWorkletNode(audioContext, 'wake-pcm-worklet');

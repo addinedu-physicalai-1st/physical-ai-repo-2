@@ -37,12 +37,6 @@ const stream = useDanceStream();
 const stateWs = useEdupingStateWs();
 stateWs.start();
 
-// 근접 안전정지 — 사람이 0.6m 이내면 음악 일시정지(팔은 bridge 가 정지), 해제 시 재개.
-watch(() => stateWs.proximityBlocked.value, (blocked) => {
-  if (blocked) stream.pauseAudio();
-  else stream.resumeAudio();
-});
-
 // 패널 최소화 상태 — 헤더만 남기고 본문 접음.
 const cameraMinimized = ref(false);
 const musicMinimized = ref(false);

@@ -3,6 +3,12 @@
  *
  * 사용처 (AttendanceCamera, MugunghwaGame, RecruitPhase) 가 매 frame 자체적으로
  * requestAnimationFrame 루프를 돌므로 본 컴포저블은 send/onResults 만 노출.
+ *
+ * ⚠ 2026-06-01: tasks-vision FaceDetector 로 이관했다가 되돌림. tasks-vision 의
+ * GPU delegate 는 자체 GL context 를 만드는데, AttendanceCamera 처럼 three.js WebGL
+ * 이 없는 (2D canvas 만 있는) 화면에선 검출이 조용히 no-op 돼 "얼굴 인식 중…" 이
+ * 영원히 안 풀렸다. solutions API (FaceDetection) 는 자체 WASM/GL 로 host context 없이
+ * 동작 → 등원/하원/무궁화에서 검증된 경로라 이걸 유지한다.
  */
 import { FaceDetection, type Detection, type Results } from '@mediapipe/face_detection';
 import type { Bbox } from './useFaceTracker';

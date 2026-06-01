@@ -20,8 +20,11 @@ import { useModeIntents } from '@/composables/useModeIntents';
 import { VOICE_CONTROLLER_KEY } from '@/composables/voiceControllerKey';
 import { useEmotionCapture } from '@/composables/useEmotionCapture';
 import { useEdupingStateWs } from '@/composables/useEdupingStateWs';
-import { useProximityOverride } from '@/composables/useProximityOverride';
-import { useMugunghwaPerception } from './useMugunghwaPerception';
+import { pickExternalCamera } from '@/composables/selectExternalCamera';
+import { useFaceDetector } from '@/composables/useFaceDetector';
+import { useFaceTracker, type TrackedFace } from '@/composables/useFaceTracker';
+import { useFaceIdentityCache, type IdentityResult } from '@/composables/useFaceIdentityCache';
+import { mapMatchesToTracks, postRecognizeMulti } from '@/composables/identifyTracksFromFrame';
 import OpenarmViewer from './OpenarmViewer.vue';
 import type { JointSnapshot as StreamJointSnapshot } from './useDanceStream';
 
@@ -103,7 +106,7 @@ useModeIntents('무궁화꽃이 피었습니다', {
     // end: 놀이 끝 popup → '다시하기' → 참가자 초기화 후 entry 로 복귀.
     // 그 외 stage (song / observation / eliminationWait) 는 음성 진행점 정의 안 됨.
     if (stage.value === 'entry') {
-      startEntryGame();
+      setStage('ready');
     } else if (stage.value === 'ready') {
       setStage('song');
     } else if (stage.value === 'end') {
@@ -268,23 +271,56 @@ function interpolateMotion(t: number): StreamJointSnapshot | null {
   return { jointNames: m.joint_names, positions, tMs: tt * 1000 };
 }
 
-// ---- 노래 stage: 고정 속도 + 실 오디오 진행 추적 -----------------------------
-// `yeonghui_mugunghwa.mp3` (자연 속도 ~4.6s) 가 진행률의 단일 진실의 원천.
-// 속도는 고정(자연 속도 1.0×) — sim 모션·오디오·실물 팔 play 가 모두 같은 속도라 별도
-// 동기 로직 불필요. (이전엔 quintic/random 동적 템포였으나 실물 팔과 sim 동기 단순화 위해 고정.)
+// ---- 노래 stage: tempo variation + 실 오디오 진행 추적 -----------------------
+// `yeonghui_mugunghwa.mp3` (자연 속도 ~4.6s) 가 단일 진실의 원천 (single source of truth).
+// `audio.currentTime / audio.duration` 으로 진행률을 그리고, `audio.ended` 가 발화하면
+// 짧은 꼬리 후 관찰 단계로 전이. 이전엔 TTS 발화 vs. 가상 타이머 두 경주를 돌리느라
+// 빠른 tempo 에서 가상 시간이 먼저 만료돼 "무궁화" 도중 끊기는 버그가 있었음.
+type TempoPattern = 'random' | 'slow_to_fast' | 'fast_to_slow';
+
+const TEMPO_LABEL: Record<TempoPattern, string> = {
+  random: '빨랐다 느렸다',
+  slow_to_fast: '점점 빠르게',
+  fast_to_slow: '점점 느리게',
+};
+
+// 0.6 = 늘어진 슬로우모, 1.1 = 자연 속도 + 10%. 실물 로봇팔 안전상 RATE_MAX 는
+// 자연 속도 110% 를 넘기지 않는다 — 모터 부하·관성 우려 + 어린이 손이 닿는 거리.
+// 슬로우 쪽은 모터에 무해하므로 RATE_MIN 은 충분히 낮게 유지.
+const RATE_MIN = 0.6;
+const RATE_MAX = 1.1;
+const RATE_MID = (RATE_MIN + RATE_MAX) / 2;
+// 'random' 패턴의 속도 갱신 간격도 무작위 — 일정 주기로 바뀌면 거기에 적응당함.
+const RANDOM_RATE_MIN_REFRESH_MS = 220;
+const RANDOM_RATE_MAX_REFRESH_MS = 700;
 const TICK_MS = 80;
 const SONG_AUDIO_URL = '/sounds/yeonghui_mugunghwa.mp3';
 
+const tempoPattern = ref<TempoPattern>('slow_to_fast');
+const currentRate = ref(1.0);
 const songProgressRatio = ref(0);  // audio.currentTime / audio.duration, live updated
 const songProgressPct = computed(() => Math.min(100, songProgressRatio.value * 100));
 
-let songTimer: number | null = null;        // 음악 진행률 timer
-let coverTimer: number | null = null;        // 가리기 애니메이션 timer (sim)
-let coverStartTimer: number | null = null;   // 가리기 완료 → 음악 시작 짧은 텀
+let songTimer: number | null = null;
+let songTailTimer: number | null = null;
+let lastTickAt = 0;
+let lastRandomChangeAt = 0;
+let nextRandomRefreshMs = RANDOM_RATE_MIN_REFRESH_MS;
 let songAudio: HTMLAudioElement | null = null;
 
-const COVER_HOLD_BUFFER_MS = 250;   // 가리기 끝나고 음악 시작 전 짧은 텀
-const COVER_FALLBACK_S = 2.5;       // motion 미로딩 시 가리기 추정 시간
+function pickTempoPattern(): TempoPattern {
+  const r = Math.random();
+  if (r < 1 / 3) return 'random';
+  if (r < 2 / 3) return 'slow_to_fast';
+  return 'fast_to_slow';
+}
+
+function pickRandomRefreshMs(): number {
+  return (
+    RANDOM_RATE_MIN_REFRESH_MS
+    + Math.random() * (RANDOM_RATE_MAX_REFRESH_MS - RANDOM_RATE_MIN_REFRESH_MS)
+  );
+}
 
 function ensureSongAudio(): HTMLAudioElement {
   if (songAudio) return songAudio;
@@ -294,94 +330,54 @@ function ensureSongAudio(): HTMLAudioElement {
   return a;
 }
 
-// 실물 팔 — song(가리기 forward) / observation(떼기 reverse) 시 녹화된 mugunghwa 모션을
-// follower 로 재생. realActive 일 때만 — sim 은 realActive 면 패널이 숨겨지므로 불필요.
-// speed=1.0(자연 속도) 고정 — 실물 안전상 자연 속도 110% 를 넘기지 않는다.
-async function playArmMotion(reverse: boolean): Promise<void> {
-  if (!stateWs.realActive.value) return;
-  try {
-    await fetch('/api/eduping/mugunghwa/motion/play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target: 'real', speed: 1.0, reverse }),
-    });
-  } catch { /* 실물 재생 실패는 게임 진행을 막지 않음 */ }
-}
-
-// 게임 종료/나가기 시 양팔을 부드럽게 home pose 로 복귀 (율동 정지와 동일 메커니즘 —
-// trapezoidal velocity profile). 가리기 자세로 멈춰 끝나도 제자리로 돌아온다.
-async function returnArmHome(): Promise<void> {
-  if (!stateWs.realActive.value) return;
-  try {
-    await fetch('/api/eduping/arm/return-home', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target: 'real' }),
-    });
-  } catch { /* noop */ }
-}
-
-// 새 흐름: 1) 가리기 동작이 끝나면 → 2) 음악 재생 (팔은 가리기 자세로 정지 유지,
-// 음악 중에만 이동 허용) → 3) 음악 종료 → 관찰(떼기 + 프리즈, 움직이면 탈락).
 function startSongStage(): void {
   stopSongStage();
+  tempoPattern.value = pickTempoPattern();
+  nextRandomRefreshMs = pickRandomRefreshMs();
   songProgressRatio.value = 0;
-  armSnapshot.value = interpolateMotion(0);  // 팔 내림 자세에서 시작
-  // 1) 가리기 — 실물 forward play + sim 1회 보간 (coverDur 동안 0→full).
-  void playArmMotion(false);
-  const coverDur = motion.value?.duration_s ?? COVER_FALLBACK_S;
-  const startAt = performance.now();
-  coverTimer = window.setInterval(() => {
-    const elapsed = (performance.now() - startAt) / 1000;
-    const p = coverDur > 0 ? Math.min(1, elapsed / coverDur) : 1;
-    if (motion.value) armSnapshot.value = interpolateMotion(coverDur * p);
-    if (p >= 1) {
-      if (coverTimer !== null) { window.clearInterval(coverTimer); coverTimer = null; }
-      if (motion.value) armSnapshot.value = interpolateMotion(coverDur);  // 가리기 자세 유지
-      // 2) 가리기 완료 → 짧은 텀 후 음악 재생.
-      coverStartTimer = window.setTimeout(() => {
-        coverStartTimer = null;
-        if (stage.value === 'song') startMusicPhase();
-      }, COVER_HOLD_BUFFER_MS);
-    }
-  }, TICK_MS);
-}
+  currentRate.value =
+    tempoPattern.value === 'fast_to_slow' ? RATE_MAX
+    : tempoPattern.value === 'slow_to_fast' ? RATE_MIN
+    : RATE_MID;
+  // 노래 시작 = t=0 keyframe (≈ 팔 내림 자세) 부터 시작. 직전 관찰 단계에서 가리기
+  // 자세로 멈춰있던 viewer 가 갑자기 점프하지 않도록 즉시 reset — 첫 songTick 까지의
+  // 80ms 갭에서 발생하던 visual jump 제거.
+  armSnapshot.value = interpolateMotion(0);
 
-function startMusicPhase(): void {
   const audio = ensureSongAudio();
   try { audio.pause(); } catch { /* noop */ }
   try { audio.currentTime = 0; } catch { /* noop */ }
-  audio.playbackRate = 1.0;  // 고정 속도
+  audio.playbackRate = currentRate.value;
   audio.onended = () => {
-    // 3) 음악 종료 → 관찰(떼기 + 프리즈). 음악 중에만 이동 허용, 이후 움직이면 탈락.
-    if (stage.value === 'song') setStage('observation');
+    if (stage.value !== 'song') return;
+    // 짧은 꼬리 — 아이가 멈출 0.2~0.8초 반응 시간. 가속/감속 패턴 모두 자연스럽게.
+    songTailTimer = window.setTimeout(() => {
+      songTailTimer = null;
+      if (stage.value === 'song') setStage('observation');
+    }, 200 + Math.random() * 600);
   };
-  const pr = audio.play();
-  if (pr && typeof pr.catch === 'function') {
-    pr.catch((err: unknown) => {
+  const p = audio.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch((err: unknown) => {
       const name = (err as { name?: string } | null)?.name;
       if (name === 'AbortError' || name === 'NotAllowedError') return;
       console.warn('[mugunghwa-song] play failed', err);
     });
   }
-  // 음악 진행률 (progress bar) 만 갱신. 팔은 가리기 자세로 정지 유지 (armSnapshot update 안 함).
-  songTimer = window.setInterval(() => {
-    const dur = audio.duration;
-    if (Number.isFinite(dur) && dur > 0) {
-      songProgressRatio.value = Math.min(1, audio.currentTime / dur);
-    }
-  }, TICK_MS);
+
+  lastTickAt = performance.now();
+  lastRandomChangeAt = lastTickAt;
+  songTimer = window.setInterval(songTick, TICK_MS);
 }
 
 function stopSongStage(): void {
-  for (const t of [songTimer, coverTimer]) {
-    if (t !== null) window.clearInterval(t);
+  if (songTimer !== null) {
+    window.clearInterval(songTimer);
+    songTimer = null;
   }
-  songTimer = null;
-  coverTimer = null;
-  if (coverStartTimer !== null) {
-    window.clearTimeout(coverStartTimer);
-    coverStartTimer = null;
+  if (songTailTimer !== null) {
+    window.clearTimeout(songTailTimer);
+    songTailTimer = null;
   }
   if (songAudio) {
     songAudio.onended = null;
@@ -391,13 +387,53 @@ function stopSongStage(): void {
   songProgressRatio.value = 0;
 }
 
-// 참가자(등록된 어린이)가 한 명도 없으면 게임 시작 불가 — entry 에 머물며 안내.
-function startEntryGame(): void {
-  if (registeredCount.value === 0) {
-    pushToast('참가자를 먼저 등록해주세요 — 카메라 앞에 친구가 인식되어야 시작할 수 있어요');
-    return;
+function songTick(): void {
+  const audio = songAudio;
+  if (!audio) return;
+  const now = performance.now();
+  lastTickAt = now;
+
+  // 진행률 — duration 이 metadata 로딩 전엔 NaN 이므로 가드.
+  const dur = audio.duration;
+  if (Number.isFinite(dur) && dur > 0) {
+    songProgressRatio.value = Math.min(1, audio.currentTime / dur);
   }
-  setStage('ready');
+
+  // 가리기 모션 정방향 — audio progress 에 lock 된 motion 시간으로 keyframe 보간.
+  // audio.playbackRate 가 동적으로 변하면 audio.currentTime 도 같은 속도로 변하므로
+  // motion 도 자동으로 같은 tempo 로 재생됨.
+  if (motion.value) {
+    armSnapshot.value = interpolateMotion(motion.value.duration_s * songProgressRatio.value);
+  }
+
+  // 패턴별 rate. slow_to_fast / fast_to_slow 는 **quintic** 커브 (t⁵) — 실제 무궁화꽃이
+  // 피었습니다 놀이의 술래 가락은 "무우구웅화 꼬오치이" 늘어진 슬로우모로 끌다 끝에 가서
+  // "피었습니다!" 휘몰아치는 형태. 선형 ramp 는 중간부터 이미 보통 속도가 돼버려서
+  // 슬로우모 느낌이 안 남. 5제곱 곡선이면 t=0.7 까지 rate < 0.75× 로 늘어진 채 유지되고,
+  // 마지막 ~25% 구간에서 가속해 RATE_MAX 에 도달.
+  //   t=0.50 → rate ≈ 0.46  (거의 RATE_MIN — 늘어진 슬로우모)
+  //   t=0.70 → rate ≈ 0.74  (여전히 느림)
+  //   t=0.85 → rate ≈ 1.29
+  //   t=1.00 → rate = RATE_MAX
+  // random 은 무작위 간격으로 새 값.
+  if (tempoPattern.value === 'random') {
+    if (now - lastRandomChangeAt >= nextRandomRefreshMs) {
+      currentRate.value = RATE_MIN + (RATE_MAX - RATE_MIN) * Math.random();
+      lastRandomChangeAt = now;
+      nextRandomRefreshMs = pickRandomRefreshMs();
+    }
+  } else {
+    const t = songProgressRatio.value;
+    const eased = t * t * t * t * t;  // t^5 — 슬로우 구간이 곡선의 대부분
+    if (tempoPattern.value === 'slow_to_fast') {
+      // 거의 RATE_MIN 유지하다 끝에서 가속.
+      currentRate.value = RATE_MIN + (RATE_MAX - RATE_MIN) * eased;
+    } else {
+      // fast_to_slow — 대칭형. 거의 RATE_MAX 유지하다 끝에서 늘어짐.
+      currentRate.value = RATE_MAX - (RATE_MAX - RATE_MIN) * eased;
+    }
+  }
+  try { audio.playbackRate = currentRate.value; } catch { /* noop */ }
 }
 
 // ---- stage transitions ------------------------------------------------------
@@ -504,16 +540,13 @@ function restartGame(): void {
     p.reached = false;
     p.place = null;
   }
-  perception.reset();  // 노드 bindings 초기화 — 새 게임에서 다시 바인딩 (end 에서 idle 였음)
   setStage('entry');
 }
 
-// 게임 종료 조건: (1) 1명이라도 도달 → onPhysicalReach 가 setStage('end'). (2) 전원 탈락
-// (등록자 전원 eliminated) → 아래 watcher. 부분 탈락(일부만)으론 안 끝남 — 나머지는 계속.
-// (이전엔 alive===0 으로 "도달자 포함" 이라, 등록자가 적으면 한 명 탈락에 끝나버렸음.)
-watch([eliminatedCount, registeredCount], ([elim, reg]) => {
+// 모든 등록된 친구가 도착 OR 탈락 → 자동으로 종료 단계로. entry/ready 에서는 발동 안 함.
+watch([aliveCount, registeredCount], ([alive, reg]) => {
   if (
-    reg > 0 && elim === reg
+    reg > 0 && alive === 0
     && stage.value !== 'end'
     && stage.value !== 'entry'
     && stage.value !== 'ready'
@@ -532,24 +565,30 @@ function toggleDrawer(): void { drawerOpen.value = !drawerOpen.value }
 // 시뮬은 보조 정보라 default 최소화. 첫 펼침 전엔 three.js/URDF/STL 로드 자체를 안 함.
 const stateWs = useEdupingStateWs();
 stateWs.start();
-
-// 무궁화는 "사람이 다가오는 것"이 게임 목표라, 근접을 팔/음악 정지가 아니라 도달(게임 종료)
-// 신호로 쓴다. 따라서 전역 proximity 정지(bridge pause)는 이 모드 동안 override 로 끄고
-// (가리기/떼기가 끊기거나 떨리지 않도록), 도달 판정은 perception 노드의 reached 이벤트로 받는다.
-useProximityOverride();
-
 const simMinimized = ref(true);
 const simEverOpened = ref(false);
 watch(simMinimized, (m) => { if (!m) simEverOpened.value = true; });
 
-// ---- perception (camera PIP + person/motion judgment via ROS2 node) ---------
-// 브라우저는 카메라를 직접 취득하지 않는다. useMugunghwaPerception 이 WS 로
-// JPEG 프레임을 수신해 pipCanvas 에 그리고, 노드로부터 등록/탈락/모션 이벤트를 수신.
-const emotionVideoRef = ref<HTMLVideoElement | null>(null);
-const motionFlash = ref(false);
+// ---- camera (메인 화면 중앙) ------------------------------------------------
+// 시뮬레이션 패널이 좌하단 플로팅으로 분리되면서 .arm-wrap 중앙이 비었음 → 사용자가
+// 카메라 미리보기로 채우길 원함. videoRef 는 이제 중앙 영역의 video 엘리먼트를 가리키며,
+// face detection/motion detection/emotion capture 가 모두 같은 엘리먼트를 공유.
+const videoRef = ref<HTMLVideoElement | null>(null);
+const cameraReady = ref(false);
+const cameraError = ref('');
+let cameraStream: MediaStream | null = null;
 
-// 자연 촬영 — 진행 단계(노래/관찰/탈락 대기)에서 PIP canvas 위에 5fps 추론을 얹어
-// happy/sad 표정 캡처 → /api/photos/natural 업로드.
+// 카메라 선택 — AttendanceCamera/IntegratedCameraPreview 와 동일 패턴.
+// 기본은 외장 USB (회의실 카메라 등) 가 있으면 그 첫 후보를, 없으면 첫 video device.
+// 사용자가 dropdown 으로 직접 바꿀 수 있다 — 기본 선택이 실패한 경우 (다른 앱이 점유,
+// 권한 거부 등) 사용자가 다른 카메라로 즉시 전환 가능.
+const cameras = ref<MediaDeviceInfo[]>([]);
+const selectedDeviceId = ref<string>('');
+const hasCameras = computed(() => cameras.value.length > 0);
+
+// 자연 촬영 — 진행 단계(노래/관찰/탈락 대기)에서 PIP 비디오 위에 5fps 추론을 얹어
+// happy/sad 표정 캡처 → /api/photos/natural 업로드. 보고서는 같은 child_id+date 의
+// 모든 photo 를 모아 AI 가 합성하므로 별도 서버 변경 불필요. OXQuiz 와 동일한 흐름.
 const captureArmed = computed(
   () =>
     stage.value === 'song'
@@ -564,71 +603,380 @@ const emotionCapture = useEmotionCapture({
   onCaptured: () => { naturalShotCount.value += 1; },
 });
 
-const perception = useMugunghwaPerception({
-  onRegistered: (childId) => {
+async function listCameras(): Promise<void> {
+  try {
+    let devs = await navigator.mediaDevices.enumerateDevices();
+    if (devs.filter((d) => d.kind === 'videoinput').every((d) => !d.label)) {
+      // 라벨이 비어 있으면 권한 트리거 후 다시 enumerate.
+      try {
+        const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+        tmp.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* 권한 거부해도 enumerate 는 가능 (라벨 빈 채로) */
+      }
+      devs = await navigator.mediaDevices.enumerateDevices();
+    }
+    cameras.value = devs.filter((d) => d.kind === 'videoinput');
+    const stillValid = cameras.value.some((c) => c.deviceId === selectedDeviceId.value);
+    if (!selectedDeviceId.value || !stillValid) {
+      // 기본은 외장 USB — 무궁화 놀이에선 노트북 내장 카메라보다 큰 외장이 보통 더 적합.
+      const ext = await pickExternalCamera();
+      selectedDeviceId.value = ext?.deviceId ?? cameras.value[0]?.deviceId ?? '';
+    }
+  } catch (e) {
+    cameraError.value = `카메라 목록 실패: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+async function setupCamera(): Promise<void> {
+  cameraError.value = '';
+  if (!selectedDeviceId.value) {
+    await listCameras();
+  }
+  if (!selectedDeviceId.value) {
+    cameraError.value = '사용 가능한 카메라가 없어요';
+    return;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      // 얼굴 인식이 작은 얼굴도 잡을 수 있도록 640x480 로. PIP CSS 가 축소 표시.
+      video: {
+        deviceId: { exact: selectedDeviceId.value },
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      },
+      audio: false,
+    });
+    if (videoRef.value) {
+      videoRef.value.srcObject = cameraStream;
+      await videoRef.value.play();
+      cameraReady.value = true;
+      emotionCapture.attach(videoRef.value);
+    }
+  } catch (e) {
+    cameraError.value = (e as Error).message || '카메라 접근 실패';
+  }
+}
+
+async function restartStream(): Promise<void> {
+  // device 변경 시 — emotion capture detach + 기존 track stop → 새 device 로 재시작.
+  emotionCapture.detach();
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((t) => t.stop());
+    cameraStream = null;
+  }
+  cameraReady.value = false;
+  await setupCamera();
+}
+
+async function onCameraChange(): Promise<void> {
+  await restartStream();
+}
+
+async function rescanCameras(): Promise<void> {
+  await listCameras();
+}
+
+let deviceChangeDebounce: number | null = null;
+function scheduleListCamerasOnDeviceChange(): void {
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+  }
+  deviceChangeDebounce = window.setTimeout(() => {
+    deviceChangeDebounce = null;
+    void listCameras();
+  }, 400);
+}
+
+function teardownCamera(): void {
+  emotionCapture.detach();
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((t) => t.stop());
+    cameraStream = null;
+  }
+  cameraReady.value = false;
+}
+
+// ---- face recognition (tracker + identity cache) ---------------------------
+// 모든 단계 (entry / observation / eliminationWait) 가 동일한 detector + tracker +
+// identity cache 파이프라인을 공유한다. detector loop 는 entry 진입 시 시작돼
+// end 단계에서 종료되며, 그 사이에는 latestTracks 와 identityCache 가 항상 최신.
+const recognitionActive = ref(false);
+
+const tracker = useFaceTracker();
+let latestTracks: TrackedFace[] = [];
+
+const identityCache = useFaceIdentityCache({
+  // 등원 (한 명씩) 대비 무궁화 (최대 6명 동시) 가 다수 얼굴을 한 번에 들고 식별하느라 첫
+  // identify 까지 wait 가 길게 느껴짐. 트래커 연속성이 이미 노이즈를 컷오프하므로 3 프레임으로.
+  stableFramesRequired: 3,
+  identify: async (tracks): Promise<IdentityResult[]> => identifyTracks(tracks),
+});
+
+const detector = useFaceDetector({
+  onDetections: (faces) => {
+    latestTracks = tracker.update(faces.map((f) => ({ bbox: f.bbox })));
+    void identityCache.feed(latestTracks).then(() => {
+      if (stage.value === 'entry') applyEntryBindings();
+    });
+  },
+});
+
+// /recognize-multi 로 보내기 전 max 640w 로 다운스케일. 서버 InsightFace 가 어차피 det_size
+// 640 으로 resize 하므로 정확도 영향은 거의 없는데, 디텍션 비용은 입력 해상도에 비례 →
+// 1280×720 → 640×360 로 줄면 detection 만 2~3배 빨라짐. 업로드 페이로드도 1/4 감소.
+const SEND_MAX_WIDTH = 640;
+
+async function captureFullFrame(): Promise<Blob | null> {
+  const v = videoRef.value;
+  if (!v || v.readyState < 2) return null;
+  const srcW = v.videoWidth;
+  const srcH = v.videoHeight;
+  const scale = srcW > SEND_MAX_WIDTH ? SEND_MAX_WIDTH / srcW : 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(srcW * scale);
+  canvas.height = Math.round(srcH * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
+}
+
+async function identifyTracks(tracks: TrackedFace[]): Promise<IdentityResult[]> {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return [];
+  const fullBlob = await captureFullFrame();
+  if (!fullBlob) return [];
+  const matches = await postRecognizeMulti(fullBlob, DEVICE_TOKEN);
+  return mapMatchesToTracks(tracks, matches).map((p) => p.result);
+}
+
+function applyEntryBindings(): void {
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
     const p = participants.value.find((x) => x.id === childId);
-    if (!p || p.registered) return;
+    if (!p || p.registered) continue;
     p.registered = true;
     pushToast(`${p.name} 등록!`, p.faceUrl);
     void tts.speak(`${p.name} 등록 완료`).catch(() => { /* TTS off */ });
-  },
-  onEliminated: (childIds) => {
-    const names: string[] = [];
-    for (const id of childIds) {
-      const p = participants.value.find((x) => x.id === id);
-      if (!p || p.eliminated) continue;
-      p.eliminated = true;
-      if (p.reached) p.reached = false;
-      names.push(p.name);
-    }
-    if (names.length === 0) return;
-    const joined = names.join(', ');
-    pushToast(`${joined} 어린이 탈락했습니다`);
-    void tts.speak(`${joined} 어린이 탈락했습니다`).catch(() => { /* noop */ });
-    setStage('eliminationWait');
-  },
-  onMotion: () => {
-    motionFlash.value = true;
-    window.setTimeout(() => { motionFlash.value = false; }, 400);
-  },
-  onReached: (childId) => { onPhysicalReach(childId); },
-});
-
-// 근접 도달 — perception 노드가 사람이 1m 이내(디바운스됨)로 다가오면 보내는 신호.
-// **노래(song) 단계에서만** "로봇 도달=승리"로 인정. 관찰(freeze) 중엔 움직여서 다가가면
-// 그건 도달이 아니라 탈락이어야 하므로 도달 신호를 무시한다. ready/entry/observation/end 무시.
-function onPhysicalReach(childId: number | null): void {
-  if (stage.value !== 'song') return;
-  // 무궁화 규칙: 1명이라도 로봇에 도달하면 잡히지 않은 생존자 전원 승리. 도달한 아이를
-  // 1등으로, 나머지 생존자도 순서대로 승자 처리. (탈락자는 그대로 패.)
-  const survivors = participants.value.filter((p) => p.registered && !p.eliminated);
-  const reacher = childId != null ? survivors.find((p) => p.id === childId) : undefined;
-  const ordered = reacher ? [reacher, ...survivors.filter((p) => p !== reacher)] : survivors;
-  ordered.forEach((p, i) => { p.reached = true; p.place = i + 1; });
-  const name = reacher?.name ?? null;
-  playTouchdownSound();
-  pushToast(name ? `${name} 로봇 도착! 생존자 전원 승리!` : '로봇 도착! 생존자 전원 승리!');
-  void tts.speak(name ? `${name} 도착! 생존자 전원 승리!` : '로봇에 도착했어요! 생존자 전원 승리!')
-    .catch(() => { /* noop */ });
-  setStage('end');
+  }
 }
 
-// ---- perception stage signals -----------------------------------------------
-// observation 진입/이탈 및 end 단계에서 노드에 신호를 보낸다.
-watch(stage, (s, prev) => {
-  // recognize 는 참가자 확인(entry) 단계에만. 초기 entry 는 노드가 peer 접속 시 처리하고,
-  // 여기선 재진입(다시하기) 시 켜고, entry 를 벗어나면 끈다 → song/종료 중 recognize 중단.
-  if (s === 'entry') perception.registerStart();
-  else if (prev === 'entry') perception.registerStop();
-  if (s === 'observation') perception.observeStart();
-  else if (prev === 'observation') perception.observeStop();
-  if (s === 'end') {
-    // 놀이 끝 — perception 노드 idle 로(YOLO/recognize·attendance POST 정지). 팔 복귀는
-    // 모드 이탈(onUnmounted)에서 하므로 여기선 안 함. bindings reset 은 다시하기(restart)에서.
-    perception.idle();
+let detectorRafId: number | null = null;
+
+function startDetectorLoop(): void {
+  if (detectorRafId !== null) return;
+  detector.start();
+  recognitionActive.value = true;
+  const tick = async (): Promise<void> => {
+    if (videoRef.value && videoRef.value.readyState >= 2) {
+      try { await detector.send(videoRef.value); } catch { /* noop */ }
+    }
+    detectorRafId = requestAnimationFrame(() => void tick());
+  };
+  detectorRafId = requestAnimationFrame(() => void tick());
+}
+
+function stopDetectorLoop(): void {
+  if (detectorRafId !== null) {
+    cancelAnimationFrame(detectorRafId);
+    detectorRafId = null;
   }
+  detector.close();
+  tracker.reset();
+  identityCache.reset();
+  latestTracks = [];
+  recognitionActive.value = false;
+}
+
+watch(stage, (s, prev) => {
+  // detector 루프는 entry 부터 시작, end 시 정지. observation 에선 entry 의 캐시를
+  // 그대로 사용해야 하므로 루프 유지.
+  if (s === 'entry' && prev !== 'entry') startDetectorLoop();
+  if (s === 'end') stopDetectorLoop();
 });
 
+// ---- motion detection during 관찰 ------------------------------------------
+// 가벼운 binary 알람: 관찰 진입 시점 프레임을 baseline 으로 캡처 → 8Hz 로 현재 프레임과의
+// SAD (Sum of Absolute Differences, 그레이스케일 다운샘플 160x90) 비교 → 임계 초과 시
+// 카메라 PIP 빨강 플래시 + "움직였어요!" TTS (쿨다운). 누가 움직였는지는 식별하지 않고
+// 교사가 카드의 ✕ 버튼으로 직접 탈락 처리. 추후 YOLO-Pose + ByteTrack 으로 per-kid 자동화 예정.
+// 별도 1.5s 주기 probe 는 제거 — 식별이 캐시 기반이라 주기적 재호출이 불필요하고, 천천히
+// 움직이는 케이스도 8Hz motion-diff 가 누적 SAD 로 잡아내는 것을 신뢰. 잡지 못한 케이스는
+// 교사가 ✕ 로 직접 탈락 처리.
+const MOTION_DOWNSAMPLE_W = 160;
+const MOTION_DOWNSAMPLE_H = 90;
+// 평균 픽셀 변화율 임계 — 0..1 범위 (255 정규화 후 평균). 작을수록 민감.
+const MOTION_THRESHOLD = 0.015;
+const MOTION_TICK_MS = 125;          // 8 Hz
+const MOTION_TTS_COOLDOWN_MS = 2000;
+
+const motionDetected = ref(false);
+let motionTimer: number | null = null;
+let motionBaseline: ImageData | null = null;
+let motionCanvas: HTMLCanvasElement | null = null;
+let motionCtx: CanvasRenderingContext2D | null = null;
+let lastMotionAnnouncementAt = 0;
+// 관찰 진입 시 캡처한 각 등록 아이의 bbox 중심점 — 이후 motion 이벤트마다 비교.
+const observationBasePositions = new Map<number, { x: number; y: number }>();
+// 연속 motion 이벤트로 인한 setStage 중복 실행 차단. 서버 호출은 더 이상 없음.
+let moverProbeInflight = false;
+// 픽셀 단위 변위 임계. 640x480 기준 ~1.6%. strict 이상이면 즉시 탈락.
+const MOVER_DISPLACEMENT_PX = 10;
+// loose fallback — strict 미만이지만 motion 이 분명히 발생했을 때 "가장 많이 움직인 한 명"을
+// 탈락시키기 위한 최소 변위. 노이즈와 진짜 움직임을 구분.
+const MOVER_DISPLACEMENT_LOOSE_PX = 4;
+
+function ensureMotionCanvas(): void {
+  if (motionCanvas) return;
+  motionCanvas = document.createElement('canvas');
+  motionCanvas.width = MOTION_DOWNSAMPLE_W;
+  motionCanvas.height = MOTION_DOWNSAMPLE_H;
+  motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
+}
+
+function captureMotionFrame(): ImageData | null {
+  if (!videoRef.value || videoRef.value.readyState < 2) return null;
+  ensureMotionCanvas();
+  if (!motionCtx) return null;
+  motionCtx.drawImage(videoRef.value, 0, 0, MOTION_DOWNSAMPLE_W, MOTION_DOWNSAMPLE_H);
+  return motionCtx.getImageData(0, 0, MOTION_DOWNSAMPLE_W, MOTION_DOWNSAMPLE_H);
+}
+
+function frameDiffNormalized(a: ImageData, b: ImageData): number {
+  const aData = a.data;
+  const bData = b.data;
+  // RGBA 4-byte stride → 그레이스케일은 (R+G+B)/3 평균
+  let sad = 0;
+  const n = aData.length;
+  for (let i = 0; i < n; i += 4) {
+    const ga = (aData[i] + aData[i + 1] + aData[i + 2]) / 3;
+    const gb = (bData[i] + bData[i + 1] + bData[i + 2]) / 3;
+    sad += Math.abs(ga - gb);
+  }
+  return sad / ((n / 4) * 255);
+}
+
+function captureObservationBaseline(): void {
+  // 관찰 진입 순간의 tracker bbox 중심을 child_id 별로 기록. 식별된 트랙만 baseline 으로
+  // 쓰고, 누락된 child 는 probeMoversAndMaybeEliminate 가 다음 frame 에서 지연 채움.
+  observationBasePositions.clear();
+  for (const t of latestTracks) {
+    const childId = identityCache.getChildId(t.trackId);
+    if (childId == null) continue;
+    const [x1, y1, x2, y2] = t.bbox;
+    observationBasePositions.set(childId, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
+  }
+}
+
+function probeMoversAndMaybeEliminate(): void {
+  if (moverProbeInflight) return;  // 연속 motion 이벤트 중복 차단
+  if (stage.value !== 'observation') return;
+  moverProbeInflight = true;
+  try {
+    // 등록된 아이 중 baseline 누락된 것이 있으면 지연 baseline (이번 frame 의 bbox 로).
+    for (const t of latestTracks) {
+      const childId = identityCache.getChildId(t.trackId);
+      if (childId == null) continue;
+      if (observationBasePositions.has(childId)) continue;
+      const [x1, y1, x2, y2] = t.bbox;
+      observationBasePositions.set(childId, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 });
+    }
+
+    type Candidate = { id: number; name: string; dist: number };
+    const candidates: Candidate[] = [];
+    for (const t of latestTracks) {
+      const childId = identityCache.getChildId(t.trackId);
+      if (childId == null) continue;
+      const base = observationBasePositions.get(childId);
+      if (!base) continue;
+      const [x1, y1, x2, y2] = t.bbox;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      const dist = Math.hypot(cx - base.x, cy - base.y);
+      const p = participants.value.find((x) => x.id === childId);
+      if (!p || !p.registered || p.eliminated) continue;
+      candidates.push({ id: childId, name: p.name, dist });
+    }
+    if (candidates.length === 0) return;
+
+    let toEliminate = candidates.filter((c) => c.dist >= MOVER_DISPLACEMENT_PX);
+    if (toEliminate.length === 0) {
+      const maxDist = Math.max(...candidates.map((c) => c.dist));
+      if (maxDist >= MOVER_DISPLACEMENT_LOOSE_PX) {
+        toEliminate = candidates.filter((c) => c.dist === maxDist);
+      }
+    }
+    if (toEliminate.length === 0) {
+      const maxDist = candidates.length
+        ? Math.max(...candidates.map((c) => c.dist))
+        : 0;
+      pushToast(`움직임 감지 — 식별 실패 (최대 ${maxDist.toFixed(0)}px)`);
+      return;
+    }
+
+    for (const { id } of toEliminate) {
+      const p = participants.value.find((x) => x.id === id);
+      if (!p) continue;
+      p.eliminated = true;
+      if (p.reached) p.reached = false;
+    }
+    const names = toEliminate.map((m) => m.name).join(', ');
+    pushToast(`${names} 어린이 탈락했습니다`);
+    void tts.speak(`${names} 어린이 탈락했습니다`).catch(() => { /* noop */ });
+    setStage('eliminationWait');
+  } finally {
+    moverProbeInflight = false;
+  }
+}
+
+function startMotionDetection(): void {
+  stopMotionDetection();
+  // baseline 즉시 캡처. 비디오 readyState 가 아직 낮을 수 있으니 첫 tick 에서 재시도.
+  motionBaseline = captureMotionFrame();
+  motionDetected.value = false;
+  // 등록 아이들의 bbox 중심 baseline — tracker 캐시에서 즉시 동기로 채움.
+  captureObservationBaseline();
+  motionTimer = window.setInterval(() => {
+    if (stage.value !== 'observation') return;
+    if (!motionBaseline) {
+      motionBaseline = captureMotionFrame();
+      return;
+    }
+    const cur = captureMotionFrame();
+    if (!cur) return;
+    const diff = frameDiffNormalized(motionBaseline, cur);
+    if (diff > MOTION_THRESHOLD) {
+      motionDetected.value = true;
+      const now = performance.now();
+      if (now - lastMotionAnnouncementAt > MOTION_TTS_COOLDOWN_MS) {
+        lastMotionAnnouncementAt = now;
+        // tracker bbox + identity cache 로 누가 움직였는지 식별 → 자동 탈락 + 전이 시도.
+        // 식별 실패하면 카메라 flash 만 남고 교사가 직접 ✕ 로 처리.
+        probeMoversAndMaybeEliminate();
+      }
+    } else {
+      motionDetected.value = false;
+    }
+  }, MOTION_TICK_MS);
+}
+
+function stopMotionDetection(): void {
+  if (motionTimer !== null) {
+    window.clearInterval(motionTimer);
+    motionTimer = null;
+  }
+  motionBaseline = null;
+  motionDetected.value = false;
+  observationBasePositions.clear();
+  moverProbeInflight = false;
+}
+
+watch(stage, (s, prev) => {
+  if (s === 'observation') startMotionDetection();
+  else if (prev === 'observation') stopMotionDetection();
+});
 
 const observationLike = computed(
   () => stage.value === 'observation' || stage.value === 'eliminationWait',
@@ -693,8 +1041,6 @@ function countEliminated(): number {
 
 function startObservationCountdown(): void {
   stopObservationCountdown();
-  // 실물 팔: 떼기(reverse) 재생 (realActive 일 때만, 고정 속도).
-  void playArmMotion(true);
   observationEliminatedBefore = countEliminated();
   observationDur = OBS_DURATION_MIN_MS + Math.random() * (OBS_DURATION_MAX_MS - OBS_DURATION_MIN_MS);
   observationEndAt = performance.now() + observationDur;
@@ -726,32 +1072,77 @@ watch(stage, (s, prev) => {
   else if (prev === 'observation') stopObservationCountdown();
 });
 
-// ---- 탈락 대기 — 탈락 확인 후 교사가 직접 ✕ 또는 다음 라운드로 이동 --------
-// 브라우저 face-tracking 이 제거되어 "탈락자가 시야 밖으로 나갔는지" 를 자동 판단할 수
-// 없다. 탈락 대기는 교사가 드로어의 DEV 패널이나 setStage 로 수동 전환하거나,
-// 4초 후 자동으로 노래 단계로 복귀한다.
-const ELIM_WAIT_AUTO_RESUME_MS = 4000;
+// ---- 탈락 대기 — 탈락한 친구가 시야 밖으로 나가면 자동으로 노래 단계 재개 -------
+// 식별 (recognize) 은 자세·조명·거리 영향으로 같은 사람을 잠깐 놓치기도 한다. 그래서
+// "탈락 ID 가 안 보임" 한 신호만으로 advance 하면, 실제 탈락자가 여전히 화면에 있어도
+// 가끔 게임이 재개되는 false negative 가 발생. 이를 보완하기 위해 신호를 두 개 OR:
+//   (a) 매칭된 face 중 eliminationWaitIds 에 포함된 ID 가 발견됨 (강한 신호)
+//   (b) detect 된 총 face 개수가 남아있어야 할 인원 (registered AND !eliminated) 을
+//       초과 → 식별 실패하더라도 추가 사람이 화면에 있음 (= 탈락자 미퇴장)
+// 또한 연속 absent 카운트를 2→3 으로 늘려 통계적 안정성 확보.
+const ELIM_WAIT_POLL_MS = 1500;
+const ELIM_WAIT_REQUIRED_ABSENT_CHECKS = 3;
+const eliminationWaitIds = new Set<number>();
 let eliminationWaitTimer: number | null = null;
+let elimAbsentStreak = 0;
 
-function startEliminationWait(): void {
-  stopEliminationWait();
-  const hasPending = participants.value.some((p) => p.registered && p.eliminated);
-  if (!hasPending) {
+function eliminationWaitTick(): void {
+  if (stage.value !== 'eliminationWait') return;
+  if (eliminationWaitIds.size === 0) {
+    // 안전망 — 새로 탈락한 아이가 없는 상태로 진입했으면 즉시 노래로 복귀
     setStage('song');
     return;
   }
+  // tracker + identity cache 로 탈락자의 잔존 여부 판단. recognize 호출 없이 매 tick 즉시.
+  const totalFacesDetected = latestTracks.length;
+  const presentIds = new Set<number>();
+  for (const t of latestTracks) {
+    const cid = identityCache.getChildId(t.trackId);
+    if (cid != null) presentIds.add(cid);
+  }
+  const matchedEliminatedVisible = Array.from(eliminationWaitIds).some(
+    (id) => presentIds.has(id),
+  );
+  // 화면에 남아있어야 정상인 인원 — 등록됐고 탈락 안 한 아이들.
+  const expectedRemaining = participants.value.filter(
+    (p) => p.registered && !p.eliminated,
+  ).length;
+  const tooManyFaces = totalFacesDetected > expectedRemaining;
+  const stillVisible = matchedEliminatedVisible || tooManyFaces;
+  if (stillVisible) {
+    elimAbsentStreak = 0;
+  } else {
+    elimAbsentStreak += 1;
+    if (elimAbsentStreak >= ELIM_WAIT_REQUIRED_ABSENT_CHECKS) {
+      // 모든 탈락자가 시야 밖 (식별 + face count 둘 다 만족) → 게임 계속
+      setStage('song');
+    }
+  }
+}
+
+function startEliminationWait(): void {
+  stopEliminationWait();
+  eliminationWaitIds.clear();
+  for (const p of participants.value) {
+    if (p.registered && p.eliminated) eliminationWaitIds.add(p.id);
+  }
+  if (eliminationWaitIds.size === 0) {
+    // 탈락 대기로 들어왔지만 사실 탈락자가 없는 케이스 — 곧장 노래 복귀
+    setStage('song');
+    return;
+  }
+  elimAbsentStreak = 0;
   pushToast('탈락한 친구는 자리에서 벗어나주세요');
-  eliminationWaitTimer = window.setTimeout(() => {
-    eliminationWaitTimer = null;
-    if (stage.value === 'eliminationWait') setStage('song');
-  }, ELIM_WAIT_AUTO_RESUME_MS);
+  eliminationWaitTimer = window.setInterval(eliminationWaitTick, ELIM_WAIT_POLL_MS);
 }
 
 function stopEliminationWait(): void {
   if (eliminationWaitTimer !== null) {
-    window.clearTimeout(eliminationWaitTimer);
+    window.clearInterval(eliminationWaitTimer);
     eliminationWaitTimer = null;
   }
+  eliminationWaitIds.clear();
+  elimAbsentStreak = 0;
 }
 
 watch(stage, (s, prev) => {
@@ -762,7 +1153,7 @@ watch(stage, (s, prev) => {
 // 단계별 viewer 입력:
 //   entry / ready / end / eliminationWait — rest snapshot (자연 하강 자세). follower WS
 //     가 잔존 pose 를 들고 있어도 명시적으로 zero pose 로 덮어쓴다.
-//   song — 가리기 1회 보간 후 가리기 자세 유지 (startSongStage 의 coverTimer)
+//   song — 음악 진행률에 lock 된 모션 보간 (songTick 에서 갱신)
 //   observation — 노래 끝 자세 (가리기) 에서 정지 (update 안 함)
 watch(stage, (s) => {
   if (s === 'entry' || s === 'ready' || s === 'end' || s === 'eliminationWait') {
@@ -780,16 +1171,10 @@ onMounted(() => {
   void loadMotion();
   // 첫 mount 단계가 entry 면 stage watch 가 한 번 안 돌므로 직접 rest pose 적용.
   armSnapshot.value = makeRestSnapshot();
-  // perception WS 연결 + emotion capture 를 PIP canvas 스트림에 연결.
-  perception.connect();
-  const stream = perception.captureStream(5);
-  if (stream && emotionVideoRef.value) {
-    emotionVideoRef.value.srcObject = stream;
-    void emotionVideoRef.value.play();
-    // TODO: captureStream 이 canvas 에 첫 프레임이 그려지기 전에 호출되면 감정 캡처
-    // 추론 루프가 빈 프레임을 볼 수 있다. 실 운용 시 timing 을 확인할 것.
-    emotionCapture.attach(emotionVideoRef.value);
-  }
+  void setupCamera();
+  navigator.mediaDevices.addEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+  // 첫 mount 가 entry 면 stage watch 가 한 번 안 돌므로 detector loop 직접 시작.
+  if (stage.value === 'entry') startDetectorLoop();
 });
 
 // STT prompt hint — stage 별 expected 단어들.
@@ -811,14 +1196,14 @@ watch(
 
 onUnmounted(() => {
   voice.setSttHints([]);
-  // 어떤 경로로 나가든(종료·대기·언마운트) 실물 팔을 제자리로 복귀 — stateWs.stop() 전에 호출.
-  void returnArmHome();
   stopSongStage();
   if (songAudio) {
     try { songAudio.pause(); } catch { /* noop */ }
     songAudio.src = '';
     songAudio = null;
   }
+  stopDetectorLoop();
+  stopMotionDetection();
   stopObservationCountdown();
   stopEliminationWait();
   stopReadyCountdown();
@@ -826,8 +1211,12 @@ onUnmounted(() => {
     try { void audioContext.close(); } catch { /* noop */ }
     audioContext = null;
   }
-  emotionCapture.detach();
-  // perception WS 는 useMugunghwaPerception 의 onUnmounted 훅이 disconnect() 를 호출.
+  navigator.mediaDevices.removeEventListener('devicechange', scheduleListCamerasOnDeviceChange);
+  if (deviceChangeDebounce !== null) {
+    window.clearTimeout(deviceChangeDebounce);
+    deviceChangeDebounce = null;
+  }
+  teardownCamera();
   stateWs.stop();
 });
 </script>
@@ -871,20 +1260,38 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <div class="camera-picker" @click.stop>
+              <select
+                v-model="selectedDeviceId"
+                :disabled="!hasCameras"
+                class="camera-picker__select"
+                aria-label="카메라 선택"
+                @change="onCameraChange"
+              >
+                <option v-if="!hasCameras" disabled value="">— 카메라 없음 —</option>
+                <option v-for="c in cameras" :key="c.deviceId" :value="c.deviceId">
+                  {{ c.label || `카메라 ${c.deviceId.slice(0, 8)}…` }}
+                </option>
+              </select>
+              <button
+                type="button"
+                class="camera-picker__rescan"
+                aria-label="카메라 다시 스캔"
+                title="카메라 다시 스캔"
+                @click="rescanCameras"
+              >↻</button>
+            </div>
 
             <button type="button" class="btn-icon close-btn" aria-label="닫기" @click="close">×</button>
           </header>
 
           <!-- 메인: 카메라가 중앙을 채움. 게임 단계별 오버레이는 카메라 위에 렌더링. -->
           <main class="main-area">
-            <div class="arm-wrap" :class="{ 'motion-flash': motionFlash }">
-              <!-- PIP canvas — JPEG 프레임이 perception composable 에 의해 그려진다 -->
-              <canvas
-                :ref="(el) => (perception.pipCanvas.value = el as HTMLCanvasElement | null)"
-                class="center-cam"
-              />
-              <!-- 감정 캡처용 hidden video — PIP canvas stream 을 srcObject 로 사용 -->
-              <video ref="emotionVideoRef" class="emotion-hidden" muted playsinline />
+            <div class="arm-wrap" :class="{ 'motion-flash': motionDetected }">
+              <!-- 카메라 비디오 — 중앙 전체 채움 -->
+              <video ref="videoRef" class="center-cam" muted playsinline />
+              <div v-if="!cameraReady && !cameraError" class="cam-overlay">카메라 준비 중…</div>
+              <div v-if="cameraError" class="cam-overlay err">⚠ {{ cameraError }}</div>
 
               <!-- 셔터 플래시 -->
               <div
@@ -902,7 +1309,7 @@ onUnmounted(() => {
               </div>
               <!-- 라이브 HUD -->
               <div
-                v-if="captureArmed && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
+                v-if="captureArmed && cameraReady && emotionCapture.ready.value && !emotionCapture.inCaptureCooldown.value"
                 class="cam-live-hud"
                 :class="{ 'has-face': emotionCapture.faceDetected.value }"
               >
@@ -920,13 +1327,16 @@ onUnmounted(() => {
               <!-- 참가자 확인 단계 하단 컨트롤 -->
               <footer v-if="stage === 'entry'" class="cam-stage-foot">
                 <div class="entry-info">
-                  <div class="entry-line">참가자 확인 중</div>
+                  <div class="entry-line">
+                    참가자 확인 중
+                    <span v-if="recognitionActive" class="reco-dot" title="얼굴 인식 중" />
+                  </div>
                   <div class="entry-sub">
-                    로봇 카메라가 인식한 친구는 자동으로 등록돼요.
+                    카메라에 보이는 친구는 자동으로 등록돼요.
                     <strong>{{ registeredCount }}</strong> / {{ participants.length }} 명 등록됨
                   </div>
                 </div>
-                <button type="button" class="btn-start" :disabled="registeredCount === 0" @click="startEntryGame">시작</button>
+                <button type="button" class="btn-start" @click="setStage('ready')">시작</button>
               </footer>
 
               <!-- 준비 단계 하단 컨트롤 -->
@@ -941,6 +1351,10 @@ onUnmounted(() => {
               </footer>
 
               <div v-if="stage === 'song'" class="arm-overlay">
+                <div class="tempo-badge" :class="`tempo-${tempoPattern}`">
+                  <span class="tempo-name">{{ TEMPO_LABEL[tempoPattern] }}</span>
+                  <span class="tempo-rate">{{ currentRate.toFixed(2) }}×</span>
+                </div>
                 <div class="song-bar" role="progressbar" aria-label="노래 진행">
                   <div class="song-fill" :style="{ width: `${songProgressPct}%` }" />
                 </div>
@@ -1222,8 +1636,8 @@ onUnmounted(() => {
 /* ---------------- top bar ---------------- */
 .top-bar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  /* [hamburger] [stage] [close] */
+  grid-template-columns: auto 1fr auto auto;
+  /* [hamburger] [stage] [camera-picker] [close] */
   align-items: center;
   gap: 16px;
   padding: 14px 20px;
@@ -1314,23 +1728,49 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
+.camera-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.camera-picker__select {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 11px;
+  font-family: inherit;
+  background: white;
+  color: #1f3a4d;
+  cursor: pointer;
+}
+.camera-picker__select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.camera-picker__rescan {
+  flex-shrink: 0;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  color: #5b7a8c;
+}
+.camera-picker__rescan:hover { background: #f1f5f9; }
 
-/* 중앙 카메라 (PIP canvas) */
+/* 중앙 카메라 */
 .center-cam {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: scaleX(-1);
   display: block;
-}
-/* 감정 캡처용 hidden video — PIP canvas 스트림의 화면 외 처리용 */
-.emotion-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 .arm-wrap.motion-flash {
   animation: motion-flash 0.55s ease-in-out infinite;
@@ -1422,6 +1862,49 @@ onUnmounted(() => {
     box-shadow: 0 0 0 12px rgba(220, 38, 38, 0), 0 4px 14px rgba(220, 38, 38, 0.5);
   }
 }
+.camera-pip video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.cam-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px;
+}
+.cam-overlay.err { color: #fecaca; background: rgba(127, 29, 29, 0.85); }
+.cam-badge {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.rec-dot {
+  width: 6px;
+  height: 6px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: rec-blink 1s ease-in-out infinite;
+}
+@keyframes rec-blink { 50% { opacity: 0.25; } }
+
 /* ---------------- main area ---------------- */
 .main-area {
   display: grid;
@@ -2160,6 +2643,19 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.reco-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: reco-pulse 1.4s ease-out infinite;
+}
+@keyframes reco-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+  70%  { box-shadow: 0 0 0 8px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
 }
 .entry-sub {
   margin-top: 2px;
