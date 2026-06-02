@@ -12,81 +12,349 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#5BB6FF;
+    --accentSoft:rgba(91,182,255,.16);
+    --topbar-h:64px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0}
+  html,body{margin:0; padding:0; height:100%;}
   body{
     background:var(--bg); color:var(--ink);
     font-family:'Pretendard Variable',system-ui,sans-serif;
-    opacity:0; transition:opacity .3s ease; min-height:100vh;
+    opacity:0; transition:opacity .3s ease;
+    overflow-x:hidden;
+    overflow-y:scroll;
+    scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+
+  /* 상단 고정 바 — 뒤로가기 버튼 + 섹션 뱃지 */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    min-height:var(--topbar-h);
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+    padding:10px 22px;
+    background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    flex:0 0 auto;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
-    padding:8px 16px; border-radius:999px; cursor:pointer;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
+    padding:7px 14px; border-radius:999px; cursor:pointer;
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accentSoft); border:1px solid rgba(91,182,255,.55);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
+    padding:6px 11px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s, border-color .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(91,182,255,.32); border-color:var(--accent)}
+  .sec-nav a.active{background:linear-gradient(135deg,var(--accent),#7FE0B8); color:#16131F; border-color:transparent}
+  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a.active .n{color:#16131F}
+
+  /* 슬라이드 — 한 항목 = 한 화면 가득 (PPT 스타일) */
+  .slide{
+    min-height:100vh; height:100vh;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--topbar-h) + 22px) 3vw 30px;
+    overflow:hidden;
+  }
+  /* 부드러운 카드 프레임 — 한 슬라이드라는 시각적 단서 */
+  .inner{
+    width:100%; max-width:1700px; height:100%;
+    display:flex; flex-direction:column; justify-content:center;
+    overflow:auto;
+    padding:46px 58px;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(91,182,255,.06), transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:28px;
+    box-shadow:0 28px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(91,182,255,.04) inset;
+  }
+  .slide-no{
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:17px;
+    letter-spacing:.2em; margin:0 0 10px;
+  }
+  .slide h2{
+    font-family:'Jua',sans-serif; font-size:48px; margin:0 0 28px;
+    display:flex; align-items:center; gap:20px;
+  }
+  .secnum{
+    flex:0 0 auto; width:68px; height:68px; border-radius:18px;
+    background:linear-gradient(135deg,var(--accent),#7FE0B8); color:#16131F;
+    font-family:'Jua',sans-serif; font-size:32px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  h3{font-family:'Jua',sans-serif; font-size:26px; color:#7FE0B8; margin:22px 0 10px}
+  h3:first-child{margin-top:0}
+  p{line-height:1.7; font-size:21px; margin:8px 0; color:var(--ink)}
+  ul{margin:8px 0 12px; padding-left:28px}
+  li{line-height:1.7; font-size:21px; margin:8px 0; color:var(--ink)}
+  b{color:#fff}
+  .lead{font-size:23px; line-height:1.7; margin:0 0 18px}
+  .lead b{color:var(--accent)}
+
+  .chip{display:inline-block; background:rgba(255,255,255,.05); color:var(--inkSoft);
+    border:1px solid var(--border); border-radius:999px; padding:6px 18px; font-size:18px; margin:5px 6px 0 0}
+  .pill{display:inline-block; background:var(--accentSoft); color:var(--accent);
+    border-radius:8px; padding:2px 14px; font-weight:700; font-size:21px}
+  code{background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:8px; padding:3px 10px; font-size:.92em; color:#BFE3FF}
+
+  /* 개요(hero) */
+  .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px}
+  .hero .kicker{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:20px}
+  .hero h1{
+    font-family:'Jua',sans-serif; font-size:104px; margin:14px 0 8px; line-height:1.1;
+    background:linear-gradient(90deg,var(--accent),#7FE0B8);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero .sub{color:var(--inkSoft); font-size:24px; margin:0 0 40px}
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; width:100%; max-width:1300px}
+  @media (max-width:760px){ .metrics{grid-template-columns:repeat(2,1fr)} }
+  .metric{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:30px 22px}
+  .metric .num{font-family:'Jua',sans-serif; font-size:46px; line-height:1;
+    background:linear-gradient(90deg,var(--accent),#7FE0B8);
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .metric .lab{color:var(--inkSoft); font-size:18px; margin-top:12px}
+
+  /* 2단 split */
+  .split{display:grid; grid-template-columns:1.1fr 1fr; gap:42px; align-items:center; flex:1; min-height:0}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+  figure{margin:0; text-align:center}
+  figure img{
+    max-width:100%; max-height:62vh; display:block; margin:0 auto;
+    border-radius:18px; border:1px solid var(--border); object-fit:contain;
+    box-shadow:0 18px 50px rgba(0,0,0,.5);
+  }
+  figcaption{color:var(--inkSoft); font-size:17px; margin-top:14px; line-height:1.55}
+
+  /* 갤러리 (2장 나란히) */
+  .gallery{display:grid; grid-template-columns:1fr 1fr; gap:32px; flex:1; min-height:0; align-items:center}
+  @media (max-width:760px){ .gallery{grid-template-columns:1fr} }
+
+  /* 흐름 step */
+  .flow{list-style:none; padding-left:6px; margin:8px 0}
+  .flow li{position:relative; padding:18px 0 18px 38px; border-left:3px solid var(--border); margin-left:6px; font-size:22px; line-height:1.65}
+  .flow li::before{content:""; position:absolute; left:-10px; top:26px; width:18px; height:18px; border-radius:50%;
+    background:var(--accent); border:3px solid var(--surface)}
+  .flow b{color:var(--accent)}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:20px}
+  th,td{border:1px solid var(--border); padding:14px 18px; text-align:left; vertical-align:top}
+  th{background:rgba(255,255,255,.05); color:var(--accent); font-family:'Jua',sans-serif; font-weight:400; white-space:nowrap}
+  td b{color:#fff}
+
+  /* callout */
+  .callout{
+    display:flex; gap:16px; align-items:flex-start;
+    background:rgba(91,182,255,.08); border:1px solid rgba(91,182,255,.30);
+    border-left:4px solid var(--accent); border-radius:14px;
+    padding:18px 22px; margin:16px 0;
+  }
+  .callout .material-icons-round{color:var(--accent); font-size:30px; margin-top:2px}
+  .callout p{margin:0; line-height:1.65; font-size:20px}
+  .callout b{color:var(--accent)}
+
+  /* 자랑 grid */
+  .braggrid{display:grid; grid-template-columns:1fr 1fr; gap:0 44px}
+  @media (max-width:760px){ .braggrid{grid-template-columns:1fr} }
+  .brag{border-bottom:1px dashed var(--border); padding:18px 0}
+  .brag .bt{font-family:'Jua',sans-serif; color:#fff; font-size:21px}
+  .brag .bd{font-size:17px; color:var(--inkSoft); margin-top:6px; line-height:1.55}
+
+  .hint{
+    position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
+    color:var(--inkSoft); font-size:12px;
+    background:rgba(36,31,51,.85); border:1px solid var(--border); border-radius:999px;
+    padding:6px 14px;
+  }
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
-
-  <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 10</p>
-    <h1 class="jua">OX 퀴즈</h1>
-    <p class="member">담당 · 이지수</p>
-
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">quiz</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>이지수 님이 작성할 <b style="color:var(--ink)">OX 퀴즈</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+  <!-- 상단 바 -->
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav" id="secNav">
+      <a href="#overview">개요</a>
+      <a href="#sec-01"><span class="n">01</span> 흐름</a>
+      <a href="#sec-02"><span class="n">02</span> 사용 기술</a>
+      <a href="#sec-03"><span class="n">03</span> 인식 화면</a>
+      <a href="#sec-04"><span class="n">04</span> 제어 구조</a>
+      <a href="#sec-brag">자랑</a>
+    </nav>
   </div>
+
+  <!-- 개요 -->
+  <section class="slide" id="overview">
+    <div class="inner">
+      <div class="hero">
+        <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
+        <h1>OX 퀴즈</h1>
+        <div class="sub">교실 책상 위 로봇팔이 아이와 O/X 퀴즈를 하는 책상친구 게임 · 담당 이지수</div>
+        <div class="metrics">
+          <div class="metric"><div class="num">OMX-F</div><div class="lab">교실 비치 로봇팔</div></div>
+          <div class="metric"><div class="num">3문제</div><div class="lab">한 라운드 구성</div></div>
+          <div class="metric"><div class="num">터치리스</div><div class="lab">손동작 기반 입력</div></div>
+          <div class="metric"><div class="num">YOLO+Hands</div><div class="lab">보드·손 인식</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 흐름 -->
+  <section class="slide" id="sec-01">
+    <div class="inner">
+      <p class="slide-no">01 / 05</p>
+      <h2><span class="secnum">1</span> 게임 흐름</h2>
+      <p class="lead">
+        한 라운드는 <b>3문제</b>. 아이가 답하면 <b>로봇팔이 정답 쪽을 가리켜</b> 알려줍니다.
+        게임 내내 표정을 자동 촬영해 하원 알림장에 "OX 퀴즈 활동"으로 기록합니다.
+      </p>
+      <ul class="flow">
+        <li><b>음성 시작</b> — "OX 퀴즈 하자" → STT → 의도(intent) 분류 → 모드 진입</li>
+        <li><b>출제</b> — 3문제 랜덤 출제 + TTS로 읽어주기</li>
+        <li><b>응답</b> — 아이가 답 (① O/X 버튼 클릭 &nbsp;② 손을 영역 위 1.5초 유지)</li>
+        <li><b>정답 지시</b> — 로봇팔이 정답 쪽을 가리킴 (두구두구 효과음)</li>
+        <li><b>공개</b> — 정답 / 해설 / 점수 공개 → 다음 문제</li>
+        <li><b>마무리</b> — 최종 점수 + 오늘 찍힌 표정 사진 N장</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 02 사용 기술 -->
+  <section class="slide" id="sec-02">
+    <div class="inner">
+      <p class="slide-no">02 / 05</p>
+      <h2><span class="secnum">2</span> 사용한 기술</h2>
+      <table>
+        <tr><th>로봇 제어</th><td>ROS2, OMX-F 로봇팔, 사전 녹화 트래젝토리 재생(lerobot), rule-based 정책</td></tr>
+        <tr><th>비전</th><td>YOLO-World(보드 O/X 영역 검출) + MediaPipe Hands(손끝 추적)</td></tr>
+        <tr><th>표정 인식</th><td>face-api (happy / sad 감지 후 자동 촬영)</td></tr>
+        <tr><th>음성</th><td>Whisper STT(키워드 바이어싱) + TTS</td></tr>
+        <tr><th>백엔드</th><td>FastAPI, WebSocket(비전), SSE(관절 상태 스트리밍), LLM 리포트</td></tr>
+        <tr><th>프론트</th><td>Vue 3, Three.js(URDF 시뮬레이터 뷰어), Pinia</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- 03 인식 화면 -->
+  <section class="slide" id="sec-03">
+    <div class="inner">
+      <p class="slide-no">03 / 05</p>
+      <h2><span class="secnum">3</span> 보드·손 인식 화면 (YOLO + MediaPipe)</h2>
+      <div class="gallery">
+        <figure>
+          <img src="https://images.prismic.io/block/ah6SSgeQX7-eWh5Y_ox-vision-board.png?auto=format,compress" alt="O/X 영역 구분 화면">
+          <figcaption>O / X 영역 구분 — 보드를 검출해 색으로 나눔<br>(파란 면 = O, 빨간 면 = X)</figcaption>
+        </figure>
+        <figure>
+          <img src="https://images.prismic.io/block/ah6STAeQX7-eWh5b_ox-vision-lockin.png?auto=format,compress" alt="손 검출 화면">
+          <figcaption>손 검출 — 손가락 끝을 추적해 어느 영역 위에 있는지 판단<br>(락인 진행 링)</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 제어 구조 -->
+  <section class="slide" id="sec-04">
+    <div class="inner">
+      <p class="slide-no">04 / 05</p>
+      <h2><span class="secnum">4</span> 팔·그리퍼 제어 구조</h2>
+      <p class="lead">
+        OMX-F는 ROS에서 컨트롤러가 <b>둘로 분리</b>돼 있어, 녹화된 6축(5축 + 그리퍼) 데이터를
+        실물 재생할 때 채널을 나눠 보냅니다.
+      </p>
+      <table>
+        <thead><tr><th>부위</th><th>컨트롤러</th><th>명령 받는 방식</th></tr></thead>
+        <tbody>
+          <tr><td><b>팔 5축</b><br>(joint1~5)</td><td>arm_controller<br>(JointTrajectoryController)</td><td><code>/arm_controller/joint_trajectory</code> 토픽</td></tr>
+          <tr><td><b>그리퍼</b><br>(gripper_joint_1)</td><td>gripper_controller<br>(GripperActionController)</td><td><code>/gripper_controller/gripper_cmd</code> 액션</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <span class="material-icons-round">verified_user</span>
+        <p><b>그리퍼 안전 제어:</b> 학습된 동작(open → close → open)을 그대로 재생하되,
+           모터 최대 토크를 <b>max_effort = 5.0</b>으로 제한 → 무언가에 닿아도 손가락이 끼거나
+           모터가 무리하게 힘주는 것을 방지합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 자랑 -->
+  <section class="slide" id="sec-brag">
+    <div class="inner">
+      <p class="slide-no">자랑</p>
+      <h2><span class="secnum"><span class="material-icons-round" style="font-size:36px">star</span></span> 자랑하고 싶은 점</h2>
+      <div class="braggrid">
+        <div class="brag"><div class="bt">터치리스 인터랙션</div><div class="bd">손동작만으로 답하는 비전 기반 입력 — 연령 친화적.</div></div>
+        <div class="brag"><div class="bt">실물·시뮬 자동 전환</div><div class="bd">코드 수정 없이 환경에 맞춰 동작.</div></div>
+        <div class="brag"><div class="bt">자연스러운 표정 사진</div><div class="bd">게임 중 웃는 순간을 자동 포착해 하원 알림장에 자동 연동.</div></div>
+        <div class="brag"><div class="bt">체감 지연 0</div><div class="bd">로봇 동작 길이를 예측해 답 공개 타이밍을 최적화.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint">탭 클릭 · ↑ ↓ 방향키 · 휠 스크롤로 슬라이드 이동</div>
 
   <script>
     requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+
     function backToQna() {
       var ov = document.getElementById('page-fade');
       ov.style.opacity = '1';
       setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
     }
+
+    // 현재 슬라이드 nav 하이라이트
+    var slides = Array.from(document.querySelectorAll('.slide'));
+    var links  = Array.from(document.querySelectorAll('#secNav a'));
+    var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = byId(en.target.id);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { threshold: 0.55 });
+    slides.forEach(function(s){ obs.observe(s); });
+
+    // 방향키 ↑↓ 로 슬라이드 이동
+    var current = function(){
+      var top = window.scrollY + window.innerHeight * 0.5;
+      for (var i = 0; i < slides.length; i++) {
+        var r = slides[i].getBoundingClientRect();
+        var y = r.top + window.scrollY;
+        if (top >= y && top < y + slides[i].offsetHeight) return i;
+      }
+      return 0;
+    };
+    var go = function(i){
+      var n = Math.max(0, Math.min(slides.length - 1, i));
+      slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); go(current() + 1); }
+      if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); go(current() - 1); }
+    });
   </script>
 </body>
 </html>

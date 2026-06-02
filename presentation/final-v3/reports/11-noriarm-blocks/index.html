@@ -12,81 +12,484 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#B98CFF;
+    --accentSoft:rgba(185,140,255,.16);
+    --topbar-h:64px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0}
+  html,body{margin:0; padding:0; height:100%;}
   body{
     background:var(--bg); color:var(--ink);
     font-family:'Pretendard Variable',system-ui,sans-serif;
-    opacity:0; transition:opacity .3s ease; min-height:100vh;
+    opacity:0; transition:opacity .3s ease;
+    overflow-x:hidden;
+    overflow-y:scroll;
+    scroll-snap-type:y mandatory;
+    scroll-behavior:smooth;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+
+  /* 상단 고정 바 — 뒤로가기 버튼 + 섹션 뱃지 */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    min-height:var(--topbar-h);
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+    padding:10px 22px;
+    background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    flex:0 0 auto;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
-    padding:8px 16px; border-radius:999px; cursor:pointer;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
+    padding:7px 14px; border-radius:999px; cursor:pointer;
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accentSoft); border:1px solid rgba(185,140,255,.55);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
+    padding:6px 11px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s, border-color .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(185,140,255,.32); border-color:var(--accent)}
+  .sec-nav a.active{background:linear-gradient(135deg,var(--accent),#7FE0B8); color:#16131F; border-color:transparent}
+  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a.active .n{color:#16131F}
+
+  /* 슬라이드 — 한 항목 = 한 화면 가득 (PPT 스타일) */
+  .slide{
+    min-height:100vh; height:100vh;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--topbar-h) + 22px) 3vw 30px;
+    overflow:hidden;
+  }
+  /* 부드러운 카드 프레임 — 한 슬라이드라는 시각적 단서 */
+  .inner{
+    width:100%; max-width:1700px; height:100%;
+    display:flex; flex-direction:column; justify-content:center;
+    overflow:auto;
+    padding:46px 58px;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(185,140,255,.06), transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:28px;
+    box-shadow:0 28px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(185,140,255,.04) inset;
+  }
+  .slide-no{
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:17px;
+    letter-spacing:.2em; margin:0 0 10px;
+  }
+  .slide h2{
+    font-family:'Jua',sans-serif; font-size:48px; margin:0 0 28px;
+    display:flex; align-items:center; gap:20px;
+  }
+  .secnum{
+    flex:0 0 auto; width:68px; height:68px; border-radius:18px;
+    background:linear-gradient(135deg,var(--accent),#7FE0B8); color:#16131F;
+    font-family:'Jua',sans-serif; font-size:32px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  h3{font-family:'Jua',sans-serif; font-size:26px; color:#7FE0B8; margin:22px 0 10px}
+  h3:first-child{margin-top:0}
+  p{line-height:1.7; font-size:21px; margin:8px 0; color:var(--ink)}
+  ul{margin:8px 0 12px; padding-left:28px}
+  li{line-height:1.7; font-size:21px; margin:8px 0; color:var(--ink)}
+  b{color:#fff}
+  .lead{font-size:23px; line-height:1.7; margin:0 0 18px}
+  .lead b{color:var(--accent)}
+
+  .chip{display:inline-block; background:rgba(255,255,255,.05); color:var(--inkSoft);
+    border:1px solid var(--border); border-radius:999px; padding:6px 18px; font-size:18px; margin:5px 6px 0 0}
+  .pill{display:inline-block; background:var(--accentSoft); color:var(--accent);
+    border-radius:8px; padding:2px 14px; font-weight:700; font-size:21px}
+
+  /* 개요(hero) */
+  .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px}
+  .hero .kicker{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:20px}
+  .hero h1{
+    font-family:'Jua',sans-serif; font-size:104px; margin:14px 0 8px; line-height:1.1;
+    background:linear-gradient(90deg,var(--accent),#7FE0B8);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero .sub{color:var(--inkSoft); font-size:24px; margin:0 0 40px}
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; width:100%; max-width:1300px}
+  @media (max-width:760px){ .metrics{grid-template-columns:repeat(2,1fr)} }
+  .metric{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:30px 22px}
+  .metric .num{font-family:'Jua',sans-serif; font-size:46px; color:var(--accent); line-height:1;
+    background:linear-gradient(90deg,var(--accent),#7FE0B8);
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .metric .lab{color:var(--inkSoft); font-size:18px; margin-top:12px}
+
+  /* 2단 split */
+  .split{display:grid; grid-template-columns:1.1fr 1fr; gap:42px; align-items:center; flex:1; min-height:0}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+  .figcol{display:flex; flex-direction:column; gap:16px}
+  figure{margin:0; text-align:center}
+  figure img{
+    max-width:100%; max-height:62vh; display:block; margin:0 auto;
+    border-radius:18px; border:1px solid var(--border); object-fit:contain;
+    box-shadow:0 18px 50px rgba(0,0,0,.5);
+  }
+  figcaption{color:var(--inkSoft); font-size:17px; margin-top:14px}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:20px}
+  th,td{border:1px solid var(--border); padding:14px 18px; text-align:center}
+  th{background:rgba(255,255,255,.05); color:var(--ink); font-family:'Jua',sans-serif; font-weight:400}
+  td b{color:var(--accent)}
+
+  /* callout (note) */
+  .callout{
+    display:flex; gap:16px; align-items:flex-start;
+    background:rgba(242,194,0,.08); border:1px solid rgba(242,194,0,.32);
+    border-left:4px solid #F2C200; border-radius:14px;
+    padding:18px 22px; margin:16px 0;
+  }
+  .callout .material-icons-round{color:#F2C200; font-size:30px; margin-top:2px}
+  .callout p{margin:0; line-height:1.65; font-size:20px}
+  .callout b{color:#F2C200}
+
+  /* timeline */
+  .timeline{list-style:none; padding-left:6px; margin:8px 0}
+  .timeline li{position:relative; padding:22px 0 22px 38px; border-left:3px solid var(--border); margin-left:6px; font-size:23px; line-height:1.65}
+  .timeline li::before{content:""; position:absolute; left:-10px; top:30px; width:18px; height:18px; border-radius:50%;
+    background:var(--accent); border:3px solid var(--surface)}
+  .timeline .date{font-family:'Jua',sans-serif; color:var(--accent); margin-right:12px}
+
+  /* tech grid */
+  .techgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+  @media (max-width:760px){ .techgrid{grid-template-columns:1fr 1fr} }
+  .t{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:16px; padding:22px 24px}
+  .t .name{font-family:'Jua',sans-serif; color:var(--accent); font-size:22px; margin-bottom:8px}
+  .t .desc{font-size:17px; color:var(--inkSoft); line-height:1.55}
+
+  /* problem-solution */
+  .psgrid{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media (max-width:760px){ .psgrid{grid-template-columns:1fr} }
+  .ps{border:1px solid var(--border); border-radius:16px; padding:22px 24px; background:rgba(255,255,255,.03)}
+  .ps .prob{color:#FF9A8B; font-family:'Jua',sans-serif; font-size:21px}
+  .ps .sol{color:#7FE0B8; font-family:'Jua',sans-serif; font-size:21px; margin-top:8px}
+  .ps p{font-size:18px; color:var(--inkSoft); margin:10px 0 0; line-height:1.55}
+
+  /* brag grid */
+  .braggrid{display:grid; grid-template-columns:1fr 1fr; gap:0 44px}
+  @media (max-width:760px){ .braggrid{grid-template-columns:1fr} }
+  .brag{border-bottom:1px dashed var(--border); padding:18px 0}
+  .brag .bt{font-family:'Jua',sans-serif; color:#fff; font-size:21px}
+  .brag .bd{font-size:17px; color:var(--inkSoft); margin-top:6px; line-height:1.55}
+
+  .hint{
+    position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
+    color:var(--inkSoft); font-size:12px;
+    background:rgba(36,31,51,.85); border:1px solid var(--border); border-radius:999px;
+    padding:6px 14px;
+  }
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
-
-  <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 11</p>
-    <h1 class="jua">블럭쌓기 게임</h1>
-    <p class="member">담당 · 이지수</p>
-
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">widgets</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>이지수 님이 작성할 <b style="color:var(--ink)">블럭쌓기 게임</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+  <!-- 상단 바 -->
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav" id="secNav">
+      <a href="#overview">개요</a>
+      <a href="#sec-01"><span class="n">01</span> 데이터셋</a>
+      <a href="#sec-02"><span class="n">02</span> 모방학습</a>
+      <a href="#sec-03"><span class="n">03</span> 학습 최적화</a>
+      <a href="#sec-04"><span class="n">04</span> 게임 진행</a>
+      <a href="#sec-05"><span class="n">05</span> 추론 양상</a>
+      <a href="#sec-06"><span class="n">06</span> 이슈 &amp; 변경</a>
+      <a href="#sec-07"><span class="n">07</span> UI 구성</a>
+      <a href="#sec-tech">사용 기술</a>
+      <a href="#sec-hard">어려웠던 점</a>
+      <a href="#sec-brag">자랑</a>
+    </nav>
   </div>
+
+  <!-- 개요 -->
+  <section class="slide" id="overview">
+    <div class="inner">
+      <div class="hero">
+        <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
+        <h1>블럭쌓기 게임</h1>
+        <div class="sub">사람과 로봇이 번갈아 블럭을 쌓는 모방학습 기반 상호작용 게임 · 담당 이지수</div>
+        <div class="metrics">
+          <div class="metric"><div class="num">ACT</div><div class="lab">최종 정책 모델</div></div>
+          <div class="metric"><div class="num">611 ep</div><div class="lab">총 에피소드 수</div></div>
+          <div class="metric"><div class="num">약 197만</div><div class="lab">누적 학습 스텝</div></div>
+          <div class="metric"><div class="num">ROI</div><div class="lab">환경 변화 대응</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 데이터셋 -->
+  <section class="slide" id="sec-01">
+    <div class="inner">
+      <p class="slide-no">01 / 10</p>
+      <h2><span class="secnum">1</span> 데이터셋 수집</h2>
+      <div class="split">
+        <div>
+          <h3>모델 정하기 — SmolVLA → ACT</h3>
+          <p>같은 조건으로 학습했을 때 SmolVLA가 ACT보다 성능이 떨어지고 학습 시간도
+             <b>3배</b>나 오래 걸려서 <b>ACT</b>로 결정했습니다.</p>
+          <h3>에피소드 구성</h3>
+          <p>사람과 로봇이 번갈아 큰 것부터 순서대로 쌓습니다.</p>
+          <p>
+            <span class="chip">① 사람 · 파랑</span>
+            <span class="chip">② 로봇 · 노랑</span>
+            <span class="chip">③ 사람 · 초록</span>
+            <span class="chip">④ 로봇 · 흰색</span>
+          </p>
+          <h3>데이터 구성과 보강</h3>
+          <p>초기엔 노란 100 · 흰 40 · 미동작 60개로 시작했고, 부족분을 추가 녹화·머지하고
+             <b>이어서 학습</b>해 <span class="pill">총 611개</span>를 구성했습니다 (약 500개는 직접 리드암 녹화).</p>
+        </div>
+        <figure>
+          <img src="https://images.prismic.io/block/ah6AxQeQX7-eWhvN_block_stacking_pickup_area.png?auto=format,compress"
+               alt="픽업 영역 확장 before/after">
+          <figcaption>좁은 영역에서만 집기 → 전체 영역에서 집기 가능으로 확장</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 모방학습 -->
+  <section class="slide" id="sec-02">
+    <div class="inner">
+      <p class="slide-no">02 / 10</p>
+      <h2><span class="secnum">2</span> 모방학습</h2>
+      <div class="split">
+        <div>
+          <p class="lead">
+            ACT 배치 16 · 30만 스텝을 기본으로, 안 되는 부분을 추가해 같은 조건으로
+            <b>이어서 누적 학습</b>했습니다. 한 번에 큰 스텝으로 돌리기보다 추론 양상을 보고
+            부족분을 보강해 이어 학습하는 방식이 더 효과적이었습니다.
+          </p>
+          <table>
+            <thead><tr><th>단계</th><th>배치</th><th>스텝</th><th>반복</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>4</td><td>30만</td><td>×1</td></tr>
+              <tr><td>2</td><td>16</td><td>30만</td><td>×4</td></tr>
+              <tr><td>3</td><td>32</td><td>27만</td><td>×1</td></tr>
+              <tr><td>4</td><td>32</td><td>20만</td><td>×1</td></tr>
+              <tr><td colspan="3"><b>총 누적 스텝</b></td><td><b>약 197만</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <figure>
+          <img src="https://images.prismic.io/block/ah6AxgeQX7-eWhvP_block_stacking_dataset.png?auto=format,compress"
+               alt="데이터셋 구성 차트">
+          <figcaption>초기 200 ep → 주차별 보강으로 611 ep 도달</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 학습 최적화 -->
+  <section class="slide" id="sec-03">
+    <div class="inner">
+      <p class="slide-no">03 / 10</p>
+      <h2><span class="secnum">3</span> 학습 최적화를 위해 도입한 추가 요소</h2>
+      <h3>카메라 설정</h3>
+      <p>자동 노출을 끄고, 색이 잘 잡히도록 밝기·대비·채도·감마·화이트밸런스를 직접 조정해 고정값으로 사용했습니다.</p>
+      <h3>블럭 집는 방법</h3>
+      <ul>
+        <li>집으러 갈 때부터 쌓을 때까지 <b>카메라 화면 정면</b>에 최대한 나오도록 했습니다.</li>
+        <li>홈포즈에서 올라갈 때 로봇팔을 <b>약 90도</b>로 올리는 동작을 고정했습니다.</li>
+        <li>블럭 각도가 틀어지면: 상단으로 <b>수직 이동</b> → <b>wrist 카메라</b> 가로축과 평행하게 그리퍼를 회전 정렬 → 하강해 잡습니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 04 게임 진행 -->
+  <section class="slide" id="sec-04">
+    <div class="inner">
+      <p class="slide-no">04 / 10</p>
+      <h2><span class="secnum">4</span> 게임 진행을 원활하게 하기 위한 추가 요소</h2>
+      <h3>중단 시 홈포즈 복귀로 위험 최소화</h3>
+      <p>중단 시 모터가 바로 꺼지면 위험하고 사람이 잡아줘야 했습니다. 유치원생을 고려해
+         중단 시 <b>3초간 천천히 홈포즈로 복귀한 후</b> 종료하도록 했습니다.
+         홈포즈는 시작 시 관절값으로 추출하고, 관절값 편차로 <b>사용자 차례</b>를 인식합니다.</p>
+      <h3>백그라운드 모델 사전 로딩</h3>
+      <p>세션 시작 시 HF 멀티스레딩 제한 + 백그라운드 캐싱을 적용하고, 가위바위보 카드 노출
+         (4 + 2.5초) 동안 모델 로드를 미리 호출해 게임 지연을 줄였습니다.</p>
+      <h3>실시간 오버레이 연동</h3>
+      <p>로봇 상태(가위바위보 / 추론 / 완료)와 전면 카메라 스트림을 웹 UI에 실시간으로 오버레이합니다.</p>
+    </div>
+  </section>
+
+  <!-- 05 추론 양상 -->
+  <section class="slide" id="sec-05">
+    <div class="inner">
+      <p class="slide-no">05 / 10</p>
+      <h2><span class="secnum">5</span> 추론 양상 변화</h2>
+      <ul class="timeline">
+        <li><span class="date">초반</span>특정 위치에서만 잡을 수 있었고, 파란 블럭 전에도 노란 블럭을 잡아버려서 — 사람이 파란 블럭을 먼저 놓은 뒤 추론을 돌려야 했습니다.</li>
+        <li><span class="date">5/21 ~</span>파란 블럭을 놓기 전에도 로봇이 움직이지 않고 잘 동작하게 되었습니다.</li>
+        <li><span class="date">5/28 ~</span>책상 각도 변경 등 환경 변화로 문제가 재발 → 재학습 대신 <b>ROI 방식</b>으로 해결했습니다 (최종 데모 영상).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 06 이슈 & 변경 -->
+  <section class="slide" id="sec-06">
+    <div class="inner">
+      <p class="slide-no">06 / 10</p>
+      <h2><span class="secnum">6</span> 과정 중 이슈 및 변경</h2>
+      <div class="split">
+        <div>
+          <h3>흰색 블럭 잡기 정확도 낮음</h3>
+          <p>추가 녹화·학습을 반복했습니다. 처음부터 큰 스텝으로 돌리기보다
+             <b>모델 양상을 보고 부족분을 이어 학습</b>하는 방식이 더 효과적이었습니다.</p>
+          <h3>사람 차례에 로봇이 계속 움직임</h3>
+          <p>"집어 놓기 : 안 움직이기"를 약 <b>7:3</b>으로 보강했습니다. 첫 턴은 계속 움직였으나,
+             비율 집착을 내려놓고 누적 학습하니 <b>빈 구역(첫 턴)도 정지</b>하게 되었습니다.</p>
+          <div class="callout">
+            <span class="material-icons-round">warning</span>
+            <p><b>데모 촬영 중 재발:</b> 책상 각도 변경으로 추론이 흐트러졌습니다
+               (모방학습의 환경 민감성). 시간상 재학습 대신 다른 방식을 모색했습니다.</p>
+          </div>
+          <h3>해결 — ROI 시작 조건 (HSV + inRange)</h3>
+          <p>front 카메라의 쌓기 구역을 ROI로 잡고, RGB→<b>HSV</b> 변환 후 <b>cv2.inRange</b>로 마스킹합니다.
+             파란 블럭이 <span class="pill">70 % 이상</span> 인식되면 추론을 시작합니다.</p>
+        </div>
+        <figure>
+          <img src="https://images.prismic.io/block/ah6AyAeQX7-eWhvQ_block_stacking_camera_view.png?auto=format,compress"
+               alt="ROI 카메라 뷰">
+          <figcaption>전면 ROI 인식(좌) + wrist 카메라(우) — 파란 블럭 진입 시 추론 시작</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 UI 구성 -->
+  <section class="slide" id="sec-07">
+    <div class="inner">
+      <p class="slide-no">07 / 10</p>
+      <h2><span class="secnum">7</span> 블럭 쌓기 게임 UI 구성</h2>
+      <h3>가위바위보</h3>
+      <p>MediaPipe로 손 모양을 인식합니다. ① 내장 분류기 + ② 랜드마크 기하 분류기(회전·크기 불변)를
+         <b>confidence 가중 투표</b>하고, margin 확보 시 확정(아니면 재시도)하는 앙상블 구조입니다.
+         결과로 쌓기 순서를 정합니다.</p>
+      <h3>음성</h3>
+      <ul>
+        <li>터치 / 클릭 + <b>음성 시작</b> ("노리암, 블럭쌓기 하자")</li>
+        <li>가위바위보를 외치고 승패를 발화 / 사람 턴 음성 안내 ("파란색 블럭을 쌓아봐")</li>
+        <li>종료 후 재시작·종료를 음성으로 결정</li>
+      </ul>
+      <h3>카드 상태 표시 · 종료 연출</h3>
+      <p>진행 상태를 카드로 안내하고, 로봇이 홈포즈로 돌아오면 사용자 차례로 전환합니다.
+         그만하기 버튼을 상시 노출하며(음성 종료 가능), 종료 시 칭찬과 팡파레가 나옵니다.</p>
+    </div>
+  </section>
+
+  <!-- 사용 기술 -->
+  <section class="slide" id="sec-tech">
+    <div class="inner">
+      <p class="slide-no">사용 기술</p>
+      <h2><span class="secnum"><span class="material-icons-round" style="font-size:36px">build</span></span> 구현을 위해 썼던 기술</h2>
+      <div class="techgrid">
+        <div class="t"><div class="name">ACT</div><div class="desc">최종 모방학습 정책. SmolVLA 대비 성능·속도 우위.</div></div>
+        <div class="t"><div class="name">LeRobot</div><div class="desc">데이터셋·학습·체크포인트·HF 푸시 파이프라인.</div></div>
+        <div class="t"><div class="name">OpenCV · HSV + inRange</div><div class="desc">ROI 픽셀 마스킹, 파란 블럭 70 % 인식 시 시작.</div></div>
+        <div class="t"><div class="name">MediaPipe 앙상블</div><div class="desc">내장 + 기하 분류기 confidence 가중 투표.</div></div>
+        <div class="t"><div class="name">음성 인식·합성 (TTS)</div><div class="desc">시작 / 재시작 / 종료, 진행 안내·결과 발화.</div></div>
+        <div class="t"><div class="name">카메라 튜닝</div><div class="desc">자동노출 off + 색 고정으로 안정화.</div></div>
+        <div class="t"><div class="name">홈포즈 인식</div><div class="desc">관절값 편차로 턴 종료 / 사용자 차례 감지.</div></div>
+        <div class="t"><div class="name">HF 사전 로딩</div><div class="desc">백그라운드 캐싱으로 게임 지연 절감.</div></div>
+        <div class="t"><div class="name">실시간 웹 오버레이</div><div class="desc">로봇 상태 + 전면 카메라 스트림 오버레이.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 어려웠던 점 -->
+  <section class="slide" id="sec-hard">
+    <div class="inner">
+      <p class="slide-no">어려웠던 점</p>
+      <h2><span class="secnum"><span class="material-icons-round" style="font-size:36px">psychology</span></span> 어려웠던 점과 극복 과정</h2>
+      <div class="psgrid">
+        <div class="ps"><div class="prob">SmolVLA 성능 부족 &amp; 학습 3배</div><div class="sol">→ ACT로 전환</div><p>성능·속도 우위인 ACT를 메인 정책으로 채택.</p></div>
+        <div class="ps"><div class="prob">블럭을 잘 못 집음 / 좁은 영역만</div><div class="sol">→ 정면 정렬 + 영역 점진 확장</div><p>정면·90도 고정, 좁은 영역 검증 후 전 영역으로 확장.</p></div>
+        <div class="ps"><div class="prob">흰색 블럭 정확도 낮음</div><div class="sol">→ 누적 이어학습</div><p>부족분만 추가 녹화해 이어 학습이 더 효과적.</p></div>
+        <div class="ps"><div class="prob">사람 차례에 로봇이 계속 움직임</div><div class="sol">→ 비율 집착↓ + 누적 학습</div><p>누적 학습하니 빈 구역(첫 턴)도 정지.</p></div>
+        <div class="ps" style="grid-column:1 / -1"><div class="prob">환경 변화(책상 각도)로 추론 흐트러짐</div><div class="sol">→ ROI 시작 조건 도입</div><p>HSV + inRange로 70 % 인식 시에만 추론, 재학습 없이 해결.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 자랑 -->
+  <section class="slide" id="sec-brag">
+    <div class="inner">
+      <p class="slide-no">자랑</p>
+      <h2><span class="secnum"><span class="material-icons-round" style="font-size:36px">star</span></span> 자랑하고 싶은 점</h2>
+      <div class="braggrid">
+        <div class="brag"><div class="bt">611 ep · 197만 스텝 완주</div><div class="bd">직접 녹화 ~500개 포함 대규모 데이터셋을 누적 학습으로 완성.</div></div>
+        <div class="brag"><div class="bt">"누적 이어학습" 노하우</div><div class="bd">양상 보고 부족분을 이어 학습하는 방식이 더 빠르고 효과적임을 입증.</div></div>
+        <div class="brag"><div class="bt">ROI로 환경 민감성 우회</div><div class="bd">재학습 없이 HSV ROI로 실전 해결 (최종 데모 성공).</div></div>
+        <div class="brag"><div class="bt">가위바위보 앙상블 인식</div><div class="bd">2개 분류기 가중 투표 + margin 확보 시 확정하는 견고한 구조.</div></div>
+        <div class="brag"><div class="bt">유치원생 안전 설계</div><div class="bd">중단 시 3초간 홈포즈 복귀 후 종료 — 아이가 잡을 필요 없음.</div></div>
+        <div class="brag"><div class="bt">지연 절감 사전 로딩</div><div class="bd">카드 노출 시간에 모델을 미리 로드해 흐름이 끊기지 않음.</div></div>
+        <div class="brag"><div class="bt">멀티모달 UX</div><div class="bd">음성 + 터치 시작, 음성 안내·결과, 실시간 카드·오버레이.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint">탭 클릭 · ↑ ↓ 방향키 · 휠 스크롤로 슬라이드 이동</div>
 
   <script>
     requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+
     function backToQna() {
       var ov = document.getElementById('page-fade');
       ov.style.opacity = '1';
       setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
     }
+
+    // 현재 슬라이드 nav 하이라이트
+    var slides = Array.from(document.querySelectorAll('.slide'));
+    var links  = Array.from(document.querySelectorAll('#secNav a'));
+    var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = byId(en.target.id);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { threshold: 0.55 });
+    slides.forEach(function(s){ obs.observe(s); });
+
+    // 방향키 ↑↓ 로 슬라이드 이동
+    var current = function(){
+      var top = window.scrollY + window.innerHeight * 0.5;
+      for (var i = 0; i < slides.length; i++) {
+        var r = slides[i].getBoundingClientRect();
+        var y = r.top + window.scrollY;
+        if (top >= y && top < y + slides[i].offsetHeight) return i;
+      }
+      return 0;
+    };
+    var go = function(i){
+      var n = Math.max(0, Math.min(slides.length - 1, i));
+      slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); go(current() + 1); }
+      if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); go(current() - 1); }
+    });
   </script>
 </body>
 </html>
