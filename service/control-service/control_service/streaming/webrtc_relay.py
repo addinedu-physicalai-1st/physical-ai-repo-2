@@ -51,9 +51,12 @@ class WebRTCRelay:
             def _on_track(track: MediaStreamTrack) -> None:
                 _log.info("producer track received: kind=%s id=%s", track.kind, track.id)
                 self._producer_track = track
-                # 기존 consumer 에 forward 추가
+                # 기존 consumer 에 forward 추가.
+                # buffered=False — 라이브 영상은 최신 프레임만 의미. 기본값 True 면 consumer
+                # 마다 무한 asyncio.Queue 가 생겨 느린/움직임 많은 상황(예: 숨바꼭질 순찰)에서
+                # 프레임이 쌓여 지연 폭증 → freeze(검정)/burst 재생.
                 for cid, cpc in self._consumer_pcs.items():
-                    cpc.addTrack(self._relay.subscribe(track))
+                    cpc.addTrack(self._relay.subscribe(track, buffered=False))
 
             @pc.on("connectionstatechange")
             async def _on_state() -> None:
@@ -92,7 +95,8 @@ class WebRTCRelay:
         """
         if self._producer_track is None:
             return
-        track = self._relay.subscribe(self._producer_track)
+        # buffered=False — 라이브 relay. _on_track 의 forward 와 동일 이유 (지연 누적 방지).
+        track = self._relay.subscribe(self._producer_track, buffered=False)
         for transceiver in pc.getTransceivers():
             if transceiver.kind == "video":
                 transceiver.sender.replaceTrack(track)

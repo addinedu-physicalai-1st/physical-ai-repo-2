@@ -25,7 +25,7 @@ waypoints:
   y: 3.3549065589904785
   yaw: 0.0
   id: 23
-  group: null
+  group: 복도
   can_rotate: false
 - name: 복-2
   x: 0.3685901000773679
@@ -39,7 +39,7 @@ waypoints:
   y: 6.594151485490084
   yaw: 1.7063240407803975
   id: 25
-  group: null
+  group: 복도
   can_rotate: false
 - name: 복-4
   x: 0.3685901000773679
@@ -53,7 +53,7 @@ waypoints:
   y: 9.969625473022461
   yaw: 0.0
   id: 27
-  group: null
+  group: 복도
   can_rotate: false
 - name: 복-6
   x: 0.2796
@@ -151,7 +151,7 @@ waypoints:
   y: 12.834519743089727
   yaw: -1.5502512727614963
   id: 41
-  group: null
+  group: 복도
   can_rotate: true
 - name: 놀이방입구-상
   x: -0.5409778478
