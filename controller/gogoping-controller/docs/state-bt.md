@@ -22,22 +22,24 @@
 
 ## monitor 정책 매트릭스
 
-`collision` 열은 `_shell.py` 의 `include_collision` flag 로 정책상 ON 이지만 `CollisionMonitor`
-behavior **실제 wiring 미구현** (`_shell.py` 의 TODO 주석). 따라서 현재 모든 state 의 children
-에 실제로 추가되지 않음. behavior 작성 시 helper TODO 만 해제하면 매트릭스대로 자동 배치됨.
-의도/실제를 구분하기 위해 "🟡 (정책 ON, wiring ☐)" 로 표시.
+`collision` 열 = `_shell.py` 의 `include_collision` flag → `CollisionMonitor` leaf 배치.
+**구현됨** (collision_subscriber + CollisionMonitor leaf + nav2 collision_monitor 노드).
+nav2 로 주행하는 state(GOTO/RETURNING/LOW_BATTERY_RETURNING/HIDEANDSEEK)만 ON — 데이터 plane
+collision_monitor 가 controller 출력(cmd_vel_nav)을 gate 하므로 이 state 들의 실제 정지를 커버.
+**FOLLOW/LULLABY 제외** — FOLLOW 의 reactive 추종은 cmd_vel_raw 직접(controller 우회)이라
+gate 무관 + 사람을 막으면 안 됨, LULLABY 는 정지 재생. (자세히: `bt/behaviors/common.md#collision_monitor`)
 
 | state | battery_low | battery_full | idle_timeout | map_boundary | hw_health | collision | command_listener |
 |---|---|---|---|---|---|---|---|
 | IDLE | ✅ | — | ✅ | ✅ | ✅ | — | ✅ |
 | CHARGING | — | ✅ | — | ✅ | ✅ | — | ✅ |
-| GOTO | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
-| FOLLOW | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
-| LULLABY | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
-| HIDEANDSEEK | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
+| GOTO | ✅ | — | — | ✅ | ✅ | ✅ | ✅ |
+| FOLLOW | ✅ | — | — | ✅ | ✅ | — | ✅ |
+| LULLABY | ✅ | — | — | ✅ | ✅ | — | ✅ |
+| HIDEANDSEEK | ✅ | — | — | ✅ | ✅ | ✅ | ✅ |
 | MANUAL | — | — | — | ✅ | — | — | ✅ |
-| RETURNING | ✅ | — | — | ✅ | ✅ | 🟡 | ✅ |
-| LOW_BATTERY_RETURNING | — | — | — | ✅ | ✅ | 🟡 | ❌ (lockdown) |
+| RETURNING | ✅ | — | — | ✅ | ✅ | ✅ | ✅ |
+| LOW_BATTERY_RETURNING | — | — | — | ✅ | ✅ | ✅ (→fault) | ❌ (lockdown) |
 | ERROR | — | — | — | — | — | — | ❌ (terminal) |
 
 ---
@@ -70,7 +72,7 @@ GOTO
         ├─ BatteryLowMonitor      (✅ ≤20% → battery_low → LOW_BATTERY_RETURNING)
         ├─ MapBoundaryMonitor     (✅ → fault(reason="out_of_map") → ERROR)
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
-        ├─ CollisionEventHandler  (추후)
+        ├─ CollisionMonitor       (✅ stop 5분 지속 → cancel → IDLE)
         ├─ CommandListener        (✅)  ※ cancel / 다른 task_request 도 가능
         └─ GotoSubTree            (✅ — body SUCCESS → root SUCCESS → task_done → IDLE)
 
@@ -84,8 +86,7 @@ FOLLOW
         ├─ BatteryLowMonitor      (✅)
         ├─ MapBoundaryMonitor     (✅)
         ├─ HardwareHealthMonitor  (✅)
-        ├─ CollisionEventHandler  (추후)
-        ├─ CommandListener        (✅)
+        ├─ CommandListener        (✅)   ※ CollisionMonitor 없음 — 사람 추종은 collision gate 무관
         └─ FollowSubTree          (🟡 StubFollow 로 대체 중 — 진짜 follow 미완성)
 
   sub: BT_follow_sub — StubFollow (stub: InfiniteRunning)
@@ -98,8 +99,7 @@ LULLABY
         ├─ BatteryLowMonitor      (✅)
         ├─ MapBoundaryMonitor     (✅)
         ├─ HardwareHealthMonitor  (✅)
-        ├─ CollisionEventHandler  (추후)
-        ├─ CommandListener        (✅)
+        ├─ CommandListener        (✅)   ※ CollisionMonitor 없음 — 정지 재생(주행 없음)
         └─ LullabySubTree         (✅ — body SUCCESS → task_done → IDLE)
 
   sub: BT_lullaby_sub — LullabyAudio leaf
@@ -112,7 +112,7 @@ HIDEANDSEEK
         ├─ BatteryLowMonitor      (✅)
         ├─ MapBoundaryMonitor     (✅)
         ├─ HardwareHealthMonitor  (✅)
-        ├─ CollisionEventHandler  (추후)
+        ├─ CollisionMonitor       (✅ stop 5분 지속 → cancel → IDLE)
         ├─ CommandListener        (✅)
         └─ HideAndSeekSubTree     (✅ patrol-only — 진짜 hideseek 인식 ☐)
 
@@ -147,7 +147,7 @@ RETURNING
         ├─ BatteryLowMonitor      (✅ — escalation: 또 떨어지면 LOW_BATTERY_RETURNING)
         ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 밖 이탈 시 fault(reason="out_of_map"))
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
-        ├─ CollisionEventHandler  (추후)
+        ├─ CollisionMonitor       (✅ stop 5분 지속 → cancel → IDLE)
         ├─ CommandListener        (✅ — 사용자 cancel / *_request)
         └─ ReturnSubTree          (✅ — OneShot(Sequence))
 
@@ -164,7 +164,7 @@ LOW_BATTERY_RETURNING
         Parallel (SuccessOnAll)
         ├─ MapBoundaryMonitor     (✅ — 도크 복귀 중 맵 경계 이탈 시 fault)
         ├─ HardwareHealthMonitor  (✅ LIDAR/odom staleness → fault)
-        ├─ CollisionEventHandler  (추후)
+        ├─ CollisionMonitor       (✅ stop 5분 지속 → fault → ERROR; lockdown 이라 cancel 불가)
         └─ ReturnSubTree          (✅ — RETURNING 과 동일 SubTree 재사용)
   sub: ReturnSubTree (✅ — 위 RETURNING sub 와 동일)
 

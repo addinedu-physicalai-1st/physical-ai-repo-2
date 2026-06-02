@@ -15,7 +15,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 |---|---|---|---|---|
 | `battery_level` | `float` (0~100) | `battery_subscriber` | `battery_full_monitor`, `battery_low_monitor`, `tree_inspector` | % |
 | `hardware_health` | `dict[str, bool]` | (각 HW 토픽 subscriber) | `hardware_health_monitor` | 컴포넌트별 alive 플래그 |
-| `collision_state` | `str` (`ok` / `warn` / `fault`) | `collision_subscriber` | `collision_event_handler` | Nav2 Collision Monitor |
+| `collision_state` | `str` (`ok` / `stop`) | `collision_subscriber` (`/collision_monitor_state` action_type) | `collision_monitor` (leaf) | Nav2 Collision Monitor stop zone 활성 여부 |
 | `docking_contact` | `bool` | `docking_contact_check` | `docking_contact_check` (self) | 도킹 접점 전류 흐름 |
 | `robot_pose` | `dict {x: float, y: float, yaw: float}` | `pose_subscriber` (`/amcl_pose` → map frame) | `map_boundary_monitor`, `align_to_dock`, `tree_inspector` | AMCL localization 결과 (map frame). 부팅 시 `{0.0, 0.0, 0.0}` |
 | `pose_override_active` | `bool` | `command_listener` (`SetRobotPose.srv`) | `pose_subscriber` (W skip 판정) | True 면 `/amcl_pose` 메시지 무시 → ROBOT_POSE 유지. 디버그 좌표 강제용 |

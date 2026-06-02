@@ -13,7 +13,7 @@ Parallel(SuccessOnAll(synchronise=False))
 └─ CommandListener          common/command_listener.md           (✅)
 ```
 
-추후 추가 예정: `CollisionEventHandler` (현재 ☐).
+`CollisionMonitor` 미배치 — IDLE 은 정지 상태(주행 없음)라 collision_monitor gate 무관.
 
 ### IdleTimeoutMonitor 의 역할
 

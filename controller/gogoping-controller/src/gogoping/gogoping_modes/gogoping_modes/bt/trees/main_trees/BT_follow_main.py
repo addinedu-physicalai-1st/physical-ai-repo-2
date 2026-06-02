@@ -23,7 +23,9 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         include_battery_low=True,
         include_map_boundary=True,
         include_hw_health=True,
-        include_collision=True,
+        # FOLLOW 제외 — 사람 추종(REACTIVE)은 nav2 controller 를 안 거쳐 collision_monitor
+        # 게이팅 대상이 아니고, 추종 중 사람을 장애물로 정지시키면 안 됨.
+        include_collision=False,
         include_command_listener=True,
         task_body=True,
     )

@@ -87,9 +87,26 @@ LIDAR / odom staleness 감지 → `"fault"` trigger.
 | 의존 토픽 | `/gogoping/scan`, `/gogoping/odom` (직접 subscribe — 별도 interface 없음, ctx.node 사용) |
 | ROS param | `hw_health_staleness_seconds` (float, 기본 3.0) |
 
-## collision_event_handler  *(스켈레톤)*
+## collision_monitor  *(구현됨)*
 
-Nav2 Collision Monitor 비정상 → `"fault"` trigger.
+Nav2 `collision_monitor` 노드(데이터 plane)가 LiDAR stop zone 으로 cmd_vel 을 끊은 상태
+(`collision_subscriber` → `COLLISION_STATE == "stop"`)가 **5분 이상 지속**되면 상위 반응 발화:
+
+- `LOW_BATTERY_RETURNING` → `fault` (→ ERROR). 방전 위험이라 IDLE 방치 대신 교사 호출. (LOW_BATTERY 는 FSM lockdown — cancel 거부, fault 만 받음.)
+- 그 외 (GOTO / RETURNING / HIDEANDSEEK) → `cancel` (→ IDLE). task 포기.
+
+매 tick RUNNING. edge-triggered (`_fired`), `initialise()` 가 트리 재진입 시 타이머·플래그 리셋.
+실제 정지(cmd_vel zero)는 collision_monitor 노드가 담당 — 본 leaf 는 관측 + 장시간 stuck 시 상위 전이.
+
+| 항목 | 값 |
+|---|---|
+| 읽기 | `COLLISION_STATE` (collision_subscriber W) |
+| 쓰기 | `ERROR_REASON` / `ERROR_SOURCE` (fault 시) |
+| trigger | `cancel` 또는 `fault` (현재 state 따라) |
+| timeout | 5분 (`_DEFAULT_TIMEOUT_S=300.0`) |
+| 배치 | GOTO / RETURNING / LOW_BATTERY_RETURNING / HIDEANDSEEK (`_shell.py` include_collision). FOLLOW/LULLABY 제외 — 사람 추종/정지 모드라 nav2 controller gate 무관. |
+| disable | `disable_error_safety:=true` (safety group "error") |
+| 파일 | [`bt/behaviors/common/collision_monitor.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/common/collision_monitor.py) |
 
 ## map_boundary_monitor  *(구현됨)*
 

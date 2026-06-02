@@ -22,7 +22,8 @@ def build(ctx: Context) -> py_trees.behaviour.Behaviour:
         include_battery_low=True,
         include_map_boundary=True,
         include_hw_health=True,
-        include_collision=True,
+        # LULLABY 제외 — 정지 상태 자장가 재생(주행 없음)이라 collision_monitor 무관.
+        include_collision=False,
         include_command_listener=True,
         task_body=True,
     )
