@@ -11,338 +11,334 @@
 <style>
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
-    --border:rgba(255,255,255,.10); --accent:#FF6F86;
-    --accentSoft:rgba(255,111,134,.16);
+    --border:rgba(255,255,255,.10); --accent:#FF6F86; --accentSoft:rgba(255,111,134,.16);
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  html,body{margin:0}
+  html,body{margin:0;height:100%}
   body{
-    background:var(--bg); color:var(--ink);
-    font-family:'Pretendard Variable',system-ui,sans-serif;
-    opacity:0; transition:opacity .3s ease; min-height:100vh;
+    background:radial-gradient(1100px 680px at 72% -12%, #2a2036 0%, #1b1626 55%, #16131F 100%);
+    color:var(--ink); font-family:'Pretendard Variable',system-ui,sans-serif;
+    overflow:hidden; opacity:0; transition:opacity .3s ease;
+    word-break:keep-all; overflow-wrap:break-word;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
 
-  /* 상단 고정 바 — 뒤로가기 버튼 + 섹션 뱃지를 같은 라인에 둔다 */
+  /* ── 상단 고정 바: ⚠️ Q&A 복귀(반드시 유지) + 섹션 인덱스 뱃지 ── */
   .topbar{
-    position:fixed; top:0; left:0; right:0; z-index:10;
-    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
-    padding:14px 24px;
-    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
+    position:fixed; top:0; left:0; right:0; z-index:60;
+    display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+    padding:11px 22px; background:rgba(20,17,28,.78); backdrop-filter:blur(8px);
     border-bottom:1px solid var(--border);
   }
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
   .back{
-    flex:0 0 auto;
-    display:inline-flex; align-items:center; gap:6px;
-    background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
-    padding:8px 16px; border-radius:999px; cursor:pointer;
-    transition:color .15s, border-color .15s, transform .15s;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border); color:var(--inkSoft);
+    font-family:'Jua',sans-serif; font-size:14px; padding:7px 15px; border-radius:999px;
+    cursor:pointer; transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-
-  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
+  .sec-nav{display:flex; flex-wrap:wrap; gap:7px; margin:0}
   .sec-nav a{
-    display:inline-flex; align-items:center; gap:8px;
-    background:var(--accentSoft); border:1px solid var(--accent);
-    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
-    padding:8px 16px; border-radius:999px; text-decoration:none;
-    transition:transform .15s, background .15s;
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--inkSoft);
+    font-family:'Jua',sans-serif; font-size:13px; padding:6px 13px; border-radius:999px;
+    transition:color .15s, background .15s, border-color .15s; white-space:nowrap;
   }
-  .sec-nav a:hover{transform:translateY(-1px); background:rgba(255,111,134,.26)}
-  .sec-nav a .n{color:var(--accent); font-size:13px}
+  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.08)}
+  .sec-nav a.on{color:#2A0F16; background:var(--accent); border-color:var(--accent)}
+  .sec-nav a .n{font-size:12px; opacity:.8}
 
-  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px; line-height:1.2}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
-
-  /* 표지 — 핵심 + 데모 + 스택 칩 */
-  .keypoint{
-    display:flex; gap:12px; align-items:flex-start;
-    background:var(--accentSoft); border:1px solid var(--accent);
-    border-radius:14px; padding:15px 18px; margin:0 0 24px;
+  /* ── 가로 스와이프 덱 ── */
+  .deck{
+    position:fixed; inset:0; display:flex; overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type:x mandatory; scroll-behavior:smooth; -webkit-overflow-scrolling:touch;
   }
-  .keypoint .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
-  .keypoint p{margin:0; line-height:1.78; font-size:15px}
+  .deck::-webkit-scrollbar{display:none}
+  .deck{scrollbar-width:none}
+  .dslide{
+    flex:0 0 100vw; width:100vw; height:100vh; scroll-snap-align:center; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0;
+  }
+  .dslide-in{width:min(1060px,calc(100vw - 112px)); transform-origin:center center; will-change:transform}
+
+  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:15px; margin:0 0 10px}
+  .cover h1{font-family:'Jua',sans-serif; font-size:54px; line-height:1.12; margin:0 0 8px}
+  .cover .sub{font-size:23px; color:var(--inkSoft); margin:0 0 14px}
+  .cover .member{color:var(--inkSoft); font-size:15px; margin:0 0 22px}
+  .cover-grid{display:grid; grid-template-columns:1.05fr .95fr; gap:34px; align-items:center}
+  @media (max-width:860px){ .cover-grid{grid-template-columns:1fr} }
+
+  .keypoint{display:flex; gap:12px; align-items:flex-start; background:var(--accentSoft); border:1px solid var(--accent); border-radius:14px; padding:16px 18px}
+  .keypoint .material-icons-round{color:var(--accent); font-size:24px; margin-top:1px}
+  .keypoint p{margin:0; line-height:1.8; font-size:17px}
   .keypoint b{color:var(--accent)}
   .keypoint mark{background:var(--accent); color:#2A0F16; padding:0 5px; border-radius:4px; font-weight:700}
+  /* 쉽게 말하면 — 비전공자용 풀이 (차분한 블루) */
+  .eli5{display:flex; gap:10px; align-items:flex-start; margin-top:18px; padding:13px 16px; border-radius:12px; background:rgba(124,196,255,.10); border:1px solid rgba(124,196,255,.30)}
+  .eli5 .lbl{flex:0 0 auto; font-family:'Jua',sans-serif; font-size:12.5px; color:#7CC4FF; background:rgba(124,196,255,.16); padding:4px 11px; border-radius:999px; margin-top:1px}
+  .eli5 p{margin:0; font-size:15px; line-height:1.78; color:var(--ink)}
+  .eli5 b{color:#9bd0ff}
 
-  figure.hero{
-    margin:0 0 26px; max-width:520px; border:1px solid var(--border);
-    border-radius:16px; overflow:hidden; background:#000;
-    box-shadow:0 14px 40px rgba(0,0,0,.45);
-  }
-  figure.hero img{display:block; width:100%}
+  figure.hero{margin:0; border:1px solid var(--border); border-radius:18px; overflow:hidden; background:#000; box-shadow:0 18px 48px rgba(0,0,0,.5)}
+  figure.hero img{display:block; width:100%; max-height:430px; object-fit:cover}
   figure.hero figcaption{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
 
-  .stack{margin:0 0 34px}
-  .stack .lbl{display:block; color:var(--inkSoft); font-family:'Jua',sans-serif; letter-spacing:.12em; font-size:13px; margin:0 0 11px}
-  .tech-row{display:flex; flex-wrap:wrap; gap:9px}
-  .tech{display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:13.5px; padding:7px 14px; border-radius:999px}
-  .tech .material-icons-round{font-size:16px; color:var(--accent)}
+  .s-head{display:flex; align-items:center; gap:14px; margin:0 0 24px; flex-wrap:wrap}
+  .s-num{flex:0 0 auto; width:48px; height:48px; border-radius:13px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:22px; display:flex; align-items:center; justify-content:center}
+  .s-head h2{font-family:'Jua',sans-serif; font-size:30px; margin:0}
+  .s-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px}
+  .s-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace}
 
-  /* ── 섹션 카드 ── */
-  .section{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:20px; padding:30px 34px; margin-bottom:28px;
-    scroll-margin-top:84px;
-  }
-  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px; flex-wrap:wrap}
-  .sec-num{
-    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
-    background:var(--accentSoft); color:var(--accent);
-    font-family:'Jua',sans-serif; font-size:20px;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
-  .sec-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end}
-  .sec-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:12px; padding:4px 10px; border-radius:999px; font-family:ui-monospace,monospace}
-  @media (max-width:680px){ .sec-head .tags{margin-left:0; width:100%; justify-content:flex-start} }
+  .split{display:grid; grid-template-columns:1.1fr 1fr; gap:34px; align-items:center}
+  @media (max-width:860px){ .split{grid-template-columns:1fr} }
+  .media-box{position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--border); background:#000; box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .media-box img{display:block; width:100%; max-height:440px; object-fit:cover}
+  .media-box .cap{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
 
-  .split{display:grid; grid-template-columns:1.15fr 1fr; gap:28px; align-items:center}
-  @media (max-width:880px){ .split{grid-template-columns:1fr} }
-
-  .media-box{
-    position:relative; border-radius:16px; overflow:hidden;
-    border:1px solid var(--border); background:#000;
-    box-shadow:0 14px 40px rgba(0,0,0,.45);
-  }
-  .media-box img,.media-box video{display:block; width:100%; height:auto}
-  .media-box .cap{padding:8px 13px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
-
-  .stat{display:flex; align-items:baseline; gap:10px; margin:0 0 16px}
-  .stat .num{font-family:'Jua',sans-serif; font-size:54px; color:var(--accent); line-height:1}
-  .stat .unit{font-family:'Jua',sans-serif; font-size:22px; color:var(--ink)}
-  .stat .label{color:var(--inkSoft); font-size:15px}
-
-  .lead{font-size:16px; line-height:1.85; margin:0 0 16px}
+  .lead{font-size:19px; line-height:1.85; margin:0 0 16px}
   .lead b{color:var(--accent)}
-  .balls{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px}
-  .pill{font-size:13px; padding:4px 12px; border-radius:999px; font-weight:700; border:1px solid var(--border)}
+  .stat{display:flex; align-items:baseline; gap:10px; margin:0 0 14px}
+  .stat .num{font-family:'Jua',sans-serif; font-size:64px; color:var(--accent); line-height:1}
+  .stat .unit{font-family:'Jua',sans-serif; font-size:26px}
+  .stat .label{color:var(--inkSoft); font-size:15px}
+  .balls{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px}
+  .pill{font-size:14px; padding:5px 13px; border-radius:999px; font-weight:700; border:1px solid var(--border)}
   .pill.r{color:#FF8A8A; background:rgba(255,138,138,.14); border-color:rgba(255,138,138,.4)}
   .pill.b{color:#7CC4FF; background:rgba(124,196,255,.14); border-color:rgba(124,196,255,.4)}
 
-  .callout{
-    display:flex; gap:12px; align-items:flex-start;
-    background:rgba(255,255,255,.04); border:1px solid var(--border);
-    border-left:3px solid var(--accent); border-radius:12px;
-    padding:16px 18px; margin-top:6px;
-  }
-  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
-  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
+  .callout{display:flex; gap:12px; align-items:flex-start; background:rgba(255,255,255,.04); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:12px; padding:16px 18px; margin-top:8px}
+  .callout .material-icons-round{color:var(--accent); font-size:24px; margin-top:1px}
+  .callout p{margin:0; line-height:1.75; font-size:16px}
   .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
 
-  .reasons{display:flex; flex-direction:column; gap:12px}
-  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
-  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
-  .reason .ic .material-icons-round{font-size:20px}
-  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
-  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
+  .stack-grid{display:flex; flex-wrap:wrap; gap:12px; margin-top:8px}
+  .tech{display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px}
+  .tech .material-icons-round{font-size:20px; color:var(--accent)}
+
+  .reasons{display:grid; grid-template-columns:1fr 1fr; gap:13px}
+  @media (max-width:760px){ .reasons{grid-template-columns:1fr} }
+  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:15px 17px; background:rgba(255,255,255,.03)}
+  .reason .ic{flex:0 0 auto; width:36px; height:36px; border-radius:10px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
+  .reason .ic .material-icons-round{font-size:21px}
+  .reason h4{font-family:'Jua',sans-serif; font-size:16px; margin:0 0 4px}
+  .reason p{margin:0; font-size:14.5px; line-height:1.7; color:var(--inkSoft)}
   .reason b{color:var(--accent)}
   code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.9em; color:#FFD9A8}
 
+  /* ── 하단 크롬 ── */
+  .progress{position:fixed; left:0; bottom:0; height:4px; width:0; background:var(--accent); z-index:60; transition:width .25s}
+  .foot{position:fixed; right:18px; bottom:14px; z-index:60; display:flex; align-items:center; gap:10px; background:rgba(36,31,51,.92); border:1px solid var(--border); border-radius:999px; padding:6px 8px 6px 16px; box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  .foot .ct{font-family:'Jua',sans-serif; font-size:14px; color:var(--ink); font-variant-numeric:tabular-nums}
+  .nav{width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,.05); color:var(--ink); cursor:pointer; font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; padding:0}
+  .nav:hover{background:var(--accent); color:#2A0F16; border-color:var(--accent)}
+  .nav:disabled{opacity:.32; cursor:default}
+  .hint{position:fixed; left:18px; bottom:18px; z-index:55; font-size:12px; color:var(--inkSoft); pointer-events:none}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
+  /* 이미지 클릭 → 확대(라이트박스) */
+  .zoomable{cursor:zoom-in}
+  .lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(6,4,10,.93); padding:40px}
+  .lightbox.open{display:flex}
+  .lightbox img{max-width:94vw; max-height:90vh; object-fit:contain; border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-out}
+  .lb-x{position:fixed; top:18px; right:22px; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
+  .lb-x:hover{background:rgba(255,255,255,.26)}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- 상단 바: ⚠️ 뒤로가기 버튼(반드시 유지) + 섹션 인덱스 뱃지(필수) -->
   <div class="topbar">
-    <button class="back jua" onclick="backToQna()">
-      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-    </button>
-    <nav class="sec-nav">
-      <a href="#sec-01"><span class="n">01</span> 손을 3D로</a>
-      <a href="#sec-02"><span class="n">02</span> closed-loop IK</a>
-      <a href="#sec-03"><span class="n">03</span> 동작 · 트윈</a>
-      <a href="#sec-04"><span class="n">04</span> 어려웠던 점</a>
-    </nav>
+    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:17px">arrow_back</span> Q&amp;A</button>
+    <nav class="sec-nav" id="secnav"></nav>
   </div>
 
-  <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 01 · 등/하원</p>
-    <h1 class="jua">등원 하이파이브 — 손을 3D로 찾아, 손바닥을 마주치기까지</h1>
-    <p class="member">담당 · 이정우 &nbsp;·&nbsp; EduPing(OpenArm 양팔) · 뎁스 하이파이브</p>
+  <div class="deck" id="deck">
 
-    <div class="keypoint">
-      <span class="material-icons-round">auto_awesome</span>
-      <p>고정 보정값을 버리고 <b>FK로 실제 위치를 재측정해 스스로 교정</b>(closed-loop) — 손 빗나감 20~28&nbsp;cm 를 <mark>2&nbsp;cm 이내</mark>로 줄였습니다. 실물 OpenArm이 있지만 <b>먼저 시뮬레이션으로 검증한 뒤 실물로 시연</b>했습니다.</p>
-    </div>
-
-    <figure class="hero">
-      <img src="https://images.prismic.io/joey/ah544AeQX7-eWhsi_hifive_final.gif" alt="최종 실물 하이파이브 데모" />
-      <figcaption>최종 데모 — 실물 OpenArm 하이파이브(시뮬 검증 후 실물 시연).</figcaption>
-    </figure>
-
-    <div class="stack">
-      <span class="lbl">STACK &amp; SKILLS</span>
-      <div class="tech-row">
-        <span class="tech"><span class="material-icons-round">back_hand</span>MediaPipe HandLandmarker</span>
-        <span class="tech"><span class="material-icons-round">3d_rotation</span>뎁스 역투영(deprojection)</span>
-        <span class="tech"><span class="material-icons-round">precision_manufacturing</span>TRAC-IK (position-only)</span>
-        <span class="tech"><span class="material-icons-round">loop</span>closed-loop IK→FK</span>
-        <span class="tech"><span class="material-icons-round">view_in_ar</span>three.js · URDFLoader</span>
-        <span class="tech"><span class="material-icons-round">show_chart</span>5차(quintic) 궤적</span>
-        <span class="tech"><span class="material-icons-round">science</span>MuJoCo 디지털 트윈</span>
-        <span class="tech"><span class="material-icons-round">hub</span>ROS 2 Jazzy · MoveIt</span>
-      </div>
-    </div>
-
-    <!-- ── 01 ── -->
-    <section id="sec-01" class="section">
-      <div class="sec-head">
-        <div class="sec-num">01</div>
-        <h2 class="jua">손을 3D로 본다</h2>
-        <div class="tags"><span>MediaPipe</span><span>역투영</span><span>D435</span></div>
-      </div>
-      <div class="split">
-        <div class="media-box">
-          <img src="https://images.prismic.io/joey/ah541QeQX7-eWhsX_browser_cloud.jpg?auto=format,compress" alt="브라우저 포인트클라우드" />
-          <div class="cap">브라우저 3D 뷰 — 무지개색이 손 포인트클라우드.</div>
-        </div>
-        <div>
-          <p class="lead">
-            <b>MediaPipe HandLandmarker</b>(GPU)로 손바닥 중심을 잡고,
-            같은 픽셀의 뎁스 값과 카메라 내부 파라미터로 <b>3차원 좌표를 복원</b>합니다(역투영).
-            이 점이 로봇이 가야 할 목표가 되고, 화면에는 손 영역이 무지개색
-            포인트클라우드로 떠서 어디를 인식했는지 바로 보입니다.
-          </p>
+    <!-- 표지 -->
+    <section class="dslide" data-label="표지">
+      <div class="dslide-in cover">
+        <div class="cover-grid">
+          <div>
+            <p class="eyebrow">Q&amp;A · 01 · 등/하원</p>
+            <h1 class="jua">등원 하이파이브</h1>
+            <p class="sub">손을 3D로 찾아, 손바닥을 마주치기까지</p>
+            <p class="member">담당 · 이정우 &nbsp;·&nbsp; EduPing(OpenArm 양팔) · 뎁스 하이파이브</p>
+            <div class="keypoint">
+              <span class="material-icons-round">auto_awesome</span>
+              <p>처음엔 미리 정해둔 보정 숫자로 로봇 손을 아이 손 앞에 보냈는데 매번 <b>20~28&nbsp;cm씩 빗나갔습니다.</b> 로봇이 "내 손이 실제로 어디 갔지?"를 스스로 다시 재서 목표를 고치게(closed-loop) 바꾸니 <mark>2&nbsp;cm 이내</mark>로 줄었습니다.</p>
+            </div>
+          </div>
+          <figure class="hero">
+            <img src="https://images.prismic.io/joey/ah544AeQX7-eWhsi_hifive_final.gif" alt="최종 실물 하이파이브 데모" />
+            <figcaption>최종 데모 — 실물 OpenArm 하이파이브(시뮬 검증 후 실물 시연).</figcaption>
+          </figure>
         </div>
       </div>
     </section>
 
-    <!-- ── 02 ── -->
-    <section id="sec-02" class="section">
-      <div class="sec-head">
-        <div class="sec-num">02</div>
-        <h2 class="jua">파란 공을 빨간 공에 — closed-loop 역기구학 ★</h2>
-        <div class="tags"><span>TRAC-IK</span><span>IK→FK</span></div>
-      </div>
-      <div class="split">
-        <div class="media-box">
-          <img src="https://images.prismic.io/joey/ah545AeQX7-eWhsl_hifive_sim.gif" alt="블루·레드 볼 시뮬" />
-          <div class="cap">좌 브라우저 / 우 MuJoCo — 파란 공이 빨간 공으로 수렴.</div>
-        </div>
-        <div>
-          <div class="stat">
-            <span class="num">2</span><span class="unit">cm</span>
-            <span class="label">고정 보정 20~28&nbsp;cm → closed-loop 수렴 오차</span>
-          </div>
-          <div class="balls">
-            <span class="pill r">🔴 빨간 공 = 아이(사람) 손</span>
-            <span class="pill b">🔵 파란 공 = 로봇 손바닥</span>
-          </div>
-          <p class="lead">
-            디버깅을 쉽게 하려고 시뮬에 공 두 개를 띄워 "<b>파란 공을 빨간 공에 맞추는 게임</b>"으로
-            바꿨습니다. <b>TRAC-IK</b>(위치 전용)로 보낸 뒤 <b>FK로 파란 공의 실제 위치를 다시 재고</b>,
-            오차만큼 목표를 밀어 재-IK — 다섯 번이면 2&nbsp;cm 이내로 수렴합니다.
-          </p>
-          <div class="callout">
-            <span class="material-icons-round">flag</span>
-            <p>자세(orientation)는 풀지 않고 <span class="k">위치 전용</span>으로 — 손바닥이 한 점에
-               닿기만 하면 되고, 방향까지 맞추면 팔의 좁은 작동 범위에선 해가 거의 안 나오기 때문입니다.</p>
-          </div>
+    <!-- STACK -->
+    <section class="dslide" data-label="STACK">
+      <div class="dslide-in">
+        <p class="eyebrow">STACK &amp; SKILLS</p>
+        <h2 class="jua" style="font-size:34px;margin:0 0 18px">구현에 쓴 기술</h2>
+        <div class="stack-grid">
+          <span class="tech"><span class="material-icons-round">back_hand</span>MediaPipe HandLandmarker</span>
+          <span class="tech"><span class="material-icons-round">3d_rotation</span>뎁스 역투영(deprojection)</span>
+          <span class="tech"><span class="material-icons-round">precision_manufacturing</span>TRAC-IK (position-only)</span>
+          <span class="tech"><span class="material-icons-round">loop</span>closed-loop IK→FK</span>
+          <span class="tech"><span class="material-icons-round">view_in_ar</span>three.js · URDFLoader</span>
+          <span class="tech"><span class="material-icons-round">show_chart</span>5차(quintic) 궤적</span>
+          <span class="tech"><span class="material-icons-round">science</span>MuJoCo 디지털 트윈</span>
+          <span class="tech"><span class="material-icons-round">hub</span>ROS 2 Jazzy · MoveIt</span>
         </div>
       </div>
     </section>
 
-    <!-- ── 03 ── -->
-    <section id="sec-03" class="section">
-      <div class="sec-head">
-        <div class="sec-num">03</div>
-        <h2 class="jua">4단계 동작 &amp; 디지털 트윈 검증</h2>
-        <div class="tags"><span>5차 궤적</span><span>three.js</span><span>MuJoCo</span></div>
-      </div>
-      <div class="split">
-        <div class="media-box">
-          <img src="https://images.prismic.io/joey/ah548AeQX7-eWhsw_twin_blueball.jpg?auto=format,compress" alt="MuJoCo 트윈" />
-          <div class="cap">트윈 — 초록 박스 안 파란 공이 손 포인트클라우드로 수렴.</div>
-        </div>
-        <div>
-          <p class="lead">
-            동작은 <b>5차 다항식 보간</b>으로 ① 들기 → ② 마주치기 → ③ 반동 → ④ 복귀를
-            부드럽게 밟고, 드는 동안에는 손을 실시간으로 따라가다 마주치기 직전 목표를 고정합니다.
-            브라우저 3D 뷰어는 <b>three.js + URDFLoader</b>로 양팔·포인트클라우드·초록 박스·D435
-            프러스텀을 합성(무거운 COLLADA 메시는 <code>.glb</code>로 변환).
-          </p>
-          <div class="callout">
-            <span class="material-icons-round">science</span>
-            <p>실물로 옮기기 전 <span class="k">MuJoCo 디지털 트윈</span>(500&nbsp;Hz)과 자동 측정
-               스크립트로 "어깨 위 침범 / 손에 닿는 거리 / 떨림"을 수치로 확인하며 튜닝한 뒤 실물 시연으로 이어갔습니다.</p>
+    <!-- 01 -->
+    <section class="dslide" data-label="손 3D">
+      <div class="dslide-in">
+        <div class="s-head"><div class="s-num">01</div><h2 class="jua">손을 3D로 본다</h2><div class="tags"><span>MediaPipe</span><span>역투영</span><span>D435</span></div></div>
+        <div class="split">
+          <div class="media-box">
+            <img src="https://images.prismic.io/joey/ah541QeQX7-eWhsX_browser_cloud.jpg?auto=format,compress" alt="브라우저 포인트클라우드" />
+            <div class="cap">브라우저 3D 뷰 — 무지개색이 손 포인트클라우드.</div>
           </div>
+          <p class="lead"><b>MediaPipe HandLandmarker</b>(GPU)로 손바닥 중심을 잡고, 같은 픽셀의 <b>뎁스(거리) 값</b>과 카메라 정보로 <b>손의 3차원 위치를 복원</b>합니다(역투영). 이 점이 로봇이 가야 할 목표가 됩니다.</p>
         </div>
+        <div class="eli5"><span class="lbl">쉽게 말하면</span><p>뎁스 카메라는 화면 속 각 점이 "<b>얼마나 먼지</b>"를 압니다. 손이 찍힌 <b>화면 위치 + 그 거리</b>를 합치면 손이 공간의 어디 있는지 좌표가 나옵니다 — 화면 속 점을 실제 공간의 점으로 되돌리는 게 <b>역투영</b>입니다.</p></div>
       </div>
     </section>
 
-    <!-- ── 04 ── -->
-    <section id="sec-04" class="section">
-      <div class="sec-head">
-        <div class="sec-num">04</div>
-        <h2 class="jua">어려웠던 점과 극복</h2>
-        <div class="tags"><span>미러 풀이</span><span>moveit_servo 우회</span><span>DCP-RMP</span></div>
+    <!-- 02 -->
+    <section class="dslide" data-label="closed-loop IK ★">
+      <div class="dslide-in">
+        <div class="s-head"><div class="s-num">02</div><h2 class="jua">파란 공을 빨간 공에 — closed-loop 역기구학 ★</h2><div class="tags"><span>TRAC-IK</span><span>IK→FK</span></div></div>
+        <div class="split">
+          <div class="media-box">
+            <img src="https://images.prismic.io/joey/ah545AeQX7-eWhsl_hifive_sim.gif" alt="블루·레드 볼 시뮬" />
+            <div class="cap">좌 브라우저 / 우 MuJoCo — 파란 공이 빨간 공으로 수렴.</div>
+          </div>
+          <div>
+            <div class="stat"><span class="num">2</span><span class="unit jua">cm</span><span class="label">고정 보정 20~28&nbsp;cm → closed-loop 수렴 오차</span></div>
+            <div class="balls"><span class="pill r">🔴 빨간 공 = 아이 손</span><span class="pill b">🔵 파란 공 = 로봇 손바닥</span></div>
+            <p class="lead" style="font-size:17px">시뮬에 공 두 개를 띄워 "<b>파란 공을 빨간 공에 맞추는 게임</b>"으로 바꿨습니다. <b>TRAC-IK</b>로 보낸 뒤 <b>FK로 실제 위치를 다시 재고</b> 오차만큼 목표를 밀어 재-IK — 다섯 번이면 2&nbsp;cm 이내로 수렴합니다.</p>
+            <div class="callout"><span class="material-icons-round">flag</span><p>자세(orientation)는 풀지 않고 <span class="k">위치 전용</span> — 손바닥이 한 점에 닿기만 하면 되고, 방향까지 맞추면 좁은 작동 범위에선 해가 거의 안 나오기 때문입니다.</p></div>
+          </div>
+        </div>
+        <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>IK(역기구학)</b>는 "손을 여기 두려면 관절을 몇 도씩 굽힐까"를 거꾸로 계산하는 것, <b>FK(순기구학)</b>는 반대로 "관절이 이 각도면 손은 실제로 어디 있나"를 계산하는 것입니다. 보낸 대로 가도 그리퍼가 손목보다 조금 튀어나와 살짝 어긋나서, FK로 실제 위치를 재 오차만큼 목표를 밀어 다시 푸는 걸 반복합니다(결과 보고 자가 교정 = closed-loop).</p></div>
       </div>
-      <div class="reasons">
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">straighten</span></div>
+    </section>
+
+    <!-- 03 -->
+    <section class="dslide" data-label="동작·트윈">
+      <div class="dslide-in">
+        <div class="s-head"><div class="s-num">03</div><h2 class="jua">4단계 동작 &amp; 디지털 트윈 검증</h2><div class="tags"><span>5차 궤적</span><span>three.js</span><span>MuJoCo</span></div></div>
+        <div class="split">
+          <div class="media-box">
+            <img src="https://images.prismic.io/joey/ah548AeQX7-eWhsw_twin_blueball.jpg?auto=format,compress" alt="MuJoCo 트윈" />
+            <div class="cap">트윈 — 초록 박스 안 파란 공이 손 포인트클라우드로 수렴.</div>
+          </div>
           <div>
-            <h4>① 손이 20~28&nbsp;cm씩 빗나감 → closed-loop</h4>
-            <p>팔뚝 회전(j5) 자유도 때문에 목표마다 손바닥 방향이 달라져 고정 보정값이 들쭉날쭉했다.
-               <b>실제 결과(FK)를 측정해 스스로 교정</b>하니 2&nbsp;cm 이내로 안정.</p>
+            <p class="lead" style="font-size:17px">동작은 <b>5차 다항식 보간</b>으로 ① 들기 → ② 마주치기 → ③ 반동 → ④ 복귀를 부드럽게 밟고, 드는 동안 손을 실시간 추적하다 직전에 목표를 고정합니다. 브라우저 3D 뷰어는 <b>three.js + URDFLoader</b>로 양팔·포인트클라우드·초록 박스·D435 프러스텀을 합성(COLLADA 메시는 <code>.glb</code> 변환).</p>
+            <div class="callout"><span class="material-icons-round">science</span><p>실물 전 <span class="k">MuJoCo 트윈</span>(500&nbsp;Hz)과 자동 측정 스크립트로 "어깨 위 침범 / 닿는 거리 / 떨림"을 수치로 확인하며 튜닝한 뒤 실물로 시연했습니다.</p></div>
           </div>
         </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">flip</span></div>
-          <div>
-            <h4>② 왼팔이 어깨를 안 폄 → 미러(대칭) 풀이</h4>
-            <p>시뮬에서 왼팔만 IK가 어깨를 평평하게 풀어 어색했다. <b>왼팔 목표를 좌우 대칭해 오른팔
-               그룹으로 풀고 해를 다시 대칭</b>해 되돌려 양팔이 똑같이 어깨를 폄(FK 검증 오차 1.1&nbsp;cm).</p>
-          </div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">bolt</span></div>
-          <div>
-            <h4>③ <code>moveit_servo</code>가 무한 대기 → IK + 촘촘한 궤적으로 우회</h4>
-            <p>ROS 2 Jazzy의 clock-type 버그로 초기화에서 멈췄고 apt 패치도 없었다.
-               <b>IK로 푼 목표를 촘촘한 궤적으로 높은 빈도 재계획</b>해 서보 없이 비슷한 부드러움을 얻음.</p>
-          </div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">unfold_more</span></div>
-          <div>
-            <h4>④ MoveIt ↔ MuJoCo 위치가 Z로 ~10&nbsp;cm 어긋남 → 팔별 보정</h4>
-            <p>두 기구학 모델의 상수 차이로 생긴 고정 오차임을 확인하고 <b>팔별 오프셋을 캘리브레이션</b>
-               (근본 해결은 두 URDF 일치).</p>
-          </div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">block</span></div>
-          <div>
-            <h4>⑤ 다가오는 손·자기 팔을 장애물로 오인 → 손 grace + depth-mask</h4>
-            <p>장애물 회피(<b>DCP-RMP</b>)가 하이파이브하려는 손/팔까지 오탐해, 최종 데모에선
-               <b>손 가시성 grace · depth-mask</b> 위주로 간소화(전체 회피 코드는 남겨 둠).</p>
-          </div>
-        </div>
+        <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>디지털 트윈</b> = 실제 로봇을 컴퓨터 속에 똑같이 만든 "가상 쌍둥이 로봇". 아이 옆에서 휘두르는 팔이라, 위험한 동작을 실물 대신 여기서 수백 번 빠르게 시험해 안전을 확인한 뒤 진짜 로봇으로 옮겼습니다. <b>5차 곡선</b>은 출발·도착이 덜컥거리지 않게 속도를 매끄럽게 잇는 계산입니다.</p></div>
       </div>
-      <div class="callout" style="margin-top:18px">
-        <span class="material-icons-round">verified</span>
-        <p>가장 자랑하고 싶은 건 <span class="k">"시뮬 먼저, 그다음 실물"</span> 흐름을 끝까지 완주한 점 —
-           화면 속 검증 그대로 그리퍼가 아이 손바닥에 정확히 닿습니다.</p>
+    </section>
+
+    <!-- 04 -->
+    <section class="dslide" data-label="어려웠던 점">
+      <div class="dslide-in">
+        <div class="s-head"><div class="s-num">04</div><h2 class="jua">어려웠던 점과 극복</h2><div class="tags"><span>미러 풀이</span><span>servo 우회</span><span>DCP-RMP</span></div></div>
+        <div class="reasons">
+          <div class="reason"><div class="ic"><span class="material-icons-round">straighten</span></div><div><h4>① 손이 20~28&nbsp;cm 빗나감 → closed-loop</h4><p>팔뚝 회전(j5)으로 손바닥 방향이 목표마다 달라 고정 보정이 들쭉날쭉. FK로 측정해 스스로 교정 → 2&nbsp;cm 이내.</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">flip</span></div><div><h4>② 왼팔이 어깨를 안 폄 → 미러 풀이</h4><p>왼팔 목표를 좌우 대칭해 오른팔 그룹으로 풀고 해를 다시 대칭해 되돌림(FK 오차 1.1&nbsp;cm).</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">bolt</span></div><div><h4>③ <code>moveit_servo</code> 무한 대기 → 촘촘한 궤적</h4><p>Jazzy clock-type 버그. IK로 푼 목표를 촘촘한 궤적으로 높은 빈도 재계획해 우회.</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">unfold_more</span></div><div><h4>④ MoveIt↔MuJoCo Z ~10&nbsp;cm 차이 → 팔별 보정</h4><p>두 모델의 상수 차이. 팔별 오프셋 캘리브레이션(근본은 두 URDF 일치).</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">block</span></div><div><h4>⑤ 다가오는 손·자기 팔 오인 → 손 grace</h4><p>회피(DCP-RMP)가 하이파이브 손까지 오탐. 손 grace · depth-mask 위주로 간소화(코드는 남김).</p></div></div>
+          <div class="reason" style="border-color:var(--accent);background:var(--accentSoft)"><div class="ic"><span class="material-icons-round">verified</span></div><div><h4 style="color:var(--accent)">시뮬 먼저, 그다음 실물</h4><p>화면 속 검증 그대로 그리퍼가 아이 손바닥에 정확히 닿습니다.</p></div></div>
+        </div>
       </div>
     </section>
 
   </div>
+
+  <div class="progress" id="prog"></div>
+  <div class="foot">
+    <button class="nav" id="prev" aria-label="이전">‹</button>
+    <span class="ct" id="ct"></span>
+    <button class="nav" id="next" aria-label="다음">›</button>
+  </div>
+  <div class="hint">← → 또는 스와이프로 넘기기 · F 전체화면 · Esc Q&amp;A</div>
 
   <script>
-    requestAnimationFrame(function () { document.body.style.opacity = '1'; });
-    function backToQna() {
-      var ov = document.getElementById('page-fade');
-      ov.style.opacity = '1';
-      setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
-    }
+    function backToQna(){ var ov=document.getElementById('page-fade'); ov.style.opacity='1'; setTimeout(function(){ window.location.href='../../index.html#/qna'; },300); }
+    (function(){
+      var deck=document.getElementById('deck');
+      var slides=[].slice.call(deck.querySelectorAll('.dslide'));
+      var N=slides.length, idx=0;
+      var prog=document.getElementById('prog'), ct=document.getElementById('ct');
+      var prev=document.getElementById('prev'), next=document.getElementById('next');
+      var secnav=document.getElementById('secnav');
+      slides.forEach(function(s,i){
+        var a=document.createElement('a');
+        a.innerHTML='<span class="n">'+(i+1)+'</span> '+(s.dataset.label||('슬라이드 '+(i+1)));
+        a.onclick=function(){ go(i); };
+        secnav.appendChild(a);
+      });
+      var navItems=[].slice.call(secnav.children);
+
+      // ── 이미지 클릭 → 확대(라이트박스) ──
+      var lb=document.createElement('div'); lb.id='lightbox'; lb.className='lightbox';
+      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><img alt="확대 이미지" />';
+      document.body.appendChild(lb);
+      var lbImg=lb.querySelector('img');
+      function lbIsOpen(){ return lb.classList.contains('open'); }
+      function openLb(src){ lbImg.src=src; lb.classList.add('open'); }
+      function closeLb(){ lb.classList.remove('open'); lbImg.removeAttribute('src'); }
+      lb.addEventListener('click', function(){ closeLb(); });
+      [].forEach.call(deck.querySelectorAll('.media-box img, figure.hero img'), function(im){
+        im.classList.add('zoomable');
+        im.addEventListener('click', function(e){ e.stopPropagation(); openLb(im.currentSrc||im.src); });
+      });
+
+      function vw(){ return window.innerWidth; }
+      function clamp(i){ return Math.max(0,Math.min(N-1,i)); }
+      function go(i){ idx=clamp(i); deck.scrollTo({left:idx*vw(),behavior:'smooth'}); update(); }
+      function update(){
+        ct.textContent=(idx+1)+' / '+N;
+        prog.style.width=((idx+1)/N*100)+'%';
+        prev.disabled=idx===0; next.disabled=idx===N-1;
+        navItems.forEach(function(a,i){ a.className=(i===idx?'on':''); });
+      }
+      prev.onclick=function(){ go(idx-1); }; next.onclick=function(){ go(idx+1); };
+      var st; deck.addEventListener('scroll',function(){ clearTimeout(st); st=setTimeout(function(){ idx=clamp(Math.round(deck.scrollLeft/vw())); update(); },90); });
+      document.addEventListener('keydown',function(e){
+        if(lbIsOpen()){ if(e.key==='Escape'){ e.preventDefault(); closeLb(); } return; }
+        if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ e.preventDefault(); go(idx+1); }
+        else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); go(idx-1); }
+        else if(e.key==='Home'){ e.preventDefault(); go(0); }
+        else if(e.key==='End'){ e.preventDefault(); go(N-1); }
+        else if(e.key==='Escape'){ backToQna(); }
+        else if(e.key==='f'||e.key==='F'){ try{ document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen(); }catch(_){ } }
+      });
+      function fit(s){
+        var inner=s.querySelector('.dslide-in'); if(!inner) return;
+        inner.style.transform='none';
+        var MX=56, TOP=80, BOT=66;
+        var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
+        inner.style.width=Math.min(1060,aW)+'px';
+        var nW=inner.offsetWidth, nH=inner.offsetHeight;
+        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.4,Math.min(sc,1.18));
+        inner.style.transform='scale('+sc+')';
+      }
+      function fitAll(){ slides.forEach(fit); }
+      window.addEventListener('resize',function(){ fitAll(); deck.scrollTo({left:idx*vw()}); });
+      if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(fitAll); }
+      [].forEach.call(deck.querySelectorAll('img'),function(im){ if(!im.complete){ im.addEventListener('load',function(){ fit(im.closest('.dslide')); }); } });
+      fitAll(); update();
+      requestAnimationFrame(function(){ document.body.style.opacity='1'; });
+    })();
   </script>
 </body>
 </html>

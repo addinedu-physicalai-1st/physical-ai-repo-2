@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>무궁화 꽃이 피었습니다 · Q&A 보고서 — 이정우</title>
+<title>일과 보고서(포털) · Q&A 보고서 — 이정우</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
@@ -62,21 +62,22 @@
   .cover h1{font-family:'Jua',sans-serif; font-size:50px; line-height:1.12; margin:0 0 8px}
   .cover .sub{font-size:22px; color:var(--inkSoft); margin:0 0 14px}
   .cover .member{color:var(--inkSoft); font-size:15px; margin:0 0 22px}
-  .cover-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:34px; align-items:center}
+  .cover-grid{display:grid; grid-template-columns:1fr 1.1fr; gap:34px; align-items:center}
   @media (max-width:860px){ .cover-grid{grid-template-columns:1fr} }
 
   .keypoint{display:flex; gap:12px; align-items:flex-start; background:var(--accentSoft); border:1px solid var(--accent); border-radius:14px; padding:16px 18px}
   .keypoint .material-icons-round{color:var(--accent); font-size:24px; margin-top:1px}
   .keypoint p{margin:0; line-height:1.8; font-size:17px}
   .keypoint b{color:var(--accent)}
+  .keypoint mark{background:var(--accent); color:#2A0F16; padding:0 5px; border-radius:4px; font-weight:700}
   /* 쉽게 말하면 — 비전공자용 풀이 (차분한 블루) */
   .eli5{display:flex; gap:10px; align-items:flex-start; margin-top:18px; padding:13px 16px; border-radius:12px; background:rgba(124,196,255,.10); border:1px solid rgba(124,196,255,.30)}
   .eli5 .lbl{flex:0 0 auto; font-family:'Jua',sans-serif; font-size:12.5px; color:#7CC4FF; background:rgba(124,196,255,.16); padding:4px 11px; border-radius:999px; margin-top:1px}
   .eli5 p{margin:0; font-size:15px; line-height:1.78; color:var(--ink)}
   .eli5 b{color:#9bd0ff}
 
-  figure.hero{margin:0; border:1px solid var(--border); border-radius:18px; overflow:hidden; background:#000; box-shadow:0 18px 48px rgba(0,0,0,.5)}
-  figure.hero img{display:block; width:100%; max-height:430px; object-fit:cover}
+  figure.hero{margin:0; border:1px solid var(--border); border-radius:18px; overflow:hidden; background:#0b0e14; box-shadow:0 18px 48px rgba(0,0,0,.5)}
+  figure.hero img{display:block; width:100%; max-height:420px; object-fit:contain}
   figure.hero figcaption{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
 
   .s-head{display:flex; align-items:center; gap:14px; margin:0 0 24px; flex-wrap:wrap}
@@ -85,23 +86,14 @@
   .s-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px}
   .s-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace}
 
-  .split{display:grid; grid-template-columns:1fr 1.05fr; gap:34px; align-items:center}
+  .split{display:grid; grid-template-columns:1.05fr 1fr; gap:34px; align-items:center}
   @media (max-width:860px){ .split{grid-template-columns:1fr} }
-  .media-box{position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--border); background:#000; box-shadow:0 16px 44px rgba(0,0,0,.5)}
-  .media-box img{display:block; width:100%; max-height:440px; object-fit:cover}
+  .media-box{position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--border); background:#0b0e14; box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .media-box img{display:block; width:100%; max-height:430px; object-fit:contain}
   .media-box .cap{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
 
-  .narrow{max-width:880px; margin:0 auto}
   .lead{font-size:18px; line-height:1.85; margin:0 0 14px}
   .lead b{color:var(--accent)}
-
-  .flow{background:rgba(0,0,0,.32); border:1px solid var(--border); border-radius:12px; padding:14px 18px; margin:8px 0 0; font-family:ui-monospace,monospace; font-size:15px; line-height:2.1; color:var(--inkSoft); overflow-x:auto}
-  .flow b{color:var(--ink)} .flow .a{color:var(--accent)}
-  table{border-collapse:collapse; width:100%; margin:16px 0 0; font-size:15px}
-  th,td{border:1px solid var(--border); padding:9px 13px; text-align:left; vertical-align:top}
-  th{background:rgba(255,255,255,.05); font-family:'Jua',sans-serif; font-weight:400}
-  td{color:var(--inkSoft)}
-  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.9em; color:#FFD9A8}
 
   .callout{display:flex; gap:12px; align-items:flex-start; background:rgba(255,255,255,.04); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:12px; padding:16px 18px; margin-top:18px}
   .callout .material-icons-round{color:var(--accent); font-size:24px; margin-top:1px}
@@ -121,6 +113,7 @@
   .reason h4{font-family:'Jua',sans-serif; font-size:16px; margin:0 0 4px}
   .reason p{margin:0; font-size:14.5px; line-height:1.7; color:var(--inkSoft)}
   .reason b{color:var(--accent)}
+  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.9em; color:#FFD9A8}
 
   .progress{position:fixed; left:0; bottom:0; height:4px; width:0; background:var(--accent); z-index:60; transition:width .25s}
   .foot{position:fixed; right:18px; bottom:14px; z-index:60; display:flex; align-items:center; gap:10px; background:rgba(36,31,51,.92); border:1px solid var(--border); border-radius:999px; padding:6px 8px 6px 16px; box-shadow:0 6px 18px rgba(0,0,0,.45)}
@@ -154,18 +147,18 @@
       <div class="dslide-in cover">
         <div class="cover-grid">
           <div>
-            <p class="eyebrow">Q&amp;A · 02 · 무궁화 꽃이 피었습니다</p>
-            <h1 class="jua">무궁화 꽃이 피었습니다</h1>
-            <p class="sub">노래하고, 움직인 아이를 잡아내기까지</p>
-            <p class="member">담당 · 이정우 &nbsp;·&nbsp; EduPing(OpenArm 양팔) · 술래잡기 놀이 모드</p>
+            <p class="eyebrow">Q&amp;A · 03 · 일과 보고서</p>
+            <h1 class="jua">일과 보고서</h1>
+            <p class="sub">교사가 쓰고, 학부모가 타임라인으로 본다</p>
+            <p class="member">담당 · 이정우 &nbsp;·&nbsp; pingdergarten 포털(학부모·교사 웹)</p>
             <div class="keypoint">
               <span class="material-icons-round">auto_awesome</span>
-              <p>게임 흐름·노래·박자·동작·녹화부터 <b>참가자 인식·움직임 감지·탈락 판정</b>까지 놀이 한 판을 처음부터 끝까지 — <b>한 화면에서 충돌 없이</b> 맞물리게 한 게 핵심입니다.</p>
+              <p>같은 데이터 한 벌(이벤트 + 요약)로 <b>교사 작성 · 학부모 열람</b>을 모두 처리 — 백엔드 형식이 흔들려도 <mark>화면이 안 깨진다</mark>는 견고함이 핵심입니다.</p>
             </div>
           </div>
           <figure class="hero">
-            <img src="https://images.prismic.io/joey/ah546geQX7-eWhsq_mugunghwa_real.gif" alt="무궁화 실물 시연" />
-            <figcaption>실물 시연 — 참가자들이 술래(로봇) 앞에 서고, 로봇 태블릿이 게임 화면.</figcaption>
+            <img src="https://images.prismic.io/joey/ah547AeQX7-eWhss_report_ui.jpg?auto=format,compress" alt="일과 보고서 화면" />
+            <figcaption>실제 화면 — 아이 목록 + 시간순 타임라인(시간·점·카드) + 사진 + 요약 + 생성/편집.</figcaption>
           </figure>
         </div>
       </div>
@@ -177,80 +170,61 @@
         <p class="eyebrow">STACK &amp; SKILLS</p>
         <h2 class="jua" style="font-size:34px;margin:0 0 18px">구현에 쓴 기술</h2>
         <div class="stack-grid">
-          <span class="tech"><span class="material-icons-round">account_tree</span>Vue 3 상태머신</span>
-          <span class="tech"><span class="material-icons-round">music_note</span>audio currentTime · playbackRate</span>
-          <span class="tech"><span class="material-icons-round">show_chart</span>5차 곡선 박자 변주</span>
-          <span class="tech"><span class="material-icons-round">fiber_smart_record</span>three.js 정·역재생 녹화</span>
-          <span class="tech"><span class="material-icons-round">face</span>MediaPipe FaceDetection</span>
-          <span class="tech"><span class="material-icons-round">join_inner</span>IoU 트래커</span>
-          <span class="tech"><span class="material-icons-round">badge</span>InsightFace (코사인)</span>
-          <span class="tech"><span class="material-icons-round">motion_photos_on</span>SAD 움직임 감지</span>
-          <span class="tech"><span class="material-icons-round">center_focus_strong</span>YOLO + ByteTrack</span>
+          <span class="tech"><span class="material-icons-round">code</span>Vue 3 · Vue Router</span>
+          <span class="tech"><span class="material-icons-round">inventory_2</span>Pinia (공용 store)</span>
+          <span class="tech"><span class="material-icons-round">edit_note</span>항목별 inline PATCH</span>
+          <span class="tech"><span class="material-icons-round">alt_route</span>이중 파싱(JSON→정규식)</span>
+          <span class="tech"><span class="material-icons-round">collections</span>Teleport 라이트박스</span>
+          <span class="tech"><span class="material-icons-round">schedule</span>60초 틱 현재시간 강조</span>
+          <span class="tech"><span class="material-icons-round">hourglass_bottom</span>이미지 lazy load</span>
+          <span class="tech"><span class="material-icons-round">auto_fix_high</span>AI 보고서 생성</span>
         </div>
       </div>
     </section>
 
     <!-- 01 -->
-    <section class="dslide" data-label="상태머신·박자">
+    <section class="dslide" data-label="두 화면, 한 데이터">
       <div class="dslide-in">
-        <div class="s-head"><div class="s-num">01</div><h2 class="jua">게임 상태머신 &amp; 오디오 동기 박자</h2><div class="tags"><span>Vue 3</span><span>currentTime</span><span>playbackRate</span></div></div>
-        <div class="narrow">
-          <p class="lead"><b>여섯 단계 상태 머신</b>으로 진입(등록)부터 종료(순위)까지 한 화면에서 돌게 했습니다. 팔 동작 시각을 <b>노래 재생 시각(<code>audio.currentTime</code>)에 묶어</b> 박자를 바꿔도 팔이 정확히 따라오고, 술래의 약 올리는 맛을 살리려 <b>재생 속도를 0.6~2.0배로 변주</b>합니다.</p>
-          <div class="flow"><b>진입</b>(등록) <span class="a">→</span> <b>준비</b>(30초) <span class="a">→</span> <b>노래</b>(팔·박자) <span class="a">→</span> <b>관찰</b>(정지·판정) <span class="a">→</span> <b>탈락 대기</b>(퇴장) <span class="a">→</span> 반복 <span class="a">→</span> <b>종료</b></div>
-          <table>
-            <tr><th>패턴</th><th>설명</th></tr>
-            <tr><td><code>random</code></td><td>속도를 무작위로 — 언제 멈출지 모르게.</td></tr>
-            <tr><td><code>slow_to_fast</code></td><td>5차 곡선(t⁵)이라 슬로우가 ~70%, 막판에 휘몰아침.</td></tr>
-            <tr><td><code>fast_to_slow</code></td><td>뒤집어 점점 느리게.</td></tr>
-          </table>
-          <div class="eli5"><span class="lbl">쉽게 말하면</span><p>노래 파일의 "<b>현재 재생 위치</b>(currentTime)"를 게임 전체의 기준 시계로 삼고, <b>재생 속도(playbackRate)</b>를 0.6~2.0배로 바꿉니다. 툭 바꾸면 어색해 <b>t⁵(다섯제곱) 곡선</b>으로 천천히 빨라졌다 느려지게 해, 술래가 "무~궁~화…꽃이피었습니다!" 하고 약 올리는 그 느낌을 냅니다.</p></div>
+        <div class="s-head"><div class="s-num">01</div><h2 class="jua">두 화면, 한 데이터</h2><div class="tags"><span>Vue 3 · Router</span><span>Pinia</span><span>inline PATCH</span></div></div>
+        <div class="split">
+          <div class="media-box">
+            <img src="https://images.prismic.io/joey/ah546weQX7-eWhsr_report_ui2.jpg?auto=format,compress" alt="아이별 타임라인" />
+            <div class="cap">실제 화면 — 아이를 고르면 그 아이의 시간순 타임라인이 뜸.</div>
+          </div>
+          <p class="lead">학부모 보고서(<code>parent/Report.vue</code>)는 <b>시간 | 점 | 카드</b>의 세로 타임라인 + 요약 카드로, 표정 라벨·출결·놀이 사진을 함께 묶습니다. 교사 화면(<code>teacher/Reports.vue</code>)에서는 같은 데이터를 <b>인라인으로 편집</b>하고, 각 항목을 고치면 <b>그 항목만 PATCH</b>로 저장합니다 — 원본이 하나라 교사 편집이 학부모 화면에 어긋날 일이 없습니다.</p>
         </div>
+        <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>PATCH</b> = 전체를 다시 보내지 말고 "<b>바뀐 한 줄만</b>" 고쳐 저장하는 방식. 한 줄 고쳤는데 보고서 전체를 통째로 덮어쓰면 충돌·낭비라서, 항목 하나만 가볍게 저장합니다. <b>Pinia</b> = 화면들이 함께 보는 "공용 데이터 보관함"이라 교사가 고친 게 학부모 화면에도 자연히 반영됩니다.</p></div>
       </div>
     </section>
 
     <!-- 02 -->
-    <section class="dslide" data-label="가리기 모션">
+    <section class="dslide" data-label="사진 · 일정">
       <div class="dslide-in">
-        <div class="s-head"><div class="s-num">02</div><h2 class="jua">가리기 모션 + 율동 녹화</h2><div class="tags"><span>three.js</span><span>정·역재생</span></div></div>
+        <div class="s-head"><div class="s-num">02</div><h2 class="jua">사진 갤러리 + 현재 시각 일정</h2><div class="tags"><span>Teleport</span><span>←/→/Esc</span><span>60초 틱</span></div></div>
         <div class="split">
           <div class="media-box">
-            <img src="https://images.prismic.io/joey/ah548weQX7-eWhs0_web_eduping_ui.jpg?auto=format,compress" alt="EduPing 메뉴" />
-            <div class="cap">메뉴의 "무궁화 꽃이 피었습니다" · 율동 등록.</div>
+            <img src="https://images.prismic.io/joey/ah541geQX7-eWhsY_emo_01.jpg?auto=format,compress" alt="emotion capture 표정 사진" />
+            <div class="cap">놀이 중 자동 촬영된 emotion capture — 세션별 묶음 → 라이트박스 갤러리.</div>
           </div>
-          <p class="lead">눈 가리기 동작은 <b>녹화 UI</b>(<code>MugunghwaArmManager.vue</code>)로 직접 녹화하고, 관찰 구간에는 같은 동작을 <b>거꾸로 재생</b>해 가렸던 눈을 스르르 뗍니다. 동작을 두 벌 만들 필요 없이 적은 데이터로 자연스러운 연출이 됩니다.</p>
+          <div>
+            <p class="lead" style="font-size:17px">무궁화·율동 중 자동 촬영된 표정 사진을 <b>세션(놀이)별로 묶어</b> 타임라인에 띄우고, 누르면 <code>Teleport</code>로 <b>body 직속 라이트박스 갤러리</b>가 열립니다(키보드 ←/→/Esc, lazy load).</p>
+            <p class="lead" style="font-size:17px;margin:0">학부모 일정(<code>parent/Schedule.vue</code>)은 하루 일과 그리드에서 <b>현재 시각의 칸을 강조</b>합니다 — <code>setInterval</code> 60초 틱 + <code>HH:MM</code> 범위 비교, 등/하원 행은 항상 보이게 보장.</p>
+          </div>
         </div>
+        <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>Teleport</b> = 사진 확대창을 화면 맨 위로 띄워 다른 요소에 안 가리게 하는 Vue 기능. <b>60초 틱</b> = 화면이 1분마다 "지금 시각"을 확인해 타임라인에서 현재 시간대를 밝게 강조 — "지금 우리 아이가 뭐 하는 중"인지 한눈에 보입니다.</p></div>
       </div>
     </section>
 
     <!-- 03 -->
-    <section class="dslide" data-label="참가자 인식">
-      <div class="dslide-in">
-        <div class="s-head"><div class="s-num">03</div><h2 class="jua">참가자 인식 &amp; 움직임 판정</h2><div class="tags"><span>MediaPipe · IoU</span><span>InsightFace</span><span>SAD · ByteTrack</span></div></div>
-        <div class="split">
-          <div class="media-box">
-            <img src="https://images.prismic.io/joey/ah545QeQX7-eWhsm_m0866_22.jpg?auto=format,compress" alt="여러 참가자" />
-            <div class="cap">한 화면에 여러 명이 동시에 등장하는 술래잡기.</div>
-          </div>
-          <div>
-            <p class="lead" style="font-size:17px"><b>MediaPipe FaceDetection</b>으로 여러 얼굴을 검출 → <b>IoU 트래커</b>로 같은 사람을 유지 → 서버 <code>recognize-multi</code>(<b>InsightFace</b>, 코사인 거리)로 각각 누구인지 식별해 "○○ 등록!"을 띄웁니다.</p>
-            <p class="lead" style="font-size:17px;margin:0">관찰 구간엔 화면을 작게(160×90) 줄여 밝기 차이 합(<b>SAD</b>)으로 움직임을 재고 얼굴 박스 변위로 탈락 판정(자기 팔은 self-filter 제외). D435에선 <b>YOLO + ByteTrack</b> perception 노드가 per-kid를 추적합니다.</p>
-          </div>
-        </div>
-        <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>SAD</b> = 직전 화면과 지금 화면의 픽셀 차이를 더해 "누가 움직였나" 보기. <b>IoU</b> = "직전 얼굴 상자와 지금 상자가 얼마나 겹치나"로 같은 사람을 이어 추적. <b>InsightFace</b> = 얼굴을 숫자 지문으로 바꿔 누구인지 식별. <b>YOLO+ByteTrack</b> = 사람을 찾아 번호를 붙여 화면이 바뀌어도 계속 따라가는 추적기. <b>self-filter</b> = 로봇 자기 팔 영역은 판정에서 제외.</p></div>
-      </div>
-    </section>
-
-    <!-- 04 -->
     <section class="dslide" data-label="어려웠던 점">
       <div class="dslide-in">
-        <div class="s-head"><div class="s-num">04</div><h2 class="jua">어려웠던 점과 극복</h2><div class="tags"><span>단일 시계</span><span>2단 임계</span><span>self-filter</span></div></div>
+        <div class="s-head"><div class="s-num">03</div><h2 class="jua">어려웠던 점과 극복</h2><div class="tags"><span>이중 파싱</span><span>세션 묶음</span></div></div>
         <div class="reasons">
-          <div class="reason"><div class="ic"><span class="material-icons-round">music_off</span></div><div><h4>① 노래가 중간에 끊김 → <code>onended</code> 단일 기준</h4><p>가상 타이머는 빠른 박자에서 먼저 만료. 실제 <code>onended</code>만 신뢰하고 진행률은 <code>currentTime</code>으로 추적.</p></div></div>
-          <div class="reason"><div class="ic"><span class="material-icons-round">schedule</span></div><div><h4>② 박자 바꾸면 팔 어긋남 → 시각을 하나로</h4><p>동작 진행을 <b>오디오 시각에서 파생</b>시키는 단일 시계로, 빨라지든 느려지든 팔이 노래에 붙음.</p></div></div>
-          <div class="reason"><div class="ic"><span class="material-icons-round">how_to_reg</span></div><div><h4>③ 탈락자 안 나갔는데 재개 → 연속 3회 확인</h4><p>탈락자 미검출 + 얼굴 수 기대 이하를 <b>3회 연속</b> 만족해야 다음 라운드 — 잠깐 끊겨도 오판 없음.</p></div></div>
-          <div class="reason"><div class="ic"><span class="material-icons-round">rule</span></div><div><h4>④ "움직임" 기준 애매 → 2단 임계 + self-filter</h4><p>전체 SAD 1차 + 얼굴 박스 변위로 <b>2단 임계</b>, 자기 팔은 self-filter 제외(애매하면 교사 수동).</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">alt_route</span></div><div><h4>① JSON일 때도, 한 줄 평문일 때도 → 이중 파싱</h4><p>보고서 본문이 깔끔한 JSON으로만 오지 않고 평문으로 합쳐지기도 했다. <b>JSON을 먼저 시도하고 실패하면 <code>HH:MM</code>을 정규식 스캔</b>해 평문도 여러 이벤트로 쪼개 화면이 안 깨지게.</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">photo_library</span></div><div><h4>② 사진이 흩어짐 → 세션별 묶음 + 지연 로딩</h4><p>놀이마다 자동 촬영된 사진이 시간순으로 흩어져 보기 어려웠다. <b>세션별로 묶어</b> 타임라인 카드에 붙이고, 목록은 lazy load로 보이는 것만 불러왔다.</p></div></div>
         </div>
-        <div class="callout"><span class="material-icons-round">celebration</span><p>무작위·점점 빠르게·점점 느리게 + 5차 곡선으로 <span class="k">술래 특유의 약 올리는 페이스</span>를 살렸고, 게임 로직과 인식을 한 화면에 통합해 <b>실물 로봇 태블릿에서도 그대로</b> 돌았습니다.</p></div>
+        <div class="callout"><span class="material-icons-round">verified</span><p>데이터가 JSON이든 합쳐진 평문이든 <span class="k">학부모 화면은 항상 또렷한 시간순 타임라인</span>으로 보이고, 놀이 사진은 그대로 추억 갤러리가 되며, 교사는 클릭 한 번으로 항목을 고치고 AI로 초안을 생성합니다.</p></div>
+        <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>JSON</b> = 컴퓨터가 바로 읽도록 정리된 데이터 형식. 보고서가 항상 그렇게 오지 않아 "<b>JSON이면 그대로 읽고, 아니면 본문에서 09:30 같은 시각을 긁어</b> 타임라인을 만든다"는 2단 방어를 둬서, 어떤 형식이 들어와도 화면이 안 깨집니다.</p></div>
       </div>
     </section>
 

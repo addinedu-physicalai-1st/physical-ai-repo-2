@@ -20,7 +20,12 @@
 
         <button onclick="qnaReset()" aria-label="닫기" style="position:absolute;top:14px;right:18px;background:transparent;border:none;color:var(--inkSoft);font-size:30px;line-height:1;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--babypink)'" onmouseout="this.style.color='var(--inkSoft)'">&times;</button>
 
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:12px;margin-top:8px">
+        <!--
+          포털(일과 보고서)을 이정우 타일 옆(02 다음)에 03 으로 추가.
+          타일 앞 번호는 "표시 인덱스" — 포털이 03, 그 뒤 타일은 +1 재부여.
+          openReport 경로(폴더 슬러그)는 그대로라 표시 인덱스와 폴더 번호가 다를 수 있음.
+        -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:12px;margin-top:8px">
 
       <div onclick="openReport('reports/01-eduping-commute/index.html')" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
@@ -40,10 +45,20 @@
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이정우</p>
       </div>
 
+      <!-- 포털 일과 보고서 — 이정우 타일 옆, 표시 인덱스 03 -->
+      <div onclick="openReport('reports/portal-report/index.html')" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--skyInk)">summarize</span>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">03 · PORTAL</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">일과 보고서</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이정우</p>
+      </div>
+
       <div onclick="openReport('reports/03-eduping-dance/index.html')" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--babypink)">music_note</span>
-          <p style="color:var(--babypink);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">03 · EDUPING</p>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">04 · EDUPING</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">율동 기능</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
@@ -52,7 +67,7 @@
       <div onclick="openReport('reports/04-eduping-doctor/index.html')" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--skyInk)">medical_services</span>
-          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">04 · EDUPING</p>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">05 · EDUPING</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">원격진찰 기능</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
@@ -61,7 +76,7 @@
       <div onclick="openReport('reports/05-voice-stt-tts/index.html')" style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--butterInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--butterSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--butterInk)">graphic_eq</span>
-          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">05 · VOICE</p>
+          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">06 · VOICE</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">호출어와 STT·TTS</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
@@ -70,7 +85,7 @@
       <div onclick="openReport('reports/06-nlu/index.html')" style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--lavInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--lavenderSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--lavInk)">forum</span>
-          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">06 · NLU</p>
+          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">07 · NLU</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">자연어 처리</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
@@ -79,7 +94,7 @@
       <div onclick="openReport('reports/07-gogoping-nav/index.html')" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--mintInk)">navigation</span>
-          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">07 · GOGOPING</p>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">08 · GOGOPING</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">자율주행 이동</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이강택</p>
@@ -88,7 +103,7 @@
       <div onclick="openReport('reports/08-gogoping-follow/index.html')" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--mintInk)">directions_walk</span>
-          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">08 · GOGOPING</p>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">09 · GOGOPING</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">추종 기능</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">노영주</p>
@@ -97,7 +112,7 @@
       <div onclick="openReport('reports/09-noriarm-shop/index.html')" style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--butterInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--butterSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--butterInk)">storefront</span>
-          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">09 · NORIARM</p>
+          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">10 · NORIARM</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">가게놀이 기능</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">최민성</p>
@@ -106,7 +121,7 @@
       <div onclick="openReport('reports/10-noriarm-oxquiz/index.html')" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--skyInk)">quiz</span>
-          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">10 · NORIARM</p>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">11 · NORIARM</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">OX 퀴즈</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이지수</p>
@@ -115,7 +130,7 @@
       <div onclick="openReport('reports/11-noriarm-blocks/index.html')" style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--lavInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--lavenderSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--lavInk)">widgets</span>
-          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">11 · NORIARM</p>
+          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">12 · NORIARM</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">블럭쌓기 게임</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이지수</p>
@@ -124,7 +139,7 @@
       <div onclick="openReport('reports/12-gogoping-hideseek/index.html')" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
         <div style="display:flex;align-items:center;gap:9px">
           <span class="material-icons-round" style="font-size:22px;color:var(--mintInk)">visibility_off</span>
-          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">12 · GOGOPING</p>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">13 · GOGOPING</p>
         </div>
         <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">숨바꼭질</h3>
         <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이강택</p>
