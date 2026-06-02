@@ -56,7 +56,7 @@
     flex:0 0 100vw; width:100vw; height:100vh; scroll-snap-align:center; scroll-snap-stop:always;
     display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0;
   }
-  .dslide-in{width:min(1060px,calc(100vw - 112px)); transform-origin:center center; will-change:transform}
+  .dslide-in{width:min(1140px,calc(100vw - 88px)); transform-origin:center center; will-change:transform}
 
   .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:15px; margin:0 0 10px}
   .cover h1{font-family:'Jua',sans-serif; font-size:50px; line-height:1.12; margin:0 0 8px}
@@ -84,7 +84,7 @@
   .s-num{flex:0 0 auto; width:48px; height:48px; border-radius:13px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:22px; display:flex; align-items:center; justify-content:center}
   .s-head h2{font-family:'Jua',sans-serif; font-size:30px; margin:0}
   .s-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px}
-  .s-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace}
+  .s-head .tags span{background:var(--accentSoft); border:1px solid var(--accent); color:var(--accent); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace; font-weight:600}
 
   .split{display:grid; grid-template-columns:1.05fr 1fr; gap:34px; align-items:center}
   @media (max-width:860px){ .split{grid-template-columns:1fr} }
@@ -102,7 +102,7 @@
   .callout b{color:var(--accent)}
 
   .stack-grid{display:flex; flex-wrap:wrap; gap:12px; margin-top:8px}
-  .tech{display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px}
+  .tech{display:inline-flex; align-items:center; gap:8px; background:var(--accentSoft); border:1px solid var(--accent); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px; font-weight:600}
   .tech .material-icons-round{font-size:20px; color:var(--accent)}
 
   .reasons{display:grid; grid-template-columns:1fr 1fr; gap:13px}
@@ -123,13 +123,20 @@
   .nav:disabled{opacity:.32; cursor:default}
   .hint{position:fixed; left:18px; bottom:18px; z-index:55; font-size:12px; color:var(--inkSoft); pointer-events:none}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
-  /* 이미지 클릭 → 확대(라이트박스) */
+  /* 가독성 하이라이트 (앰버 마커) */
+  .hl{background:linear-gradient(transparent 55%, rgba(255,216,107,.42) 55%); padding:0 2px; border-radius:2px; font-weight:600}
+  /* 중요 용어(terminology) 인라인 강조 */
+  .term{color:var(--accent); font-weight:700; background:var(--accentSoft); padding:1px 6px; border-radius:6px; white-space:nowrap}
+  /* 이미지 클릭 → 확대(라이트박스, 2단 줌: 맞춤 ↔ 실제 크기) */
   .zoomable{cursor:zoom-in}
-  .lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(6,4,10,.93); padding:40px}
-  .lightbox.open{display:flex}
-  .lightbox img{max-width:94vw; max-height:90vh; object-fit:contain; border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-out}
-  .lb-x{position:fixed; top:18px; right:22px; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
+  .lightbox{position:fixed; inset:0; z-index:9999; display:none; background:rgba(6,4,10,.95)}
+  .lightbox.open{display:flex; flex-direction:column}
+  .lb-scroll{flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:54px 16px 42px}
+  .lightbox img{max-width:95vw; max-height:88vh; object-fit:contain; border-radius:10px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-in}
+  .lightbox img.actual{max-width:none; max-height:none; width:auto; border-radius:0; cursor:zoom-out}
+  .lb-x{position:fixed; top:16px; right:20px; z-index:2; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
   .lb-x:hover{background:rgba(255,255,255,.26)}
+  .lb-hint{position:fixed; bottom:13px; left:0; right:0; text-align:center; color:#9fb0c6; font-size:12px; pointer-events:none}
 </style>
 </head>
 <body>
@@ -223,7 +230,7 @@
           <div class="reason"><div class="ic"><span class="material-icons-round">alt_route</span></div><div><h4>① JSON일 때도, 한 줄 평문일 때도 → 이중 파싱</h4><p>보고서 본문이 깔끔한 JSON으로만 오지 않고 평문으로 합쳐지기도 했다. <b>JSON을 먼저 시도하고 실패하면 <code>HH:MM</code>을 정규식 스캔</b>해 평문도 여러 이벤트로 쪼개 화면이 안 깨지게.</p></div></div>
           <div class="reason"><div class="ic"><span class="material-icons-round">photo_library</span></div><div><h4>② 사진이 흩어짐 → 세션별 묶음 + 지연 로딩</h4><p>놀이마다 자동 촬영된 사진이 시간순으로 흩어져 보기 어려웠다. <b>세션별로 묶어</b> 타임라인 카드에 붙이고, 목록은 lazy load로 보이는 것만 불러왔다.</p></div></div>
         </div>
-        <div class="callout"><span class="material-icons-round">verified</span><p>데이터가 JSON이든 합쳐진 평문이든 <span class="k">학부모 화면은 항상 또렷한 시간순 타임라인</span>으로 보이고, 놀이 사진은 그대로 추억 갤러리가 되며, 교사는 클릭 한 번으로 항목을 고치고 AI로 초안을 생성합니다.</p></div>
+        <div class="callout"><span class="material-icons-round">verified</span><p>데이터가 JSON이든 합쳐진 평문이든 <span class="hl">학부모 화면은 항상 또렷한 시간순 타임라인</span>으로 보이고, 놀이 사진은 그대로 추억 갤러리가 되며, 교사는 클릭 한 번으로 항목을 고치고 AI로 초안을 생성합니다.</p></div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>JSON</b> = 컴퓨터가 바로 읽도록 정리된 데이터 형식. 보고서가 항상 그렇게 오지 않아 "<b>JSON이면 그대로 읽고, 아니면 본문에서 09:30 같은 시각을 긁어</b> 타임라인을 만든다"는 2단 방어를 둬서, 어떤 형식이 들어와도 화면이 안 깨집니다.</p></div>
       </div>
     </section>
@@ -255,15 +262,26 @@
       });
       var navItems=[].slice.call(secnav.children);
 
-      // ── 이미지 클릭 → 확대(라이트박스) ──
+      // ── 이미지 클릭 → 확대(라이트박스, 2단 줌: 맞춤 ↔ 실제 크기) ──
       var lb=document.createElement('div'); lb.id='lightbox'; lb.className='lightbox';
-      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><img alt="확대 이미지" />';
+      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><div class="lb-scroll"><img alt="확대 이미지" /></div><div class="lb-hint">클릭 = 실제 크기 ↔ 맞춤(특정 부분 확대) · 바깥/✕/Esc = 닫기</div>';
       document.body.appendChild(lb);
-      var lbImg=lb.querySelector('img');
+      var lbImg=lb.querySelector('img'), lbScroll=lb.querySelector('.lb-scroll'), lbX=lb.querySelector('.lb-x');
       function lbIsOpen(){ return lb.classList.contains('open'); }
-      function openLb(src){ lbImg.src=src; lb.classList.add('open'); }
-      function closeLb(){ lb.classList.remove('open'); lbImg.removeAttribute('src'); }
-      lb.addEventListener('click', function(){ closeLb(); });
+      function openLb(src){ lbImg.classList.remove('actual'); lbImg.src=src; lb.classList.add('open'); lbScroll.scrollTop=0; lbScroll.scrollLeft=0; }
+      function closeLb(){ lb.classList.remove('open'); lbImg.classList.remove('actual'); lbImg.removeAttribute('src'); }
+      lbImg.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(!lbImg.classList.contains('actual')){
+          var r=lbImg.getBoundingClientRect();
+          var rx=(e.clientX-r.left)/r.width, ry=(e.clientY-r.top)/r.height;
+          lbImg.classList.add('actual');
+          lbScroll.scrollLeft=Math.max(0, rx*lbImg.offsetWidth - lbScroll.clientWidth/2);
+          lbScroll.scrollTop=Math.max(0, ry*lbImg.offsetHeight - lbScroll.clientHeight/2);
+        } else { lbImg.classList.remove('actual'); lbScroll.scrollTop=0; lbScroll.scrollLeft=0; }
+      });
+      lbX.addEventListener('click', function(e){ e.stopPropagation(); closeLb(); });
+      lb.addEventListener('click', function(e){ if(e.target===lb || e.target===lbScroll) closeLb(); });
       [].forEach.call(deck.querySelectorAll('.media-box img, figure.hero img'), function(im){
         im.classList.add('zoomable');
         im.addEventListener('click', function(e){ e.stopPropagation(); openLb(im.currentSrc||im.src); });
@@ -292,11 +310,11 @@
       function fit(s){
         var inner=s.querySelector('.dslide-in'); if(!inner) return;
         inner.style.transform='none';
-        var MX=56, TOP=80, BOT=66;
+        var MX=44, TOP=78, BOT=62;
         var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
-        inner.style.width=Math.min(1060,aW)+'px';
+        inner.style.width=Math.min(1140,aW)+'px';
         var nW=inner.offsetWidth, nH=inner.offsetHeight;
-        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.4,Math.min(sc,1.18));
+        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.45,Math.min(sc,1.55));
         inner.style.transform='scale('+sc+')';
       }
       function fitAll(){ slides.forEach(fit); }

@@ -59,7 +59,7 @@
     flex:0 0 100vw; width:100vw; height:100vh; scroll-snap-align:center; scroll-snap-stop:always;
     display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0;
   }
-  .dslide-in{width:min(1060px,calc(100vw - 112px)); transform-origin:center center; will-change:transform}
+  .dslide-in{width:min(1140px,calc(100vw - 88px)); transform-origin:center center; will-change:transform}
 
   .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:15px; margin:0 0 10px}
   .cover h1{font-family:'Jua',sans-serif; font-size:54px; line-height:1.12; margin:0 0 8px}
@@ -87,7 +87,7 @@
   .s-num{flex:0 0 auto; width:48px; height:48px; border-radius:13px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:22px; display:flex; align-items:center; justify-content:center}
   .s-head h2{font-family:'Jua',sans-serif; font-size:30px; margin:0}
   .s-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px}
-  .s-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace}
+  .s-head .tags span{background:var(--accentSoft); border:1px solid var(--accent); color:var(--accent); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace; font-weight:600}
 
   .split{display:grid; grid-template-columns:1.1fr 1fr; gap:34px; align-items:center}
   @media (max-width:860px){ .split{grid-template-columns:1fr} }
@@ -112,7 +112,7 @@
   .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
 
   .stack-grid{display:flex; flex-wrap:wrap; gap:12px; margin-top:8px}
-  .tech{display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px}
+  .tech{display:inline-flex; align-items:center; gap:8px; background:var(--accentSoft); border:1px solid var(--accent); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px; font-weight:600}
   .tech .material-icons-round{font-size:20px; color:var(--accent)}
 
   .reasons{display:grid; grid-template-columns:1fr 1fr; gap:13px}
@@ -134,13 +134,20 @@
   .nav:disabled{opacity:.32; cursor:default}
   .hint{position:fixed; left:18px; bottom:18px; z-index:55; font-size:12px; color:var(--inkSoft); pointer-events:none}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
-  /* 이미지 클릭 → 확대(라이트박스) */
+  /* 가독성 하이라이트 (앰버 마커) */
+  .hl{background:linear-gradient(transparent 55%, rgba(255,216,107,.42) 55%); padding:0 2px; border-radius:2px; font-weight:600}
+  /* 중요 용어(terminology) 인라인 강조 */
+  .term{color:var(--accent); font-weight:700; background:var(--accentSoft); padding:1px 6px; border-radius:6px; white-space:nowrap}
+  /* 이미지 클릭 → 확대(라이트박스, 2단 줌: 맞춤 ↔ 실제 크기) */
   .zoomable{cursor:zoom-in}
-  .lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(6,4,10,.93); padding:40px}
-  .lightbox.open{display:flex}
-  .lightbox img{max-width:94vw; max-height:90vh; object-fit:contain; border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-out}
-  .lb-x{position:fixed; top:18px; right:22px; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
+  .lightbox{position:fixed; inset:0; z-index:9999; display:none; background:rgba(6,4,10,.95)}
+  .lightbox.open{display:flex; flex-direction:column}
+  .lb-scroll{flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:54px 16px 42px}
+  .lightbox img{max-width:95vw; max-height:88vh; object-fit:contain; border-radius:10px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-in}
+  .lightbox img.actual{max-width:none; max-height:none; width:auto; border-radius:0; cursor:zoom-out}
+  .lb-x{position:fixed; top:16px; right:20px; z-index:2; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
   .lb-x:hover{background:rgba(255,255,255,.26)}
+  .lb-hint{position:fixed; bottom:13px; left:0; right:0; text-align:center; color:#9fb0c6; font-size:12px; pointer-events:none}
 </style>
 </head>
 <body>
@@ -202,7 +209,7 @@
             <img src="https://images.prismic.io/joey/ah541QeQX7-eWhsX_browser_cloud.jpg?auto=format,compress" alt="브라우저 포인트클라우드" />
             <div class="cap">브라우저 3D 뷰 — 무지개색이 손 포인트클라우드.</div>
           </div>
-          <p class="lead"><b>MediaPipe HandLandmarker</b>(GPU)로 손바닥 중심을 잡고, 같은 픽셀의 <b>뎁스(거리) 값</b>과 카메라 정보로 <b>손의 3차원 위치를 복원</b>합니다(역투영). 이 점이 로봇이 가야 할 목표가 됩니다.</p>
+          <p class="lead"><span class="term">MediaPipe HandLandmarker</span>(GPU)로 손바닥 중심을 잡고, 같은 픽셀의 <b>뎁스(거리) 값</b>과 카메라 정보로 <b>손의 3차원 위치를 복원</b>합니다(역투영). 이 점이 로봇이 가야 할 목표가 됩니다.</p>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p>뎁스 카메라는 화면 속 각 점이 "<b>얼마나 먼지</b>"를 압니다. 손이 찍힌 <b>화면 위치 + 그 거리</b>를 합치면 손이 공간의 어디 있는지 좌표가 나옵니다 — 화면 속 점을 실제 공간의 점으로 되돌리는 게 <b>역투영</b>입니다.</p></div>
       </div>
@@ -220,7 +227,7 @@
           <div>
             <div class="stat"><span class="num">2</span><span class="unit jua">cm</span><span class="label">고정 보정 20~28&nbsp;cm → closed-loop 수렴 오차</span></div>
             <div class="balls"><span class="pill r">🔴 빨간 공 = 아이 손</span><span class="pill b">🔵 파란 공 = 로봇 손바닥</span></div>
-            <p class="lead" style="font-size:17px">시뮬에 공 두 개를 띄워 "<b>파란 공을 빨간 공에 맞추는 게임</b>"으로 바꿨습니다. <b>TRAC-IK</b>로 보낸 뒤 <b>FK로 실제 위치를 다시 재고</b> 오차만큼 목표를 밀어 재-IK — 다섯 번이면 2&nbsp;cm 이내로 수렴합니다.</p>
+            <p class="lead" style="font-size:17px">시뮬에 공 두 개를 띄워 "<b>파란 공을 빨간 공에 맞추는 게임</b>"으로 바꿨습니다. <span class="term">TRAC-IK</span>로 보낸 뒤 <b>FK로 실제 위치를 다시 재고</b> 오차만큼 목표를 밀어 재-IK — 다섯 번이면 <span class="hl">2&nbsp;cm 이내로 수렴</span>합니다.</p>
             <div class="callout"><span class="material-icons-round">flag</span><p>자세(orientation)는 풀지 않고 <span class="k">위치 전용</span> — 손바닥이 한 점에 닿기만 하면 되고, 방향까지 맞추면 좁은 작동 범위에선 해가 거의 안 나오기 때문입니다.</p></div>
           </div>
         </div>
@@ -238,7 +245,7 @@
             <div class="cap">트윈 — 초록 박스 안 파란 공이 손 포인트클라우드로 수렴.</div>
           </div>
           <div>
-            <p class="lead" style="font-size:17px">동작은 <b>5차 다항식 보간</b>으로 ① 들기 → ② 마주치기 → ③ 반동 → ④ 복귀를 부드럽게 밟고, 드는 동안 손을 실시간 추적하다 직전에 목표를 고정합니다. 브라우저 3D 뷰어는 <b>three.js + URDFLoader</b>로 양팔·포인트클라우드·초록 박스·D435 프러스텀을 합성(COLLADA 메시는 <code>.glb</code> 변환).</p>
+            <p class="lead" style="font-size:17px">동작은 <b>5차 다항식 보간</b>으로 ① 들기 → ② 마주치기 → ③ 반동 → ④ 복귀를 부드럽게 밟고, 드는 동안 손을 실시간 추적하다 직전에 목표를 고정합니다. 브라우저 3D 뷰어는 <span class="term">three.js + URDFLoader</span>로 양팔·포인트클라우드·초록 박스·D435 프러스텀을 합성(COLLADA 메시는 <code>.glb</code> 변환).</p>
             <div class="callout"><span class="material-icons-round">science</span><p>실물 전 <span class="k">MuJoCo 트윈</span>(500&nbsp;Hz)과 자동 측정 스크립트로 "어깨 위 침범 / 닿는 거리 / 떨림"을 수치로 확인하며 튜닝한 뒤 실물로 시연했습니다.</p></div>
           </div>
         </div>
@@ -251,7 +258,7 @@
       <div class="dslide-in">
         <div class="s-head"><div class="s-num">04</div><h2 class="jua">어려웠던 점과 극복</h2><div class="tags"><span>미러 풀이</span><span>servo 우회</span><span>DCP-RMP</span></div></div>
         <div class="reasons">
-          <div class="reason"><div class="ic"><span class="material-icons-round">straighten</span></div><div><h4>① 손이 20~28&nbsp;cm 빗나감 → closed-loop</h4><p>팔뚝 회전(j5)으로 손바닥 방향이 목표마다 달라 고정 보정이 들쭉날쭉. FK로 측정해 스스로 교정 → 2&nbsp;cm 이내.</p></div></div>
+          <div class="reason"><div class="ic"><span class="material-icons-round">straighten</span></div><div><h4>① 손이 20~28&nbsp;cm 빗나감 → closed-loop</h4><p>팔뚝 회전(j5)으로 손바닥 방향이 목표마다 달라 고정 보정이 들쭉날쭉. FK로 측정해 스스로 교정 → <span class="hl">2&nbsp;cm 이내.</span></p></div></div>
           <div class="reason"><div class="ic"><span class="material-icons-round">flip</span></div><div><h4>② 왼팔이 어깨를 안 폄 → 미러 풀이</h4><p>왼팔 목표를 좌우 대칭해 오른팔 그룹으로 풀고 해를 다시 대칭해 되돌림(FK 오차 1.1&nbsp;cm).</p></div></div>
           <div class="reason"><div class="ic"><span class="material-icons-round">bolt</span></div><div><h4>③ <code>moveit_servo</code> 무한 대기 → 촘촘한 궤적</h4><p>Jazzy clock-type 버그. IK로 푼 목표를 촘촘한 궤적으로 높은 빈도 재계획해 우회.</p></div></div>
           <div class="reason"><div class="ic"><span class="material-icons-round">unfold_more</span></div><div><h4>④ MoveIt↔MuJoCo Z ~10&nbsp;cm 차이 → 팔별 보정</h4><p>두 모델의 상수 차이. 팔별 오프셋 캘리브레이션(근본은 두 URDF 일치).</p></div></div>
@@ -288,15 +295,26 @@
       });
       var navItems=[].slice.call(secnav.children);
 
-      // ── 이미지 클릭 → 확대(라이트박스) ──
+      // ── 이미지 클릭 → 확대(라이트박스, 2단 줌: 맞춤 ↔ 실제 크기) ──
       var lb=document.createElement('div'); lb.id='lightbox'; lb.className='lightbox';
-      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><img alt="확대 이미지" />';
+      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><div class="lb-scroll"><img alt="확대 이미지" /></div><div class="lb-hint">클릭 = 실제 크기 ↔ 맞춤(특정 부분 확대) · 바깥/✕/Esc = 닫기</div>';
       document.body.appendChild(lb);
-      var lbImg=lb.querySelector('img');
+      var lbImg=lb.querySelector('img'), lbScroll=lb.querySelector('.lb-scroll'), lbX=lb.querySelector('.lb-x');
       function lbIsOpen(){ return lb.classList.contains('open'); }
-      function openLb(src){ lbImg.src=src; lb.classList.add('open'); }
-      function closeLb(){ lb.classList.remove('open'); lbImg.removeAttribute('src'); }
-      lb.addEventListener('click', function(){ closeLb(); });
+      function openLb(src){ lbImg.classList.remove('actual'); lbImg.src=src; lb.classList.add('open'); lbScroll.scrollTop=0; lbScroll.scrollLeft=0; }
+      function closeLb(){ lb.classList.remove('open'); lbImg.classList.remove('actual'); lbImg.removeAttribute('src'); }
+      lbImg.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(!lbImg.classList.contains('actual')){
+          var r=lbImg.getBoundingClientRect();
+          var rx=(e.clientX-r.left)/r.width, ry=(e.clientY-r.top)/r.height;
+          lbImg.classList.add('actual');
+          lbScroll.scrollLeft=Math.max(0, rx*lbImg.offsetWidth - lbScroll.clientWidth/2);
+          lbScroll.scrollTop=Math.max(0, ry*lbImg.offsetHeight - lbScroll.clientHeight/2);
+        } else { lbImg.classList.remove('actual'); lbScroll.scrollTop=0; lbScroll.scrollLeft=0; }
+      });
+      lbX.addEventListener('click', function(e){ e.stopPropagation(); closeLb(); });
+      lb.addEventListener('click', function(e){ if(e.target===lb || e.target===lbScroll) closeLb(); });
       [].forEach.call(deck.querySelectorAll('.media-box img, figure.hero img'), function(im){
         im.classList.add('zoomable');
         im.addEventListener('click', function(e){ e.stopPropagation(); openLb(im.currentSrc||im.src); });
@@ -325,11 +343,11 @@
       function fit(s){
         var inner=s.querySelector('.dslide-in'); if(!inner) return;
         inner.style.transform='none';
-        var MX=56, TOP=80, BOT=66;
+        var MX=44, TOP=78, BOT=62;
         var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
-        inner.style.width=Math.min(1060,aW)+'px';
+        inner.style.width=Math.min(1140,aW)+'px';
         var nW=inner.offsetWidth, nH=inner.offsetHeight;
-        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.4,Math.min(sc,1.18));
+        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.45,Math.min(sc,1.55));
         inner.style.transform='scale('+sc+')';
       }
       function fitAll(){ slides.forEach(fit); }

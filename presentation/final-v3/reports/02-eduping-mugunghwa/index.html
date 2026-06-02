@@ -56,7 +56,7 @@
     flex:0 0 100vw; width:100vw; height:100vh; scroll-snap-align:center; scroll-snap-stop:always;
     display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0;
   }
-  .dslide-in{width:min(1060px,calc(100vw - 112px)); transform-origin:center center; will-change:transform}
+  .dslide-in{width:min(1140px,calc(100vw - 88px)); transform-origin:center center; will-change:transform}
 
   .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:15px; margin:0 0 10px}
   .cover h1{font-family:'Jua',sans-serif; font-size:50px; line-height:1.12; margin:0 0 8px}
@@ -83,7 +83,7 @@
   .s-num{flex:0 0 auto; width:48px; height:48px; border-radius:13px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:22px; display:flex; align-items:center; justify-content:center}
   .s-head h2{font-family:'Jua',sans-serif; font-size:30px; margin:0}
   .s-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px}
-  .s-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace}
+  .s-head .tags span{background:var(--accentSoft); border:1px solid var(--accent); color:var(--accent); font-size:13px; padding:5px 11px; border-radius:999px; font-family:ui-monospace,monospace; font-weight:600}
 
   .split{display:grid; grid-template-columns:1fr 1.05fr; gap:34px; align-items:center}
   @media (max-width:860px){ .split{grid-template-columns:1fr} }
@@ -110,7 +110,7 @@
   .callout b{color:var(--accent)}
 
   .stack-grid{display:flex; flex-wrap:wrap; gap:12px; margin-top:8px}
-  .tech{display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px}
+  .tech{display:inline-flex; align-items:center; gap:8px; background:var(--accentSoft); border:1px solid var(--accent); color:var(--ink); font-size:17px; padding:11px 18px; border-radius:999px; font-weight:600}
   .tech .material-icons-round{font-size:20px; color:var(--accent)}
 
   .reasons{display:grid; grid-template-columns:1fr 1fr; gap:13px}
@@ -130,13 +130,20 @@
   .nav:disabled{opacity:.32; cursor:default}
   .hint{position:fixed; left:18px; bottom:18px; z-index:55; font-size:12px; color:var(--inkSoft); pointer-events:none}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
-  /* 이미지 클릭 → 확대(라이트박스) */
+  /* 가독성 하이라이트 (앰버 마커) */
+  .hl{background:linear-gradient(transparent 55%, rgba(255,216,107,.42) 55%); padding:0 2px; border-radius:2px; font-weight:600}
+  /* 중요 용어(terminology) 인라인 강조 */
+  .term{color:var(--accent); font-weight:700; background:var(--accentSoft); padding:1px 6px; border-radius:6px; white-space:nowrap}
+  /* 이미지 클릭 → 확대(라이트박스, 2단 줌: 맞춤 ↔ 실제 크기) */
   .zoomable{cursor:zoom-in}
-  .lightbox{position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; background:rgba(6,4,10,.93); padding:40px}
-  .lightbox.open{display:flex}
-  .lightbox img{max-width:94vw; max-height:90vh; object-fit:contain; border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-out}
-  .lb-x{position:fixed; top:18px; right:22px; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
+  .lightbox{position:fixed; inset:0; z-index:9999; display:none; background:rgba(6,4,10,.95)}
+  .lightbox.open{display:flex; flex-direction:column}
+  .lb-scroll{flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:54px 16px 42px}
+  .lightbox img{max-width:95vw; max-height:88vh; object-fit:contain; border-radius:10px; box-shadow:0 24px 70px rgba(0,0,0,.6); cursor:zoom-in}
+  .lightbox img.actual{max-width:none; max-height:none; width:auto; border-radius:0; cursor:zoom-out}
+  .lb-x{position:fixed; top:16px; right:20px; z-index:2; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; font-size:20px; line-height:1; cursor:pointer}
   .lb-x:hover{background:rgba(255,255,255,.26)}
+  .lb-hint{position:fixed; bottom:13px; left:0; right:0; text-align:center; color:#9fb0c6; font-size:12px; pointer-events:none}
 </style>
 </head>
 <body>
@@ -160,7 +167,7 @@
             <p class="member">담당 · 이정우 &nbsp;·&nbsp; EduPing(OpenArm 양팔) · 술래잡기 놀이 모드</p>
             <div class="keypoint">
               <span class="material-icons-round">auto_awesome</span>
-              <p>게임 흐름·노래·박자·동작·녹화부터 <b>참가자 인식·움직임 감지·탈락 판정</b>까지 놀이 한 판을 처음부터 끝까지 — <b>한 화면에서 충돌 없이</b> 맞물리게 한 게 핵심입니다.</p>
+              <p>게임 흐름·노래·박자·동작·녹화부터 <b>참가자 인식·움직임 감지·탈락 판정</b>까지 놀이 한 판을 처음부터 끝까지 — <span class="hl">한 화면에서 충돌 없이</span> 맞물리게 한 게 핵심입니다.</p>
             </div>
           </div>
           <figure class="hero">
@@ -232,8 +239,8 @@
             <div class="cap">한 화면에 여러 명이 동시에 등장하는 술래잡기.</div>
           </div>
           <div>
-            <p class="lead" style="font-size:17px"><b>MediaPipe FaceDetection</b>으로 여러 얼굴을 검출 → <b>IoU 트래커</b>로 같은 사람을 유지 → 서버 <code>recognize-multi</code>(<b>InsightFace</b>, 코사인 거리)로 각각 누구인지 식별해 "○○ 등록!"을 띄웁니다.</p>
-            <p class="lead" style="font-size:17px;margin:0">관찰 구간엔 화면을 작게(160×90) 줄여 밝기 차이 합(<b>SAD</b>)으로 움직임을 재고 얼굴 박스 변위로 탈락 판정(자기 팔은 self-filter 제외). D435에선 <b>YOLO + ByteTrack</b> perception 노드가 per-kid를 추적합니다.</p>
+            <p class="lead" style="font-size:17px"><span class="term">MediaPipe FaceDetection</span>으로 여러 얼굴을 검출 → <b>IoU 트래커</b>로 같은 사람을 유지 → 서버 <code>recognize-multi</code>(<b>InsightFace</b>, 코사인 거리)로 각각 누구인지 식별해 "○○ 등록!"을 띄웁니다.</p>
+            <p class="lead" style="font-size:17px;margin:0">관찰 구간엔 화면을 작게(160×90) 줄여 밝기 차이 합(<span class="term">SAD</span>)으로 움직임을 재고 얼굴 박스 변위로 탈락 판정(자기 팔은 self-filter 제외). D435에선 <span class="term">YOLO + ByteTrack</span> perception 노드가 per-kid를 추적합니다.</p>
           </div>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>SAD</b> = 직전 화면과 지금 화면의 픽셀 차이를 더해 "누가 움직였나" 보기. <b>IoU</b> = "직전 얼굴 상자와 지금 상자가 얼마나 겹치나"로 같은 사람을 이어 추적. <b>InsightFace</b> = 얼굴을 숫자 지문으로 바꿔 누구인지 식별. <b>YOLO+ByteTrack</b> = 사람을 찾아 번호를 붙여 화면이 바뀌어도 계속 따라가는 추적기. <b>self-filter</b> = 로봇 자기 팔 영역은 판정에서 제외.</p></div>
@@ -281,15 +288,26 @@
       });
       var navItems=[].slice.call(secnav.children);
 
-      // ── 이미지 클릭 → 확대(라이트박스) ──
+      // ── 이미지 클릭 → 확대(라이트박스, 2단 줌: 맞춤 ↔ 실제 크기) ──
       var lb=document.createElement('div'); lb.id='lightbox'; lb.className='lightbox';
-      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><img alt="확대 이미지" />';
+      lb.innerHTML='<button class="lb-x" aria-label="닫기">✕</button><div class="lb-scroll"><img alt="확대 이미지" /></div><div class="lb-hint">클릭 = 실제 크기 ↔ 맞춤(특정 부분 확대) · 바깥/✕/Esc = 닫기</div>';
       document.body.appendChild(lb);
-      var lbImg=lb.querySelector('img');
+      var lbImg=lb.querySelector('img'), lbScroll=lb.querySelector('.lb-scroll'), lbX=lb.querySelector('.lb-x');
       function lbIsOpen(){ return lb.classList.contains('open'); }
-      function openLb(src){ lbImg.src=src; lb.classList.add('open'); }
-      function closeLb(){ lb.classList.remove('open'); lbImg.removeAttribute('src'); }
-      lb.addEventListener('click', function(){ closeLb(); });
+      function openLb(src){ lbImg.classList.remove('actual'); lbImg.src=src; lb.classList.add('open'); lbScroll.scrollTop=0; lbScroll.scrollLeft=0; }
+      function closeLb(){ lb.classList.remove('open'); lbImg.classList.remove('actual'); lbImg.removeAttribute('src'); }
+      lbImg.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(!lbImg.classList.contains('actual')){
+          var r=lbImg.getBoundingClientRect();
+          var rx=(e.clientX-r.left)/r.width, ry=(e.clientY-r.top)/r.height;
+          lbImg.classList.add('actual');
+          lbScroll.scrollLeft=Math.max(0, rx*lbImg.offsetWidth - lbScroll.clientWidth/2);
+          lbScroll.scrollTop=Math.max(0, ry*lbImg.offsetHeight - lbScroll.clientHeight/2);
+        } else { lbImg.classList.remove('actual'); lbScroll.scrollTop=0; lbScroll.scrollLeft=0; }
+      });
+      lbX.addEventListener('click', function(e){ e.stopPropagation(); closeLb(); });
+      lb.addEventListener('click', function(e){ if(e.target===lb || e.target===lbScroll) closeLb(); });
       [].forEach.call(deck.querySelectorAll('.media-box img, figure.hero img'), function(im){
         im.classList.add('zoomable');
         im.addEventListener('click', function(e){ e.stopPropagation(); openLb(im.currentSrc||im.src); });
@@ -318,11 +336,11 @@
       function fit(s){
         var inner=s.querySelector('.dslide-in'); if(!inner) return;
         inner.style.transform='none';
-        var MX=56, TOP=80, BOT=66;
+        var MX=44, TOP=78, BOT=62;
         var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
-        inner.style.width=Math.min(1060,aW)+'px';
+        inner.style.width=Math.min(1140,aW)+'px';
         var nW=inner.offsetWidth, nH=inner.offsetHeight;
-        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.4,Math.min(sc,1.18));
+        var sc=Math.min(aW/nW, aH/nH); sc=Math.max(0.45,Math.min(sc,1.55));
         inner.style.transform='scale('+sc+')';
       }
       function fitAll(){ slides.forEach(fit); }
