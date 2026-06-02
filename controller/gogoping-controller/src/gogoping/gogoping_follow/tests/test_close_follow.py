@@ -6,6 +6,7 @@ from gogoping_follow.close_follow import (
     evaluate_close_follow,
     is_doorway_vertex,
     nearest_doorway_distance,
+    should_force_nav2_at_doorway,
 )
 
 
@@ -119,3 +120,26 @@ def test_close_on_no_doorway_releases_immediately():
     )
     # doorway 정보 없음 (graph 로드 실패 등) → 안전 default: inactive
     assert new_state.active is False
+
+
+# ---------- should_force_nav2_at_doorway (hysteresis) ----------
+def test_doorway_nav2_no_pose_returns_false():
+    # localization 없음 / doorway 미정의 → 강제 안 함 (blind REACTIVE 유지)
+    assert should_force_nav2_at_doorway(None, False, 2.0, 2.8) is False
+
+
+def test_doorway_nav2_enter_within_trigger():
+    # 평소 REACTIVE(in_nav2=False) — trigger(2.0) 안 → NAV2 강제
+    assert should_force_nav2_at_doorway(1.5, False, 2.0, 2.8) is True
+    assert should_force_nav2_at_doorway(2.5, False, 2.0, 2.8) is False
+
+
+def test_doorway_nav2_hysteresis_hold_until_release():
+    # 이미 NAV2(in_nav2=True) — release(2.8) 까지 유지 (trigger~release 사이도 NAV2 유지)
+    assert should_force_nav2_at_doorway(2.5, True, 2.0, 2.8) is True
+    assert should_force_nav2_at_doorway(2.9, True, 2.0, 2.8) is False
+
+
+def test_doorway_nav2_disabled_when_trigger_zero():
+    # trigger=0 → 사실상 비활성 (doorway 와 정확히 겹치지 않는 한 False)
+    assert should_force_nav2_at_doorway(0.5, False, 0.0, 0.0) is False

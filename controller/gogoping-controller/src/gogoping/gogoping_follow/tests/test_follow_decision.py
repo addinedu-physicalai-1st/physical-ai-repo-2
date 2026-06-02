@@ -199,3 +199,34 @@ def test_idle_with_lost_timeout_stays_idle():
         recovery_lost_timeout_s=2.0,
     )
     assert d.mode == DecisionMode.IDLE
+
+
+# ── STOP hysteresis (stop_release_margin) ───────────────────────────────────
+def _decide_hyst(distance_m, prev_mode, margin=0.15):
+    return decide_follow_action(
+        distance_m=distance_m, prev_mode=prev_mode,
+        stop_max=0.8, reactive_max=1.7, nav2_min=1.2, initial_threshold=1.4,
+        stop_release_margin=margin,
+    ).mode
+
+
+def test_hysteresis_stays_stop_within_release_band():
+    # prev=STOP, stop_max(0.8) ≤ d < stop_max+margin(0.95) → STOP 유지 (이탈 보류)
+    assert _decide_hyst(0.85, DecisionMode.STOP) == DecisionMode.STOP
+    assert _decide_hyst(0.94, DecisionMode.STOP) == DecisionMode.STOP
+
+
+def test_hysteresis_releases_above_margin():
+    # prev=STOP, d ≥ stop_max+margin(0.95) → STOP 해제 → initial_threshold 로 분기 (REACTIVE)
+    assert _decide_hyst(0.96, DecisionMode.STOP) == DecisionMode.REACTIVE
+
+
+def test_hysteresis_entry_uses_stop_max_not_band():
+    # prev=REACTIVE, 진입은 margin 무관 — stop_max(0.8) 미만에서만 STOP
+    assert _decide_hyst(0.85, DecisionMode.REACTIVE) == DecisionMode.REACTIVE
+    assert _decide_hyst(0.79, DecisionMode.REACTIVE) == DecisionMode.STOP
+
+
+def test_hysteresis_zero_margin_is_legacy_behavior():
+    # margin=0 → 진입=이탈=stop_max (기존 동작)
+    assert _decide_hyst(0.85, DecisionMode.STOP, margin=0.0) == DecisionMode.REACTIVE

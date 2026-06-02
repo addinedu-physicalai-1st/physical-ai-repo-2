@@ -1,9 +1,9 @@
 """gogoping_follow ROS 노드 — tracking_state → hybrid (STOP/REACTIVE/NAV2) cmd_vel/goal +
 RECOVERY / WAITING_HINT lost recovery + close-follow lost prevention.
 
-Control loop (NAV2_GOAL_HZ):
+Control loop (CONTROL_HZ):
 1. tracking_state 가 stale / not tracking → lost_duration 추적 → RECOVERY/WAITING_HINT/IDLE
-2. distance_m EMA filter
+2. distance_m EMA filter (새 sample 일 때만 — 제어 루프 > perception rate 중복 필터 방지)
 3. close-follow flag 평가 (doorway 거리 + hysteresis) — target_distance / stop_max 동적
 4. decide_follow_action → STOP / REACTIVE / NAV2 (hysteresis 적용)
 5. Mode transition 시 정리 (cmd_vel zero / Nav2 cancel / PAN center 복귀)
@@ -40,6 +40,7 @@ from gogoping_follow.close_follow import (
     evaluate_close_follow,
     is_doorway_vertex,
     nearest_doorway_distance,
+    should_force_nav2_at_doorway,
 )
 from gogoping_follow.config import (
     CHASSIS_TURN_SCALE_LEFT,
@@ -49,6 +50,9 @@ from gogoping_follow.config import (
     CLOSE_RELEASE_DIST_M,
     CLOSE_TRIGGER_DIST_M,
     CMD_VEL_RAW_TOPIC,
+    CONTROL_HZ,
+    DOORWAY_NAV2_RELEASE_M,
+    DOORWAY_NAV2_TRIGGER_M,
     FOLLOW_DISTANCE_CLOSE_M,
     FOLLOW_DISTANCE_M,
     FOLLOW_STATE_TOPIC,
@@ -56,7 +60,6 @@ from gogoping_follow.config import (
     HINT_BACK_TURN_RATE_RAD_S,
     HINT_TOPIC,
     INITIAL_MODE_THRESHOLD_M,
-    NAV2_GOAL_HZ,
     NAV2_MIN_DISTANCE_M,
     PAN_CMD_TOPIC,
     REACTIVE_ANGLE_DEADBAND_DEG,
@@ -64,8 +67,10 @@ from gogoping_follow.config import (
     REACTIVE_KP_ANG,
     REACTIVE_KP_LIN,
     REACTIVE_MAX_ANG,
+    REACTIVE_MAX_ANG_ACCEL,
     REACTIVE_MAX_DISTANCE_M,
     REACTIVE_MAX_LIN,
+    REACTIVE_MAX_LIN_ACCEL,
     RECOVERY_BODY_MAX_TOTAL_DEG,
     RECOVERY_BODY_TURN_DEG,
     RECOVERY_BODY_TURN_RATE_RAD_S,
@@ -84,6 +89,7 @@ from gogoping_follow.config import (
     STATE_STALE_TIMEOUT_S,
     STOP_MAX_CLOSE_M,
     STOP_MAX_DISTANCE_M,
+    STOP_RELEASE_MARGIN_M,
     TILT_CMD_TOPIC,
     TRACKING_STATE_EMA_ALPHA,
     VOICE_FOUND_TIMEOUT_S,
@@ -112,7 +118,7 @@ from gogoping_follow.recovery_body_planner import (
     on_narrow_sweep_reach_target,
     on_sweep_complete,
 )
-from gogoping_follow.state_filter import TrackingStateEMA
+from gogoping_follow.state_filter import FilteredState, TrackingStateEMA
 from gogoping_follow.target_pose_estimator import estimate_follow_goal
 from gogoping_follow.voice_search_planner import (
     SweepPhase,
@@ -145,6 +151,13 @@ class FollowNode(Node):
         self._robot_map_pose: Pose | None = None
         self._last_goal: Pose | None = None
         self._mode: DecisionMode = DecisionMode.IDLE
+
+        # cmd_vel slew (가속 제한) 상태 — _publish_cmd 가 매 tick 갱신, _publish_zero 가 0 reset.
+        self._cmd_lin: float = 0.0
+        self._cmd_ang: float = 0.0
+        # EMA 게이팅 상태 — 제어 루프가 perception 보다 빨라도 새 sample 일 때만 필터 update.
+        self._last_filtered: FilteredState | None = None
+        self._filtered_state_ts: float = -1.0
 
         # graph (close-follow doorway + RECOVERY adjacency)
         self._graph = None
@@ -205,7 +218,8 @@ class FollowNode(Node):
         # 초기 mode publish (IDLE)
         self._publish_follow_state()
 
-        self.create_timer(1.0 / NAV2_GOAL_HZ, self._tick_control)
+        self._tick_dt = 1.0 / CONTROL_HZ
+        self.create_timer(self._tick_dt, self._tick_control)
 
         self.get_logger().info(
             "FollowNode initialized — hybrid follow + close + recovery. "
@@ -243,12 +257,12 @@ class FollowNode(Node):
         if not msg.teacher_id:
             self._target_id = ""
             self._last_state = None
-            self._filter.reset()
+            self._reset_filter()
             self._enter_idle()
             self.get_logger().info("FollowTarget stop — IDLE")
             return
         self._target_id = msg.teacher_id
-        self._filter.reset()
+        self._reset_filter()
         self._mode = DecisionMode.IDLE
         self.get_logger().info(
             f"FollowTarget start: {msg.teacher_name} ({msg.teacher_id[:8]}...)"
@@ -315,7 +329,7 @@ class FollowNode(Node):
         self._pending_hint = direction
         self.get_logger().info(f"hint 수신: {direction} → 처리 시작")
 
-    # ---------- control loop (NAV2_GOAL_HZ) ----------
+    # ---------- control loop (CONTROL_HZ) ----------
     def _tick_control(self) -> None:
         if not self._target_id:
             return
@@ -364,10 +378,14 @@ class FollowNode(Node):
         self._lost_since = None
 
         assert state is not None
-        filtered = self._filter.update(
-            distance_m=float(state.distance_m),
-            angle_deg=float(state.angle_deg),
-        )
+        # 새 tracking_state sample 일 때만 EMA update — 같은 sample 중복 필터링(시정수 단축) 방지.
+        if self._last_filtered is None or self._last_state_ts != self._filtered_state_ts:
+            self._last_filtered = self._filter.update(
+                distance_m=float(state.distance_m),
+                angle_deg=float(state.angle_deg),
+            )
+            self._filtered_state_ts = self._last_state_ts
+        filtered = self._last_filtered
 
         # close-follow flag 평가 (동적 target_distance / stop_max)
         if self._robot_map_pose is not None and self._doorway_vertices:
@@ -402,8 +420,18 @@ class FollowNode(Node):
             initial_threshold=INITIAL_MODE_THRESHOLD_M,
             lost_duration_s=0.0,
             recovery_lost_timeout_s=RECOVERY_LOST_TIMEOUT_S,
+            stop_release_margin=STOP_RELEASE_MARGIN_M,
         )
         new_mode = decision.mode
+
+        # doorway 근처면 REACTIVE → NAV2(costmap) 강제 — 문틀 충돌 방지 (STOP/NAV2 는 그대로).
+        if new_mode == DecisionMode.REACTIVE and should_force_nav2_at_doorway(
+            doorway_dist,
+            self._mode == DecisionMode.NAV2,
+            DOORWAY_NAV2_TRIGGER_M,
+            DOORWAY_NAV2_RELEASE_M,
+        ):
+            new_mode = DecisionMode.NAV2
 
         if new_mode != self._mode:
             self._on_mode_transition(self._mode, new_mode)
@@ -474,7 +502,7 @@ class FollowNode(Node):
             )
 
         state = self._recovery_body
-        dt = 1.0 / NAV2_GOAL_HZ
+        dt = 1.0 / CONTROL_HZ
 
         if state.phase == BodyPhase.EXHAUSTED:
             self.get_logger().info("RECOVERY EXHAUSTED — WAITING_HINT 전이")
@@ -582,7 +610,7 @@ class FollowNode(Node):
             dwell=RECOVERY_HINT_DWELL_S,
         )
         assert action is not None  # _on_hint 에서 이미 검증
-        dt = 1.0 / NAV2_GOAL_HZ
+        dt = 1.0 / CONTROL_HZ
 
         # Phase 1: base 180° 회전 (back hint). chassis 비대칭 보정 적용.
         yaw_dir_hint = 1.0 if action.base_rotate_rad > 0 else -1.0
@@ -656,7 +684,7 @@ class FollowNode(Node):
             self._publish_zero()
             return
 
-        dt = 1.0 / NAV2_GOAL_HZ
+        dt = 1.0 / CONTROL_HZ
         next_pan, next_phase = compute_voice_sweep_step(
             current=self._pan_current_deg,
             phase=self._voice_sweep_phase,
@@ -777,14 +805,25 @@ class FollowNode(Node):
         self._mode = DecisionMode.IDLE
 
     # ---------- cmd publishers ----------
+    def _reset_filter(self) -> None:
+        """EMA + 게이팅 상태 초기화 — target 변경/IDLE 진입 시."""
+        self._filter.reset()
+        self._last_filtered = None
+        self._filtered_state_ts = -1.0
+
     def _publish_zero(self) -> None:
-        twist = Twist()
-        self._cmd_vel_pub.publish(twist)
+        # 안전정지/IDLE — 즉시 0 (slew 미적용). slew 상태도 0 으로 reset 해 다음 출발이 0 부터 ramp.
+        self._cmd_lin = 0.0
+        self._cmd_ang = 0.0
+        self._cmd_vel_pub.publish(Twist())
 
     def _publish_cmd(self, linear_x: float, angular_z: float) -> None:
+        # REACTIVE cmd 에 가속 제한(slew) 적용 — deadband/STOP 경계의 0↔v 급변을 매끈하게.
+        self._cmd_lin = _slew(self._cmd_lin, linear_x, REACTIVE_MAX_LIN_ACCEL * self._tick_dt)
+        self._cmd_ang = _slew(self._cmd_ang, angular_z, REACTIVE_MAX_ANG_ACCEL * self._tick_dt)
         twist = Twist()
-        twist.linear.x = linear_x
-        twist.angular.z = angular_z
+        twist.linear.x = self._cmd_lin
+        twist.angular.z = self._cmd_ang
         self._cmd_vel_pub.publish(twist)
 
     def _publish_pan(self, deg: float) -> None:
@@ -802,6 +841,18 @@ class FollowNode(Node):
         msg = String()
         msg.data = self._mode.value
         self._follow_state_pub.publish(msg)
+
+
+def _slew(current: float, target: float, max_step: float) -> float:
+    """current → target 로 한 tick 당 |Δ| ≤ max_step 으로 제한 이동. max_step≤0 이면 즉시 target."""
+    if max_step <= 0.0:
+        return target
+    delta = target - current
+    if delta > max_step:
+        return current + max_step
+    if delta < -max_step:
+        return current - max_step
+    return target
 
 
 def _pose_distance(a: Pose, b: Pose) -> float:

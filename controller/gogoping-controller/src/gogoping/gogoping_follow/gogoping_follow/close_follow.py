@@ -32,6 +32,23 @@ def nearest_doorway_distance(
     return min(math.hypot(vx - rx, vy - ry) for _name, vx, vy in doorway_vertices)
 
 
+def should_force_nav2_at_doorway(
+    doorway_dist: float | None,
+    in_nav2: bool,
+    trigger_dist: float,
+    release_dist: float,
+) -> bool:
+    """doorway 근처에서 REACTIVE 대신 NAV2(costmap 회피) 를 강제할지.
+
+    hysteresis: 진입은 trigger_dist, 유지는 release_dist (경계 AMCL 지터 flapping 방지).
+    doorway_dist None (localization 없음 / doorway 미정의) → False.
+    """
+    if doorway_dist is None:
+        return False
+    threshold = release_dist if in_nav2 else trigger_dist
+    return doorway_dist < threshold
+
+
 def evaluate_close_follow(
     prev: CloseFollowState,
     doorway_dist: float | None,

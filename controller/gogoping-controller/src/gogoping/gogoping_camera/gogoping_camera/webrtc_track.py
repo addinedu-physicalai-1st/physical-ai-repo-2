@@ -59,11 +59,11 @@ class D435VideoTrack(VideoStreamTrack):
         return await self._stamp(vframe)
 
     async def _stamp(self, vframe: av.VideoFrame) -> av.VideoFrame:
+        # PTS 는 첫 recv() 시점 기준 monotonic elapsed — wall clock jump (NTP) 보호.
         if self._start_ts is None:
-            self._start_ts = time.time()
-        elapsed = time.time() - self._start_ts
-        pts = int(elapsed * VIDEO_CLOCK_RATE)
-        vframe.pts = pts
+            self._start_ts = time.monotonic()
+        elapsed = time.monotonic() - self._start_ts
+        vframe.pts = int(elapsed * VIDEO_CLOCK_RATE)
         vframe.time_base = VIDEO_TIME_BASE
         self._frame_count += 1
         return vframe
