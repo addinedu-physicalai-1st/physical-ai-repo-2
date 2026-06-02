@@ -12,8 +12,10 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#FF6F86;
+    --accentSoft:rgba(255,111,134,.16);
   }
   *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
   html,body{margin:0}
   body{
     background:var(--bg); color:var(--ink);
@@ -21,9 +23,17 @@
     opacity:0; transition:opacity .3s ease; min-height:100vh;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+  /* 상단 고정 바 — 뒤로가기 버튼 + 섹션 뱃지를 같은 라인에 둔다 */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 24px;
+    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
   /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    flex:0 0 auto;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
     color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
@@ -31,53 +41,129 @@
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
+  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
   .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
+
+  /* ── 상단 섹션 인덱스 뱃지 (필수) — 뒤로가기 버튼과 같은 라인 ── */
+  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
+    padding:8px 16px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(255,111,134,.26)}
+  .sec-nav a .n{color:var(--accent); font-size:13px}
+
+  /* ── 섹션 카드 ── */
+  .section{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:30px 34px; margin-bottom:28px;
+    scroll-margin-top:84px;   /* 고정 뒤로가기 버튼에 가리지 않도록 */
+  }
+  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px}
+  .sec-num{
+    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
+    background:var(--accentSoft); color:var(--accent);
+    font-family:'Jua',sans-serif; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
+
+  .split{display:grid; grid-template-columns:1.15fr 1fr; gap:28px; align-items:center}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .video-box{
+    position:relative; border-radius:16px; overflow:hidden;
+    border:1px solid var(--border); background:#000;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  .video-box video{display:block; width:100%; height:auto}
+
+  .stat{display:flex; align-items:baseline; gap:10px; margin:0 0 18px}
+  .stat .num{font-family:'Jua',sans-serif; font-size:54px; color:var(--accent); line-height:1}
+  .stat .unit{font-family:'Jua',sans-serif; font-size:22px; color:var(--ink)}
+  .stat .label{color:var(--inkSoft); font-size:15px}
+
+  .lead{font-size:17px; line-height:1.85; margin:0 0 18px}
+  .lead b{color:var(--accent)}
+
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:12px;
+    padding:16px 18px; margin-top:6px;
+  }
+  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
+  .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
+  <!-- 상단 바: ⚠️ 뒤로가기 버튼(반드시 유지) + 섹션 인덱스 뱃지(필수)를 같은 라인에 -->
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <!-- 섹션 추가 시 여기에도 한 줄 추가 -->
+    <nav class="sec-nav">
+      <a href="#sec-01"><span class="n">01</span> 안전 거리 근접 정지</a>
+    </nav>
+  </div>
 
   <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 03</p>
+    <p class="eyebrow">Q&amp;A · 03 · 율동 기능</p>
     <h1 class="jua">율동 기능</h1>
     <p class="member">담당 · 박우림</p>
 
     <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
+      asset 규칙: 영상은 저장소에 커밋하지 않고 Prismic CDN 업로드 후 URL 사용.
+      아래 영상은 scripts/prismic/upload.sh 로 업로드한 IMG_4740.mov 의 CDN URL.
     -->
-    <div class="placeholder">
-      <span class="material-icons-round">music_note</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>박우림 님이 작성할 <b style="color:var(--ink)">율동 기능</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+    <section id="sec-01" class="section">
+      <div class="sec-head">
+        <div class="sec-num">01</div>
+        <h2 class="jua">안전 거리 근접 정지</h2>
+      </div>
+
+      <div class="split">
+        <div class="video-box">
+          <video src="https://woolimi.cdn.prismic.io/woolimi/ah52bweQX7-eWhrx_IMG_4740.mov"
+                 controls playsinline muted preload="metadata"></video>
+        </div>
+
+        <div>
+          <div class="stat">
+            <span class="num">0.6</span><span class="unit">m</span>
+            <span class="label">근접 정지 임계 거리</span>
+          </div>
+
+          <p class="lead">
+            율동 중 사람이 로봇 <b>0.6&nbsp;m 이내</b>로 들어오면
+            진행 중인 동작을 <b>즉시 멈추도록</b> 설계했습니다.
+            아이가 가까이 다가와 팔 동작과 부딪히는 충돌을 막기 위한
+            안전 거리 기반 근접 정지 로직입니다.
+          </p>
+
+          <div class="callout">
+            <span class="material-icons-round">flag</span>
+            <p>
+              단, <span class="k">특정 모드</span>에서는 예외로 처리했습니다.
+              상호작용을 위해 의도적으로 사람이 가까이 와야 하는 모드에서는
+              근접 정지를 비활성화하여 동작을 그대로 유지합니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <script>

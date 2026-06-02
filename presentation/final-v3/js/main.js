@@ -294,8 +294,9 @@ function openReport(path) {
     document.body.appendChild(ov);
   }
   ov.style.pointerEvents = 'auto';
+  var url = path + (path.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
   requestAnimationFrame(function () { ov.style.opacity = '1'; });
-  setTimeout(function () { window.location.href = path; }, 300);
+  setTimeout(function () { window.location.href = url; }, 300);
 }
 
 /* ── Video speed controls (overlay on every video) ── */
