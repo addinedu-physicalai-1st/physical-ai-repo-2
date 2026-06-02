@@ -12,8 +12,10 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#FF6F86;
+    --accentSoft:rgba(255,111,134,.16);
   }
   *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
   html,body{margin:0}
   body{
     background:var(--bg); color:var(--ink);
@@ -21,9 +23,16 @@
     opacity:0; transition:opacity .3s ease; min-height:100vh;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 24px;
+    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    flex:0 0 auto;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
     color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
@@ -31,53 +40,269 @@
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
+    padding:8px 16px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(255,111,134,.26)}
+  .sec-nav a .n{color:var(--accent); font-size:13px}
+
+  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
+  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
+  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px; line-height:1.2}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
+
+  .keypoint{
+    display:flex; gap:12px; align-items:flex-start;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    border-radius:14px; padding:15px 18px; margin:0 0 24px;
+  }
+  .keypoint .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .keypoint p{margin:0; line-height:1.78; font-size:15px}
+  .keypoint b{color:var(--accent)}
+
+  figure.hero{
+    margin:0 0 26px; max-width:420px; border:1px solid var(--border);
+    border-radius:16px; overflow:hidden; background:#000;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  figure.hero img{display:block; width:100%}
+  figure.hero figcaption{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
+
+  .stack{margin:0 0 34px}
+  .stack .lbl{display:block; color:var(--inkSoft); font-family:'Jua',sans-serif; letter-spacing:.12em; font-size:13px; margin:0 0 11px}
+  .tech-row{display:flex; flex-wrap:wrap; gap:9px}
+  .tech{display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:13.5px; padding:7px 14px; border-radius:999px}
+  .tech .material-icons-round{font-size:16px; color:var(--accent)}
+
+  .section{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:30px 34px; margin-bottom:28px;
+    scroll-margin-top:84px;
+  }
+  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px; flex-wrap:wrap}
+  .sec-num{
+    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
+    background:var(--accentSoft); color:var(--accent);
+    font-family:'Jua',sans-serif; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
+  .sec-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end}
+  .sec-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:12px; padding:4px 10px; border-radius:999px; font-family:ui-monospace,monospace}
+  @media (max-width:680px){ .sec-head .tags{margin-left:0; width:100%; justify-content:flex-start} }
+
+  .split{display:grid; grid-template-columns:1fr 1.05fr; gap:28px; align-items:center}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .media-box{
+    position:relative; border-radius:16px; overflow:hidden;
+    border:1px solid var(--border); background:#000;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  .media-box img{display:block; width:100%; height:auto}
+  .media-box .cap{padding:8px 13px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
+
+  .lead{font-size:16px; line-height:1.85; margin:0 0 6px}
+  .lead b{color:var(--accent)}
+
+  .flow{background:rgba(0,0,0,.32); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin:14px 0 0; font-family:ui-monospace,monospace; font-size:13px; line-height:2; color:var(--inkSoft); overflow-x:auto}
+  .flow b{color:var(--ink)} .flow .a{color:var(--accent)}
+  table{border-collapse:collapse; width:100%; margin:14px 0 0; font-size:14px}
+  th,td{border:1px solid var(--border); padding:8px 11px; text-align:left; vertical-align:top}
+  th{background:rgba(255,255,255,.05); font-family:'Jua',sans-serif; font-weight:400; color:var(--ink)}
+  td{color:var(--inkSoft)}
+  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.9em; color:#FFD9A8}
+
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:12px;
+    padding:16px 18px; margin-top:16px;
+  }
+  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
+  .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
+  .reasons{display:flex; flex-direction:column; gap:12px}
+  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
+  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
+  .reason .ic .material-icons-round{font-size:20px}
+  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
+  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
+  .reason b{color:var(--accent)}
+
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav">
+      <a href="#sec-01"><span class="n">01</span> 상태머신 · 박자</a>
+      <a href="#sec-02"><span class="n">02</span> 가리기 모션</a>
+      <a href="#sec-03"><span class="n">03</span> 참가자 인식</a>
+      <a href="#sec-04"><span class="n">04</span> 어려웠던 점</a>
+    </nav>
+  </div>
 
   <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 02</p>
-    <h1 class="jua">무궁화 꽃이 피었습니다</h1>
-    <p class="member">담당 · 이정우</p>
+    <p class="eyebrow">Q&amp;A · 02 · 무궁화 꽃이 피었습니다</p>
+    <h1 class="jua">무궁화 꽃이 피었습니다 — 노래하고, 움직인 아이를 잡아내기까지</h1>
+    <p class="member">담당 · 이정우 &nbsp;·&nbsp; EduPing(OpenArm 양팔) · 술래잡기 놀이 모드</p>
 
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">local_florist</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>이정우 님이 작성할 <b style="color:var(--ink)">무궁화 꽃이 피었습니다</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
+    <div class="keypoint">
+      <span class="material-icons-round">auto_awesome</span>
+      <p>게임 흐름·노래·박자 변주·양팔 동작·녹화 UI부터 <b>참가자 인식·움직임 감지·탈락 판정</b>까지 놀이 한 판을 처음부터 끝까지 만들었습니다. 노래·박자·팔·녹화·인식을 <b>한 화면에서 충돌 없이</b> 맞물리게 한 게 핵심입니다.</p>
     </div>
+
+    <figure class="hero">
+      <img src="https://images.prismic.io/joey/ah546geQX7-eWhsq_mugunghwa_real.gif" alt="무궁화 실물 시연" />
+      <figcaption>실물 시연 — 참가자들이 술래(로봇) 앞에 서고, 로봇 태블릿이 게임 화면.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <span class="lbl">STACK &amp; SKILLS</span>
+      <div class="tech-row">
+        <span class="tech"><span class="material-icons-round">account_tree</span>Vue 3 상태머신</span>
+        <span class="tech"><span class="material-icons-round">music_note</span>audio currentTime · playbackRate</span>
+        <span class="tech"><span class="material-icons-round">show_chart</span>5차 곡선 박자 변주</span>
+        <span class="tech"><span class="material-icons-round">fiber_smart_record</span>three.js 정·역재생 녹화</span>
+        <span class="tech"><span class="material-icons-round">face</span>MediaPipe FaceDetection</span>
+        <span class="tech"><span class="material-icons-round">join_inner</span>IoU 트래커</span>
+        <span class="tech"><span class="material-icons-round">badge</span>InsightFace (코사인)</span>
+        <span class="tech"><span class="material-icons-round">motion_photos_on</span>SAD 움직임 감지</span>
+        <span class="tech"><span class="material-icons-round">center_focus_strong</span>YOLO + ByteTrack</span>
+      </div>
+    </div>
+
+    <!-- ── 01 ── -->
+    <section id="sec-01" class="section">
+      <div class="sec-head">
+        <div class="sec-num">01</div>
+        <h2 class="jua">게임 상태머신 &amp; 오디오 동기 박자</h2>
+        <div class="tags"><span>Vue 3</span><span>currentTime</span><span>playbackRate</span></div>
+      </div>
+      <p class="lead">
+        <b>여섯 단계 상태 머신</b>으로 진입(등록)부터 종료(순위)까지 한 화면에서 돌게 했습니다.
+        팔 동작 시각을 <b>노래 재생 시각(<code>audio.currentTime</code>)에 묶어</b> 박자를 바꿔도
+        팔이 정확히 따라오고, 술래의 약 올리는 맛을 살리려 <b>재생 속도를 0.6~2.0배로 변주</b>합니다.
+      </p>
+      <div class="flow"><b>진입</b>(등록) <span class="a">→</span> <b>준비</b>(30초) <span class="a">→</span> <b>노래</b>(팔·박자) <span class="a">→</span> <b>관찰</b>(정지·판정) <span class="a">→</span> <b>탈락 대기</b>(퇴장) <span class="a">→</span> 반복 <span class="a">→</span> <b>종료</b></div>
+      <table>
+        <tr><th>패턴</th><th>설명</th></tr>
+        <tr><td><code>random</code></td><td>속도를 무작위로 — 언제 멈출지 모르게.</td></tr>
+        <tr><td><code>slow_to_fast</code></td><td>5차 곡선(t⁵)이라 슬로우가 ~70%, 막판에 휘몰아침.</td></tr>
+        <tr><td><code>fast_to_slow</code></td><td>뒤집어 점점 느리게.</td></tr>
+      </table>
+    </section>
+
+    <!-- ── 02 ── -->
+    <section id="sec-02" class="section">
+      <div class="sec-head">
+        <div class="sec-num">02</div>
+        <h2 class="jua">가리기 모션 + 율동 녹화</h2>
+        <div class="tags"><span>three.js</span><span>정·역재생</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah548weQX7-eWhs0_web_eduping_ui.jpg?auto=format,compress" alt="EduPing 메뉴" />
+          <div class="cap">메뉴의 "무궁화 꽃이 피었습니다" · 율동 등록.</div>
+        </div>
+        <div>
+          <p class="lead">
+            눈 가리기 동작은 <b>녹화 UI</b>(<code>MugunghwaArmManager.vue</code>)로 직접 녹화하고,
+            관찰 구간에는 같은 동작을 <b>거꾸로 재생</b>해 가렸던 눈을 스르르 뗍니다.
+            동작을 두 벌 만들 필요 없이 적은 데이터로 자연스러운 연출이 됩니다.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 03 ── -->
+    <section id="sec-03" class="section">
+      <div class="sec-head">
+        <div class="sec-num">03</div>
+        <h2 class="jua">참가자 인식 &amp; 움직임 판정</h2>
+        <div class="tags"><span>MediaPipe · IoU</span><span>InsightFace</span><span>SAD · ByteTrack</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah545QeQX7-eWhsm_m0866_22.jpg?auto=format,compress" alt="여러 참가자" />
+          <div class="cap">한 화면에 여러 명이 동시에 등장하는 술래잡기.</div>
+        </div>
+        <div>
+          <p class="lead">
+            <b>MediaPipe FaceDetection</b>으로 여러 얼굴을 검출 → <b>IoU 트래커</b>로 프레임 간 같은
+            사람을 유지 → 서버 <code>recognize-multi</code>(<b>InsightFace</b>, 코사인 거리)로 각각 누구인지
+            식별해 "○○ 등록!"을 띄웁니다.
+          </p>
+          <p class="lead">
+            관찰 구간에는 화면을 작게(160×90) 줄여 직전 프레임과의 밝기 차이 합(<b>SAD</b>)으로 움직임을
+            재고 얼굴 박스 변위로 탈락을 판정(자기 팔은 self-filter 제외). 기기 쪽엔 D435에서
+            <b>YOLO + ByteTrack</b>으로 per-kid를 추적하는 perception 노드가 따로 돕니다.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 04 ── -->
+    <section id="sec-04" class="section">
+      <div class="sec-head">
+        <div class="sec-num">04</div>
+        <h2 class="jua">어려웠던 점과 극복</h2>
+        <div class="tags"><span>단일 시계</span><span>2단 임계</span><span>self-filter</span></div>
+      </div>
+      <div class="reasons">
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">music_off</span></div>
+          <div>
+            <h4>① 노래가 중간에 끊김 → <code>audio.onended</code> 단일 기준</h4>
+            <p>가상 타이머는 빠른 박자에서 먼저 만료돼 "무궁화" 도중 끊겼다. 실제 오디오의
+               <code>onended</code>만 신뢰하고 진행률은 <code>currentTime</code>으로 추적해 끝까지 재생.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">schedule</span></div>
+          <div>
+            <h4>② 박자를 바꾸면 팔이 어긋남 → 시각을 하나로</h4>
+            <p>동작의 진행을 <b>오디오 시각에서 파생</b>시키는 단일 시계 구조로 바꿔, 빨라지든 느려지든
+               팔이 노래에 정확히 붙게 했다.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">how_to_reg</span></div>
+          <div>
+            <h4>③ 탈락자가 안 나갔는데 재개 → 연속 3회 확인</h4>
+            <p>탈락자가 안 보이고 전체 얼굴 수가 기대치 이하인 상태를 <b>세 번 연속</b> 만족해야 다음
+               라운드로 넘어가게 해, 식별이 잠깐 끊겨도 오판하지 않게 했다.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">rule</span></div>
+          <div>
+            <h4>④ "움직였다" 기준이 애매 → 2단 임계 + 자기 팔 제외</h4>
+            <p>전체 SAD로 1차 판정 후 얼굴 박스 변위로 <b>엄격/완화 2단 임계</b>를 적용하고, 로봇 자기
+               팔은 <b>self-filter</b>로 제외(애매하면 교사 수동 탈락)해 억울한 탈락을 줄였다.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="material-icons-round">celebration</span>
+        <p>무작위·점점 빠르게·점점 느리게 + 5차 곡선으로 <span class="k">술래 특유의 약 올리는 페이스</span>를
+           살렸고, 게임 진행 로직과 인식을 한 화면에 통합해 <b>실물 로봇 태블릿에서도 그대로</b> 돌았습니다.</p>
+      </div>
+    </section>
+
   </div>
 
   <script>

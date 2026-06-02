@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>일과 보고서(포털) · Q&A 보고서 — 이정우</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root{
+    --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
+    --border:rgba(255,255,255,.10); --accent:#FF6F86;
+    --accentSoft:rgba(255,111,134,.16);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard Variable',system-ui,sans-serif;
+    opacity:0; transition:opacity .3s ease; min-height:100vh;
+  }
+  .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 24px;
+    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
+  .back{
+    flex:0 0 auto;
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border);
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
+    padding:8px 16px; border-radius:999px; cursor:pointer;
+    transition:color .15s, border-color .15s, transform .15s;
+  }
+  .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
+    padding:8px 16px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s;
+  }
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(255,111,134,.26)}
+  .sec-nav a .n{color:var(--accent); font-size:13px}
+
+  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
+  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
+  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px; line-height:1.2}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
+
+  .keypoint{
+    display:flex; gap:12px; align-items:flex-start;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    border-radius:14px; padding:15px 18px; margin:0 0 24px;
+  }
+  .keypoint .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .keypoint p{margin:0; line-height:1.78; font-size:15px}
+  .keypoint b{color:var(--accent)}
+  .keypoint mark{background:var(--accent); color:#2A0F16; padding:0 5px; border-radius:4px; font-weight:700}
+
+  figure.hero{
+    margin:0 0 26px; max-width:640px; border:1px solid var(--border);
+    border-radius:16px; overflow:hidden; background:#0b0e14;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  figure.hero img{display:block; width:100%}
+  figure.hero figcaption{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
+
+  .stack{margin:0 0 34px}
+  .stack .lbl{display:block; color:var(--inkSoft); font-family:'Jua',sans-serif; letter-spacing:.12em; font-size:13px; margin:0 0 11px}
+  .tech-row{display:flex; flex-wrap:wrap; gap:9px}
+  .tech{display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:13.5px; padding:7px 14px; border-radius:999px}
+  .tech .material-icons-round{font-size:16px; color:var(--accent)}
+
+  .section{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:30px 34px; margin-bottom:28px;
+    scroll-margin-top:84px;
+  }
+  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px; flex-wrap:wrap}
+  .sec-num{
+    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
+    background:var(--accentSoft); color:var(--accent);
+    font-family:'Jua',sans-serif; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
+  .sec-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end}
+  .sec-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:12px; padding:4px 10px; border-radius:999px; font-family:ui-monospace,monospace}
+  @media (max-width:680px){ .sec-head .tags{margin-left:0; width:100%; justify-content:flex-start} }
+
+  .split{display:grid; grid-template-columns:1.05fr 1fr; gap:28px; align-items:center}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .media-box{
+    position:relative; border-radius:16px; overflow:hidden;
+    border:1px solid var(--border); background:#0b0e14;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  .media-box img{display:block; width:100%; height:auto}
+  .media-box .cap{padding:8px 13px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
+
+  .lead{font-size:16px; line-height:1.85; margin:0 0 14px}
+  .lead b{color:var(--accent)}
+
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:12px;
+    padding:16px 18px; margin-top:6px;
+  }
+  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
+  .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
+  .reasons{display:flex; flex-direction:column; gap:12px}
+  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
+  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
+  .reason .ic .material-icons-round{font-size:20px}
+  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
+  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
+  .reason b{color:var(--accent)}
+  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.9em; color:#FFD9A8}
+
+  #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
+</style>
+</head>
+<body>
+  <div id="page-fade"></div>
+
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav">
+      <a href="#sec-01"><span class="n">01</span> 두 화면, 한 데이터</a>
+      <a href="#sec-02"><span class="n">02</span> 사진 · 일정</a>
+      <a href="#sec-03"><span class="n">03</span> 어려웠던 점</a>
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <p class="eyebrow">Q&amp;A · 포털 · 일과 보고서</p>
+    <h1 class="jua">일과 보고서 — 교사가 쓰고, 학부모가 타임라인으로 본다</h1>
+    <p class="member">담당 · 이정우 &nbsp;·&nbsp; pingdergarten 포털(학부모·교사 웹) · 일과 보고서 + 일정</p>
+
+    <div class="keypoint">
+      <span class="material-icons-round">auto_awesome</span>
+      <p>같은 데이터 한 벌(이벤트 + 요약)로 <b>교사 작성 · 학부모 열람</b>을 모두 처리합니다 — 백엔드
+         형식이 흔들려도 <mark>화면이 안 깨진다</mark>는 견고함이 핵심입니다.</p>
+    </div>
+
+    <figure class="hero">
+      <img src="https://images.prismic.io/joey/ah547AeQX7-eWhss_report_ui.jpg?auto=format,compress" alt="일과 보고서 화면" />
+      <figcaption>실제 화면 — 좌측 아이 목록 + 시간순 타임라인(시간·점·카드) + 사진 + 요약 + 생성/편집.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <span class="lbl">STACK &amp; SKILLS</span>
+      <div class="tech-row">
+        <span class="tech"><span class="material-icons-round">code</span>Vue 3 · Vue Router</span>
+        <span class="tech"><span class="material-icons-round">inventory_2</span>Pinia (공용 store)</span>
+        <span class="tech"><span class="material-icons-round">edit_note</span>항목별 inline PATCH</span>
+        <span class="tech"><span class="material-icons-round">alt_route</span>이중 파싱(JSON→정규식)</span>
+        <span class="tech"><span class="material-icons-round">collections</span>Teleport 라이트박스</span>
+        <span class="tech"><span class="material-icons-round">schedule</span>60초 틱 현재시간 강조</span>
+        <span class="tech"><span class="material-icons-round">hourglass_bottom</span>이미지 lazy load</span>
+        <span class="tech"><span class="material-icons-round">auto_fix_high</span>AI 보고서 생성</span>
+      </div>
+    </div>
+
+    <!-- ── 01 ── -->
+    <section id="sec-01" class="section">
+      <div class="sec-head">
+        <div class="sec-num">01</div>
+        <h2 class="jua">두 화면, 한 데이터</h2>
+        <div class="tags"><span>Vue 3 · Router</span><span>Pinia</span><span>inline PATCH</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah546weQX7-eWhsr_report_ui2.jpg?auto=format,compress" alt="아이별 타임라인" />
+          <div class="cap">실제 화면 — 아이를 고르면 그 아이의 시간순 타임라인이 뜸.</div>
+        </div>
+        <div>
+          <p class="lead">
+            학부모 보고서(<code>parent/Report.vue</code>)는 <b>시간 | 점 | 카드</b>의 세로 타임라인 +
+            요약 카드로, 이벤트마다 표정 라벨(😊/😢)과 출결·놀이 사진을 그날 타임라인에 함께 묶습니다.
+          </p>
+          <p class="lead">
+            교사 화면(<code>teacher/Reports.vue</code>)에서는 같은 데이터를 <b>인라인으로 편집</b>하고,
+            각 항목을 고치면 <b>그 항목만 PATCH</b>로 저장합니다(통째 덮어쓰기 충돌·낭비 방지).
+            원본이 하나라 교사 편집이 학부모 화면에 어긋날 일이 없습니다.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 02 ── -->
+    <section id="sec-02" class="section">
+      <div class="sec-head">
+        <div class="sec-num">02</div>
+        <h2 class="jua">사진 갤러리 + 현재 시각 일정</h2>
+        <div class="tags"><span>Teleport</span><span>←/→/Esc</span><span>60초 틱</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah541geQX7-eWhsY_emo_01.jpg?auto=format,compress" alt="emotion capture 표정 사진" />
+          <div class="cap">놀이 중 자동 촬영된 emotion capture — 세션별 묶음 → 라이트박스 갤러리.</div>
+        </div>
+        <div>
+          <p class="lead">
+            무궁화·율동 중 자동 촬영된 표정 사진을 <b>세션(놀이)별로 묶어</b> 타임라인에 띄우고, 누르면
+            <code>Teleport</code>로 <b>body 직속 라이트박스 갤러리</b>가 열립니다(키보드 ←/→/Esc, lazy load).
+          </p>
+          <p class="lead">
+            학부모 일정(<code>parent/Schedule.vue</code>)은 하루 일과 그리드에서 <b>현재 시각의 칸을 강조</b>
+            합니다 — <code>setInterval</code> 60초 틱 + <code>HH:MM</code> 범위 비교로, 등/하원 행이 항상 보이게 보장.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 03 ── -->
+    <section id="sec-03" class="section">
+      <div class="sec-head">
+        <div class="sec-num">03</div>
+        <h2 class="jua">어려웠던 점과 극복</h2>
+        <div class="tags"><span>이중 파싱</span><span>세션 묶음</span></div>
+      </div>
+      <div class="reasons">
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">alt_route</span></div>
+          <div>
+            <h4>① JSON일 때도, 한 줄 평문일 때도 → 이중 파싱</h4>
+            <p>보고서 본문이 항상 깔끔한 JSON으로 오지 않고 백엔드 정리 과정에서 한 줄 평문으로 합쳐지기도
+               했다. <b>교사 JSON을 먼저 시도하고, 실패하면 본문에서 <code>HH:MM</code>을 정규식 스캔</b>해
+               평문도 여러 이벤트로 쪼개 화면이 안 깨지게 했다.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">photo_library</span></div>
+          <div>
+            <h4>② 사진이 여기저기 흩어짐 → 세션별 묶음 + 지연 로딩</h4>
+            <p>놀이마다 자동 촬영된 사진이 시간순으로 흩어져 보기 어려웠다. <b>세션별로 묶어</b> 타임라인
+               카드에 붙이고 라이트박스로 한 묶음을 넘겨 보게 했으며, 목록은 lazy load로 보이는 것만 불러왔다.</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:18px">
+        <span class="material-icons-round">verified</span>
+        <p>데이터가 JSON이든 합쳐진 평문이든 <span class="k">학부모 화면은 항상 또렷한 시간순 타임라인</span>으로
+           보이고, 놀이 사진은 그대로 추억 갤러리가 되며, 교사는 클릭 한 번으로 항목을 고치고 AI로 초안을 생성합니다.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+    function backToQna() {
+      var ov = document.getElementById('page-fade');
+      ov.style.opacity = '1';
+      setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
+    }
+  </script>
+</body>
+</html>

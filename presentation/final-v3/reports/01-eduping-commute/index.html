@@ -12,8 +12,10 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#FF6F86;
+    --accentSoft:rgba(255,111,134,.16);
   }
   *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
   html,body{margin:0}
   body{
     background:var(--bg); color:var(--ink);
@@ -21,9 +23,18 @@
     opacity:0; transition:opacity .3s ease; min-height:100vh;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+
+  /* 상단 고정 바 — 뒤로가기 버튼 + 섹션 뱃지를 같은 라인에 둔다 */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 24px;
+    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
   /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    flex:0 0 auto;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
     color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
@@ -31,53 +42,298 @@
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
+    padding:8px 16px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(255,111,134,.26)}
+  .sec-nav a .n{color:var(--accent); font-size:13px}
+
+  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
+  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
+  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px; line-height:1.2}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
+
+  /* 표지 — 핵심 + 데모 + 스택 칩 */
+  .keypoint{
+    display:flex; gap:12px; align-items:flex-start;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    border-radius:14px; padding:15px 18px; margin:0 0 24px;
+  }
+  .keypoint .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .keypoint p{margin:0; line-height:1.78; font-size:15px}
+  .keypoint b{color:var(--accent)}
+  .keypoint mark{background:var(--accent); color:#2A0F16; padding:0 5px; border-radius:4px; font-weight:700}
+
+  figure.hero{
+    margin:0 0 26px; max-width:520px; border:1px solid var(--border);
+    border-radius:16px; overflow:hidden; background:#000;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  figure.hero img{display:block; width:100%}
+  figure.hero figcaption{padding:9px 14px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
+
+  .stack{margin:0 0 34px}
+  .stack .lbl{display:block; color:var(--inkSoft); font-family:'Jua',sans-serif; letter-spacing:.12em; font-size:13px; margin:0 0 11px}
+  .tech-row{display:flex; flex-wrap:wrap; gap:9px}
+  .tech{display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--ink); font-size:13.5px; padding:7px 14px; border-radius:999px}
+  .tech .material-icons-round{font-size:16px; color:var(--accent)}
+
+  /* ── 섹션 카드 ── */
+  .section{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:30px 34px; margin-bottom:28px;
+    scroll-margin-top:84px;
+  }
+  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px; flex-wrap:wrap}
+  .sec-num{
+    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
+    background:var(--accentSoft); color:var(--accent);
+    font-family:'Jua',sans-serif; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
+  .sec-head .tags{margin-left:auto; display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end}
+  .sec-head .tags span{background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft); font-size:12px; padding:4px 10px; border-radius:999px; font-family:ui-monospace,monospace}
+  @media (max-width:680px){ .sec-head .tags{margin-left:0; width:100%; justify-content:flex-start} }
+
+  .split{display:grid; grid-template-columns:1.15fr 1fr; gap:28px; align-items:center}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .media-box{
+    position:relative; border-radius:16px; overflow:hidden;
+    border:1px solid var(--border); background:#000;
+    box-shadow:0 14px 40px rgba(0,0,0,.45);
+  }
+  .media-box img,.media-box video{display:block; width:100%; height:auto}
+  .media-box .cap{padding:8px 13px; font-size:13px; color:var(--inkSoft); background:rgba(255,255,255,.04); border-top:1px solid var(--border)}
+
+  .stat{display:flex; align-items:baseline; gap:10px; margin:0 0 16px}
+  .stat .num{font-family:'Jua',sans-serif; font-size:54px; color:var(--accent); line-height:1}
+  .stat .unit{font-family:'Jua',sans-serif; font-size:22px; color:var(--ink)}
+  .stat .label{color:var(--inkSoft); font-size:15px}
+
+  .lead{font-size:16px; line-height:1.85; margin:0 0 16px}
+  .lead b{color:var(--accent)}
+  .balls{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px}
+  .pill{font-size:13px; padding:4px 12px; border-radius:999px; font-weight:700; border:1px solid var(--border)}
+  .pill.r{color:#FF8A8A; background:rgba(255,138,138,.14); border-color:rgba(255,138,138,.4)}
+  .pill.b{color:#7CC4FF; background:rgba(124,196,255,.14); border-color:rgba(124,196,255,.4)}
+
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:12px;
+    padding:16px 18px; margin-top:6px;
+  }
+  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
+  .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
+  .reasons{display:flex; flex-direction:column; gap:12px}
+  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
+  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
+  .reason .ic .material-icons-round{font-size:20px}
+  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
+  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
+  .reason b{color:var(--accent)}
+  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.9em; color:#FFD9A8}
+
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
+  <!-- 상단 바: ⚠️ 뒤로가기 버튼(반드시 유지) + 섹션 인덱스 뱃지(필수) -->
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav">
+      <a href="#sec-01"><span class="n">01</span> 손을 3D로</a>
+      <a href="#sec-02"><span class="n">02</span> closed-loop IK</a>
+      <a href="#sec-03"><span class="n">03</span> 동작 · 트윈</a>
+      <a href="#sec-04"><span class="n">04</span> 어려웠던 점</a>
+    </nav>
+  </div>
 
   <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 01</p>
-    <h1 class="jua">등/하원</h1>
-    <p class="member">담당 · 이정우</p>
+    <p class="eyebrow">Q&amp;A · 01 · 등/하원</p>
+    <h1 class="jua">등원 하이파이브 — 손을 3D로 찾아, 손바닥을 마주치기까지</h1>
+    <p class="member">담당 · 이정우 &nbsp;·&nbsp; EduPing(OpenArm 양팔) · 뎁스 하이파이브</p>
 
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">waving_hand</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>이정우 님이 작성할 <b style="color:var(--ink)">등/하원</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
+    <div class="keypoint">
+      <span class="material-icons-round">auto_awesome</span>
+      <p>고정 보정값을 버리고 <b>FK로 실제 위치를 재측정해 스스로 교정</b>(closed-loop) — 손 빗나감 20~28&nbsp;cm 를 <mark>2&nbsp;cm 이내</mark>로 줄였습니다. 실물 OpenArm이 있지만 <b>먼저 시뮬레이션으로 검증한 뒤 실물로 시연</b>했습니다.</p>
     </div>
+
+    <figure class="hero">
+      <img src="https://images.prismic.io/joey/ah544AeQX7-eWhsi_hifive_final.gif" alt="최종 실물 하이파이브 데모" />
+      <figcaption>최종 데모 — 실물 OpenArm 하이파이브(시뮬 검증 후 실물 시연).</figcaption>
+    </figure>
+
+    <div class="stack">
+      <span class="lbl">STACK &amp; SKILLS</span>
+      <div class="tech-row">
+        <span class="tech"><span class="material-icons-round">back_hand</span>MediaPipe HandLandmarker</span>
+        <span class="tech"><span class="material-icons-round">3d_rotation</span>뎁스 역투영(deprojection)</span>
+        <span class="tech"><span class="material-icons-round">precision_manufacturing</span>TRAC-IK (position-only)</span>
+        <span class="tech"><span class="material-icons-round">loop</span>closed-loop IK→FK</span>
+        <span class="tech"><span class="material-icons-round">view_in_ar</span>three.js · URDFLoader</span>
+        <span class="tech"><span class="material-icons-round">show_chart</span>5차(quintic) 궤적</span>
+        <span class="tech"><span class="material-icons-round">science</span>MuJoCo 디지털 트윈</span>
+        <span class="tech"><span class="material-icons-round">hub</span>ROS 2 Jazzy · MoveIt</span>
+      </div>
+    </div>
+
+    <!-- ── 01 ── -->
+    <section id="sec-01" class="section">
+      <div class="sec-head">
+        <div class="sec-num">01</div>
+        <h2 class="jua">손을 3D로 본다</h2>
+        <div class="tags"><span>MediaPipe</span><span>역투영</span><span>D435</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah541QeQX7-eWhsX_browser_cloud.jpg?auto=format,compress" alt="브라우저 포인트클라우드" />
+          <div class="cap">브라우저 3D 뷰 — 무지개색이 손 포인트클라우드.</div>
+        </div>
+        <div>
+          <p class="lead">
+            <b>MediaPipe HandLandmarker</b>(GPU)로 손바닥 중심을 잡고,
+            같은 픽셀의 뎁스 값과 카메라 내부 파라미터로 <b>3차원 좌표를 복원</b>합니다(역투영).
+            이 점이 로봇이 가야 할 목표가 되고, 화면에는 손 영역이 무지개색
+            포인트클라우드로 떠서 어디를 인식했는지 바로 보입니다.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 02 ── -->
+    <section id="sec-02" class="section">
+      <div class="sec-head">
+        <div class="sec-num">02</div>
+        <h2 class="jua">파란 공을 빨간 공에 — closed-loop 역기구학 ★</h2>
+        <div class="tags"><span>TRAC-IK</span><span>IK→FK</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah545AeQX7-eWhsl_hifive_sim.gif" alt="블루·레드 볼 시뮬" />
+          <div class="cap">좌 브라우저 / 우 MuJoCo — 파란 공이 빨간 공으로 수렴.</div>
+        </div>
+        <div>
+          <div class="stat">
+            <span class="num">2</span><span class="unit">cm</span>
+            <span class="label">고정 보정 20~28&nbsp;cm → closed-loop 수렴 오차</span>
+          </div>
+          <div class="balls">
+            <span class="pill r">🔴 빨간 공 = 아이(사람) 손</span>
+            <span class="pill b">🔵 파란 공 = 로봇 손바닥</span>
+          </div>
+          <p class="lead">
+            디버깅을 쉽게 하려고 시뮬에 공 두 개를 띄워 "<b>파란 공을 빨간 공에 맞추는 게임</b>"으로
+            바꿨습니다. <b>TRAC-IK</b>(위치 전용)로 보낸 뒤 <b>FK로 파란 공의 실제 위치를 다시 재고</b>,
+            오차만큼 목표를 밀어 재-IK — 다섯 번이면 2&nbsp;cm 이내로 수렴합니다.
+          </p>
+          <div class="callout">
+            <span class="material-icons-round">flag</span>
+            <p>자세(orientation)는 풀지 않고 <span class="k">위치 전용</span>으로 — 손바닥이 한 점에
+               닿기만 하면 되고, 방향까지 맞추면 팔의 좁은 작동 범위에선 해가 거의 안 나오기 때문입니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 03 ── -->
+    <section id="sec-03" class="section">
+      <div class="sec-head">
+        <div class="sec-num">03</div>
+        <h2 class="jua">4단계 동작 &amp; 디지털 트윈 검증</h2>
+        <div class="tags"><span>5차 궤적</span><span>three.js</span><span>MuJoCo</span></div>
+      </div>
+      <div class="split">
+        <div class="media-box">
+          <img src="https://images.prismic.io/joey/ah548AeQX7-eWhsw_twin_blueball.jpg?auto=format,compress" alt="MuJoCo 트윈" />
+          <div class="cap">트윈 — 초록 박스 안 파란 공이 손 포인트클라우드로 수렴.</div>
+        </div>
+        <div>
+          <p class="lead">
+            동작은 <b>5차 다항식 보간</b>으로 ① 들기 → ② 마주치기 → ③ 반동 → ④ 복귀를
+            부드럽게 밟고, 드는 동안에는 손을 실시간으로 따라가다 마주치기 직전 목표를 고정합니다.
+            브라우저 3D 뷰어는 <b>three.js + URDFLoader</b>로 양팔·포인트클라우드·초록 박스·D435
+            프러스텀을 합성(무거운 COLLADA 메시는 <code>.glb</code>로 변환).
+          </p>
+          <div class="callout">
+            <span class="material-icons-round">science</span>
+            <p>실물로 옮기기 전 <span class="k">MuJoCo 디지털 트윈</span>(500&nbsp;Hz)과 자동 측정
+               스크립트로 "어깨 위 침범 / 손에 닿는 거리 / 떨림"을 수치로 확인하며 튜닝한 뒤 실물 시연으로 이어갔습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 04 ── -->
+    <section id="sec-04" class="section">
+      <div class="sec-head">
+        <div class="sec-num">04</div>
+        <h2 class="jua">어려웠던 점과 극복</h2>
+        <div class="tags"><span>미러 풀이</span><span>moveit_servo 우회</span><span>DCP-RMP</span></div>
+      </div>
+      <div class="reasons">
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">straighten</span></div>
+          <div>
+            <h4>① 손이 20~28&nbsp;cm씩 빗나감 → closed-loop</h4>
+            <p>팔뚝 회전(j5) 자유도 때문에 목표마다 손바닥 방향이 달라져 고정 보정값이 들쭉날쭉했다.
+               <b>실제 결과(FK)를 측정해 스스로 교정</b>하니 2&nbsp;cm 이내로 안정.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">flip</span></div>
+          <div>
+            <h4>② 왼팔이 어깨를 안 폄 → 미러(대칭) 풀이</h4>
+            <p>시뮬에서 왼팔만 IK가 어깨를 평평하게 풀어 어색했다. <b>왼팔 목표를 좌우 대칭해 오른팔
+               그룹으로 풀고 해를 다시 대칭</b>해 되돌려 양팔이 똑같이 어깨를 폄(FK 검증 오차 1.1&nbsp;cm).</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">bolt</span></div>
+          <div>
+            <h4>③ <code>moveit_servo</code>가 무한 대기 → IK + 촘촘한 궤적으로 우회</h4>
+            <p>ROS 2 Jazzy의 clock-type 버그로 초기화에서 멈췄고 apt 패치도 없었다.
+               <b>IK로 푼 목표를 촘촘한 궤적으로 높은 빈도 재계획</b>해 서보 없이 비슷한 부드러움을 얻음.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">unfold_more</span></div>
+          <div>
+            <h4>④ MoveIt ↔ MuJoCo 위치가 Z로 ~10&nbsp;cm 어긋남 → 팔별 보정</h4>
+            <p>두 기구학 모델의 상수 차이로 생긴 고정 오차임을 확인하고 <b>팔별 오프셋을 캘리브레이션</b>
+               (근본 해결은 두 URDF 일치).</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">block</span></div>
+          <div>
+            <h4>⑤ 다가오는 손·자기 팔을 장애물로 오인 → 손 grace + depth-mask</h4>
+            <p>장애물 회피(<b>DCP-RMP</b>)가 하이파이브하려는 손/팔까지 오탐해, 최종 데모에선
+               <b>손 가시성 grace · depth-mask</b> 위주로 간소화(전체 회피 코드는 남겨 둠).</p>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:18px">
+        <span class="material-icons-round">verified</span>
+        <p>가장 자랑하고 싶은 건 <span class="k">"시뮬 먼저, 그다음 실물"</span> 흐름을 끝까지 완주한 점 —
+           화면 속 검증 그대로 그리퍼가 아이 손바닥에 정확히 닿습니다.</p>
+      </div>
+    </section>
+
   </div>
 
   <script>
