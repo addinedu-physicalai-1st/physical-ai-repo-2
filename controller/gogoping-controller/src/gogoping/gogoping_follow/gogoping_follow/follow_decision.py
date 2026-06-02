@@ -54,6 +54,7 @@ def decide_follow_action(
     initial_threshold: float,
     lost_duration_s: float = 0.0,
     recovery_lost_timeout_s: float = 2.0,
+    stop_release_margin: float = 0.0,
 ) -> Decision:
     """Distance + prev_mode + lost_duration → next mode.
 
@@ -62,10 +63,13 @@ def decide_follow_action(
     그 외 NaN distance → prev_mode 유지.
 
     Active 거리 기반 분기 (기존 hybrid 로직):
-    - distance < stop_max → STOP
+    - distance < stop_max → STOP (단, prev=STOP 이면 stop_max+stop_release_margin 까지 유지)
     - prev=REACTIVE: distance > reactive_max → NAV2, else REACTIVE
     - prev=NAV2:     distance < nav2_min → REACTIVE, else NAV2
     - prev=IDLE/STOP/etc: distance < initial_threshold → REACTIVE, else NAV2
+
+    ``stop_release_margin`` 으로 STOP 진입/이탈 임계 분리 (hysteresis) — 경계 jitter 로
+    STOP↔REACTIVE 가 펄럭여 cmd_vel 이 끊기는 것 방지. 0 (기본) → 진입=이탈=stop_max.
     """
     # Voice-guided mode 는 distance 와 무관하게 prev 유지 (전이는 _on_hint / _tick).
     if prev_mode in _VOICE_MODES:
@@ -80,8 +84,12 @@ def decide_follow_action(
         # 그 외 (IDLE/RECOVERY/WAITING_HINT/짧은 lost) → prev 유지
         return Decision(mode=prev_mode)
 
-    # 1) STOP 영역은 mode 무관 즉시
-    if distance_m < stop_max:
+    # 1) STOP 영역 — hysteresis. 진입은 stop_max, 이탈은 stop_max+margin 이상에서만.
+    if prev_mode == DecisionMode.STOP:
+        if distance_m < stop_max + stop_release_margin:
+            return Decision(mode=DecisionMode.STOP)
+        # margin 위로 회복 → 아래 active 분기로 fall-through (prev=STOP → initial_threshold 사용)
+    elif distance_m < stop_max:
         return Decision(mode=DecisionMode.STOP)
 
     # 2) hysteresis — 현 mode 따라 다른 임계

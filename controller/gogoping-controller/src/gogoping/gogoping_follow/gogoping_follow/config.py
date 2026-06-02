@@ -1,16 +1,19 @@
 """gogoping_follow 튜닝 상수 — Nav2 통합."""
 
 # ---------- Follow geometry ----------
-FOLLOW_DISTANCE_M = 1.0         # target 뒤 goal 거리 (한 걸음 반 = 안전거리)
+FOLLOW_DISTANCE_M = 1.3         # target 뒤 goal 거리 — STOP(0.8) 과 0.5m 버퍼로 끊김 방지
 GOAL_CHANGE_THRESHOLD_M = 0.3   # 이전 goal 과 이 거리 이상 차이날 때만 새 goal — Nav2 reissue spam 회피
 
 # ---------- Hybrid mode thresholds (distance-based, with hysteresis) ----------
 # distance_m 으로 STOP / REACTIVE / NAV2 결정. hysteresis 로 mode flapping 방지.
 # 영역: <stop_max=STOP / stop_max~reactive_max=REACTIVE / >nav2_min=NAV2.
-STOP_MAX_DISTANCE_M     = 0.9   # 이 미만이면 STOP (안전거리)
-REACTIVE_MAX_DISTANCE_M = 1.7   # REACTIVE → NAV2 hysteresis 상단
-NAV2_MIN_DISTANCE_M     = 1.2   # NAV2 → REACTIVE hysteresis 하단
-INITIAL_MODE_THRESHOLD_M = 1.4  # IDLE/STOP → ACTIVE 진입 시 REACTIVE/NAV2 분기
+STOP_MAX_DISTANCE_M     = 0.8   # 이 미만이면 STOP (안전거리, 카메라 기준 — 로봇 앞면 ≈ 0.5m)
+STOP_RELEASE_MARGIN_M   = 0.15  # STOP 이탈 hysteresis — stop_max+이 값 이상에서만 해제 (경계 flapping/끊김 방지)
+# REACTIVE 가 상시 추종, NAV2 는 큰 격차/시야밖 전용. nav2_min > FOLLOW_DISTANCE_M 필수 —
+# 작으면 NAV2 가 세운 위치(target)가 복귀 임계 아래라 REACTIVE 로 못 넘어와 NAV2 에 갇힌다.
+REACTIVE_MAX_DISTANCE_M = 2.5   # REACTIVE → NAV2 hysteresis 상단 (이 격차까지는 reactive 연속 추종)
+NAV2_MIN_DISTANCE_M     = 1.5   # NAV2 → REACTIVE hysteresis 하단 (target 위 — 반드시 > FOLLOW_DISTANCE_M)
+INITIAL_MODE_THRESHOLD_M = 2.5  # IDLE/STOP → ACTIVE 진입 시 REACTIVE/NAV2 분기
 
 # EMA filter alpha — angle_deg jitter 가 estimate_follow_goal 의 atan2(dy,dx)
 # 진동으로 amplify 되는 것을 smoothing 으로 억제. 0.15 ≈ 5Hz → 1.4s 시정수.
@@ -20,10 +23,13 @@ TRACKING_STATE_EMA_ALPHA = 0.15
 # distance / angle error 로부터 cmd_vel 직접 계산 (Nav2 거치지 않음).
 REACTIVE_KP_LIN              = 0.5    # m/s per m
 REACTIVE_KP_ANG              = 0.6    # rad/s per rad
-REACTIVE_MAX_LIN             = 0.3    # m/s
+REACTIVE_MAX_LIN             = 0.4    # m/s — 격차 벌어질 때 catch-up 상한 (느린 추종 시엔 자연히 낮음)
 REACTIVE_MAX_ANG             = 0.4    # rad/s — doorway sharp turn 보수적
 REACTIVE_DIST_DEADBAND_M     = 0.05
 REACTIVE_ANGLE_DEADBAND_DEG  = 5.0
+# cmd_vel slew (가속/감속 상한) — 출발·정지를 매끈하게. follow_node 가 매 tick 적용. 0=무제한.
+REACTIVE_MAX_LIN_ACCEL       = 0.5    # m/s²  (0→MAX_LIN 0.4 까지 ≈ 0.8s)
+REACTIVE_MAX_ANG_ACCEL       = 1.2    # rad/s²
 CMD_VEL_RAW_TOPIC = "/gogoping/cmd_vel_raw"  # safety_filter input
 
 # ---------- LiDAR fusion ----------
@@ -34,7 +40,8 @@ LIDAR_MAX_M = 8.0
 LIDAR_YAW_OFFSET_RAD = 3.14159265358979
 
 # ---------- Control loop ----------
-NAV2_GOAL_HZ = 2.0
+NAV2_GOAL_HZ = 2.0            # NAV2 goal 재발행 상한 (변화 > GOAL_CHANGE_THRESHOLD_M 일 때만 send)
+CONTROL_HZ = 10.0            # _tick_control 주기 — REACTIVE cmd_vel/slew/recovery 적분 dt 기준 (2→10Hz, 끊김 완화)
 STATE_STALE_TIMEOUT_S = 5.0   # tracking_state 가 이 시간 안 오면 lost
 
 # ---------- Frame names ----------
@@ -50,6 +57,12 @@ CLOSE_TRIGGER_DIST_M        = 0.0   # 0 = close 비활성화
 CLOSE_RELEASE_DIST_M        = 2.0
 CLOSE_ANGLE_STABLE_DEG      = 15.0
 CLOSE_ANGLE_STABLE_S        = 1.0
+
+# ---------- Doorway 통과 (costmap 회피) ----------
+# REACTIVE 직진은 문틀 회피 못 함 — doorway vertex 근처면 NAV2(costmap)로 문 gap 경로계획 강제.
+# AMCL + costmap 전제, planning latency 감안해 미리 켠다. 0 → 비활성(blind REACTIVE).
+DOORWAY_NAV2_TRIGGER_M = 2.0   # robot↔doorway vertex 이 거리 안 → NAV2 강제 (진입 임계)
+DOORWAY_NAV2_RELEASE_M = 2.8   # NAV2 유지 hysteresis 상단 — 통과 후 이 거리 벗어나면 REACTIVE 복귀
 
 # ---------- Recovery (자동 회복) ----------
 # tracking 잃은 후 RECOVERY_LOST_TIMEOUT_S 지속되면 RECOVERY 진입.

@@ -200,22 +200,9 @@ global_costmap:
       footprint: '[[0.10, -0.2625], [0.10, 0.2625], [-0.50, 0.2625], [-0.50, -0.2625]]'
       resolution: 0.05
       track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /gogoping/scan_filtered
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          # ← Gazebo LIDAR 자기 몸체 스캔 방지 (반치수 0.30 + 여유 0.05). default 0.0
-          raytrace_min_range: 0.35
-          obstacle_max_range: 2.5
-          obstacle_min_range: 0.35
+      # 동적 장애물 (사람 등) 이 map frame 에 흔적으로 누적되는 것 방지 — global 은
+      # static_layer 만. 동적 회피는 local_costmap/voxel_layer (rolling_window) 가 전담.
+      plugins: ["static_layer", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
