@@ -9,6 +9,7 @@
                   ✓ (muted)       = SUCCESS — 완료, 취소선
                   ✗ (red, bold)   = FAILURE
                   ○ (faint)       = INVALID / PENDING — 아직 실행 안 됨
+                  ⛔ (danger,bold) = CollisionMonitor + collision_state="stop" — 충돌 정지 중
                   Sequence 의 진행도가 한눈에 보임.
 - 셀 3 (BT sub):  동일 포맷. SubTree 없으면 "—" placeholder.
 
@@ -80,17 +81,44 @@ _STATE_COLORS: dict[str, tuple[str, str]] = {
 
 _PLACEHOLDER = "—"
 
+# CollisionMonitor leaf 는 항상 RUNNING 만 반환 → 기본 렌더로는 "ok"/"stop" 구분 불가.
+# snapshot top-level collision_state 를 주입해 "stop" 일 때만 경고 렌더로 덮어쓴다.
+_COLLISION_LEAF_NAME = "CollisionMonitor"
+_COLLISION_STOP = "stop"
 
-def _render_child_html(child: dict) -> str:
+
+def _render_child_html(child: dict, collision_state: str | None = None) -> str:
     """status 별 시각화 — 점/체크/엑스 + 텍스트 스타일.
 
     ``child["disabled"] == True`` 면 status 와 무관하게 *비활성* 표시 (회색 ⊘ +
     strikethrough + dim 텍스트). 시연/디버그용 monitor disable 시 표시. snapshot 의
     ``disabled`` 키는 tree_inspector._leaf_dict 가 monitor 의 ``_disabled`` 속성
     True 일 때만 포함.
+
+    CollisionMonitor 는 escalation(``_disabled`` = 5분 stuck → cancel/fault) 이 꺼져도
+    충돌 감지 자체(nav2 collision_monitor 노드 + collision_subscriber)는 ``disable_error_safety``
+    와 무관하게 **항상 동작**한다. 따라서 disabled 여부와 상관없이 live ``collision_state`` 로
+    표시 — "실행 중인데 disabled" 거짓 표시를 막는다. (HardwareHealth/MapBoundary 는 데이터
+    plane 이 따로 없어 disable 시 진짜 무동작 → 그대로 ⊘ disabled 표시.)
+    - "stop" → danger ⛔ (멈춤)
+    - 그 외("ok"/미수신) → 다른 RUNNING leaf 와 동일한 ● 감시 중
     """
     name = str(child.get("name", "?"))
     status = str(child.get("status", "INVALID")).upper()
+
+    if name == _COLLISION_LEAF_NAME:
+        if collision_state == _COLLISION_STOP:
+            # 충돌 stop — 다른 leaf 와 확실히 구분되는 경고 (danger ⛔ + bold + (멈춤)).
+            return (
+                f"<span style='color: {COLORS['danger']};'>⛔</span>"
+                f"&nbsp;<b style='color: {COLORS['danger']};'>{name}</b>"
+                f"&nbsp;<span style='color: {COLORS['warning']}; font-size: 8pt;'>(멈춤)</span>"
+            )
+        # ok / 미수신 — 감지는 항상 실행 중이므로 ● 감시 중 (escalation off 여도 동일).
+        return (
+            f"<span style='color: {COLORS['sky']};'>●</span>"
+            f"&nbsp;<b style='color: {COLORS['text']};'>{name}</b>"
+        )
 
     if child.get("disabled"):
         return (
@@ -252,7 +280,7 @@ class _TreeCell(_Cell):
 
         self.set_data(None)
 
-    def set_data(self, tree_block: dict | None) -> None:
+    def set_data(self, tree_block: dict | None, collision_state: str | None = None) -> None:
         if tree_block is None:
             self._title.setText(_PLACEHOLDER)
             self._children.setText(
@@ -268,7 +296,7 @@ class _TreeCell(_Cell):
                 f"(자식 없음)</span>"
             )
             return
-        lines = [_render_child_html(c) for c in children]
+        lines = [_render_child_html(c, collision_state) for c in children]
         self._children.setText("<br>".join(lines))
 
 
@@ -315,8 +343,11 @@ class BTStateInline(QWidget):
 
     def update_snapshot(self, snapshot: dict) -> None:
         """state_client 가 WS 메시지 받아서 호출."""
+        collision_state = snapshot.get("collision_state")
         self._state.set_state(snapshot.get("fsm_state", _PLACEHOLDER))
-        self._main.set_data(snapshot.get("main_tree"))
+        # collision_state 는 CollisionMonitor leaf 가 있는 main 트리에만 의미 (게이팅 대상
+        # GOTO/RETURNING/LOW_BATTERY_RETURNING/HIDEANDSEEK). sub 트리엔 해당 leaf 없음.
+        self._main.set_data(snapshot.get("main_tree"), collision_state)
         self._sub.set_data(snapshot.get("sub_tree"))
 
     def reset(self) -> None:

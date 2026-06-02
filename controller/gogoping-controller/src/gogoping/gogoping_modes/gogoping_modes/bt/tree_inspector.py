@@ -25,6 +25,7 @@ snapshot 구조::
         "person_dist_m": 0.5
       },                      # robot-web StatusBar 가 "앞에 친구가 있어요" 안내 표시
       "error_reason": "out_of_map",  # fault 사유 (blackboard.error_reason). state 필터 없음 (robot-web 이 ERROR 일 때만 사용)
+      "collision_state": "ok",  # nav2 collision_monitor 게이트 상태 "ok"|"stop" (blackboard.collision_state). admin UI 실시간 표시
       "ts": 1730000035.123
     }
 
@@ -70,6 +71,7 @@ def _ensure_bb_reader() -> py_trees.blackboard.Client:
         _bb_reader.register_key(key=Keys.PATROL_CURRENT_INDEX, access=Access.READ)
         _bb_reader.register_key(key=Keys.HIDESEEK_PHASE, access=Access.READ)
         _bb_reader.register_key(key=Keys.ERROR_REASON, access=Access.READ)
+        _bb_reader.register_key(key=Keys.COLLISION_STATE, access=Access.READ)
     return _bb_reader
 
 
@@ -247,6 +249,11 @@ def snapshot(
         # 때만 비어있지 않다. 소비자(robot-web)는 fsm_state==='ERROR' 일 때만 사용.
         # (e.g. "out_of_map" / "lidar_timeout" / "")
         "error_reason": _read_str_key(Keys.ERROR_REASON),
+        # collision 게이트 상태 — admin UI 가 "ok" / "stop" 실시간 표시.
+        # collision_subscriber 가 nav2 collision_monitor state 토픽에서 W. CollisionMonitor
+        # leaf 는 항상 RUNNING 만 반환해 트리뷰 status 로는 stop 여부를 알 수 없으므로, 실제
+        # collision 값은 이 필드로만 노출된다. 미수신/예외 시 "" (init 기본값 "ok").
+        "collision_state": _read_str_key(Keys.COLLISION_STATE),
         "ts": time.time(),
     }
 

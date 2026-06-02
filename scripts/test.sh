@@ -129,6 +129,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_hideseek_subtree_sequence.py \
   tests/test_gogoping_hideseek_phase_snapshot.py \
   tests/test_gogoping_error_reason_snapshot.py \
+  tests/test_gogoping_collision_state_snapshot.py \
   tests/test_gogoping_bt_main_sub_separation.py \
   tests/test_gogoping_hideseek_caught_api.py \
   tests/test_gogoping_hideseek_bridge_cache.py \
@@ -366,6 +367,21 @@ conda run -n jazzy pytest tests/test_camera_pan_card.py -v "$@" || {
     echo "  ※ pytest-qt 미설치 — 전체 SKIPPED (정상)"
   elif [[ "$rc" -eq 134 ]]; then
     echo "  ※ Qt cleanup SIGABRT — 테스트 결과는 정상"
+  else
+    EXIT=1
+  fi
+}
+echo "⏱ 위 구간 벽시계: $((SECONDS - t0))s"
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "[admin-app] BT state inline — CollisionMonitor leaf collision_state 렌더 (순수 함수)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+t0=$SECONDS
+conda run -n jazzy pytest tests/test_bt_state_inline_collision.py -v "$@" || {
+  rc=$?
+  if [[ "$rc" -eq 5 ]]; then
+    echo "  ※ PyQt5 미설치 — 전체 SKIPPED (정상)"
   else
     EXIT=1
   fi
