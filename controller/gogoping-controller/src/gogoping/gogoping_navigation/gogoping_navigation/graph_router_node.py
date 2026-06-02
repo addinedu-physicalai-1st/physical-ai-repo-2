@@ -56,6 +56,7 @@ RESUME_GRACE_S = 1.0               # 사람이 이 시간 이상 확실히 비�
 IN_PLACE_ROTATE_TOLERANCE_RAD = 0.10   # ~5.7° 이내면 회전 skip
 IN_PLACE_ROTATE_SPEED_RAD_S = 0.5      # 회전 속도 (약 30°/s)
 IN_PLACE_ROTATE_TIMEOUT_S = 25.0       # 안전 timeout — 최악 180°(0.35rad/s=8.98s) + 넉넉한 여유
+IN_PLACE_ROTATE_SETTLE_DWELL_S = 1.0   # 회전 완료 후 출발 전 정지 dwell — 잔여 각속도 가라앉혀 흔들림 방지
 
 # action_msgs/GoalStatus — admin UI 에 raw int 대신 사람 말로 표시.
 # (STATUS_UNKNOWN=0 / ACCEPTED=1 / EXECUTING=2 / CANCELING=3 / SUCCEEDED=4 / CANCELED=5 / ABORTED=6)
@@ -248,6 +249,11 @@ class GraphRouterNode(Node):
                 self._dbg(
                     f"in-place rotate done (Δ={math.degrees(diff):.1f}°)"
                 )
+                # 회전 완료 후 출발 전 settle dwell — 잔여 각속도 가라앉히고
+                # 다음 nav goal 출발이 또렷하게 끊기도록 정지 유지 (2026-06-02).
+                if IN_PLACE_ROTATE_SETTLE_DWELL_S > 0.0:
+                    self._cmd_vel_pub.publish(Twist())   # dwell 동안 zero 유지
+                    time.sleep(IN_PLACE_ROTATE_SETTLE_DWELL_S)
                 return True
             twist.linear.x = 0.0
             twist.angular.z = IN_PLACE_ROTATE_SPEED_RAD_S * (1.0 if diff > 0 else -1.0)
