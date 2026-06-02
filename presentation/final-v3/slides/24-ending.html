@@ -1,4 +1,4 @@
-<section class="title-slide">
+<section id="qna" class="title-slide">
   <div class="bg-deco">
     <div class="spin-slow" style="position:absolute;width:900px;height:900px;top:50%;left:50%;transform:translate(-50%,-50%);background:conic-gradient(from 0deg, var(--babypinkSoft), var(--lavenderSoft), var(--mintSoft), var(--butterSoft), var(--babypinkSoft));border-radius:50%;opacity:0.28;filter:blur(60px);z-index:0"></div>
     <div class="blob drift-1" style="width:320px;height:320px;background:var(--babypinkSoft);top:-90px;left:-70px"></div>
@@ -6,88 +6,137 @@
     <div class="dots"></div>
   </div>
 
-  <div class="layer" style="padding:30px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:2;align-items:center">
+  <div class="layer" style="padding:28px 56px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:2;align-items:center">
 
-    <h1 class="font-display shine-text" style="font-size:4.5em;line-height:0.95;margin:6px 0 0;letter-spacing:-0.03em">Q&amp;A</h1>
-    <p style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.25em;margin:6px 0 0">질문을 클릭하면 답변 슬라이드로 이동합니다</p>
-
-    <div style="flex:1;width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:12px;margin-top:22px;min-height:0">
-
-      <div onclick="Reveal.slide(26)" style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--lavInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--lavenderSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--lavInk)">psychology</span>
-          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">01 IMITATION</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">모방학습 (ACT)</h3>
-      </div>
-
-      <div onclick="Reveal.slide(27)" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--babypink)">local_florist</span>
-          <p style="color:var(--babypink);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">02 MUGUNGHWA</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">무궁화 device-local</h3>
-      </div>
-
-      <div onclick="Reveal.slide(28)" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--skyInk)">stethoscope</span>
-          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">03 DOCTOR</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">원격 진찰</h3>
-      </div>
-
-      <div onclick="Reveal.slide(29)" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--babypink)">shield</span>
-          <p style="color:var(--babypink);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">04 SAFETY</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">근접 안전정지</h3>
-      </div>
-
-      <div onclick="Reveal.slide(30)" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--mintInk)">directions_walk</span>
-          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">05 FOLLOW</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">교사 추종 (GogoPing)</h3>
-      </div>
-
-      <div onclick="Reveal.slide(31)" style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--butterInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--butterSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--butterInk)">graphic_eq</span>
-          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">06 WAKE WORD</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">호출어 (ONNX 브라우저)</h3>
-      </div>
-
-      <div onclick="Reveal.slide(32)" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--mintInk)">account_tree</span>
-          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">07 NAV + BT</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">자율 주행 · 행동트리</h3>
-      </div>
-
-      <div onclick="Reveal.slide(33)" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--babypink)">family_restroom</span>
-          <p style="color:var(--babypink);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">08 PORTAL</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">Portal · 일과 보고서</h3>
-      </div>
-
-      <div onclick="Reveal.slide(34)" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="material-icons-round" style="font-size:24px;color:var(--skyInk)">hub</span>
-          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">09 SYSTEM</p>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">시스템 아키텍처</h3>
-      </div>
-
+    <!-- 인트로: 큰 Q&A 글씨만. 클릭하면 팝업이 열린다. -->
+    <div id="qna-intro" style="flex:1;width:100%;display:flex;align-items:center;justify-content:center">
+      <h1 onclick="qnaShow()" class="font-display shine-text" style="font-size:13em;line-height:0.9;margin:0;letter-spacing:-0.03em;cursor:pointer;transition:transform .18s" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform=''">Q&amp;A</h1>
     </div>
 
-    <p style="color:var(--inkSoft);font-family:'Jua';font-size:0.65em;letter-spacing:0.2em;margin-top:14px">사랑의 에듀핑 · pingdergarten · 감사합니다</p>
+    <!-- 팝업: Q&A 클릭 시 표시. 딤 영역/✕ 클릭하면 닫힘. -->
+    <div id="qna-popup" style="display:none;position:absolute;inset:0;z-index:10;background:rgba(8,6,12,0.72);align-items:center;justify-content:center" onclick="qnaReset()">
+
+      <div onclick="event.stopPropagation()" style="position:relative;width:1100px;max-width:92%;background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,0.5);padding:30px 34px 34px;display:flex;flex-direction:column">
+
+        <button onclick="qnaReset()" aria-label="닫기" style="position:absolute;top:14px;right:18px;background:transparent;border:none;color:var(--inkSoft);font-size:30px;line-height:1;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--babypink)'" onmouseout="this.style.color='var(--inkSoft)'">&times;</button>
+
+        <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0 0 18px;text-align:center">질문 목록</h2>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:12px">
+
+      <div onclick="openReport('reports/01-eduping-commute/index.html')" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--babypink)">waving_hand</span>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">01 · EDUPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">등/하원</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이정우</p>
+      </div>
+
+      <div onclick="openReport('reports/02-eduping-mugunghwa/index.html')" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--babypink)">local_florist</span>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">02 · EDUPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">무궁화 꽃이 피었습니다</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이정우</p>
+      </div>
+
+      <div onclick="openReport('reports/03-eduping-dance/index.html')" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--babypink)">music_note</span>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">03 · EDUPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">율동 기능</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
+      </div>
+
+      <div onclick="openReport('reports/04-eduping-doctor/index.html')" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--skyInk)">medical_services</span>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">04 · EDUPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">원격진찰 기능</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
+      </div>
+
+      <div onclick="openReport('reports/05-voice-stt-tts/index.html')" style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--butterInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--butterSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--butterInk)">graphic_eq</span>
+          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">05 · VOICE</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">호출어와 STT·TTS</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
+      </div>
+
+      <div onclick="openReport('reports/06-nlu/index.html')" style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--lavInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--lavenderSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--lavInk)">forum</span>
+          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">06 · NLU</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">자연어 처리</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">박우림</p>
+      </div>
+
+      <div onclick="openReport('reports/07-gogoping-nav/index.html')" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--mintInk)">navigation</span>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">07 · GOGOPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">자율주행 이동</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이강택</p>
+      </div>
+
+      <div onclick="openReport('reports/08-gogoping-follow/index.html')" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--mintInk)">directions_walk</span>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">08 · GOGOPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">추종 기능</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">노영주</p>
+      </div>
+
+      <div onclick="openReport('reports/09-noriarm-shop/index.html')" style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--butterInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--butterSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--butterInk)">storefront</span>
+          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">09 · NORIARM</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">가게놀이 기능</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">최민성</p>
+      </div>
+
+      <div onclick="openReport('reports/10-noriarm-oxquiz/index.html')" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--skyInk)">quiz</span>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">10 · NORIARM</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">OX 퀴즈</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이지수</p>
+      </div>
+
+      <div onclick="openReport('reports/11-noriarm-blocks/index.html')" style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--lavInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--lavenderSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--lavInk)">widgets</span>
+          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">11 · NORIARM</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">블럭쌓기 게임</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이지수</p>
+      </div>
+
+      <div onclick="openReport('reports/12-gogoping-hideseek/index.html')" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span class="material-icons-round" style="font-size:22px;color:var(--mintInk)">visibility_off</span>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.5em;letter-spacing:0.12em;margin:0">12 · GOGOPING</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.92em;color:var(--ink);margin:7px 0 2px">숨바꼭질</h3>
+        <p style="color:var(--inkSoft);font-size:0.55em;margin:0">이강택</p>
+      </div>
+
+        </div>
+
+      </div><!-- /모달 카드 -->
+
+    </div><!-- /#qna-popup -->
 
   </div>
 </section>

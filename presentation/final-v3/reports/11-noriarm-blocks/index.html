@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>블럭쌓기 게임 · Q&A 보고서 — 이지수</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root{
+    --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
+    --border:rgba(255,255,255,.10); --accent:#B98CFF;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard Variable',system-ui,sans-serif;
+    opacity:0; transition:opacity .3s ease; min-height:100vh;
+  }
+  .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+  .back{
+    position:fixed; top:22px; left:24px; z-index:10;
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border);
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
+    padding:8px 16px; border-radius:999px; cursor:pointer;
+    transition:color .15s, border-color .15s, transform .15s;
+  }
+  .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
+  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
+  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
+  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
+  .placeholder{
+    border:1.5px dashed var(--border); border-radius:18px;
+    padding:48px 36px; text-align:center; background:var(--surface);
+  }
+  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
+  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
+  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
+  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
+</style>
+</head>
+<body>
+  <div id="page-fade"></div>
+
+  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
+  <button class="back jua" onclick="backToQna()">
+    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+  </button>
+
+  <div class="wrap">
+    <p class="eyebrow">Q&amp;A · 11</p>
+    <h1 class="jua">블럭쌓기 게임</h1>
+    <p class="member">담당 · 이지수</p>
+
+    <!--
+      ════════════════════════════════════════════════════════════════
+      여기부터 자유롭게 보고서를 작성하세요.
+      규칙 (presentation/final-v3/CLAUDE.md 참조):
+        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
+        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
+           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
+             업로드:  scripts/prismic/upload.sh
+             예)  <img src="https://images.prismic.io/.../foo.png" />
+        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
+           덱과 톤이 맞습니다.
+      ════════════════════════════════════════════════════════════════
+    -->
+    <div class="placeholder">
+      <span class="material-icons-round">widgets</span>
+      <h2 class="jua">보고서 준비 중</h2>
+      <p>이지수 님이 작성할 <b style="color:var(--ink)">블럭쌓기 게임</b> 상세 보고서 자리입니다.</p>
+      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
+    </div>
+  </div>
+
+  <script>
+    requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+    function backToQna() {
+      var ov = document.getElementById('page-fade');
+      ov.style.opacity = '1';
+      setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
+    }
+  </script>
+</body>
+</html>

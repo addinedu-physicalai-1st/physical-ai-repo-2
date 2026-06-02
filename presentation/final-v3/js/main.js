@@ -46,17 +46,8 @@ var SLIDES = [
   '23a-team-eduping.html',
   '23b-team-gogoping.html',
   '23c-team-noriarm.html',
+  // ── Q&A (마지막 슬라이드 · 항목 클릭 → reports/ 의 담당자 보고서로 이동) ──
   '24-ending.html',
-  // ── Q&A 부록 (클릭하면 점프) ──
-  'qa-1-act.html',
-  'qa-2-mugunghwa.html',
-  'qa-3-doctor.html',
-  'qa-4-safety.html',
-  'qa-5-follow.html',
-  'qa-6-wakeword.html',
-  'qa-7-nav.html',
-  'qa-8-portal.html',
-  'qa-9-architecture.html',
 ];
 
 var SLIDE_TITLES = [
@@ -87,15 +78,6 @@ var SLIDE_TITLES = [
   'Portal · 일과 보고서',
   '팀',
   'Q&A',
-  'Q&A · 모방학습 (ACT)',
-  'Q&A · 무궁화 perception',
-  'Q&A · 원격 진찰',
-  'Q&A · 근접 안전정지',
-  'Q&A · 교사 추종',
-  'Q&A · 호출어',
-  'Q&A · 자율 주행 + BT',
-  'Q&A · Portal 보고서',
-  'Q&A · 아키텍처',
 ];
 
 async function loadSlides() {
@@ -268,6 +250,7 @@ async function initPresentation() {
 
   Reveal.on('slidechanged', function (event) {
     clearDraw();
+    qnaReset();          // Q&A 슬라이드 재진입 시 리스트 다시 숨김
     forceCenterAlign();
     replayMotion();
     applyArchSpotlight();
@@ -288,6 +271,31 @@ async function initPresentation() {
       }
     });
   });
+}
+
+/* ── Q&A 질문 목록 팝업 (Q&A 글씨 클릭 → 팝업, 딤/✕/Esc → 닫기) ── */
+function qnaShow() {
+  var popup = document.getElementById('qna-popup');
+  if (popup) popup.style.display = 'flex';
+}
+function qnaReset() {
+  var popup = document.getElementById('qna-popup');
+  if (popup) popup.style.display = 'none';
+}
+
+/* ── Q&A → 담당자 보고서 이동 (같은 탭, 크림 페이드로 슬라이드처럼 연결) ── */
+function openReport(path) {
+  var ov = document.getElementById('page-fade');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'page-fade';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:#16131F;'
+      + 'opacity:0;transition:opacity .3s ease;pointer-events:none';
+    document.body.appendChild(ov);
+  }
+  ov.style.pointerEvents = 'auto';
+  requestAnimationFrame(function () { ov.style.opacity = '1'; });
+  setTimeout(function () { window.location.href = path; }, 300);
 }
 
 /* ── Video speed controls (overlay on every video) ── */
@@ -491,6 +499,7 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') {
     closeSlidePanel();
     closeImageZoom();
+    qnaReset();
   }
 });
 
