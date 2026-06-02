@@ -101,6 +101,21 @@
   .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
   .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
 
+  /* ── 시뮬 vs 실물 비교 + 원인 목록 (섹션 02) ── */
+  .compare{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px}
+  @media (max-width:760px){ .compare{grid-template-columns:1fr} }
+  .cmp{border:1px solid var(--border); border-radius:14px; padding:18px 20px; background:rgba(255,255,255,.03)}
+  .cmp h3{font-family:'Jua',sans-serif; font-size:18px; margin:0 0 8px; display:flex; align-items:center; gap:8px}
+  .cmp p{margin:0; font-size:15px; line-height:1.75; color:var(--inkSoft)}
+
+  .reasons{display:flex; flex-direction:column; gap:12px}
+  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
+  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
+  .reason .ic .material-icons-round{font-size:20px}
+  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
+  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
+  .reason b{color:var(--accent)}
+
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
@@ -115,6 +130,7 @@
     <!-- 섹션 추가 시 여기에도 한 줄 추가 -->
     <nav class="sec-nav">
       <a href="#sec-01"><span class="n">01</span> 안전 거리 근접 정지</a>
+      <a href="#sec-02"><span class="n">02</span> 율동 싱크</a>
     </nav>
   </div>
 
@@ -159,6 +175,59 @@
               상호작용을 위해 의도적으로 사람이 가까이 와야 하는 모드에서는
               근접 정지를 비활성화하여 동작을 그대로 유지합니다.
             </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sec-02" class="section">
+      <div class="sec-head">
+        <div class="sec-num">02</div>
+        <h2 class="jua">율동 싱크 — 시뮬은 되는데 실물이 안 된 이유</h2>
+      </div>
+
+      <div class="compare">
+        <div class="cmp">
+          <h3 style="color:#3FD9A6"><span class="material-icons-round">check_circle</span> 시뮬레이션</h3>
+          <p>명령한 관절 궤적을 지연 없이 그대로 추종 → 31.4&nbsp;초 율동이 음악과
+             처음부터 끝까지 정확히 맞아떨어진다.</p>
+        </div>
+        <div class="cmp">
+          <h3 style="color:var(--accent)"><span class="material-icons-round">error</span> 실물</h3>
+          <p>같은 50&nbsp;Hz 궤적인데도 후반부로 갈수록 동작이 음악보다 점점 밀려
+             (누적 desync) 박자가 어긋난다.</p>
+        </div>
+      </div>
+
+      <p class="lead" style="font-size:15px;margin:0 0 16px">
+        <b>왜?</b> 시뮬의 액추에이터는 명령을 이상적으로 즉시 따라가지만,
+        실물 서보는 물리·타이밍 한계가 있어 같은 궤적을 제때 재현하지 못합니다.
+        작은 지연이 31초 동안 쌓이면서 음악과의 간격이 벌어집니다.
+      </p>
+
+      <div class="reasons">
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">speed</span></div>
+          <div>
+            <h4>① 액추에이터 추종 지연</h4>
+            <p>서보의 속도·가속·토크 한계와 중력·관성 부하 때문에, 빠르게 꺾이는
+               구간에서 명령 위치에 제때 도달하지 못해 동작이 늦어진다.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">schedule</span></div>
+          <div>
+            <h4>② 제어·통신 타이밍 지터</h4>
+            <p>50&nbsp;Hz 재생 주기가 시뮬에선 일정하지만, 실물은 시리얼·ROS 파이프라인의
+               지연과 지터로 프레임 간격이 흔들려 음악 타임라인과 어긋난다.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">trending_down</span></div>
+          <div>
+            <h4>③ 오차 누적 (drift)</h4>
+            <p>한 프레임의 미세한 밀림이 31초 내내 더해져, 후반부로 갈수록 음악과의
+               어긋남이 눈에 띄게 커진다.</p>
           </div>
         </div>
       </div>
