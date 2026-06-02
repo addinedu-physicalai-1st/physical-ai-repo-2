@@ -21,21 +21,31 @@ var SLIDES = [
   // ── EDUPING ──
   '08-eduping-section.html',
   '09-eduping-arrival.html',
+  '09b-eduping-arrival-content.html',
   '10-eduping-dance.html',
   '11-eduping-hibiscus.html',
+  '11b-eduping-hibiscus-content.html',
   '12-eduping-doctor.html',
+  '12b-eduping-doctor-content.html',
   // ── GOGOPING ──
   '13-gogoping-section.html',
   '14-gogoping-follow.html',
+  '14b-gogoping-follow-content.html',
   // ── NORIARM ──
   '18-noriarm-section.html',
   '19-noriarm-blocks.html',
+  '19b-noriarm-blocks-content.html',
   '20-noriarm-oxquiz.html',
+  '20b-noriarm-oxquiz-content.html',
   '21-noriarm-shop.html',
+  '21b-noriarm-shop-content.html',
   // ── CLOSING ──
-  '22-sprint-jira.html',
   '22b-portal-report.html',
-  '23-team.html',
+  '22-sprint-jira.html',
+  '22a-jira-gantt.html',
+  '23a-team-eduping.html',
+  '23b-team-gogoping.html',
+  '23c-team-noriarm.html',
   '24-ending.html',
   // ── Q&A 부록 (클릭하면 점프) ──
   'qa-1-act.html',
@@ -72,7 +82,8 @@ var SLIDE_TITLES = [
   '노리암 · 블럭쌓기',
   '노리암 · OX 퀴즈',
   '노리암 · 가게놀이',
-  '스프린트 Jira',
+  '스프린트 타임라인',
+  'Jira Epic 진행',
   'Portal · 일과 보고서',
   '팀',
   'Q&A',
@@ -101,8 +112,36 @@ async function loadSlides() {
 async function initPresentation() {
   await loadSlides();
 
+  // Architecture flow: all nodes always shown; spotlight moves to current step.
+  function applyArchSpotlight() {
+    var debugMatch = location.search.match(/[?&]archstep=(\d+)/);
+    var debugStep = debugMatch ? parseInt(debugMatch[1], 10) : null;
+    document.querySelectorAll('section[data-arch-flow]').forEach(function (slide) {
+      var currentStep = 0;
+      if (debugStep !== null) {
+        currentStep = debugStep;
+      } else {
+        slide.querySelectorAll('.fragment[data-archstep]').forEach(function (f) {
+          if (f.classList.contains('visible') || f.classList.contains('current-fragment')) {
+            var s = parseInt(f.dataset.archstep, 10);
+            if (s > currentStep) currentStep = s;
+          }
+        });
+      }
+      slide.querySelectorAll('.n[data-step]').forEach(function (n) {
+        var steps = String(n.dataset.step).split(',').map(function (x) { return parseInt(x, 10); });
+        n.classList.toggle('on', steps.indexOf(currentStep) !== -1);
+      });
+      slide.querySelectorAll('svg.lines [data-flow]').forEach(function (el) {
+        var steps = String(el.dataset.flow).split(',').map(function (x) { return parseInt(x, 10); });
+        el.classList.toggle('on', steps.indexOf(currentStep) !== -1);
+      });
+    });
+  }
+
   Reveal.initialize({
     hash: true,
+    fragmentInURL: true,
     center: false,
     slideNumber: 'c/t',
     width: 1280,
@@ -212,6 +251,7 @@ async function initPresentation() {
     attachVideoSpeedControls();
     forceCenterAlign();
     replayMotion();
+    applyArchSpotlight();
 
     var slideNum = document.querySelector('.reveal .slide-number');
     if (slideNum) {
@@ -222,10 +262,15 @@ async function initPresentation() {
     }
   });
 
+  Reveal.on('fragmentshown', applyArchSpotlight);
+  Reveal.on('fragmenthidden', applyArchSpotlight);
+
+
   Reveal.on('slidechanged', function (event) {
     clearDraw();
     forceCenterAlign();
     replayMotion();
+    applyArchSpotlight();
     var panel = document.getElementById('slide-panel');
     if (panel && !panel.classList.contains('hidden')) {
       updateSlidePanelActive();

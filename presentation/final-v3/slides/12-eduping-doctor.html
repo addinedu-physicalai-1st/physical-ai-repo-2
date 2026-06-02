@@ -1,26 +1,28 @@
 <section>
-  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+  <div style="position:relative;width:1280px;height:720px;display:flex;flex-direction:column;padding:18px 40px 22px;box-sizing:border-box;gap:10px">
+    <!-- Header -->
     <div style="display:flex;align-items:center;gap:10px">
       <span class="chip" style="font-size:0.55em">EDUPING · 모드 4</span>
-      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">원격 진찰 — depth · vision slowdown · FSR</h2>
+      <h2 class="font-display" style="font-size:1.4em;color:var(--ink);margin:0">원격 진찰 — depth · vision slowdown · FSR</h2>
     </div>
-    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0">
-      <div style="background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative">
-        <video src="slides/assets/media/doctor/pointcloud.mov" loop playsinline data-press-to-play
-               style="max-width:100%;max-height:100%;object-fit:contain"
-               onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:48px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;font-size:0.7em&quot;&gt;pointcloud.mov&lt;/p&gt;&lt;/div&gt;'"></video>
-        <span style="position:absolute;bottom:10px;left:14px;background:rgba(0,0,0,0.6);color:var(--cream);padding:4px 10px;border-radius:999px;font-family:'Jua';font-size:0.55em">PointCloud · Octomap</span>
-      </div>
-      <div style="background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative">
-        <video src="slides/assets/media/doctor/vision-slowdown.webm" loop playsinline data-press-to-play
-               style="max-width:100%;max-height:100%;object-fit:contain"
-               onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:48px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;font-size:0.7em&quot;&gt;vision-slowdown.webm&lt;/p&gt;&lt;/div&gt;'"></video>
-        <span style="position:absolute;bottom:10px;left:14px;background:rgba(0,0,0,0.6);color:var(--cream);padding:4px 10px;border-radius:999px;font-family:'Jua';font-size:0.55em">Vision Slowdown · FSR 청진기</span>
+
+    <!-- Video container (16:9 to match source) -->
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0">
+      <div style="position:relative;width:1100px;height:619px;background:#000;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+        <video src="slides/assets/media/doctor/telehealth-quad.mp4" loop playsinline data-press-to-play
+               style="width:100%;height:100%;object-fit:cover;display:block"
+               onerror="this.outerHTML='&lt;div style=&quot;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;/div&gt;'"></video>
+
+        <!-- Quadrant labels — axes already drawn in video, just add labels at quadrant centers -->
+        <span style="position:absolute;top:22px;left:25%;transform:translateX(-50%);z-index:3;background:rgba(15,18,28,0.82);backdrop-filter:blur(8px);color:#fff;padding:7px 20px;border-radius:9px;font-family:'Jua';font-size:16px;letter-spacing:0.06em;border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.4)">Doctor UI</span>
+        <span style="position:absolute;top:22px;left:75%;transform:translateX(-50%);z-index:3;background:rgba(15,18,28,0.82);backdrop-filter:blur(8px);color:#fff;padding:7px 20px;border-radius:9px;font-family:'Jua';font-size:16px;letter-spacing:0.06em;border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.4)">환자 UI</span>
+        <span style="position:absolute;bottom:22px;left:25%;transform:translateX(-50%);z-index:3;background:rgba(15,18,28,0.82);backdrop-filter:blur(8px);color:#fff;padding:7px 20px;border-radius:9px;font-family:'Jua';font-size:16px;letter-spacing:0.06em;border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.4)">Doctor</span>
+        <span style="position:absolute;bottom:22px;left:75%;transform:translateX(-50%);z-index:3;background:rgba(15,18,28,0.82);backdrop-filter:blur(8px);color:#fff;padding:7px 20px;border-radius:9px;font-family:'Jua';font-size:16px;letter-spacing:0.06em;border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.4)">환자</span>
       </div>
     </div>
   </div>
   <aside class="notes">
-    원격 진찰. D435 depth 로 PointCloud + Octomap 을 생성해 의사가 환경을 3D 로 봅니다. Vision Slowdown 으로 사람과 가까워지면 자동 감속, 임피던스 제어로 부드러운 접촉.
-    FSR 청진기는 그리퍼에 단 압력 센서가 raw 값을 30Hz 로 의사 UI 에 푸시 — 의사가 "얼마나 누르는지" 를 원격으로 볼 수 있습니다.
+    원격 진찰. 영상에 분할 축이 이미 그려져 있어 라벨만 추가.
+    좌상=Doctor UI / 우상=환자 UI / 좌하=Doctor 실사 / 우하=환자 실사.
   </aside>
 </section>

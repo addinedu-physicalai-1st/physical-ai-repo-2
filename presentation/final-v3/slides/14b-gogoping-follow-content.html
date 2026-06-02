@@ -1,0 +1,53 @@
+<section>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-100px;left:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--skySoft);bottom:-60px;right:-30px;opacity:0.28"></div>
+  </div>
+  <div class="layer" style="padding:32px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--mintInk),var(--skyInk));color:#fff;border:0">GOGOPING · 모드 02</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">교사 추종 — 한 명을 끝까지</h2>
+    </div>
+
+    <div style="background:linear-gradient(90deg,rgba(74,222,128,0.12),rgba(96,165,250,0.06));border-left:4px solid var(--mintInk);border-radius:10px;padding:14px 22px;margin-bottom:22px">
+      <p style="color:var(--ink);font-size:0.85em;margin:0;line-height:1.5;font-weight:700">
+        <span style="color:var(--mintInk)">얼굴로 등록</span> · <span style="color:var(--skyInk)">외형 + 거리</span>로 재식별 → 가림·교차에도 동일 인물 유지
+      </p>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;min-height:0">
+
+      <div style="background:var(--surface);border:2px solid var(--lavInk);border-radius:16px;padding:24px 22px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;box-shadow:0 6px 20px rgba(168,85,247,0.22)">
+        <span class="material-icons-round" style="font-size:52px;color:var(--lavInk)">face</span>
+        <div style="font-family:'Jua';font-size:0.7em;color:var(--lavInk);letter-spacing:0.08em">얼굴 · 등록</div>
+        <h3 class="font-display" style="font-size:1.25em;color:var(--ink);margin:0;line-height:1.1">InsightFace</h3>
+        <p style="color:var(--inkSoft);font-size:0.62em;margin:0;line-height:1.5">
+          처음 한 번 — 이 사람이<br>"<b style="color:var(--ink)">맞다</b>" 를 확정
+        </p>
+      </div>
+
+      <div style="background:var(--surface);border:2px solid var(--mintInk);border-radius:16px;padding:24px 22px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;box-shadow:0 6px 20px rgba(74,222,128,0.22)">
+        <span class="material-icons-round" style="font-size:52px;color:var(--mintInk)">checkroom</span>
+        <div style="font-family:'Jua';font-size:0.7em;color:var(--mintInk);letter-spacing:0.08em">외형 · 지속</div>
+        <h3 class="font-display" style="font-size:1.25em;color:var(--ink);margin:0;line-height:1.1">OSNet ReID</h3>
+        <p style="color:var(--inkSoft);font-size:0.62em;margin:0;line-height:1.5">
+          매 프레임 — 옷·체형으로<br><b style="color:var(--ink)">동일 인물 매칭</b>
+        </p>
+      </div>
+
+      <div style="background:var(--surface);border:2px solid var(--butterInk);border-radius:16px;padding:24px 22px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;box-shadow:0 6px 20px rgba(245,158,11,0.22);position:relative">
+        <span style="position:absolute;top:-9px;right:14px;background:var(--butterInk);color:#0a0d14;font-family:'Jua';font-size:0.5em;padding:3px 10px;border-radius:999px;letter-spacing:0.08em">직접 고안</span>
+        <span class="material-icons-round" style="font-size:52px;color:var(--butterInk)">straighten</span>
+        <div style="font-family:'Jua';font-size:0.7em;color:var(--butterInk);letter-spacing:0.08em">거리 · 게이트</div>
+        <h3 class="font-display" style="font-size:1.25em;color:var(--ink);margin:0;line-height:1.1">D435 Depth</h3>
+        <p style="color:var(--inkSoft);font-size:0.62em;margin:0;line-height:1.5">
+          외형 비슷한 남이라도<br><b style="color:var(--ink)">거리 점프 → 거부</b>
+        </p>
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    추종 — 3 핵심 단서 (얼굴 등록 + 외형 지속 + 거리 게이트). 상세 (5-stage 파이프라인, 2단계 등록 FSM, 히스테리시스 0.40/0.20, depth 1m 임계, safety_monitor/filter 등) 은 Q&A 슬라이드로.
+  </aside>
+</section>

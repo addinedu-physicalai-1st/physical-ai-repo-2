@@ -1,17 +1,288 @@
-<section>
-  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="chip chip-sky" style="font-size:0.55em">SYSTEM</span>
-      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">아키텍처</h2>
+<section data-arch-flow>
+  <style>
+    .archx { position:relative; width:1280px; height:720px; padding:18px 24px 12px; box-sizing:border-box; background:radial-gradient(ellipse at center,#171b29 0%,#0a0d14 70%); overflow:hidden; font-family:'Pretendard Variable',system-ui,sans-serif; }
+    .archx::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle,rgba(255,255,255,0.035) 1px,transparent 1px); background-size:24px 24px; pointer-events:none; }
+
+    .archx .title { display:flex; align-items:baseline; gap:12px; margin-bottom:4px; }
+    .archx .title .eyebrow { font-family:'Jua'; letter-spacing:0.3em; font-size:13px; color:#94a3b8; }
+    .archx .title h2 { font-family:'Jua'; font-size:28px; color:#fff; margin:0; }
+    .archx .title .hint { margin-left:auto; font-size:11px; color:#64748b; }
+
+    .archx .n { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; border-radius:10px; padding:8px 12px; transition:all 0.5s cubic-bezier(0.2,0.8,0.2,1); opacity:0.78; transform:scale(0.985); filter:saturate(0.7); box-sizing:border-box; }
+    .archx .n.on { opacity:1; transform:scale(1.03); filter:saturate(1.2); }
+    .archx .n .icon { font-size:20px; margin-bottom:2px; }
+    .archx .n .label { font-size:15px; font-weight:700; color:#fff; line-height:1.05; letter-spacing:-0.01em; }
+    .archx .n .sublabel { font-size:10px; color:#a3afc0; margin-top:3px; line-height:1.2; }
+    .archx .n .tag { font-family:'Jua'; font-size:9px; letter-spacing:0.22em; opacity:0.85; margin-bottom:3px; }
+
+    .archx .n.app { background:linear-gradient(165deg,rgba(96,165,250,0.16),rgba(96,165,250,0.04)); border:1.5px solid rgba(96,165,250,0.4); }
+    .archx .n.app.on { box-shadow:0 0 0 1px rgba(96,165,250,0.7),0 0 24px rgba(96,165,250,0.45); border-color:#60a5fa; }
+    .archx .n.app .icon, .archx .n.app .tag { color:#60a5fa; }
+
+    .archx .n.svc { background:linear-gradient(165deg,rgba(74,222,128,0.14),rgba(74,222,128,0.03)); border:1.5px solid rgba(74,222,128,0.38); }
+    .archx .n.svc.on { box-shadow:0 0 0 1px rgba(74,222,128,0.7),0 0 24px rgba(74,222,128,0.5); border-color:#4ade80; }
+    .archx .n.svc .icon, .archx .n.svc .tag { color:#4ade80; }
+
+    .archx .n.hub { background:linear-gradient(165deg,rgba(34,197,94,0.25),rgba(34,197,94,0.06)); border:2px solid rgba(34,197,94,0.55); }
+    .archx .n.hub .label { font-size:19px; }
+    .archx .n.hub.on { box-shadow:0 0 0 2px rgba(34,197,94,0.85),0 0 32px rgba(34,197,94,0.55); border-color:#22c55e; }
+    .archx .n.hub .icon, .archx .n.hub .tag { color:#22c55e; }
+
+    .archx .n.ai { background:linear-gradient(165deg,rgba(168,85,247,0.16),rgba(168,85,247,0.04)); border:1.5px solid rgba(168,85,247,0.4); }
+    .archx .n.ai.on { box-shadow:0 0 0 1px rgba(168,85,247,0.7),0 0 24px rgba(168,85,247,0.5); border-color:#a855f7; }
+    .archx .n.ai .icon, .archx .n.ai .tag { color:#a855f7; }
+
+    .archx .n.db { background:linear-gradient(165deg,rgba(245,158,11,0.18),rgba(245,158,11,0.04)); border:1.5px solid rgba(245,158,11,0.4); }
+    .archx .n.db.on { box-shadow:0 0 0 1px rgba(245,158,11,0.7),0 0 22px rgba(245,158,11,0.5); border-color:#f59e0b; }
+    .archx .n.db .icon, .archx .n.db .tag { color:#f59e0b; }
+    .archx .n.db .label { font-size:10px; }
+    .archx .n.db .icon { font-size:18px; margin-bottom:1px; }
+
+    .archx .n.robot { background:linear-gradient(170deg,rgba(244,114,182,0.14),rgba(244,114,182,0.03)); border:1.5px solid rgba(244,114,182,0.36); padding:14px 16px; align-items:flex-start; justify-content:flex-start; text-align:left; }
+    .archx .n.robot .tag { min-height:14px; }
+    .archx .n.robot .rhead { min-height:62px; }
+    .archx .n.robot.on { box-shadow:0 0 0 1px rgba(244,114,182,0.75),0 0 28px rgba(244,114,182,0.5); border-color:#f472b6; }
+    .archx .n.robot .icon, .archx .n.robot .tag { color:#f472b6; }
+    .archx .n.robot .tag { font-size:11px; letter-spacing:0.22em; }
+    .archx .n.robot .rhead { display:flex; align-items:center; gap:12px; width:100%; margin-bottom:10px; }
+    .archx .n.robot .rhead img { width:62px; height:62px; object-fit:contain; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px; flex:0 0 auto; }
+    .archx .n.robot .rhead .label { font-size:24px; }
+    .archx .n.robot .board { margin-top:8px; width:100%; min-height:48px; }
+    .archx .n.robot .board:first-of-type { margin-top:0; }
+    .archx .n.robot .board .btitle { font-family:'Jua'; font-size:11px; letter-spacing:0.16em; color:#f472b6; opacity:0.85; margin-bottom:5px; min-height:13px; }
+    .archx .n.robot .hw-row { display:flex; flex-wrap:nowrap; gap:3px; align-content:flex-start; min-height:22px; overflow:hidden; }
+    .archx .n.robot .hw { display:inline-flex; align-items:center; gap:3px; font-size:12px; color:#e2e8f0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:5px; padding:2px 5px; font-weight:500; height:22px; box-sizing:border-box; flex-shrink:0; line-height:1; white-space:nowrap; }
+    .archx .n.robot .hw .material-icons-round { font-size:15px; color:#f472b6; }
+
+    .archx svg.lines { position:absolute; left:0; top:0; width:1280px; height:720px; pointer-events:none; }
+    .archx svg.lines path { fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:0.38; transition:opacity 0.4s ease, stroke-width 0.3s; }
+    .archx svg.lines path.on { opacity:1; stroke-width:2.6; filter:drop-shadow(0 0 6px currentColor); animation:edge-pulse 1.6s ease-in-out infinite; }
+    @keyframes edge-pulse { 0%,100% { stroke-width:2.4; } 50% { stroke-width:3; } }
+
+    .archx svg.lines text { font-family:system-ui,sans-serif; font-size:10.5px; font-weight:700; opacity:0.22; transition:opacity 0.4s; paint-order:stroke; stroke:rgba(10,13,20,0.95); stroke-width:5; stroke-linecap:round; stroke-linejoin:round; }
+    .archx svg.lines text.on { opacity:1; font-size:11.5px; }
+
+    .archx .ribbon { position:absolute; left:6px; font-family:'Jua'; letter-spacing:0.28em; font-size:14px; opacity:0.95; text-shadow:0 0 8px currentColor; }
+    .archx .ribbon-app { top:118px; color:#60a5fa; }
+    .archx .ribbon-svc { top:222px; color:#4ade80; }
+    .archx .ribbon-rob { top:498px; color:#f472b6; }
+
+    .archx .drv { position:absolute; left:-9999px; top:-9999px; }
+  </style>
+
+  <div class="archx">
+    <div class="title">
+      <span class="eyebrow">SYSTEM</span>
+      <h2>아키텍처</h2>
+      <span class="hint">→ 단계별로</span>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px;overflow:hidden">
-      <img src="slides/assets/media/diagrams/arch-v3.png" alt="System architecture v3"
-           style="max-width:100%;max-height:100%;object-fit:contain"
-           onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;account_tree&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;arch-v3.png 자리&lt;/p&gt;&lt;/div&gt;'">
+
+    <div class="ribbon ribbon-app">APP</div>
+    <div class="ribbon ribbon-svc">SERVICE</div>
+    <div class="ribbon ribbon-rob">ROBOTS</div>
+
+    <svg class="lines">
+      <defs>
+        <marker id="m-blue" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#60a5fa"/></marker>
+        <marker id="m-blue-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#60a5fa"/></marker>
+        <marker id="m-green" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#4ade80"/></marker>
+        <marker id="m-green-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#4ade80"/></marker>
+        <marker id="m-orange" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#f59e0b"/></marker>
+        <marker id="m-orange-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#f59e0b"/></marker>
+        <marker id="m-purple" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a855f7"/></marker>
+        <marker id="m-purple-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#a855f7"/></marker>
+        <marker id="m-pink" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#f472b6"/></marker>
+        <marker id="m-pink-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#f472b6"/></marker>
+      </defs>
+
+      <!-- Step 2: SERVICE — all internal + APP↔SERVICE -->
+      <!-- Browser → Web: vertical at x=220, between APP bottom (162) and SVC top (200) -->
+      <path data-flow="2" d="M 220,162 L 220,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
+      <text data-flow="2" x="228" y="186" fill="#60a5fa">HTTP·WS</text>
+
+      <!-- Admin → Control: vertical at x=640 -->
+      <path data-flow="2" d="M 640,162 L 640,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
+      <text data-flow="2" x="648" y="186" fill="#60a5fa">HTTP·WS</text>
+
+      <!-- Web → Control: horizontal at y=230, gap (320→440) = 120px label space -->
+      <path data-flow="2" d="M 320,230 L 440,230" stroke="#4ade80" marker-start="url(#m-green-rev)" marker-end="url(#m-green)"/>
+      <text data-flow="2" x="338" y="223" fill="#4ade80">HTTP·WS</text>
+
+      <!-- Control → DB: horizontal at y=230, gap (840→860) = 20px -->
+      <path data-flow="2" d="M 840,230 L 860,230" stroke="#f59e0b" marker-start="url(#m-orange-rev)" marker-end="url(#m-orange)"/>
+      <text data-flow="2" x="813" y="222" fill="#f59e0b">TCP</text>
+
+      <!-- Control → AI: route ABOVE SERVICE row at y=180 (in gap between APP and SVC) -->
+      <path data-flow="2" d="M 840,200 L 840,182 L 1040,182 L 1040,200" stroke="#a855f7" marker-start="url(#m-purple-rev)" marker-end="url(#m-purple)"/>
+      <text data-flow="2" x="912" y="176" fill="#a855f7">HTTP·WS</text>
+
+      <!-- Step 3: Control → EduPing: L-shape with horizontal at y=330 -->
+      <path data-flow="3" d="M 480,270 L 480,330 L 220,330 L 220,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
+      <text data-flow="3" x="240" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
+
+      <!-- Step 4: Control → GogoPing: straight vertical at x=640 -->
+      <path data-flow="4" d="M 640,270 L 640,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
+      <text data-flow="4" x="494" y="318" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
+
+      <!-- Step 5: Control → NoriArm: L-shape with horizontal at y=330 -->
+      <path data-flow="5" d="M 800,270 L 800,330 L 1000,330 L 1000,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
+      <text data-flow="5" x="822" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
+    </svg>
+
+    <!-- APP layer -->
+    <div class="n app" data-step="1" style="left:120px;top:92px;width:200px;height:70px">
+      <span class="material-icons-round icon">person</span>
+      <div class="label">Portal Browser</div>
+      <div class="sublabel">학부모 · 교사 · 의사</div>
+    </div>
+    <div class="n app" data-step="1" style="left:540px;top:92px;width:200px;height:70px">
+      <span class="material-icons-round icon">admin_panel_settings</span>
+      <div class="label">Admin App</div>
+      <div class="sublabel">운영 관제</div>
+    </div>
+
+    <!-- SERVICE layer -->
+    <div class="n svc" data-step="2" style="left:120px;top:200px;width:200px;height:70px">
+      <span class="material-icons-round icon">dns</span>
+      <div class="label">Portal Web</div>
+    </div>
+    <div class="n hub" data-step="2" style="left:440px;top:200px;width:400px;height:70px">
+      <span class="material-icons-round icon">hub</span>
+      <div class="label">Control Service</div>
+    </div>
+    <div class="n db" data-step="2" style="left:860px;top:210px;width:60px;height:50px;padding:4px">
+      <span class="material-icons-round icon">storage</span>
+      <div class="label">Control DB</div>
+    </div>
+    <div class="n ai" data-step="2" style="left:940px;top:200px;width:200px;height:70px">
+      <span class="material-icons-round icon">memory</span>
+      <div class="label">AI Service</div>
+    </div>
+
+    <!-- ROBOTS layer -->
+    <div class="n robot" data-step="3" style="left:120px;top:360px;width:340px;height:340px">
+      <div class="tag">EDUPING · 양팔 로봇</div>
+      <div class="rhead">
+        <img src="slides/assets/robots/eduping.png" alt="EduPing"/>
+        <div class="label">EduPing</div>
+      </div>
+      <div class="board">
+        <div class="btitle">MAIN BOARD</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">mic</span>Mic</span>
+          <span class="hw"><span class="material-icons-round">volume_up</span>Speaker</span>
+          <span class="hw"><span class="material-icons-round">videocam</span>D435 RGB+depth</span>
+        </div>
+      </div>
+      <div class="board">
+        <div class="btitle">ARM (OPENARM)</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">electric_bolt</span>DAMIAO BLDC ×16</span>
+        </div>
+      </div>
+      <div class="board">
+        <div class="btitle">STETHOSCOPE</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">monitor_heart</span>FSR Pressure</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="n robot" data-step="4" style="left:470px;top:360px;width:340px;height:340px">
+      <div class="tag">GOGOPING · 자율 주행</div>
+      <div class="rhead">
+        <img src="slides/assets/robots/gogoping.png" alt="GogoPing"/>
+        <div class="label">GogoPing</div>
+      </div>
+      <div class="board">
+        <div class="btitle">MAIN BOARD</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">mic</span>Mic</span>
+          <span class="hw"><span class="material-icons-round">volume_up</span>Speaker</span>
+        </div>
+      </div>
+      <div class="board">
+        <div class="btitle">VIC PINKY (BASE)</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">radar</span>RPLiDAR C1</span>
+          <span class="hw"><span class="material-icons-round">bolt</span>DC Motor ×2</span>
+          <span class="hw"><span class="material-icons-round">battery_full</span>Battery</span>
+        </div>
+      </div>
+      <div class="board">
+        <div class="btitle">CAMERA BOARD (ARDUINO)</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">videocam</span>D435 RGB+Depth</span>
+          <span class="hw"><span class="material-icons-round">tune</span>Servo ×2 (Pan/Tilt)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="n robot" data-step="5" style="left:820px;top:360px;width:340px;height:340px">
+      <div class="tag">NORIARM · OMX ×3</div>
+      <div class="rhead">
+        <img src="slides/assets/robots/noriarm.png" alt="NoriArm"/>
+        <div class="label">NoriArm</div>
+      </div>
+      <div class="board">
+        <div class="btitle">MAIN BOARD</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">mic</span>Mic</span>
+          <span class="hw"><span class="material-icons-round">volume_up</span>Speaker</span>
+          <span class="hw"><span class="material-icons-round">videocam</span>Top Cam</span>
+        </div>
+      </div>
+      <div class="board">
+        <div class="btitle">NORIARM BOARD (U2D2)</div>
+        <div class="hw-row">
+          <span class="hw"><span class="material-icons-round">settings</span>Dynamixel ×6</span>
+          <span class="hw"><span class="material-icons-round">videocam</span>Gripper Cam ×2</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fragment drivers — 5 steps -->
+    <div class="drv" aria-hidden="true">
+      <span class="fragment" data-archstep="1"></span>
+      <span class="fragment" data-archstep="2"></span>
+      <span class="fragment" data-archstep="3"></span>
+      <span class="fragment" data-archstep="4"></span>
+      <span class="fragment" data-archstep="5"></span>
     </div>
   </div>
+
   <aside class="notes">
-    소프트웨어 아키텍처 v3 (판넬 동일 — APP / SERVICES / EQUIP 3 계층). Robot UI · Portal Web · Admin UI → Control Service · AI Server → 로봇별 controllers + PostgreSQL.
-    WS Video 는 UDP 9013 → Control 8100 fanout, WebRTC Voice 는 의사 teleop + chat, REST 는 명령·상태.
+    재구성: 박스 작게, 컬럼 정렬 (left=220, mid=640, right=1040), 라벨은 박스 사이 빈 공간에.
+
+    Layout (px):
+    - APP row y=92-162: Browser left=120 center=220, Admin left=540 center=640
+    - SVC row y=200-270: Portal Web left=120 center=220, Control left=440 center=640, DB left=860, AI left=940 center=1040
+    - Robot row y=360-690: EduPing center=220, GogoPing center=640, NoriArm center=1040
+
+    수직 연결선 (vertical):
+    - Browser→Web at x=220 (centers align)
+    - Admin→Control at x=640 (centers align)
+    - Control→GogoPing at x=640 (centers align, completely straight)
+
+    수평 연결선 (horizontal):
+    - Web→Control at y=230, gap 120px (320→440)
+    - Control→DB at y=230, gap 20px (840→860)
+
+    L-shape:
+    - Control↔AI ABOVE SVC row at y=182 (between APP bottom 162 and SVC top 200)
+    - Control→EduPing: horizontal at y=330 (gap below SVC, above ROBOTS at 360)
+    - Control→NoriArm: horizontal at y=330
+
+    프로토콜 라벨 — 모두 박스 외부 빈 공간에:
+    - Vertical line 라벨: 라인 우측 10px offset, 박스 간 gap 중심 y
+    - Horizontal line 라벨: gap 중심 x, 라인 위 7px offset
+    - Control↔AI 라벨: APP/SVC 사이 gap 안 (y=176)
+
+    각 fragment step:
+    1. APP (Portal Browser + Admin App)
+    2. SERVICE 전체 (Web + Control + DB + AI 모든 노드 + 모든 내부 연결)
+    3. EduPing
+    4. GogoPing
+    5. NoriArm
   </aside>
 </section>

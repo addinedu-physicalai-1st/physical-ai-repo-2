@@ -15,26 +15,113 @@
     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;min-height:0">
 
       <div style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:18px;padding:36px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-        <span class="material-icons-round" style="font-size:78px;color:var(--babypink)">waving_hand</span>
-        <h3 class="font-display" style="font-size:1.55em;color:var(--ink);margin-top:24px;line-height:1.25">
-          이름 불러 맞아주는<br>
-          <span style="color:var(--babypink)">친구</span>
+        <!-- EduPing: 양팔 춤추는 로봇 -->
+        <svg viewBox="0 0 120 120" style="width:130px;height:130px;filter:drop-shadow(0 6px 18px rgba(244,114,182,0.45))">
+          <!-- 음표 1 -->
+          <g transform="translate(12,18)" fill="#f472b6" opacity="0.85">
+            <circle cx="0" cy="10" r="4"/>
+            <rect x="3" y="-10" width="2" height="22" rx="1"/>
+          </g>
+          <!-- 음표 2 -->
+          <g transform="translate(98,22) rotate(15)" fill="#f472b6" opacity="0.7">
+            <circle cx="0" cy="8" r="3"/>
+            <rect x="2" y="-8" width="1.6" height="18" rx="1"/>
+          </g>
+          <!-- 머리 (둥근 사각) -->
+          <rect x="42" y="20" width="36" height="30" rx="8" fill="#f472b6" opacity="0.95"/>
+          <!-- 눈 -->
+          <circle cx="52" cy="34" r="3" fill="#fff"/>
+          <circle cx="68" cy="34" r="3" fill="#fff"/>
+          <!-- 입 (미소) -->
+          <path d="M52 42 Q60 47 68 42" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- 몸통 -->
+          <rect x="46" y="52" width="28" height="28" rx="5" fill="#f472b6" opacity="0.5"/>
+          <!-- 왼팔 (위로 든 dancing) -->
+          <g stroke="#f472b6" stroke-width="6" stroke-linecap="round" fill="none">
+            <line x1="46" y1="60" x2="22" y2="38"/>
+            <circle cx="20" cy="35" r="5" fill="#f472b6" stroke="none"/>
+            <!-- 오른팔 (위로) -->
+            <line x1="74" y1="60" x2="98" y2="38"/>
+            <circle cx="100" cy="35" r="5" fill="#f472b6" stroke="none"/>
+          </g>
+          <!-- 다리/베이스 -->
+          <rect x="50" y="80" width="20" height="14" rx="3" fill="#f472b6" opacity="0.75"/>
+          <rect x="44" y="92" width="32" height="6" rx="3" fill="#f472b6" opacity="0.6"/>
+        </svg>
+        <h3 class="font-display" style="font-size:1.5em;color:var(--ink);margin-top:22px;line-height:1.25">
+          선생님과 닮고,<br>
+          <span style="color:var(--babypink)">춤도 춰주는 친구</span>
         </h3>
       </div>
 
       <div style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:18px;padding:36px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-        <span class="material-icons-round" style="font-size:78px;color:var(--mintInk)">directions_walk</span>
-        <h3 class="font-display" style="font-size:1.55em;color:var(--ink);margin-top:24px;line-height:1.25">
-          옆에서 따라다니는<br>
-          <span style="color:var(--mintInk)">친구</span>
+        <!-- GogoPing: 모바일 로봇 + 짐 들고 + 근육 -->
+        <svg viewBox="0 0 120 120" style="width:130px;height:130px;filter:drop-shadow(0 6px 18px rgba(74,222,128,0.45))">
+          <!-- 머리 -->
+          <rect x="38" y="14" width="44" height="32" rx="8" fill="#4ade80" opacity="0.95"/>
+          <!-- 눈 (날카로운) -->
+          <path d="M48 28 L56 24" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <path d="M72 24 L64 28" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="50" cy="32" r="2.5" fill="#fff"/>
+          <circle cx="70" cy="32" r="2.5" fill="#fff"/>
+          <!-- 입 (자신감) -->
+          <path d="M52 40 Q60 43 68 40" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- 몸통 (근육 모양 V) -->
+          <path d="M34 48 L60 56 L86 48 L82 78 L60 84 L38 78 Z" fill="#4ade80" opacity="0.85"/>
+          <!-- 가슴 V 라인 -->
+          <path d="M60 56 L60 78" stroke="#fff" stroke-width="2" opacity="0.5"/>
+          <!-- 짐 (위에 박스) — 들고있음 -->
+          <rect x="50" y="2" width="20" height="14" rx="2" fill="#4ade80" opacity="0.65" stroke="#4ade80" stroke-width="2"/>
+          <path d="M50 9 L70 9" stroke="#4ade80" stroke-width="1.5" opacity="0.9"/>
+          <!-- 바퀴 -->
+          <circle cx="42" cy="98" r="10" fill="#4ade80" opacity="0.9"/>
+          <circle cx="42" cy="98" r="3" fill="#0a0d14"/>
+          <circle cx="78" cy="98" r="10" fill="#4ade80" opacity="0.9"/>
+          <circle cx="78" cy="98" r="3" fill="#0a0d14"/>
+          <!-- 베이스 -->
+          <rect x="38" y="82" width="44" height="12" rx="3" fill="#4ade80" opacity="0.5"/>
+        </svg>
+        <h3 class="font-display" style="font-size:1.5em;color:var(--ink);margin-top:22px;line-height:1.25">
+          선생님보다<br>
+          <span style="color:var(--mintInk)">힘 센 친구</span>
         </h3>
       </div>
 
       <div style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:18px;padding:36px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-        <span class="material-icons-round" style="font-size:78px;color:var(--lavInk)">extension</span>
-        <h3 class="font-display" style="font-size:1.55em;color:var(--ink);margin-top:24px;line-height:1.25">
-          함께 놀고 배우는<br>
-          <span style="color:var(--lavInk)">친구</span>
+        <!-- NoriArm: 블럭 쌓는 매니퓰레이터 -->
+        <svg viewBox="0 0 120 120" style="width:130px;height:130px;filter:drop-shadow(0 6px 18px rgba(168,85,247,0.45))">
+          <!-- 책상 베이스 -->
+          <rect x="20" y="100" width="80" height="6" rx="2" fill="#a855f7" opacity="0.5"/>
+
+          <!-- 쌓인 블럭 탑 (왼쪽) -->
+          <rect x="20" y="84" width="22" height="16" rx="2" fill="#f472b6" opacity="0.9"/>
+          <rect x="23" y="68" width="16" height="16" rx="2" fill="#4ade80" opacity="0.9"/>
+          <rect x="26" y="56" width="10" height="12" rx="2" fill="#f59e0b" opacity="0.95"/>
+
+          <!-- 로봇 베이스 (오른쪽) -->
+          <rect x="78" y="90" width="22" height="12" rx="3" fill="#a855f7" opacity="0.85"/>
+          <!-- 수직 기둥 -->
+          <rect x="86" y="50" width="6" height="46" rx="2" fill="#a855f7" opacity="0.95"/>
+          <!-- 어깨 관절 -->
+          <circle cx="89" cy="50" r="5" fill="#a855f7"/>
+          <!-- 위쪽 팔 (대각선 왼쪽 위로) -->
+          <rect x="60" y="32" width="32" height="6" rx="3" fill="#a855f7" transform="rotate(-25 89 50)" opacity="0.95"/>
+          <!-- 그리퍼 관절 -->
+          <circle cx="58" cy="36" r="5" fill="#a855f7"/>
+          <!-- 그리퍼 (집게 두 개) -->
+          <path d="M54 32 L46 28 L44 32 L52 36 Z" fill="#a855f7"/>
+          <path d="M54 40 L46 44 L44 40 L52 36 Z" fill="#a855f7"/>
+
+          <!-- 집고 있는 블럭 (파란색 — 다음에 쌓을 것) -->
+          <rect x="34" y="32" width="14" height="14" rx="2" fill="#60a5fa" opacity="0.95" stroke="#fff" stroke-width="1.5"/>
+
+          <!-- 화살표 (블럭을 탑 위로 옮기는 방향) -->
+          <path d="M50 50 Q40 56 36 64" stroke="#a855f7" stroke-width="2" fill="none" stroke-dasharray="3 2" opacity="0.7"/>
+          <path d="M34 60 L36 64 L40 62" stroke="#a855f7" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+        </svg>
+        <h3 class="font-display" style="font-size:1.5em;color:var(--ink);margin-top:22px;line-height:1.25">
+          함께 놀고<br>
+          <span style="color:var(--lavInk)">배우는 친구</span>
         </h3>
       </div>
 

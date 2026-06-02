@@ -1,17 +1,66 @@
 <section>
-  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="chip" style="font-size:0.55em">EDUPING · 모드 2</span>
-      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">율동 — 음악 + 양팔 trajectory</h2>
+  <div class="bg-deco">
+    <div class="blob" style="width:300px;height:300px;background:var(--babypinkSoft);top:-90px;left:-60px;opacity:0.35"></div>
+    <div class="blob float" style="width:220px;height:220px;background:var(--lavenderSoft);bottom:-50px;right:-30px;opacity:0.3"></div>
+  </div>
+  <div class="layer" style="padding:22px 44px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--babypink),var(--lavInk));color:#fff;border:0">EDUPING · 모드 02</span>
+      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">율동 — 녹화 → 키프레임 → 재생</h2>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden">
-      <video src="slides/assets/media/eduping/dance.mp4" loop playsinline data-press-to-play
-             style="max-width:100%;max-height:100%;object-fit:contain"
-             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/eduping/dance.mp4&lt;br&gt;&lt;span style=&quot;font-size:0.7em&quot;&gt;pull-assets.sh 실행 후 표시됨&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;'"></video>
+
+    <div style="flex:1;display:grid;grid-template-columns:1.5fr 1fr;gap:18px;min-height:0">
+
+      <!-- LEFT: BIG dance demo -->
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;position:relative">
+        <video src="slides/assets/media/eduping/dance.mp4" loop playsinline data-press-to-play
+               style="max-width:100%;max-height:100%;object-fit:contain;border:2px solid var(--babypink);border-radius:16px;box-shadow:0 8px 28px rgba(236,143,166,0.35);display:block"
+               onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft)&quot;&gt;dance.mp4&lt;/div&gt;'"></video>
+        <span style="position:absolute;top:18px;left:24px;background:rgba(15,18,28,0.88);color:#fff;font-family:'Jua';font-size:14px;padding:6px 16px;border-radius:8px;border:1.5px solid var(--babypink)">실제 율동 동작 (재생)</span>
+      </div>
+
+      <!-- RIGHT: small teach + 3 steps -->
+      <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+
+        <!-- 녹화 영상 -->
+        <div style="display:flex;align-items:center;justify-content:center;min-height:0;position:relative;height:200px">
+          <img src="slides/assets/media/eduping/dance-teach.gif" alt="Leader 팔 녹화"
+               style="max-width:100%;max-height:100%;object-fit:contain;border:1.5px solid var(--lavInk);border-radius:12px;box-shadow:0 4px 16px rgba(168,85,247,0.3);display:block"/>
+          <span style="position:absolute;top:10px;left:12px;background:rgba(15,18,28,0.88);color:#fff;font-family:'Jua';font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--lavInk)">녹화 (Leader 팔)</span>
+        </div>
+
+        <!-- 3 step cards -->
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0">
+
+          <div style="background:var(--surface);border-left:4px solid var(--babypink);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;flex:1">
+            <div style="font-family:'Jua';font-size:1.7em;color:var(--babypink);line-height:1;flex:0 0 auto;width:26px;text-align:center">1</div>
+            <div>
+              <div style="font-family:'Jua';font-size:0.72em;color:var(--ink);margin-bottom:3px">녹화</div>
+              <p style="color:var(--inkSoft);font-size:0.55em;margin:0;line-height:1.45">모터 <b style="color:var(--babypink)">16개</b> 각도 · <b style="color:var(--babypink)">50Hz</b> → <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:0.95em">motion.yaml</code></p>
+            </div>
+          </div>
+
+          <div style="background:var(--surface);border-left:4px solid var(--lavInk);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;flex:1">
+            <div style="font-family:'Jua';font-size:1.7em;color:var(--lavInk);line-height:1;flex:0 0 auto;width:26px;text-align:center">2</div>
+            <div>
+              <div style="font-family:'Jua';font-size:0.72em;color:var(--ink);margin-bottom:3px">키프레임</div>
+              <p style="color:var(--inkSoft);font-size:0.55em;margin:0;line-height:1.45">시간 + 관절 라디안 · 사이는 <b style="color:var(--lavInk)">선형 보간</b></p>
+            </div>
+          </div>
+
+          <div style="background:var(--surface);border-left:4px solid var(--skyInk);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;flex:1">
+            <div style="font-family:'Jua';font-size:1.7em;color:var(--skyInk);line-height:1;flex:0 0 auto;width:26px;text-align:center">3</div>
+            <div>
+              <div style="font-family:'Jua';font-size:0.72em;color:var(--ink);margin-bottom:3px">재생</div>
+              <p style="color:var(--inkSoft);font-size:0.55em;margin:0;line-height:1.45">WS 한 채널 · 같은 <b style="color:var(--skyInk)">t_ms</b> 에 <b style="color:var(--skyInk)">동작 + 음악</b></p>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   </div>
   <aside class="notes">
-    율동 모드. 브라우저 audio 가 mp3 를 재생하면서 같은 시점에 OpenArm 양팔이 사전녹화 trajectory 를 재생합니다.
-    Robot UI 의 DanceManager 에서 곡을 고르면 Control Server 가 trajectory ID 를 받아 ROS2 액션을 발사.
+    율동 — 좌측 큰 데모 영상 (dance.mp4) · 우측 상단 녹화 GIF (dance-teach.gif) + 3 step 설명.
   </aside>
 </section>

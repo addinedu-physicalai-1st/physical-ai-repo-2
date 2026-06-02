@@ -1,2 +1,32 @@
 _proto
 README.md
+
+# Exclude all media — re-include only what slides reference
+slides/assets/media/**
+
+# Re-include used media (mirror grep of slides/*.html for assets/media/...)
+!slides/assets/media/pov.mp4
+!slides/assets/media/eduping/
+!slides/assets/media/eduping/dance.mp4
+!slides/assets/media/eduping/dance-teach.gif
+!slides/assets/media/eduping/highfive.mp4
+!slides/assets/media/eduping/mugunghwa.mp4
+!slides/assets/media/gogoping/
+!slides/assets/media/gogoping/follow.mp4
+!slides/assets/media/doctor/
+!slides/assets/media/doctor/telehealth-quad.mp4
+!slides/assets/media/noriarm/
+!slides/assets/media/noriarm/blocks.mp4
+!slides/assets/media/noriarm/blocks-pickup-area.png
+!slides/assets/media/noriarm/oxquiz.mp4
+!slides/assets/media/noriarm/oxquiz-board-crop.png
+!slides/assets/media/noriarm/oxquiz-hand-crop.png
+!slides/assets/media/noriarm/shop.mp4
+!slides/assets/media/noriarm/shop-eval.png
+!slides/assets/media/noriarm/shop-root.png
+!slides/assets/media/panel/
+!slides/assets/media/panel/hw-eduping.png
+!slides/assets/media/panel/hw-gogoping.png
+!slides/assets/media/panel/hw-noriarm.png
+!slides/assets/media/portal/
+!slides/assets/media/portal/parent-report.png

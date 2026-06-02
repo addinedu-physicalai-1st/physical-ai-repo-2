@@ -1,0 +1,90 @@
+<section>
+  <div class="bg-deco">
+    <div class="blob" style="width:320px;height:320px;background:var(--butterSoft);top:-90px;left:-60px;opacity:0.4"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--babypinkSoft);bottom:-50px;right:-30px;opacity:0.3"></div>
+  </div>
+  <div class="layer" style="padding:22px 44px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+      <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--butterInk),var(--babypink));color:#fff;border:0">NORIARM · 3</span>
+      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">가게놀이 — SmolVLA → ACT 채택</h2>
+    </div>
+
+    <div style="background:linear-gradient(90deg,rgba(245,158,11,0.12),rgba(244,114,182,0.06));border-left:4px solid var(--butterInk);border-radius:10px;padding:9px 18px;margin-bottom:12px">
+      <p style="color:var(--ink);font-size:0.65em;margin:0;line-height:1.45">
+        prompt 무반응 발견 → <b style="color:var(--butterInk)">ROI 마스킹</b>으로 vision 강제 → <b style="color:var(--babypink)">ACT 전환</b> → closed-loop 안정
+      </p>
+    </div>
+
+    <!-- 3 act -->
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;min-height:0">
+
+      <!-- 문제 -->
+      <div style="background:var(--surface);border:1.5px solid #f85149;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 14px rgba(248,81,73,0.18)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:'Jua';font-size:1.3em;color:#f85149;line-height:1">①</span>
+          <div>
+            <div style="font-family:'Jua';font-size:0.6em;color:#f85149;letter-spacing:0.08em;line-height:1">문제 발견 (5/13)</div>
+            <h3 class="font-display" style="font-size:0.88em;color:var(--ink);margin:2px 0 0;line-height:1.1">SmolVLA prompt 무반응</h3>
+          </div>
+        </div>
+        <div style="background:#0a0d14;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
+          <img src="slides/assets/media/noriarm/shop-root.png" alt="root cause" style="width:100%;height:100%;object-fit:contain;background:#fff"/>
+        </div>
+        <ul style="margin:0;padding-left:16px;color:var(--ink);font-size:0.55em;line-height:1.5">
+          <li>fine-tuned <b>정확도 60%</b></li>
+          <li>5종을 <b>2 그룹</b>으로 묶음 (딸기·포도·키위 ↔ 브로콜리·파인애플)</li>
+          <li>vision ablation: black/shuffle <b>MSE 0.08%</b> → 입력 거의 안 봄</li>
+        </ul>
+      </div>
+
+      <!-- 해결책 -->
+      <div style="background:var(--surface);border:1.5px solid var(--butterInk);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 14px rgba(245,158,11,0.2)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:'Jua';font-size:1.3em;color:var(--butterInk);line-height:1">②</span>
+          <div>
+            <div style="font-family:'Jua';font-size:0.6em;color:var(--butterInk);letter-spacing:0.08em;line-height:1">해결책 (C1)</div>
+            <h3 class="font-display" style="font-size:0.88em;color:var(--ink);margin:2px 0 0;line-height:1.1">YOLO ROI 마스킹</h3>
+          </div>
+        </div>
+        <div style="background:#0a0d14;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
+          <img src="https://images.prismic.io/minsung/ah0uZAeQX7-eWd9__day03_05-13pm_c1_pipeline_kiwi.png?auto=format,compress" alt="ROI mask" style="width:100%;height:100%;object-fit:contain"/>
+        </div>
+        <ul style="margin:0;padding-left:16px;color:var(--ink);font-size:0.55em;line-height:1.5">
+          <li>YOLO 로 <b>target 만 남김</b> · 나머지 검정 (vision 명시)</li>
+          <li>active learning R2→R13 → <b>P=0.999</b> (TP 840 / FP 1)</li>
+          <li>학습 시 phase4/5/6 단계별 ROI epi 추가</li>
+        </ul>
+      </div>
+
+      <!-- 결과 -->
+      <div style="background:var(--surface);border:1.5px solid var(--babypink);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 14px rgba(244,114,182,0.2)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:'Jua';font-size:1.3em;color:var(--babypink);line-height:1">③</span>
+          <div>
+            <div style="font-family:'Jua';font-size:0.6em;color:var(--babypink);letter-spacing:0.08em;line-height:1">결과 (5/26)</div>
+            <h3 class="font-display" style="font-size:0.88em;color:var(--ink);margin:2px 0 0;line-height:1.1">ACT 채택 (closed-loop)</h3>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
+          <img src="slides/assets/media/noriarm/shop-eval.png" alt="ACT vs SmolVLA" style="width:100%;height:100%;object-fit:contain"/>
+        </div>
+        <ul style="margin:0;padding-left:16px;color:var(--ink);font-size:0.55em;line-height:1.5">
+          <li>전체 평균 MAE: ACT <b>0.69</b> vs SmolVLA <b>1.91</b></li>
+          <li>그리퍼 MAE: ACT <b>0.039</b> vs SmolVLA <b>0.114</b></li>
+          <li>추론 속도: ACT <b>208Hz</b> vs SmolVLA <b>130Hz</b> → closed-loop 우위</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    가게놀이 — 3 막 스토리.
+    ① 문제 (5/13): SmolVLA fine-tuned 60% 정확도, "2 그룹 분류" 문제, vision ablation MSE 0.08% → prompt+state 만 보고 외움.
+    ② 해결책 (C1 pipeline): YOLO ROI 마스킹 — target 만 남기고 vision 입력 강제. active learning R2→R13 P=0.999 (TP 840 / FP 1). 학습은 phase4/5/6 단계로 ROI 데이터셋 진화.
+    ③ 결과 (5/26 eval, omx_store_play 레포): ACT 0.69 vs SmolVLA 1.91 MAE · 그리퍼 ACT 0.039 vs SmolVLA 0.114 · 속도 ACT 208Hz vs SmolVLA 130Hz → closed-loop 안정성에서 ACT 압승, 픽업 작업에 채택.
+
+    상세 (SAM3 자동 라벨 시도, Grounding-DINO 비교, R6 wrist 재라벨, R7 bell button class 추가, dead episodes 디버깅, R9-11 hysteresis tracker + dual threshold, R13 v2 augmentation + class_weights, ablation phase 진화) 등 14일간 작업 흐름은 Q&A 슬라이드로.
+
+    이미지 출처: 문제·결과는 omx_store_play 레포의 local 고화질 (shop-root.png, shop-eval.png). 해결책은 Prismic CDN.
+  </aside>
+</section>
