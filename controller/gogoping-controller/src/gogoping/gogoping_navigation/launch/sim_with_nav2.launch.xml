@@ -111,6 +111,14 @@
         <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
 
+    <!-- 3e-2) smoother_server — BT 의 SmoothPath(SimpleSmoother)가 호출. 경로 평활.
+         BT(navigate_to_pose_3hz_replan.xml)가 이 노드를 쓰므로 반드시 떠 있어야 함. -->
+    <node pkg="nav2_smoother" exec="smoother_server" name="smoother_server"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
     <!-- 3f) behavior_server -->
     <node pkg="nav2_behaviors" exec="behavior_server" name="behavior_server"
           output="screen" args="--ros-args --log-level $(var log_level)">
@@ -161,7 +169,8 @@
         <param name="use_sim_time" value="$(var use_sim_time)"/>
         <param name="autostart" value="$(var autostart)"/>
         <param name="node_names"
-               value="['controller_server', 'planner_server', 'behavior_server',
-                       'bt_navigator', 'waypoint_follower', 'velocity_smoother']"/>
+               value="['controller_server', 'planner_server', 'smoother_server',
+                       'behavior_server', 'bt_navigator', 'waypoint_follower',
+                       'velocity_smoother']"/>
     </node>
 </launch>
