@@ -28,7 +28,7 @@ class Keys:
     # 시스템 모니터링 (interfaces/ 가 ROS 콜백으로 W)
     BATTERY_LEVEL = "battery_level"               # float 0~100 %
     HARDWARE_HEALTH = "hardware_health"           # dict[str, bool]
-    COLLISION_STATE = "collision_state"           # "ok" / "warn" / "fault"
+    COLLISION_STATE = "collision_state"           # "ok" / "stop" (collision_subscriber W)
     DOCKING_CONTACT = "docking_contact"           # bool
     ROBOT_POSE = "robot_pose"                     # dict {x: float, y: float, yaw: float} — **map frame** (PoseSubscriber 가 /amcl_pose 에서 W)
     POSE_OVERRIDE_ACTIVE = "pose_override_active" # bool — True 면 PoseSubscriber 가 W skip (디버그 좌표 강제 시)

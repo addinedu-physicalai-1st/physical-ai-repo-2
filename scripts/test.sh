@@ -110,6 +110,8 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_lullaby_subtree_builder.py \
   tests/test_gogoping_main_tree_shell.py \
   tests/test_gogoping_map_boundary_monitor.py \
+  tests/test_gogoping_collision_monitor.py \
+  tests/test_gogoping_collision_subscriber.py \
   tests/test_gogoping_manual_torque_hold.py \
   tests/test_gogoping_pose_override.py \
   tests/test_gogoping_align_to_dock.py \

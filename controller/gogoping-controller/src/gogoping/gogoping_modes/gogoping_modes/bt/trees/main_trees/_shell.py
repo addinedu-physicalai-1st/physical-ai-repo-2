@@ -20,6 +20,7 @@ from py_trees.common import ParallelPolicy
 
 from ...behaviors.common.battery_full_monitor import BatteryFullMonitor
 from ...behaviors.common.battery_low_monitor import BatteryLowMonitor
+from ...behaviors.common.collision_monitor import CollisionMonitor
 from ...behaviors.common.command_listener import CommandListener
 from ...behaviors.common.hardware_health_monitor import HardwareHealthMonitor
 from ...behaviors.common.idle_timeout_monitor import IdleTimeoutMonitor
@@ -75,7 +76,8 @@ def build_active_main_tree(
         children.append(MapBoundaryMonitor("MapBoundaryMonitor", ctx))
     if include_hw_health:
         children.append(HardwareHealthMonitor("HardwareHealthMonitor", ctx))
-    # TODO: include_collision 시 CollisionMonitor 추가 (지금 wiring 없음)
+    if include_collision:
+        children.append(CollisionMonitor("CollisionMonitor", ctx))
     if include_proximity:
         children.append(ProximitySafetyMonitor("ProximitySafetyMonitor", ctx))
     if include_command_listener:

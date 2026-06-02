@@ -17,7 +17,7 @@ Parallel(SuccessOnSelected=[body])
       └─ UIPublish("도착했습니다")             — /gogoping/ui_event
 ```
 
-추후 추가 예정: `CollisionEventHandler` (현재 ☐).
+`CollisionMonitor` (✅ — COLLISION_STATE "stop" 5분 지속 → `cancel` → IDLE).
 
 ### task_body=True 정책
 

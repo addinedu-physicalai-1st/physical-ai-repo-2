@@ -81,13 +81,23 @@
         <param name="use_sim_time" value="$(var use_sim_time)"/>
     </node>
 
-    <!-- velocity_smoother — controller cmd_vel_nav → /gogoping/cmd_vel_raw (safety_filter 가 relay) -->
+    <!-- collision_monitor — LiDAR stop zone 으로 nav2 주행 cmd_vel gate (사물 충돌 안전망).
+         controller 출력(cmd_vel_nav) → collision_monitor → cmd_vel_nav_safe → velocity_smoother.
+         FOLLOW 의 reactive(cmd_vel_raw 직접)는 이 경로를 안 거쳐 사람 추종이 안 막힘.
+         topic 은 params(cmd_vel_in/out_topic, scan)에서 절대경로로 지정 — remap 불필요. -->
+    <node pkg="nav2_collision_monitor" exec="collision_monitor" name="collision_monitor"
+          output="screen" args="--ros-args --log-level $(var log_level)">
+        <param from="$(var params_file)"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- velocity_smoother — cmd_vel_nav_safe(collision gate 후) → /gogoping/cmd_vel_raw (safety_filter 가 relay) -->
     <node pkg="nav2_velocity_smoother" exec="velocity_smoother"
           name="velocity_smoother" output="screen"
           args="--ros-args --log-level $(var log_level)">
         <param from="$(var params_file)"/>
         <param name="use_sim_time" value="$(var use_sim_time)"/>
-        <remap from="cmd_vel" to="/gogoping/cmd_vel_nav"/>
+        <remap from="cmd_vel" to="/gogoping/cmd_vel_nav_safe"/>
         <remap from="cmd_vel_smoothed" to="/gogoping/cmd_vel_raw"/>
     </node>
 
@@ -111,6 +121,7 @@
                                          'behavior_server',
                                          'bt_navigator',
                                          'waypoint_follower',
+                                         'collision_monitor',
                                          'velocity_smoother']"/>
     </node>
 </launch>

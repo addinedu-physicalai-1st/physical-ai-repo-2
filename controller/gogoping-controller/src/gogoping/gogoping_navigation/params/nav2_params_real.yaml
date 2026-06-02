@@ -342,6 +342,36 @@ waypoint_follower:
       enabled: true
       waypoint_pause_duration: 200
 
+collision_monitor:
+  ros__parameters:
+    use_sim_time: false
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    # nav2 controller 출력(cmd_vel_nav)을 받아 LiDAR stop zone gate → cmd_vel_nav_safe
+    # (velocity_smoother 입력). FOLLOW 의 reactive cmd_vel_raw 는 이 경로를 안 거침.
+    cmd_vel_in_topic: "/gogoping/cmd_vel_nav"
+    cmd_vel_out_topic: "/gogoping/cmd_vel_nav_safe"
+    state_topic: "collision_monitor_state"     # → /collision_monitor_state (collision_subscriber 구독)
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: false               # 저속(0.15m/s) — odom 보정 불필요, frame 의존 ↓
+    stop_pub_timeout: 2.0
+    polygons: ["StopZone"]
+    StopZone:
+      type: "polygon"
+      # base_footprint 기준 [전방, 좌우] 범퍼 (m). Vic Pinky 소형 + 저속 → 타이트.
+      # 튜닝: 너무 자주 멈추면 축소, 충돌 위험 시 확대.
+      points: "[[0.40, 0.20], [0.40, -0.20], [-0.12, -0.20], [-0.12, 0.20]]"
+      action_type: "stop"
+      min_points: 4
+      visualize: false
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "/gogoping/scan_filtered"
+      enabled: true
+
 velocity_smoother:
   ros__parameters:
     use_sim_time: false

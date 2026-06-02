@@ -273,6 +273,33 @@ waypoint_follower:
       plugin: nav2_waypoint_follower::WaitAtWaypoint
       enabled: true
       waypoint_pause_duration: 200
+collision_monitor:
+  ros__parameters:
+    use_sim_time: true
+    base_frame_id: gogoping/base_footprint
+    odom_frame_id: gogoping/odom
+    # nav2 controller 출력(cmd_vel_nav)을 LiDAR stop zone gate → cmd_vel_nav_safe.
+    cmd_vel_in_topic: /gogoping/cmd_vel_nav
+    cmd_vel_out_topic: /gogoping/cmd_vel_nav_safe
+    state_topic: collision_monitor_state
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: false
+    stop_pub_timeout: 2.0
+    polygons: ["StopZone"]
+    StopZone:
+      type: polygon
+      points: "[[0.40, 0.20], [0.40, -0.20], [-0.12, -0.20], [-0.12, 0.20]]"
+      action_type: stop
+      min_points: 4
+      visualize: false
+      enabled: true
+    observation_sources: ["scan"]
+    scan:
+      type: scan
+      topic: /gogoping/scan_filtered
+      enabled: true
+
 velocity_smoother:
   ros__parameters:
     use_sim_time: true

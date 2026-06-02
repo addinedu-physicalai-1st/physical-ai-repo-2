@@ -64,7 +64,7 @@ controller/gogoping-controller/src/gogoping/
         │   │   │   │                                 #   ROS param hw_health_staleness_seconds (기본 3.0s).
         │   │   │   │                                 #   Used in: 8 트리 (CHARGING/IDLE/GOTO/FOLLOW/LULLABY/
         │   │   │   │                                 #            HIDEANDSEEK/RETURNING/LOW_BATTERY_RETURNING — MANUAL/ERROR 제외)
-        │   │   │   ├── collision_event_handler.[py|/] # Nav2 Collision Monitor 비정상 상태 → "fault" trigger (☐ wiring 미완)
+        │   │   │   ├── collision_monitor.[py|/]       # COLLISION_STATE "stop" 5분 지속 → cancel(IDLE)/fault(ERROR). nav2 collision_monitor 노드 + collision_subscriber 연동 (✅)
         │   │   │   │                                 #   Used in (정책 ON): GOTO/FOLLOW/LULLABY/HIDEANDSEEK/RETURNING/LOW_BATTERY_RETURNING
         │   │   │   ├── command_listener.[py|/]       # 외부 명령 수신 → reconciler 호출 → fsm.trigger 자체 발화 (✅)
         │   │   │   │                                 #   SetGoal + ForceState + SetRobotPose + emergency_stop 4 server.

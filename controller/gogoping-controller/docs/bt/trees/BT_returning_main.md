@@ -15,7 +15,7 @@ Parallel(SuccessOnAll(synchronise=False))
 
 `BatteryLowMonitor` 가 RETURNING 중에도 배터리 더 떨어지면 `battery_low` trigger → LOW_BATTERY_RETURNING 로 escalation. `ReturnSubTree` 는 OneShot 으로 감싸 SUCCESS 후 재실행 X — robot 은 도크에 들어간 상태로 cmd_vel=0 정지. 자동 `docked` trigger 는 발표 범위 외 (사람이 admin UI 디버그 버튼으로 발사 → CHARGING).
 
-추후 추가 예정: CollisionEventHandler.
+`CollisionMonitor` (✅ — COLLISION_STATE "stop" 5분 지속 → `cancel` → IDLE).
 
 ## LOW_BATTERY_RETURNING 과의 차이
 

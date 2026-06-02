@@ -15,7 +15,7 @@ Parallel(SuccessOnSelected=[body])
 └─ body: StubFollow                                              (☐ BT_follow_sub 미구현 — 영구 RUNNING)
 ```
 
-추후 추가 예정: `CollisionEventHandler` (현재 ☐).
+`CollisionMonitor` 제외 — 사람 추종(REACTIVE)은 nav2 controller 를 안 거쳐(cmd_vel_raw 직접) collision_monitor gate 대상이 아니고, 추종 중 사람을 정지시키면 안 됨.
 
 ### StubFollow 정책
 

@@ -17,7 +17,7 @@ Parallel(SuccessOnSelected=[body])
             └─ (play_area / waypoints 결손 시) Failure leaf  — 방어 분기
 ```
 
-추후 추가 예정: `CollisionEventHandler` (현재 ☐).
+`CollisionMonitor` (✅ — COLLISION_STATE "stop" 5분 지속 → `cancel` → IDLE).
 
 ### task_body=True 정책
 
