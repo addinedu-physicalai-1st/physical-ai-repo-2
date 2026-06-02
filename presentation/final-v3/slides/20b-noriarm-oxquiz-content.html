@@ -1,0 +1,72 @@
+<section>
+  <div class="bg-deco">
+    <div class="blob" style="width:320px;height:320px;background:var(--butterSoft);top:-90px;right:-60px;opacity:0.4"></div>
+    <div class="blob float" style="width:220px;height:220px;background:var(--lavenderSoft);bottom:-50px;left:-30px;opacity:0.3"></div>
+  </div>
+  <div class="layer" style="padding:24px 48px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--butterInk),var(--lavInk));color:#fff;border:0">NORIARM · 2</span>
+      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">OX 퀴즈 — 손동작으로 답하는 책상친구</h2>
+    </div>
+
+    <!-- 큰 2 사진 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;height:320px">
+      <div style="background:#0a0d14;border:1.5px solid var(--butterInk);border-radius:12px;overflow:hidden;position:relative;box-shadow:0 4px 14px rgba(245,158,11,0.2)">
+        <img src="slides/assets/media/noriarm/oxquiz-board-crop.png" alt="YOLO-World 보드"
+             style="width:100%;height:100%;object-fit:cover"/>
+        <span style="position:absolute;top:10px;left:12px;background:rgba(15,18,28,0.85);color:#fff;font-family:'Jua';font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--butterInk)">YOLO-World · 보드 O/X 검출</span>
+      </div>
+      <div style="background:#0a0d14;border:1.5px solid var(--lavInk);border-radius:12px;overflow:hidden;position:relative;box-shadow:0 4px 14px rgba(168,85,247,0.2)">
+        <img src="slides/assets/media/noriarm/oxquiz-hand-crop.png" alt="MediaPipe Hands 락인"
+             style="width:100%;height:100%;object-fit:cover"/>
+        <span style="position:absolute;top:10px;left:12px;background:rgba(15,18,28,0.85);color:#fff;font-family:'Jua';font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--lavInk)">MediaPipe Hands · 1.5초 락인</span>
+      </div>
+    </div>
+
+    <!-- 하단 2 기술 카드 (비전 + 로봇 제어) -->
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px;min-height:0">
+
+      <div style="background:var(--surface);border:1.5px solid var(--butterInk);border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 14px rgba(245,158,11,0.18)">
+        <div style="display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px dashed rgba(245,158,11,0.3)">
+          <span class="material-icons-round" style="color:var(--butterInk);font-size:28px">visibility</span>
+          <span style="font-family:'Jua';font-size:0.92em;color:var(--butterInk);letter-spacing:0.06em">비전</span>
+        </div>
+        <ul style="margin:0;padding-left:14px;color:var(--ink);font-size:0.7em;line-height:1.55;list-style:none;flex:1;display:flex;flex-direction:column;justify-content:space-around">
+          <li style="position:relative;padding-left:16px">
+            <span style="position:absolute;left:0;color:var(--butterInk);font-weight:700">▸</span>
+            <b style="color:var(--butterInk)">YOLO-World</b> — 보드 검출 후 색으로 영역 분할<br>
+            <span style="color:var(--inkSoft);font-size:0.85em">(파란 면 = O · 빨간 면 = X)</span>
+          </li>
+          <li style="position:relative;padding-left:16px">
+            <span style="position:absolute;left:0;color:var(--butterInk);font-weight:700">▸</span>
+            <b style="color:var(--butterInk)">MediaPipe Hands</b> — 손끝 추적<br>
+            <span style="color:var(--inkSoft);font-size:0.85em">손이 영역 위 1.5초 머물면 확정 (락인)</span>
+          </li>
+        </ul>
+      </div>
+
+      <div style="background:var(--surface);border:1.5px solid var(--mintInk);border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 14px rgba(74,222,128,0.18)">
+        <div style="display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px dashed rgba(74,222,128,0.3)">
+          <span class="material-icons-round" style="color:var(--mintInk);font-size:28px">precision_manufacturing</span>
+          <span style="font-family:'Jua';font-size:0.92em;color:var(--mintInk);letter-spacing:0.06em">로봇 제어</span>
+        </div>
+        <ul style="margin:0;padding-left:14px;color:var(--ink);font-size:0.7em;line-height:1.55;list-style:none;flex:1;display:flex;flex-direction:column;justify-content:space-around">
+          <li style="position:relative;padding-left:16px">
+            <span style="position:absolute;left:0;color:var(--mintInk);font-weight:700">▸</span>
+            <b style="color:var(--mintInk)">ROS2 + OMX-F</b> 로봇팔<br>
+            <span style="color:var(--inkSoft);font-size:0.85em">arm (5축) + gripper 채널 분리</span>
+          </li>
+          <li style="position:relative;padding-left:16px">
+            <span style="position:absolute;left:0;color:var(--mintInk);font-weight:700">▸</span>
+            <b style="color:var(--mintInk)">사전 녹화 트래젝토리 재생</b> (lerobot)<br>
+            <span style="color:var(--inkSoft);font-size:0.85em">정답 방향만 가리키는 rule-based 정책</span>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    OX 퀴즈 — tagline 삭제. 큰 2 사진 (보드 / 손+락인, crop 으로 손 잘 보임) + 하단 3 자랑.
+  </aside>
+</section>

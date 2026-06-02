@@ -1,0 +1,93 @@
+<section class="title-slide">
+  <div class="bg-deco">
+    <div class="spin-slow" style="position:absolute;width:900px;height:900px;top:50%;left:50%;transform:translate(-50%,-50%);background:conic-gradient(from 0deg, var(--babypinkSoft), var(--lavenderSoft), var(--mintSoft), var(--butterSoft), var(--babypinkSoft));border-radius:50%;opacity:0.28;filter:blur(60px);z-index:0"></div>
+    <div class="blob drift-1" style="width:320px;height:320px;background:var(--babypinkSoft);top:-90px;left:-70px"></div>
+    <div class="blob drift-2" style="width:280px;height:280px;background:var(--mintSoft);bottom:-80px;right:-50px"></div>
+    <div class="dots"></div>
+  </div>
+
+  <div class="layer" style="padding:30px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:2;align-items:center">
+
+    <h1 class="font-display shine-text" style="font-size:4.5em;line-height:0.95;margin:6px 0 0;letter-spacing:-0.03em">Q&amp;A</h1>
+    <p style="color:var(--inkSoft);font-family:'Jua';font-size:0.7em;letter-spacing:0.25em;margin:6px 0 0">질문을 클릭하면 답변 슬라이드로 이동합니다</p>
+
+    <div style="flex:1;width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:12px;margin-top:22px;min-height:0">
+
+      <div onclick="Reveal.slide(26)" style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--lavInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--lavenderSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--lavInk)">psychology</span>
+          <p style="color:var(--lavInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">01 IMITATION</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">모방학습 (ACT)</h3>
+      </div>
+
+      <div onclick="Reveal.slide(27)" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--babypink)">local_florist</span>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">02 MUGUNGHWA</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">무궁화 device-local</h3>
+      </div>
+
+      <div onclick="Reveal.slide(28)" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--skyInk)">stethoscope</span>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">03 DOCTOR</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">원격 진찰</h3>
+      </div>
+
+      <div onclick="Reveal.slide(29)" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--babypink)">shield</span>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">04 SAFETY</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">근접 안전정지</h3>
+      </div>
+
+      <div onclick="Reveal.slide(30)" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--mintInk)">directions_walk</span>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">05 FOLLOW</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">교사 추종 (GogoPing)</h3>
+      </div>
+
+      <div onclick="Reveal.slide(31)" style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--butterInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--butterSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--butterInk)">graphic_eq</span>
+          <p style="color:var(--butterInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">06 WAKE WORD</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">호출어 (ONNX 브라우저)</h3>
+      </div>
+
+      <div onclick="Reveal.slide(32)" style="background:var(--surface);border:1.5px solid var(--mintSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--mintInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--mintSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--mintInk)">account_tree</span>
+          <p style="color:var(--mintInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">07 NAV + BT</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">자율 주행 · 행동트리</h3>
+      </div>
+
+      <div onclick="Reveal.slide(33)" style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--babypink)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--babypinkSoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--babypink)">family_restroom</span>
+          <p style="color:var(--babypink);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">08 PORTAL</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">Portal · 일과 보고서</h3>
+      </div>
+
+      <div onclick="Reveal.slide(34)" style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;transition:transform .15s,border-color .15s" onmouseover="this.style.borderColor='var(--skyInk)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--skySoft)';this.style.transform=''">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="material-icons-round" style="font-size:24px;color:var(--skyInk)">hub</span>
+          <p style="color:var(--skyInk);font-family:'Jua';font-size:0.55em;letter-spacing:0.15em;margin:0">09 SYSTEM</p>
+        </div>
+        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:6px 0 0">시스템 아키텍처</h3>
+      </div>
+
+    </div>
+
+    <p style="color:var(--inkSoft);font-family:'Jua';font-size:0.65em;letter-spacing:0.2em;margin-top:14px">사랑의 에듀핑 · pingdergarten · 감사합니다</p>
+
+  </div>
+</section>

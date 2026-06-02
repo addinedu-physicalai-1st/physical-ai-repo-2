@@ -1,0 +1,26 @@
+<section>
+  <div style="padding:36px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative">
+    <a onclick="Reveal.slide(25)" style="position:absolute;top:18px;right:24px;font-family:'Jua';font-size:0.7em;color:var(--inkSoft);cursor:pointer;text-decoration:none">← Q&amp;A</a>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span class="material-icons-round" style="font-size:42px;color:var(--babypink)">family_restroom</span>
+      <div>
+        <p style="color:var(--babypink);font-family:'Jua';letter-spacing:0.25em;font-size:0.6em;margin:0">Q&amp;A · 08</p>
+        <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:4px 0 0">Portal · 일과 보고서</h2>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-height:0">
+      <div style="background:var(--surface);border:1px solid var(--babypinkSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--babypink);font-family:'Jua';font-size:0.7em;margin:0">Q. 일과 보고서는 누가 쓰나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">하원 시각 기록 직후 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">ai_job(kind=report)</code> 큐에 enqueue → AI Server worker 가 <b style="color:var(--ink)">Ollama qwen2.5:7b</b> 로 자녀별 하루치 사진 메타 + 모드 이력 + 점심 메뉴 통합 요약. <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">report</code> 테이블에 저장.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--babypinkSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--babypink);font-family:'Jua';font-size:0.7em;margin:0">Q. 학부모는 어떻게 보나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">Portal Web (Vue 3) 로그인 → 자녀 선택 → 일자별 timeline 보고서. fastapi-users 세션 쿠키 인증. 같은 Wi-Fi LAN IP 로 폰/PC 어느 쪽이든 접근. 교사가 인라인 편집해서 최종본 송출.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--babypinkSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--babypink);font-family:'Jua';font-size:0.7em;margin:0">Q. 사진은 어떻게 자녀 매핑되나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">놀이 모드 중 자연 촬영 → <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">photo</code> INSERT + <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">ai_job(kind=photo_classify)</code> enqueue → AI Server worker 가 InsightFace 로 프레임 내 모든 등록 아이 식별 → <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">photo_subject(photo_id, child_id)</code> N:N 매핑.</p>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>pingdergarten — A1 판넬</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root{
+    --cream:#FFF8F2; --surface:#FFFFFF;
+    --pink:#EC8FA6; --pinkS:#FCE0E7;
+    --mint:#5FAA22; --mintS:#DDEFBE;   /* 고고핑 — 라임(어두운) */
+    --butter:#D49A1C; --butterS:#FBEFCD;
+    --lav:#3D6BC4; --lavS:#D8E1F4;     /* 노리암 — 블루 */
+    --sky:#4E97D6; --skyS:#D7EAFA;
+    --teal:#2E9A86; --tealS:#CCEAE2;   /* 카테고리 + 시나리오 놀이 */
+    --coral:#E26C4F; --coralS:#FAD9CE; /* 카테고리 + 시나리오 보조 */
+    --plum:#9A4FB8; --plumS:#E7D3F0;   /* 카테고리 — 하드웨어 제원 */
+    --ink:#4A352B; --inkSoft:#7C6055; --faint:#B6A399;
+    --border:#EFD6DC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  @page{ size:594mm 841mm; margin:0; }
+  *, *::before, *::after{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
+  @media print{ *, *::before, *::after{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; } }
+  html,body{ background:#cfc7c0; font-family:'Pretendard Variable',system-ui,sans-serif; color:var(--ink); }
+
+  .poster{ width:594mm; height:841mm; background:var(--cream); position:relative; overflow:hidden; padding:13mm 13mm 9mm; display:flex; flex-direction:column; gap:7mm;
+    background-image: radial-gradient(circle at 5% 1%, #FCE0E7 0, transparent 19%), radial-gradient(circle at 96% 1%, #D7EAFA 0, transparent 17%); }
+
+  /* ── HEADER ── */
+  .head{ display:flex; align-items:center; gap:11mm; background:var(--surface); border:1mm solid var(--border); border-radius:9mm; padding:12mm 12mm; box-shadow:0 4mm 12mm rgba(236,143,166,.18); position:relative; overflow:hidden }
+  .head::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4mm; background:linear-gradient(180deg,var(--pink),var(--lav),var(--mint)) }
+  .head .htext{ flex:1; padding-left:3mm }
+  .eyebrow{ font-family:'Jua'; letter-spacing:.28em; color:var(--lav); font-size:18pt }
+  .head h1{ font-family:'Jua'; font-size:104pt; line-height:.9; margin:3mm 0 9mm }
+  .head h1 .p{color:var(--pink)} .head h1 .d{color:var(--lav)} .head h1 .g{color:var(--mint)}
+  .head .sub{ font-family:'Jua'; font-size:34pt }
+  .head .tag{ font-size:19pt; color:var(--inkSoft); margin-top:2.5mm; line-height:1.5 }
+  .head .hright{ flex:0 0 auto; text-align:center }
+  .team{ font-family:'Jua'; font-size:26pt; color:#fff; background:var(--pink); border-radius:9mm; padding:4.5mm 11mm; display:inline-block; box-shadow:0 3mm 8mm rgba(236,143,166,.4) }
+  .members{ font-family:'Jua'; font-size:20pt; color:var(--ink); margin-top:7mm; line-height:1.4; display:grid; grid-template-columns:repeat(3, auto); gap:2mm 7mm; justify-content:center }
+  .members span{ white-space:nowrap }
+  .robots{ margin-top:4mm; display:flex; gap:3mm; justify-content:center }
+  .rbadge{ font-family:'Jua'; font-size:16pt; padding:2.6mm 6mm; border-radius:7mm; color:#fff }
+
+  /* ── COLUMNS ── */
+  .cols{ flex:1; display:grid; grid-template-columns:1fr 1fr; gap:7mm; min-height:0 }
+  .col{ display:flex; flex-direction:column; gap:7mm; min-height:0 }
+
+  /* ── SECTION CARD (custom header w/ circular icon badge) ── */
+  .sec{ background:var(--surface); border:1mm solid var(--border); border-radius:8mm; overflow:hidden; box-shadow:0 4mm 11mm rgba(236,143,166,.13); display:flex; flex-direction:column }
+  .sec.grow{ flex:1 }
+  .bar{ display:flex; align-items:center; gap:4mm; padding:4.5mm 7mm; color:#fff; position:relative }
+  .bar .badge{ width:13mm; height:13mm; border-radius:50%; background:rgba(255,255,255,.28); display:flex; align-items:center; justify-content:center; flex:0 0 auto; overflow:hidden }
+  .bar .badge .material-icons-round{ font-size:30pt; color:#fff }
+  .bar .badge.icon{ background:#fff; padding:1.2mm; box-sizing:border-box }
+  .bar .badge.icon img{ width:100%; height:100%; object-fit:contain; display:block }
+  .bar h2{ font-family:'Jua'; font-size:31pt; letter-spacing:.01em }
+  .bar .num{ margin-left:auto; font-family:'Jua'; font-size:18pt; opacity:.9 }
+  .bar.pink{background:var(--pink)} .bar.mint{background:var(--mint)} .bar.butter{background:var(--butter)} .bar.lav{background:var(--lav)} .bar.sky{background:var(--sky)} .bar.teal{background:var(--teal)} .bar.coral{background:var(--coral)} .bar.plum{background:var(--plum)}
+  .bd{ padding:6.5mm 7mm; flex:1; display:flex; flex-direction:column; min-height:0 }
+  b{color:var(--ink)} .lead{ font-size:22pt; line-height:1.6 } .small{ font-size:16pt; color:var(--inkSoft); line-height:1.5 }
+  /* 프로젝트 개요 — bold 에도 형광펜 (불투명 hex) */
+  .lead b{ background-image:linear-gradient(#fff 0, #fff 55%, #ECD299 55%, #ECD299 100%); padding:0 .8mm; color:var(--ink) }
+
+  .stats{ display:flex; gap:4mm; margin-top:auto; padding-top:5mm }
+  .stat{ flex:1; text-align:center; background:var(--cream); border:1mm solid var(--border); border-radius:5mm; padding:4.5mm 1mm }
+  .stat .n{ font-family:'Jua'; font-size:43pt; line-height:1 } .stat .u{ font-size:18pt; color:var(--inkSoft) }
+  .stat .l{ font-size:15pt; color:var(--inkSoft); margin-top:1.5mm; line-height:1.3 }
+
+  /* ── tech ── */
+  .techrow{ display:flex; align-items:flex-start; gap:4mm; padding:3.2mm 0; border-top:.6mm solid var(--border) }
+  .techrow:first-child{ border-top:none }
+  .techrow .cat{ font-family:'Jua'; font-size:13pt; color:var(--inkSoft); flex:0 0 30mm; padding-top:1.5mm }
+  .chips{ display:flex; flex-wrap:wrap; gap:2.6mm }
+  .chip{ font-family:'Jua'; font-size:12.5pt; padding:2.2mm 5mm; border-radius:6mm; background:var(--pinkS); color:var(--ink) }
+  .chip.mint{background:var(--mintS)} .chip.lav{background:var(--lavS)} .chip.sky{background:var(--skyS)} .chip.butter{background:var(--butterS)}
+
+  /* ── tech logo grid ── */
+  .logos{ display:flex; flex-wrap:wrap; gap:5mm 3mm; align-content:flex-start }
+  .logo{ width:calc(16.66% - 2.5mm); display:flex; flex-direction:column; align-items:center; gap:1.8mm }
+  .logo .lw{ height:15mm; display:flex; align-items:center; justify-content:center }
+  .logo img{ max-height:15mm; max-width:22mm; object-fit:contain; display:block }
+  .logo span{ font-family:'Jua'; font-size:14pt; color:var(--inkSoft); text-align:center; line-height:1.05 }
+  .aimods{ margin-top:auto; padding-top:5mm; border-top:.8mm solid var(--border); font-size:17pt; color:var(--inkSoft); line-height:1.6 }
+  .aimods b{ color:var(--ink); font-family:'Jua' }
+
+  /* ── hardware spec (left) — 3-col × 3-row grid for aligned layout ── */
+  .specgrid{ display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr auto auto; gap:3mm 5mm; flex:1; min-height:0 }
+  .specgrid .ph{ width:100%; min-height:0; display:flex; align-items:center; justify-content:center; position:relative }
+  .specgrid .ph > img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; border:none; box-shadow:none; display:block }
+  .specgrid .sn{ font-family:'Jua'; font-size:26pt; line-height:1.1; display:flex; align-items:baseline; gap:3mm; flex-wrap:wrap; align-self:end }
+  .specgrid .sn small{ font-size:16pt; color:var(--inkSoft); font-family:'Jua' }
+  /* 사진 + 아이콘 묶음 — 아이콘이 사진 우상단에 붙도록 wrapper */
+  .specgrid .ph .phwrap{ position:relative; display:inline-flex; max-width:100%; max-height:100% }
+  .specgrid .ph .phwrap > img{ max-width:100%; max-height:100%; width:auto; height:auto; border-radius:5mm; display:block }
+  .specgrid .ph .icn{ position:absolute; top:3mm; right:3mm; width:18mm; height:18mm; border-radius:50%; background:#fff; box-shadow:0 2mm 5mm rgba(0,0,0,.18); display:flex; align-items:center; justify-content:center; padding:2mm; box-sizing:border-box; z-index:2 }
+  .specgrid .ph .icn.pink { box-shadow:0 0 0 1.2mm var(--pink),  0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn.mint { box-shadow:0 0 0 1.2mm var(--mint),  0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn.lav  { box-shadow:0 0 0 1.2mm var(--lav),   0 2mm 5mm rgba(0,0,0,.18) }
+  .specgrid .ph .icn img{ width:100%; height:100%; object-fit:contain; display:block }
+  .specgrid .sl{ font-size:19pt; line-height:1.45; color:var(--inkSoft); display:flex; flex-direction:column; align-self:start }
+  .specgrid .sl .li{ padding:1.4mm 0 1.4mm 5.5mm; position:relative }
+  .specgrid .sl .li::before{ content:""; position:absolute; left:0; top:.7em; width:1.8mm; height:1.8mm; border-radius:50%; background:currentColor; opacity:.55 }
+  .specgrid .sl b{ color:var(--ink); font-family:'Jua' }
+
+  /* ── scenario horizontal (right, compact) ── */
+  .flowh{ display:flex; align-items:center; gap:5mm; padding:1mm 0 }
+  .fh{ flex:1; text-align:center; display:flex; flex-direction:column; align-items:center; gap:1.5mm }
+  .fh .fhi{ display:none }     /* 기존 material-icon 원형 배지 제거 */
+  .fh .fht{ font-family:'Jua'; font-size:29pt; line-height:1; color:var(--ink) }
+  .fh .fhs{ font-size:17pt; color:var(--ink); line-height:1.25; font-weight:500; white-space:nowrap }
+  .fh .fhrobots{ display:flex; justify-content:center; gap:2mm; margin-top:2.5mm }
+  .fh .fhrobots img{ width:17mm; height:17mm; object-fit:contain; display:block; background:#fff; border-radius:50%; padding:1.3mm; box-sizing:border-box; box-shadow:0 1.5mm 4mm rgba(0,0,0,.22) }
+  .fh .fhrobots img.e{ box-shadow:0 0 0 .6mm var(--pink), 0 1.5mm 4mm rgba(0,0,0,.22) }
+  .fh .fhrobots img.g{ box-shadow:0 0 0 .6mm var(--mint), 0 1.5mm 4mm rgba(0,0,0,.22) }
+  .fh .fhrobots img.n{ box-shadow:0 0 0 .6mm var(--lav),  0 1.5mm 4mm rgba(0,0,0,.22) }
+  .fharrow{ align-self:center; color:var(--faint); font-size:30pt; font-family:'Jua'; flex:0 0 auto }
+
+  /* ── robot blocks (right) ── */
+  .rhead{ display:flex; align-items:center; gap:6mm; margin-bottom:4mm }
+  .pslot{ width:40mm; height:40mm; flex:0 0 auto; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.5mm; color:var(--faint); overflow:hidden }
+  .pslot .material-icons-round{ font-size:38pt } .pslot span{ font-family:'Jua'; font-size:16pt }
+  .rtitle{ font-family:'Jua'; font-size:44pt; line-height:1; display:flex; align-items:baseline; gap:4mm; flex-wrap:wrap }
+  .rtitle .en{ font-size:20pt; color:var(--inkSoft); font-family:'Jua' }
+  .rfunc{ margin-bottom:4mm; color:var(--ink); display:flex; flex-direction:column }
+  .rfunc .ff{ padding:3.5mm 0; border-top:.6mm solid var(--border); font-size:20pt; line-height:1.55; display:grid; grid-template-columns:70mm 1fr; align-items:baseline; gap:18mm }
+  .rfunc .ff:first-child{ border-top:none; padding-top:0 }
+  .rfunc .ff b{ font-family:'Jua'; font-size:24pt; line-height:1.15; white-space:nowrap }
+  .rfunc .ff span{ line-height:1.4 }
+  .rfunc.pink .ff b{ color:var(--pink) }
+  .rfunc.mint .ff b{ color:var(--mint) }
+  .rfunc.lav  .ff b{ color:var(--lav) }
+  .rblank{ flex:1; min-height:0; border:1.4mm dashed var(--faint); border-radius:6mm; background:var(--cream);
+    display:flex; align-items:center; justify-content:center; color:var(--faint); font-family:'Jua'; font-size:19pt; gap:2.5mm; overflow:hidden }
+  .rblank .material-icons-round{ font-size:28pt }
+  .rshot{ flex:1; min-height:0; border-radius:6mm; overflow:hidden; border:1mm solid var(--border); background:#fff }
+  .rshot img{ width:100%; height:100%; object-fit:cover; display:block }
+  .demohalf{ flex:1; min-height:0; display:flex; gap:3mm; align-items:stretch }
+  .demohalf .d{ flex:1; min-width:0; height:100%;
+    background:#fff; border-radius:6mm; border:1mm solid var(--border); overflow:hidden;
+    box-shadow:0 2mm 6mm rgba(236,143,166,.2); display:flex; align-items:center; justify-content:center }
+  .demohalf .d img{ width:100%; height:100%; object-fit:cover; display:block }
+  /* EduPing 전용: 살짝만 잘리도록 16:10 aspect */
+  .demohalf.eduping{ align-items:center; justify-content:center }
+  .demohalf.eduping .d{ aspect-ratio:16/10; height:auto; max-height:100% }
+
+  /* tech — 모두 섹션 색 형광펜 */
+  .rfunc .ff span .tech{
+    color:var(--ink); font-weight:700;
+    background-image:linear-gradient(#fff 0, #fff 55%, var(--mk) 55%, var(--mk) 100%);
+    padding:0 .8mm;
+    white-space:nowrap;
+  }
+  /* 섹션 한 종류씩만 — 흰 배경 위에 사전 합성된 불투명 hex (PDF 안정) */
+  .rfunc.pink .ff span .tech, .rfunc.pink .ff span .tech.hi{ --mk:#FFB4C6 }   /* pink @ .60 */
+  .rfunc.mint .ff span .tech, .rfunc.mint .ff span .tech.hi{ --mk:#94E1CE }   /* mint @ .55 */
+  .rfunc.lav  .ff span .tech, .rfunc.lav  .ff span .tech.hi{ --mk:#9EB5E2 }   /* lav  @ .50 */
+
+  .foot{ display:flex; justify-content:space-between; font-size:15pt; color:var(--faint); padding:0 4mm }
+
+  .screennote{ position:fixed; top:8px; left:8px; z-index:99; background:#4A352B; color:#fff; font-family:sans-serif; font-size:12px; padding:6px 12px; border-radius:8px; opacity:.92 }
+  @media print{ .screennote{display:none} html,body{background:#fff} }
+</style>
+</head>
+<body>
+<div class="poster">
+
+  <!-- HEADER -->
+  <header class="head">
+    <div class="htext">
+      <h1><span class="p">ping</span><span class="d">der</span><span class="g">garten</span></h1>
+      <div class="sub">유치원 교육보조로봇 서비스</div>
+    </div>
+    <div class="hright">
+      <div style="font-family:'Jua';font-size:17pt;color:var(--ink);letter-spacing:.02em;margin-bottom:4mm;text-align:center;display:flex;align-items:center;justify-content:center;gap:3mm">
+        <span style="font-weight:600">애드인에듀</span>
+        <span style="display:inline-block;width:1.4mm;height:1.4mm;border-radius:50%;background:var(--pink)"></span>
+        <span style="color:var(--inkSoft)">Physical AI 로봇 &amp; 자율주행 개발 1기</span>
+      </div>
+      <div class="team">2팀 · 사랑의 에듀핑</div>
+      <div class="members">
+        <span>노영주</span><span>박우림</span><span>이정우</span>
+        <span>최민성</span><span>이지수</span><span>이강택</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- ═══ LEFT ═══ -->
+    <div class="col">
+
+      <!-- 프로젝트 개요 -->
+      <section class="sec">
+        <div class="bar coral"><span class="badge"><span class="material-icons-round">lightbulb</span></span><h2>프로젝트 개요</h2></div>
+        <div class="bd">
+          <p class="lead">본 프로젝트는 <b>양팔 로봇 &middot; 자율주행 로봇</b>과 <b>AI 비전·음성 기술</b>을 융합하여, 유치원에서 <b>아이와 놀아주고 교사의 업무 부담을 경감해주는</b> 교육보조로봇 서비스를 구현한다.</p>
+          <p class="lead" style="margin-top:3mm">등원부터 하원까지 <b>EduPing &middot; GogoPing &middot; NoriArm</b> 3종 로봇이 하루 일과를 함께하며, 아이에게는 즐거운 놀이 친구가 되고 교사에게는 업무 여유를 제공한다.</p>
+        </div>
+      </section>
+
+      <!-- 기술 스택 -->
+      <section class="sec">
+        <div class="bar butter"><span class="badge"><span class="material-icons-round">build</span></span><h2>기술 스택</h2></div>
+        <div class="bd" style="padding:5mm 6mm;justify-content:center">
+          <img src="assets/techstack.png" alt="기술 스택 — Jira·YOLO·Raspberry Pi·git·PyTorch·OpenCV·Docker·Ollama·ROS·Hugging Face" style="width:100%;height:auto;display:block;object-fit:contain" />
+        </div>
+      </section>
+
+      <!-- 시스템 구성도 -->
+      <section class="sec">
+        <div class="bar teal"><span class="badge"><span class="material-icons-round">account_tree</span></span><h2>시스템 구성도</h2></div>
+        <div class="bd" style="padding:4mm 5mm">
+          <img src="assets/architecture.png" alt="시스템 아키텍처 — APP / SERVICES / EQUIP" style="width:100%;height:auto;object-fit:contain;display:block" />
+        </div>
+      </section>
+
+      <!-- 하드웨어 제원 -->
+      <section class="sec grow">
+        <div class="bar plum"><span class="badge"><span class="material-icons-round">memory</span></span><h2>하드웨어 제원</h2></div>
+        <div class="bd">
+          <div class="specgrid">
+            <!-- ── Row 1: photos ── -->
+            <div class="ph"><div class="phwrap"><img src="assets/hw-eduping.png" alt="EduPing 실물" /><span class="icn pink"><img src="assets/icon-eduping.png" alt="" /></span></div></div>
+            <div class="ph"><div class="phwrap"><img src="assets/hw-gogoping.png" alt="GogoPing 실물" /><span class="icn mint"><img src="assets/icon-gogoping.png" alt="" /></span></div></div>
+            <div class="ph"><div class="phwrap"><img src="assets/hw-noriarm.png" alt="NoriArm 실물" /><span class="icn lav"><img src="assets/icon-noriarm.png" alt="" /></span></div></div>
+            <!-- ── Row 2: names ── -->
+            <div class="sn" style="color:var(--pink)">에듀핑 <small>OpenArm</small></div>
+            <div class="sn" style="color:var(--mint)">고고핑 <small>VicPinky</small></div>
+            <div class="sn" style="color:var(--lav)">노리암 <small>OMX × 3</small></div>
+            <!-- ── Row 3: spec lists ── -->
+            <div class="sl">
+              <div class="li"><b>양팔 로봇</b></div>
+              <div class="li">DAMIAO BLDC ×8</div>
+              <div class="li">Top depth camera</div>
+              <div class="li">Gripper webcam ×2</div>
+              <div class="li">터치 스크린</div>
+              <div class="li">마이크 · 스피커</div>
+            </div>
+            <div class="sl">
+              <div class="li"><b>주행 로봇</b></div>
+              <div class="li">DC 모터 ×2</div>
+              <div class="li">2축 서보 depth 카메라</div>
+              <div class="li">RPLiDAR C1</div>
+              <div class="li">배터리</div>
+            </div>
+            <div class="sl">
+              <div class="li"><b>5-DoF + 그리퍼</b></div>
+              <div class="li">Dynamixel ×6</div>
+              <div class="li">Top webcam</div>
+              <div class="li">Gripper webcam</div>
+              <div class="li">마이크 · 스피커</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ═══ RIGHT : 하드웨어별 활동 ═══ -->
+    <div class="col">
+
+      <!-- 시나리오 (compact) — 맨 위로 이동 -->
+      <section class="sec">
+        <div class="bar sky"><span class="badge"><span class="material-icons-round">schedule</span></span><h2>시나리오 — 하루 일과</h2></div>
+        <div class="bd">
+          <div class="flowh">
+            <div class="fh"><span class="fht">등원</span><span class="fhs">얼굴인식 인사</span><span class="fhrobots"><img class="e" src="assets/icon-eduping.png" alt="EduPing" /></span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fht">놀이</span><span class="fhs">게임 · 율동 · 촬영</span><span class="fhrobots"><img class="e" src="assets/icon-eduping.png" alt="EduPing" /><img class="g" src="assets/icon-gogoping.png" alt="GogoPing" /><img class="n" src="assets/icon-noriarm.png" alt="NoriArm" /></span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fht">낮잠</span><span class="fhs">자장가 · 휴식</span><span class="fhrobots"><img class="g" src="assets/icon-gogoping.png" alt="GogoPing" /></span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fht">보조</span><span class="fhs">추종 · 운반</span><span class="fhrobots"><img class="g" src="assets/icon-gogoping.png" alt="GogoPing" /></span></div>
+            <span class="fharrow">→</span>
+            <div class="fh"><span class="fht">하원</span><span class="fhs">보고서 생성</span><span class="fhrobots"><img class="e" src="assets/icon-eduping.png" alt="EduPing" /></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EduPing -->
+      <section class="sec grow">
+        <div class="bar pink"><span class="badge icon"><img src="assets/icon-eduping.png" alt="" /></span><h2>에듀핑 <span style="opacity:.78;font-size:20pt;letter-spacing:.02em">· OpenArm</span></h2><span class="num">EduPing</span></div>
+        <div class="bd">
+          <div class="rfunc pink">
+            <div class="ff"><b>등하원 + 하이파이브</b><span><span class="tech">InsightFace</span> 얼굴 매칭 + 양팔 <span class="tech">환영 trajectory</span></span></div>
+            <div class="ff"><b>율동</b><span><span class="tech">음악 · 모션 동기 스트리밍</span></span></div>
+            <div class="ff"><b>무궁화꽃이 피었습니다</b><span><span class="tech hi">D435 device-local</span> · <span class="tech">YOLOv8-Pose</span> + <span class="tech">ByteTrack</span></span></div>
+            <div class="ff"><b>원격 진단</b><span><span class="tech">D435 PointCloud</span> · <span class="tech">Octomap</span> · <span class="tech">FSR 청진기</span></span></div>
+          </div>
+          <div class="demohalf eduping">
+            <div class="d"><img src="assets/eduping-demo1.jpg" alt="EduPing 데모" /></div>
+            <div class="d"><img src="assets/eduping-demo2.png" alt="EduPing 데모" /></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GogoPing -->
+      <section class="sec grow">
+        <div class="bar mint"><span class="badge icon"><img src="assets/icon-gogoping.png" alt="" /></span><h2>고고핑 <span style="opacity:.78;font-size:20pt;letter-spacing:.02em">· VicPinky</span></h2><span class="num">GogoPing</span></div>
+        <div class="bd">
+          <div class="rfunc mint">
+            <div class="ff"><b>교사 추종</b><span><span class="tech">DeepSORT</span> + <span class="tech">OSNet ReID</span> + <span class="tech">RPLiDAR C1</span> 거리 제어</span></div>
+            <div class="ff"><b>자율 운반</b><span><span class="tech">SLAM</span> + <span class="tech">nav graph</span> + <span class="tech">Nav2</span></span></div>
+            <div class="ff"><b>숨바꼭질</b><span><span class="tech">웨이포인트 순찰</span> + <span class="tech">얼굴 매칭</span></span></div>
+            <div class="ff"><b>자장가</b><span><span class="tech">모드 전환</span> + <span class="tech">낮잠 시각 기록</span></span></div>
+          </div>
+          <div class="demohalf">
+            <div class="d"><img src="assets/gogoping-follow.jpg" alt="GogoPing 추종" /></div>
+            <div class="d"><img src="assets/gogoping-wave.jpg" alt="GogoPing 인사" /></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NoriArm -->
+      <section class="sec grow">
+        <div class="bar lav"><span class="badge icon"><img src="assets/icon-noriarm.png" alt="" /></span><h2>노리암 <span style="opacity:.78;font-size:20pt;letter-spacing:.02em">· OMX × 3</span></h2><span class="num">NoriArm</span></div>
+        <div class="bd">
+          <div class="rfunc lav">
+            <div class="ff"><b>블럭쌓기</b><span><span class="tech hi">lerobot ACT 모방학습</span> + <span class="tech">HOME pose</span> 종료 감지</span></div>
+            <div class="ff"><b>OX 퀴즈</b><span><span class="tech">MediaPipe Hands</span> 손 검출 + <span class="tech">룰베이스 trajectory</span></span></div>
+            <div class="ff"><b>가게놀이</b><span><span class="tech hi">음성 프롬프트 → 원하는 객체 픽업</span> · <span class="tech">ACT 모방학습</span> + <span class="tech">의도 분류 LLM</span></span></div>
+          </div>
+          <div class="rshot"><img src="assets/noriarm-demo.png" alt="NoriArm 데모 — 블럭쌓기 · 가게놀이" /></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+
+</div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<section>
+  <div style="padding:36px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative">
+    <a onclick="Reveal.slide(25)" style="position:absolute;top:18px;right:24px;font-family:'Jua';font-size:0.7em;color:var(--inkSoft);cursor:pointer;text-decoration:none">← Q&amp;A</a>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span class="material-icons-round" style="font-size:42px;color:var(--mintInk)">account_tree</span>
+      <div>
+        <p style="color:var(--mintInk);font-family:'Jua';letter-spacing:0.25em;font-size:0.6em;margin:0">Q&amp;A · 07</p>
+        <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:4px 0 0">자율 주행 · 행동트리</h2>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-height:0">
+      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--mintInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 왜 BT(BehaviorTree)?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">GogoPing 모드(ASSIST / PLAY / RETURNING / CHARGING ...) + 복잡한 시퀀스(숨바꼭질 6-step) 를 FSM 으로 짜기엔 분기가 많아 BT 가 깔끔. 자장가(BT_lullaby), 운반(BT_goto), 숨바꼭질(BT_hide_and_seek), 순찰(BT_patrol) 모두 BT subtree.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--mintInk);font-family:'Jua';font-size:0.7em;margin:0">Q. nav graph 어떻게 편집하나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">Admin UI 가 SLAM 맵 + waypoint/lane 위에서 시각 편집. 노드 좌클릭-드래그 추가, 노드 2회 클릭으로 lane 잇기, Delete 로 끊기, 거리 threshold 자동 lane. yaml atomic write 후 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">graph_router_node</code> 자동 reload. 주행 중 편집 차단.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--mintInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 좁은 통로 회전은?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7"><b style="color:var(--ink)">can_rotate</b> behavior — 좁은 통로에서 반대 방향 목적지가 오면 그 자리 U턴 금지, 안전 지점 (지정된 회전 가능 vertex) 까지 가서 회전 후 진행. nav2 BT recovery 와 별개로 자체 노드.</p>
+      </div>
+    </div>
+  </div>
+</section>

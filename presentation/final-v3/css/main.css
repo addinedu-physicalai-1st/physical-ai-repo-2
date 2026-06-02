@@ -1,0 +1,353 @@
+/* ==========================================
+   pingdergarten — 다크 키즈 테마 (Dark Kids)
+   딥 차콜 배경 + 캔디톤 악센트 + 둥근 Jua
+   토큰 이름은 라이트 시절과 동일하게 유지(슬라이드 호환)
+   ========================================== */
+
+:root {
+  /* surfaces */
+  --canvas:   #16131F;   /* slide background — warm deep charcoal */
+  --surface:  #241F33;   /* card surface */
+  --surface2: #2C2740;   /* raised surface */
+  --cream:    #16131F;   /* legacy name → maps to canvas */
+
+  /* candy accents (bright = legible on dark) */
+  --babypink: #FF6F86;  --babypinkSoft: rgba(255,111,134,.16);
+  --mint:     #3FD9A6;  --mintSoft:     rgba(63,217,166,.16);
+  --butter:   #FFD25E;  --butterSoft:   rgba(255,210,94,.16);
+  --lavender: #B98CFF;  --lavenderSoft: rgba(185,140,255,.16);
+  --sky:      #5BB6FF;  --skySoft:      rgba(91,182,255,.16);
+
+  /* accent text (same bright tone reads as the accent on dark) */
+  --pinkInk:   #FF6F86;
+  --mintInk:   #3FD9A6;
+  --butterInk: #FFD25E;
+  --lavInk:    #B98CFF;
+  --skyInk:    #5BB6FF;
+
+  /* text */
+  --ink:      #F4EFE8;   /* primary — warm white */
+  --inkSoft:  #A79FB4;   /* secondary */
+  --inkFaint: #6F6885;   /* captions / sources */
+  --border:   rgba(255,255,255,.10);
+
+  /* structure */
+  --r-lg: 24px;
+  --r-md: 18px;
+  --sh-1: 0 6px 14px rgba(0,0,0,.30);
+  --sh-2: 0 18px 44px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05);
+  --sh-3: 0 24px 54px rgba(0,0,0,.50);
+  --ease: cubic-bezier(.22,.7,.3,1);
+}
+
+html, body {
+  background: var(--canvas) !important;
+  color: var(--ink);
+  font-family: 'Pretendard Variable', system-ui, sans-serif;
+  margin: 0;
+}
+
+/* Reveal overrides — letterbox 영역도 슬라이드와 동색 */
+.reveal-viewport, html.reveal-viewport, .reveal, .reveal .backgrounds { background: var(--canvas) !important; }
+.reveal {
+  font-family: 'Pretendard Variable', system-ui, sans-serif;
+  color: var(--ink);
+}
+.reveal .slides { text-align: left; }
+.reveal .slides section {
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 28px;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+  font-family: 'Jua', 'Pretendard Variable', system-ui, sans-serif;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.reveal a { color: var(--babypink); }
+.reveal a:hover { color: var(--lavender); }
+
+.reveal .slide-number {
+  background: var(--surface);
+  color: var(--inkSoft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-family: 'Jua', system-ui, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+.reveal .slide-number:hover {
+  background: var(--babypinkSoft);
+  color: var(--babypink);
+}
+
+.reveal .controls { color: var(--babypink); }
+.reveal .progress {
+  background: rgba(255,255,255,.08);
+  color: var(--babypink);
+  height: 4px;
+}
+
+/* Loading dots */
+.loading-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  animation: bounce 1s infinite ease-in-out;
+}
+.loading-dot:nth-child(1) { animation-delay: 0s; }
+.loading-dot:nth-child(2) { animation-delay: 0.15s; }
+.loading-dot:nth-child(3) { animation-delay: 0.3s; }
+.loading-dot:nth-child(4) { animation-delay: 0.45s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
+  40%           { transform: translateY(-10px); opacity: 1; }
+}
+
+/* Slide thumbnail panel */
+#slide-panel.flex { display: flex; }
+#slide-panel { background: var(--surface) !important; }
+.slide-thumb-item {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+.slide-thumb-item:hover {
+  border-color: var(--babypink);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.45);
+}
+.slide-thumb-item.active {
+  border-color: var(--babypink);
+  background: var(--babypinkSoft);
+}
+.slide-thumb-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Jua', system-ui, sans-serif;
+}
+.slide-thumb-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--babypink);
+  color: #16131F;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.slide-thumb-title {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.slide-thumb-item.active .slide-thumb-num {
+  background: var(--ink);
+  color: #16131F;
+}
+
+/* Material icons sizing helper */
+.material-icons-round {
+  font-family: 'Material Icons Round';
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+  vertical-align: middle;
+  font-feature-settings: 'liga';
+}
+
+/* Candy chip / pill — tinted bg + bright text on dark */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-family: 'Jua', system-ui, sans-serif;
+  font-size: 0.6em;
+  background: var(--babypinkSoft);
+  color: var(--babypink);
+}
+.chip-mint     { background: var(--mintSoft);     color: var(--mint); }
+.chip-butter   { background: var(--butterSoft);   color: var(--butter); }
+.chip-lavender { background: var(--lavenderSoft);  color: var(--lavender); }
+.chip-sky      { background: var(--skySoft);       color: var(--sky); }
+
+/* Card — raised dark surface */
+.pastel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  box-shadow: var(--sh-2);
+}
+
+/* Decorative wavy underline */
+.wavy {
+  text-decoration: underline wavy var(--babypink);
+  text-underline-offset: 8px;
+  text-decoration-thickness: 2.5px;
+}
+
+/* ==========================================
+   Dark Kids — components & utilities
+   ========================================== */
+
+/* content layer sits above decorative background */
+.layer { position: relative; z-index: 1; }
+/* ensure every slide's content div renders above the (injected) glow deco */
+.reveal .slides section > div:not(.bg-deco) { position: relative; z-index: 1; }
+
+/* eyebrow / section label */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: 'Jua', system-ui, sans-serif;
+  font-size: 0.62em;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--inkSoft);
+}
+.eyebrow::before {
+  content: "";
+  width: 0.46em; height: 0.46em;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+}
+.eyebrow-pink   { color: var(--pinkInk); }
+.eyebrow-mint   { color: var(--mintInk); }
+.eyebrow-lav    { color: var(--lavInk); }
+.eyebrow-butter { color: var(--butterInk); }
+.eyebrow-sky    { color: var(--skyInk); }
+
+/* slide title */
+.s-title {
+  font-family: 'Jua', system-ui, sans-serif;
+  font-weight: 400;
+  color: var(--ink);
+  font-size: 2.2em;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  margin: 0.18em 0 0.55em;
+}
+
+/* number / icon badge — tinted rounded square */
+.badge {
+  border-radius: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Jua', system-ui, sans-serif;
+}
+
+/* photo treatment — subtle frame + deep shadow */
+.photo {
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-3);
+  object-fit: cover;
+}
+
+/* photo placeholder slot — drop an <img> here later */
+.photo-slot {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  border: 2px dashed rgba(255,255,255,.22);
+  border-radius: 18px;
+  background: rgba(255,255,255,.035);
+  text-align: center;
+}
+.photo-slot .material-icons-round { color: var(--inkSoft); opacity: .7; }
+.photo-slot .ps-label { font-family: 'Jua', system-ui, sans-serif; font-size: 0.7em; color: var(--inkSoft); }
+.photo-slot .ps-hint  { font-size: 0.52em; color: var(--inkFaint); line-height: 1.4; }
+.photo-slot.round { border-radius: 50%; gap: 2px; }
+
+/* decorative background — soft candy glows + faint dots */
+.bg-deco {
+  position: absolute; inset: 0;
+  overflow: hidden; z-index: 0;
+  pointer-events: none;
+}
+.bg-deco .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.9;
+}
+.bg-deco .dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.05) 1.3px, transparent 1.3px);
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(ellipse 82% 72% at 50% 45%, #000 55%, transparent 100%);
+          mask-image: radial-gradient(ellipse 82% 72% at 50% 45%, #000 55%, transparent 100%);
+}
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.bg-deco .float { animation: floaty 7s ease-in-out infinite; }
+
+/* entrance motion — replayed on slide enter via .go (added in main.js) */
+.r {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity .55s var(--ease), transform .55s var(--ease);
+}
+.reveal section.go .r { opacity: 1; transform: none; }
+.go .r { transition-delay: calc(var(--i, 0) * 70ms); }
+
+/* never hide content for print / PDF export */
+@media print {
+  .r { opacity: 1 !important; transform: none !important; }
+}
+
+/* video speed controls overlay */
+.video-speed{
+  position:absolute; bottom:10px; right:14px; display:flex; gap:4px;
+  z-index:10; opacity:0; transition:opacity .15s;
+}
+.video-speed.show, *:hover > .video-speed { opacity:1; }
+.video-speed button{
+  background:rgba(20,16,28,0.78); color:#fff;
+  border:1px solid rgba(255,255,255,0.18); border-radius:6px;
+  padding:4px 9px; font-family:'Jua'; font-size:13px; cursor:pointer;
+  transition:background .12s;
+}
+.video-speed button:hover{ background:rgba(255,111,134,0.55); }
+.video-speed button.active{
+  background:var(--babypink); border-color:var(--babypink); color:#1a1622;
+}
+
+/* reveal slide — dynamic animations */
+@keyframes spin-slow { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes pulse-glow { 0%,100%{transform:scale(1);opacity:0.55} 50%{transform:scale(1.08);opacity:0.85} }
+@keyframes drift-1 { 0%,100%{transform:translate(0,0)} 33%{transform:translate(40px,-30px)} 66%{transform:translate(-30px,20px)} }
+@keyframes drift-2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-50px,40px)} }
+@keyframes shine { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+.spin-slow{animation:spin-slow 28s linear infinite}
+.pulse-glow{animation:pulse-glow 4s ease-in-out infinite}
+.drift-1{animation:drift-1 12s ease-in-out infinite}
+.drift-2{animation:drift-2 14s ease-in-out infinite}
+.shine-text{
+  background:linear-gradient(90deg,#FF6F86,#B98CFF,#3FD9A6,#FF6F86);
+  background-size:200% 100%;
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  animation:shine 6s linear infinite;
+}

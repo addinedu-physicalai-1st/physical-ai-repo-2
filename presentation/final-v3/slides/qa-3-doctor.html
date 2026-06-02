@@ -1,0 +1,26 @@
+<section>
+  <div style="padding:36px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative">
+    <a onclick="Reveal.slide(25)" style="position:absolute;top:18px;right:24px;font-family:'Jua';font-size:0.7em;color:var(--inkSoft);cursor:pointer;text-decoration:none">← Q&amp;A</a>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span class="material-icons-round" style="font-size:42px;color:var(--skyInk)">stethoscope</span>
+      <div>
+        <p style="color:var(--skyInk);font-family:'Jua';letter-spacing:0.25em;font-size:0.6em;margin:0">Q&amp;A · 03</p>
+        <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:4px 0 0">원격 진찰</h2>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-height:0">
+      <div style="background:var(--surface);border:1px solid var(--skySoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--skyInk);font-family:'Jua';font-size:0.7em;margin:0">Q. FSR 청진기로 무엇을 측정하나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">OpenArm 그리퍼에 단 <b style="color:var(--ink)">FSR402</b> 가 누름 압력을 raw int 로 시리얼 송출 (Arduino A0). <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">fsr_bridge_node</code> 가 ROS2 <code style="background:var(--butterSoft);padding:0 4px;border-radius:4px;font-size:0.92em">/eduping/stethoscope/fsr_raw</code> 로 publish, doctor UI 가 30Hz 로 현재값 + 피크 표시.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--skySoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--skyInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 의사가 환자 환경을 어떻게 보나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7">D435 depth → <b style="color:var(--ink)">PointCloud + Octomap</b> 3D 렌더링. 의사 UI 가 RGB + depth + 그리퍼 웹캠 ×2 의 4 분면 + WebRTC 양방향 음성.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--skySoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--skyInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 어린이와 접촉 안전은?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7"><b style="color:var(--ink)">Impedance 제어</b> (L1 gravity comp + L2 joint impedance + L3 contact detection, MuJoCo 검증 → 실물 이식) + <b style="color:var(--ink)">Vision Slowdown</b> (사람 근접 시 collision velocity scaling) + self-filter.</p>
+      </div>
+    </div>
+  </div>
+</section>

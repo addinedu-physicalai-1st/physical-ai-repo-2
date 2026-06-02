@@ -1,0 +1,152 @@
+<section>
+  <div class="bg-deco">
+    <div class="blob" style="width:300px;height:300px;background:var(--mintSoft);top:-80px;left:-50px;opacity:0.4"></div>
+    <div class="blob" style="width:240px;height:240px;background:var(--babypinkSoft);top:100px;right:-40px;opacity:0.35"></div>
+  </div>
+
+  <div class="layer" style="padding:22px 44px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+
+    <div style="margin-bottom:10px">
+      <p style="color:var(--lavInk);font-family:'Jua';letter-spacing:0.3em;font-size:0.65em;margin:0">TECH STACK</p>
+      <h2 class="font-display" style="font-size:1.55em;color:var(--ink);margin:2px 0 0">기술 스택</h2>
+    </div>
+
+    <!-- TOP: Big cards (Robot Control + AI/Vision) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px;height:380px">
+
+      <!-- Robot Control -->
+      <div style="background:linear-gradient(180deg,var(--mintSoft) 0%,var(--surface) 55%);border:2px solid var(--mintInk);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex:0 0 auto">
+          <span class="material-icons-round" style="font-size:32px;color:var(--mintInk)">smart_toy</span>
+          <h3 class="font-display" style="font-size:1.15em;color:var(--ink);margin:0;line-height:1">Robot Control</h3>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0">
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <img src="https://cdn.simpleicons.org/ros/F4EFE8" style="width:30px;height:30px;flex:0 0 auto" alt="ROS">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ROS2 Jazzy</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">로봇 OS · DDS pub/sub</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <span class="material-icons-round" style="font-size:30px;color:var(--mintInk);flex:0 0 auto;width:30px;text-align:center">route</span>
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">SLAM + Navigation</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cartographer · Nav2 · AMCL · DWB</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <span class="material-icons-round" style="font-size:30px;color:var(--mintInk);flex:0 0 auto;width:30px;text-align:center">precision_manufacturing</span>
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Manipulation</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MoveIt2 · Dynamixel · DAMIAO BLDC</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <span class="material-icons-round" style="font-size:30px;color:var(--mintInk);flex:0 0 auto;width:30px;text-align:center">account_tree</span>
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Behavior Tree</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">py_trees · FSM 10 states · BT 5 trees</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI / Vision -->
+      <div style="background:linear-gradient(180deg,var(--babypinkSoft) 0%,var(--surface) 55%);border:2px solid var(--babypink);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex:0 0 auto">
+          <span class="material-icons-round" style="font-size:32px;color:var(--babypink)">visibility</span>
+          <h3 class="font-display" style="font-size:1.15em;color:var(--ink);margin:0;line-height:1">AI · Vision</h3>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0">
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <img src="https://cdn.simpleicons.org/huggingface/F4EFE8" style="width:30px;height:30px;flex:0 0 auto" alt="HF">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">모방학습 · Imitation Learning</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">LeRobot ACT · SmolVLA · 블럭쌓기 611 epi</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <img src="https://cdn.simpleicons.org/ultralytics/F4EFE8" style="width:30px;height:30px;flex:0 0 auto" alt="YOLO">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">YOLO v8</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">사람 · 블럭 · OX 보드 객체 인식</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <span class="material-icons-round" style="font-size:30px;color:var(--babypink);flex:0 0 auto;width:30px;text-align:center">track_changes</span>
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ByteTrack + OSNet ReID</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">다중 인물 추적 · 교사 재식별</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 14px;flex:1;min-height:0">
+            <img src="https://cdn.simpleicons.org/mediapipe/F4EFE8" style="width:30px;height:30px;flex:0 0 auto" alt="MediaPipe">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="color:var(--ink);font-size:0.74em;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MediaPipe Pose</div>
+              <div style="color:var(--inkSoft);font-size:0.52em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">무궁화꽃 게임 자세 판정</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM: compact horizontal chip rows (Voice + LLM + 협업) -->
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;min-height:0">
+
+      <!-- Voice -->
+      <div style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex:0 0 auto">
+          <span class="material-icons-round" style="font-size:22px;color:var(--butterInk)">graphic_eq</span>
+          <h3 class="font-display" style="font-size:0.85em;color:var(--ink);margin:0;line-height:1">Voice</h3>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:6px;min-height:0;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;background:var(--butterSoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/onnx/D49A1C" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Wake Word · openWakeWord</span></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--butterSoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><span class="material-icons-round" style="font-size:16px;color:var(--butterInk);flex:0 0 auto">mic</span><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">STT · faster-whisper</span></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--butterSoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><span class="material-icons-round" style="font-size:16px;color:var(--butterInk);flex:0 0 auto">record_voice_over</span><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">TTS · edge-tts Neural</span></div>
+        </div>
+      </div>
+
+      <!-- LLM -->
+      <div style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex:0 0 auto">
+          <img src="https://cdn.simpleicons.org/ollama/5BB6FF" style="width:22px;height:22px;flex:0 0 auto" alt="Ollama">
+          <h3 class="font-display" style="font-size:0.85em;color:var(--ink);margin:0;line-height:1">LLM <span style="color:var(--inkSoft);font-size:0.55em;letter-spacing:0.1em;margin-left:4px">OLLAMA · 로컬</span></h3>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:6px;min-height:0;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;background:var(--skySoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/qwen/5BB6FF" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">의도 분류 · qwen2.5:0.5b</span></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--skySoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/qwen/5BB6FF" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">잡담 · qwen2.5:3b</span></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--skySoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/qwen/5BB6FF" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">일과 보고서 · qwen2.5:7b</span></div>
+        </div>
+      </div>
+
+      <!-- 협업 -->
+      <div style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex:0 0 auto">
+          <span class="material-icons-round" style="font-size:22px;color:var(--lavInk)">groups</span>
+          <h3 class="font-display" style="font-size:0.85em;color:var(--ink);margin:0;line-height:1">협업</h3>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:6px;min-height:0;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;background:var(--lavenderSoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/github/F4EFE8" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">GitHub · 6인 코드 협업</span></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--lavenderSoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/confluence/B98CFF" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Confluence · 설계 문서</span></div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--lavenderSoft);border-radius:8px;padding:6px 10px;flex:1;min-height:0"><img src="https://cdn.simpleicons.org/jira/5BB6FF" style="width:16px;height:16px;flex:0 0 auto" alt=""><span style="color:var(--ink);font-size:0.48em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Jira · 이슈 · 스프린트</span></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+  <aside class="notes">
+    힘준 곳: Robot Control / AI · Vision — 상단 큰 카드 2개, 그라데이션 + 두꺼운 border, 26px 로고/아이콘.
+    힘 뺀 곳: Voice / LLM / 협업 — 하단 작은 카드 3개, 16-22px 아이콘.
+
+    텍스트 짤림 방지: 모든 셀에 white-space:nowrap + overflow:hidden + text-overflow:ellipsis. 카드에 overflow:hidden.
+    상단 카드 height 380→400px, 폰트 살짝 줄임 (title 0.66em, desc 0.5em).
+
+    아이콘: Simple Icons CDN — ROS / Hugging Face / Ultralytics / MediaPipe / ONNX / WebRTC / Ollama / Qwen / GitHub / Confluence / Jira.
+    브랜드 없는 항목 (SLAM Cartographer / Nav2 / MoveIt2 / py_trees / ByteTrack / InsightFace / faster-whisper / edge-tts / bge-m3) 은 Material Icons.
+
+    LLM 은 Ollama 3-tier qwen2.5 + bge-m3, 협업은 GitHub / Confluence (push_docs.sh 양방향 동기화) / Jira.
+  </aside>
+</section>

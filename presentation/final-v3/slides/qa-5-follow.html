@@ -1,0 +1,26 @@
+<section>
+  <div style="padding:36px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative">
+    <a onclick="Reveal.slide(25)" style="position:absolute;top:18px;right:24px;font-family:'Jua';font-size:0.7em;color:var(--inkSoft);cursor:pointer;text-decoration:none">← Q&amp;A</a>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <span class="material-icons-round" style="font-size:42px;color:var(--mintInk)">directions_walk</span>
+      <div>
+        <p style="color:var(--mintInk);font-family:'Jua';letter-spacing:0.25em;font-size:0.6em;margin:0">Q&amp;A · 05</p>
+        <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:4px 0 0">교사 추종 (GogoPing)</h2>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-height:0">
+      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--mintInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 어떻게 사람을 잠그나? 다른 사람과 헷갈리지 않나?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7"><b style="color:var(--ink)">5-stage perception</b>: YOLOv8 person 검출 → ByteTrack track_id → MediaPipe Pose 자세 → <b style="color:var(--ink)">InsightFace</b> 등록 교사 얼굴 매칭 → <b style="color:var(--ink)">OSNet ReID</b> 외형 임베딩으로 잠금. 다른 사람 들어와도 ReID 임베딩으로 구분.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--mintInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 추종 중 시야에서 사라지면?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7"><b style="color:var(--ink)">RECOVERY</b> — PAN 카메라 좌우 sweep + 본체 360° 회전 + 음성 호명 ("선생님?"). 못 찾으면 IDLE 또는 충전소 복귀.</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--mintSoft);border-radius:14px;padding:18px 22px">
+        <p style="color:var(--mintInk);font-family:'Jua';font-size:0.7em;margin:0">Q. 거리는 어떻게 유지?</p>
+        <p style="color:var(--ink);font-size:0.75em;margin-top:8px;line-height:1.7"><b style="color:var(--ink)">STOP / REACTIVE / NAV2 hybrid</b> — 카메라가 사람 잠그고 RPLiDAR C1 으로 그 방위 거리 측정. 임계 가까우면 STOP, 중간이면 REACTIVE (직접 cmd_vel), 멀면 NAV2 가 목적지 따라가기. hysteresis 로 모드 전환.</p>
+      </div>
+    </div>
+  </div>
+</section>

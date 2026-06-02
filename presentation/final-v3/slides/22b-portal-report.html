@@ -1,0 +1,42 @@
+<section>
+  <div style="padding:0;height:720px;width:1280px;box-sizing:border-box;display:grid;grid-template-columns:1.4fr 1fr;background:#fff">
+
+    <!-- 좌측: 보고서 사진 풀스크린 -->
+    <div style="background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;height:720px">
+      <img src="slides/assets/media/portal/parent-report.png" alt="일과 보고서 timeline"
+           style="width:100%;height:100%;object-fit:cover;object-position:top center"
+           onerror="this.outerHTML='&lt;div style=&quot;color:#666;text-align:center&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;article&lt;/span&gt;&lt;p&gt;parent-report.png&lt;/p&gt;&lt;/div&gt;'">
+    </div>
+
+    <!-- 우측: 설명 -->
+    <div style="background:var(--cream);padding:40px 40px;display:flex;flex-direction:column;justify-content:center;gap:18px">
+      <div>
+        <p style="color:var(--skyInk);font-family:'Jua';letter-spacing:0.3em;font-size:0.65em;margin:0">PORTAL · LEARNER REPORT</p>
+        <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:8px 0 0;line-height:1.25">일과 보고서<br><span style="color:var(--mintInk);font-size:0.7em">LLM 자동 요약</span></h2>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="material-icons-round" style="font-size:20px;color:var(--skyInk);flex:0 0 auto;margin-top:2px">schedule</span>
+          <p style="color:var(--ink);font-size:0.7em;line-height:1.55;margin:0">시간 축 위 오늘의 일과 + 친구들과의 사진</p>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="material-icons-round" style="font-size:20px;color:var(--mintInk);flex:0 0 auto;margin-top:2px">auto_awesome</span>
+          <p style="color:var(--ink);font-size:0.7em;line-height:1.55;margin:0">Ollama qwen2.5 가 사진·모드·메뉴 통합 요약</p>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="material-icons-round" style="font-size:20px;color:var(--babypink);flex:0 0 auto;margin-top:2px">family_restroom</span>
+          <p style="color:var(--ink);font-size:0.7em;line-height:1.55;margin:0">학부모는 폰·PC 브라우저로 일자별 timeline 확인</p>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="material-icons-round" style="font-size:20px;color:var(--lavInk);flex:0 0 auto;margin-top:2px">photo_library</span>
+          <p style="color:var(--ink);font-size:0.7em;line-height:1.55;margin:0">사진 속 친구 InsightFace 자동 태깅 · N:N 매핑</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <aside class="notes">
+    Portal Web 학부모 일과 보고서 화면. 하원 시점에 ai_job 큐로 Ollama qwen2.5:7b 워커가 사진 메타·모드 이력·점심 메뉴 통합해 자연어 timeline 생성. 학부모는 같은 LAN 폰/PC 에서 로그인 → 자녀 선택 → 일자별 보고서 확인. 사진 속 친구는 InsightFace 가 자동 태깅해 photo_subject N:N 매핑.
+  </aside>
+</section>
