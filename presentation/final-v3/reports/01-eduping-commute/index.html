@@ -26,27 +26,29 @@
   /* ── 상단 고정 바: ⚠️ Q&A 복귀(반드시 유지) + 섹션 인덱스 뱃지 ── */
   .topbar{
     position:fixed; top:0; left:0; right:0; z-index:60;
-    display:flex; align-items:center; flex-wrap:wrap; gap:10px;
-    padding:11px 22px; background:rgba(20,17,28,.78); backdrop-filter:blur(8px);
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 28px; background:rgba(20,17,28,.82); backdrop-filter:blur(8px);
     border-bottom:1px solid var(--border);
   }
   .back{
-    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
-    background:var(--surface); border:1px solid var(--border); color:var(--inkSoft);
-    font-family:'Jua',sans-serif; font-size:14px; padding:7px 15px; border-radius:999px;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:8px;
+    height:46px; padding:0 24px;
+    background:var(--surface); border:1px solid var(--border); color:var(--ink);
+    font-family:'Jua',sans-serif; font-size:18px; border-radius:999px;
     cursor:pointer; transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .sec-nav{display:flex; flex-wrap:wrap; gap:7px; margin:0}
+  .sec-nav{display:flex; flex-wrap:wrap; gap:9px; margin:0}
   .sec-nav a{
-    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
-    background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--inkSoft);
-    font-family:'Jua',sans-serif; font-size:13px; padding:6px 13px; border-radius:999px;
+    display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+    height:46px; padding:0 19px;
+    background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft);
+    font-family:'Jua',sans-serif; font-size:16px; border-radius:999px;
     transition:color .15s, background .15s, border-color .15s; white-space:nowrap;
   }
-  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.08)}
+  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.09)}
   .sec-nav a.on{color:#2A0F16; background:var(--accent); border-color:var(--accent)}
-  .sec-nav a .n{font-size:12px; opacity:.8}
+  .sec-nav a .n{font-size:14px; opacity:.75; font-weight:700}
 
   /* ── 가로 스와이프 덱 ── */
   .deck{
@@ -97,6 +99,12 @@
 
   .lead{font-size:19px; line-height:1.85; margin:0 0 16px}
   .lead b{color:var(--accent)}
+  /* 불릿: 핵심 개념 + 짧은 설명 */
+  .points{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px}
+  .points li{position:relative; padding-left:30px; font-size:17px; line-height:1.72; color:var(--inkSoft)}
+  .points li::before{content:"›"; position:absolute; left:8px; top:-2px; color:var(--accent); font-family:'Jua',sans-serif; font-size:20px}
+  .points .c{color:var(--accent); font-weight:700; margin-right:3px}
+  .points b{color:var(--accent)}
   .stat{display:flex; align-items:baseline; gap:10px; margin:0 0 14px}
   .stat .num{font-family:'Jua',sans-serif; font-size:64px; color:var(--accent); line-height:1}
   .stat .unit{font-family:'Jua',sans-serif; font-size:26px}
@@ -154,7 +162,7 @@
   <div id="page-fade"></div>
 
   <div class="topbar">
-    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:17px">arrow_back</span> Q&amp;A</button>
+    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:20px">arrow_back</span> Q&amp;A</button>
     <nav class="sec-nav" id="secnav"></nav>
   </div>
 
@@ -209,7 +217,11 @@
             <img src="https://images.prismic.io/joey/ah541QeQX7-eWhsX_browser_cloud.jpg?auto=format,compress" alt="브라우저 포인트클라우드" />
             <div class="cap">브라우저 3D 뷰 — 무지개색이 손 포인트클라우드.</div>
           </div>
-          <p class="lead"><span class="term">MediaPipe HandLandmarker</span>(GPU)로 손바닥 중심을 잡고, 같은 픽셀의 <b>뎁스(거리) 값</b>과 카메라 정보로 <b>손의 3차원 위치를 복원</b>합니다(역투영). 이 점이 로봇이 가야 할 목표가 됩니다.</p>
+          <ul class="points">
+            <li><span class="c">MediaPipe HandLandmarker</span> — GPU로 손바닥 중심점을 실시간 검출</li>
+            <li><span class="c">뎁스 역투영</span> — 손 픽셀 + 거리(깊이) 값을 합쳐 3차원 위치 복원</li>
+            <li><span class="c">목표점</span> — 이 3D 점이 로봇 그리퍼가 가야 할 위치가 됨</li>
+          </ul>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p>뎁스 카메라는 화면 속 각 점이 "<b>얼마나 먼지</b>"를 압니다. 손이 찍힌 <b>화면 위치 + 그 거리</b>를 합치면 손이 공간의 어디 있는지 좌표가 나옵니다 — 화면 속 점을 실제 공간의 점으로 되돌리는 게 <b>역투영</b>입니다.</p></div>
       </div>
@@ -227,8 +239,12 @@
           <div>
             <div class="stat"><span class="num">2</span><span class="unit jua">cm</span><span class="label">고정 보정 20~28&nbsp;cm → closed-loop 수렴 오차</span></div>
             <div class="balls"><span class="pill r">🔴 빨간 공 = 아이 손</span><span class="pill b">🔵 파란 공 = 로봇 손바닥</span></div>
-            <p class="lead" style="font-size:17px">시뮬에 공 두 개를 띄워 "<b>파란 공을 빨간 공에 맞추는 게임</b>"으로 바꿨습니다. <span class="term">TRAC-IK</span>로 보낸 뒤 <b>FK로 실제 위치를 다시 재고</b> 오차만큼 목표를 밀어 재-IK — 다섯 번이면 <span class="hl">2&nbsp;cm 이내로 수렴</span>합니다.</p>
-            <div class="callout"><span class="material-icons-round">flag</span><p>자세(orientation)는 풀지 않고 <span class="k">위치 전용</span> — 손바닥이 한 점에 닿기만 하면 되고, 방향까지 맞추면 좁은 작동 범위에선 해가 거의 안 나오기 때문입니다.</p></div>
+            <ul class="points">
+              <li><span class="c">시각화</span> — 파란 공(로봇 손)을 빨간 공(아이 손)에 맞추는 게임으로 디버깅</li>
+              <li><span class="c">TRAC-IK</span> — 목표 위치로 관절 각도를 역계산(위치 전용)</li>
+              <li><span class="c">closed-loop</span> — FK로 실제 위치 재측정 → 오차만큼 목표 보정 → 재-IK, <span class="hl">5회면 2&nbsp;cm 이내</span></li>
+              <li><span class="c">위치 전용</span> — 손바닥이 한 점에 닿기만 하면 돼 방향(orientation)은 안 풂 → 좁은 작동범위에서도 해가 나옴</li>
+            </ul>
           </div>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>IK(역기구학)</b>는 "손을 여기 두려면 관절을 몇 도씩 굽힐까"를 거꾸로 계산하는 것, <b>FK(순기구학)</b>는 반대로 "관절이 이 각도면 손은 실제로 어디 있나"를 계산하는 것입니다. 보낸 대로 가도 그리퍼가 손목보다 조금 튀어나와 살짝 어긋나서, FK로 실제 위치를 재 오차만큼 목표를 밀어 다시 푸는 걸 반복합니다(결과 보고 자가 교정 = closed-loop).</p></div>
@@ -245,8 +261,11 @@
             <div class="cap">트윈 — 초록 박스 안 파란 공이 손 포인트클라우드로 수렴.</div>
           </div>
           <div>
-            <p class="lead" style="font-size:17px">동작은 <b>5차 다항식 보간</b>으로 ① 들기 → ② 마주치기 → ③ 반동 → ④ 복귀를 부드럽게 밟고, 드는 동안 손을 실시간 추적하다 직전에 목표를 고정합니다. 브라우저 3D 뷰어는 <span class="term">three.js + URDFLoader</span>로 양팔·포인트클라우드·초록 박스·D435 프러스텀을 합성(COLLADA 메시는 <code>.glb</code> 변환).</p>
-            <div class="callout"><span class="material-icons-round">science</span><p>실물 전 <span class="k">MuJoCo 트윈</span>(500&nbsp;Hz)과 자동 측정 스크립트로 "어깨 위 침범 / 닿는 거리 / 떨림"을 수치로 확인하며 튜닝한 뒤 실물로 시연했습니다.</p></div>
+            <ul class="points">
+              <li><span class="c">4단계 동작</span> — 5차 곡선으로 들기→마주치기→반동→복귀, 드는 중 실시간 추적 후 직전에 목표 고정</li>
+              <li><span class="c">three.js + URDFLoader</span> — 브라우저 3D 뷰어에 양팔·포인트클라우드·초록 박스·D435 시야 합성(메시 <code>.glb</code> 변환)</li>
+              <li><span class="c">MuJoCo 트윈 검증</span> — 실물 전 500&nbsp;Hz 가상 로봇 + 자동 측정으로 침범·거리·떨림을 수치 확인</li>
+            </ul>
           </div>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>디지털 트윈</b> = 실제 로봇을 컴퓨터 속에 똑같이 만든 "가상 쌍둥이 로봇". 아이 옆에서 휘두르는 팔이라, 위험한 동작을 실물 대신 여기서 수백 번 빠르게 시험해 안전을 확인한 뒤 진짜 로봇으로 옮겼습니다. <b>5차 곡선</b>은 출발·도착이 덜컥거리지 않게 속도를 매끄럽게 잇는 계산입니다.</p></div>
@@ -343,7 +362,7 @@
       function fit(s){
         var inner=s.querySelector('.dslide-in'); if(!inner) return;
         inner.style.transform='none';
-        var MX=44, TOP=78, BOT=62;
+        var MX=44, TOP=94, BOT=58;
         var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
         inner.style.width=Math.min(1140,aW)+'px';
         var nW=inner.offsetWidth, nH=inner.offsetHeight;
