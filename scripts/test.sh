@@ -113,6 +113,7 @@ if ! conda run -n jazzy pytest \
   tests/test_gogoping_manual_torque_hold.py \
   tests/test_gogoping_pose_override.py \
   tests/test_gogoping_align_to_dock.py \
+  tests/test_gogoping_rotate_to_yaw.py \
   tests/test_gogoping_reverse_into_dock.py \
   tests/test_gogoping_verify_docking_contact.py \
   tests/test_gogoping_pan_camera_sweep.py \
@@ -172,6 +173,7 @@ if ! conda run -n jazzy pytest \
   tests/test_streaming_frame_drop.py \
   tests/test_streaming_robot_controller.py \
   tests/test_streaming_ws_router.py \
+  tests/test_streaming_webrtc_relay.py \
   -v "$@"; then
   EXIT=1
 fi

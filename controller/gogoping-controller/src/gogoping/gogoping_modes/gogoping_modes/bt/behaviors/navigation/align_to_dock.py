@@ -18,8 +18,13 @@ Status:
 
 ROS param:
   align_tolerance_rad (기본 0.05 ≈ 3°)
-  align_angular_speed (기본 0.5 rad/s)
+  align_angular_speed (기본 0.5 rad/s — 멀 때 상한)
+  align_kp            (기본 1.5 — 목표 근처 비례 감속)
+  align_min_speed     (기본 0.12 rad/s — 정지마찰 floor)
   align_timeout_sec   (기본 15.0)
+
+회전 속도는 RotateToYaw 와 동일한 비례 감속(compute_rotate_cmd) — bang-bang 이
+실기에서 tolerance 밴드를 오버슈트해 왔다갔다 하던 문제를 막는다.
 
 terminate(INVALID): cmd_vel = 0 publish 보장 — 트리 중간 종료 시 robot 정지.
 """
@@ -33,6 +38,7 @@ import py_trees
 from py_trees.common import Access, Status
 
 from ...blackboard import Keys
+from .rotate_to_yaw import compute_rotate_cmd
 
 if TYPE_CHECKING:
     from ....context import Context
@@ -40,6 +46,8 @@ if TYPE_CHECKING:
 
 _DEFAULT_TOLERANCE_RAD = 0.05
 _DEFAULT_ANGULAR_SPEED = 0.5
+_DEFAULT_KP = 1.5
+_DEFAULT_MIN_SPEED = 0.12
 _DEFAULT_TIMEOUT_SEC = 15.0
 _CMD_VEL_TOPIC = "/gogoping/cmd_vel"
 
@@ -56,7 +64,9 @@ class AlignToDock(py_trees.behaviour.Behaviour):
         super().__init__(name)
         self.ctx = context
         self._tolerance = _DEFAULT_TOLERANCE_RAD
-        self._angular_speed = _DEFAULT_ANGULAR_SPEED
+        self._angular_speed = _DEFAULT_ANGULAR_SPEED   # max_speed (멀 때 상한)
+        self._kp = _DEFAULT_KP
+        self._min_speed = _DEFAULT_MIN_SPEED
         self._timeout_sec = _DEFAULT_TIMEOUT_SEC
 
         # ROS param 등록 — 이미 등록돼 있어도 안전 (idle_timeout_monitor 패턴)
@@ -67,6 +77,10 @@ class AlignToDock(py_trees.behaviour.Behaviour):
                  lambda v: setattr(self, "_tolerance", v)),
                 ("align_angular_speed", _DEFAULT_ANGULAR_SPEED,
                  lambda v: setattr(self, "_angular_speed", v)),
+                ("align_kp", _DEFAULT_KP,
+                 lambda v: setattr(self, "_kp", v)),
+                ("align_min_speed", _DEFAULT_MIN_SPEED,
+                 lambda v: setattr(self, "_min_speed", v)),
                 ("align_timeout_sec", _DEFAULT_TIMEOUT_SEC,
                  lambda v: setattr(self, "_timeout_sec", v)),
             ):
@@ -118,7 +132,14 @@ class AlignToDock(py_trees.behaviour.Behaviour):
             return Status.FAILURE
 
         error = _wrap_to_pi(target_yaw - current_yaw)
-        if abs(error) <= self._tolerance:
+        cmd = compute_rotate_cmd(
+            error=error,
+            tolerance=self._tolerance,
+            kp=self._kp,
+            min_speed=self._min_speed,
+            max_speed=self._angular_speed,
+        )
+        if cmd.reached:
             self._publish_twist(0.0, 0.0)
             return Status.SUCCESS
 
@@ -130,9 +151,8 @@ class AlignToDock(py_trees.behaviour.Behaviour):
             self._publish_twist(0.0, 0.0)
             return Status.FAILURE
 
-        # 부호로 회전 방향, 속도는 고정
-        angular = self._angular_speed if error > 0 else -self._angular_speed
-        self._publish_twist(0.0, angular)
+        # 비례 감속 — 목표 근처에서 속도↓ (오버슈트/limit cycle 방지)
+        self._publish_twist(0.0, cmd.angular_z)
         return Status.RUNNING
 
     def terminate(self, new_status: Status) -> None:

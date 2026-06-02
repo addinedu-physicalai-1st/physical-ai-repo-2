@@ -124,6 +124,34 @@ def test_wraps_around_pi_boundary():
     assert rec.published[-1][1] > 0
 
 
+def test_decelerates_near_target_not_full_speed():
+    """비례 감속: 목표 근처(밴드 밖이지만 가까움)에선 풀스피드보다 느려야 한다.
+
+    bang-bang 이면 error 0.2 에서도 0.5 를 내보내 오버슈트→왔다갔다. 비례 제어면
+    kp(1.5)*0.2 = 0.3 < max(0.5) 로 감속되어야 한다.
+    """
+    _set_pose(yaw=0.0)
+    _set_target_yaw(yaw=0.2)  # error 0.2 rad, tolerance 0.05 → 밴드 밖
+    align, rec = _new(tolerance=0.05)
+    assert align.update() == Status.RUNNING
+    angular = rec.published[-1][1]
+    assert angular == pytest.approx(0.3, abs=1e-6)
+    assert abs(angular) < 0.5
+
+
+def test_decelerates_monotonically_as_error_shrinks():
+    """목표에 가까울수록 |속도| 가 작아져야 오버슈트가 안 난다."""
+    def _speed_at(err: float) -> float:
+        _set_pose(yaw=0.0)
+        _set_target_yaw(yaw=err)
+        align, rec = _new(tolerance=0.05)
+        align.update()
+        return abs(rec.published[-1][1])
+
+    assert _speed_at(0.5) >= _speed_at(0.25) >= _speed_at(0.12)
+    assert _speed_at(0.12) < 0.5
+
+
 def test_within_tolerance_returns_success():
     """error 가 tolerance 안이면 즉시 SUCCESS."""
     _set_pose(yaw=0.04)
