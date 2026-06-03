@@ -12,8 +12,10 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#FFD25E;
+    --accentSoft:rgba(255,210,94,.16);
   }
   *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
   html,body{margin:0}
   body{
     background:var(--bg); color:var(--ink);
@@ -21,9 +23,16 @@
     opacity:0; transition:opacity .3s ease; min-height:100vh;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 24px;
+    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
   /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    flex:0 0 auto;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
     color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
@@ -31,53 +40,262 @@
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
+  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
   .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accentSoft); border:1px solid var(--accent);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
+    padding:8px 16px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(255,210,94,.26)}
+  .sec-nav a .n{color:var(--accent); font-size:13px}
+
+  .section{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:30px 34px; margin-bottom:28px;
+    scroll-margin-top:84px;
+  }
+  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px}
+  .sec-num{
+    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
+    background:var(--accentSoft); color:var(--accent);
+    font-family:'Jua',sans-serif; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
+
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:start}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .video-box{position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--border); background:#000; box-shadow:0 14px 40px rgba(0,0,0,.45)}
+  .video-box video, .video-box img{display:block; width:100%; height:auto}
+  /* 영상/이미지 placeholder — Prismic CDN URL 업로드 후 <video>/<img> 로 교체 */
+  .ph{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    aspect-ratio:16/10; border:1.5px dashed var(--border); border-radius:16px;
+    background:rgba(255,255,255,.03); color:var(--inkSoft); text-align:center; padding:20px;
+  }
+  .ph .material-icons-round{font-size:42px; color:var(--accent); opacity:.8}
+  .ph code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.85em}
+
+  .stat{display:flex; align-items:baseline; gap:10px; margin:0 0 18px}
+  .stat .num{font-family:'Jua',sans-serif; font-size:54px; color:var(--accent); line-height:1}
+  .stat .unit{font-family:'Jua',sans-serif; font-size:22px; color:var(--ink)}
+  .stat .label{color:var(--inkSoft); font-size:15px}
+
+  .lead{font-size:17px; line-height:1.85; margin:0 0 18px}
+  .lead b{color:var(--accent)}
+
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:12px;
+    padding:16px 18px; margin-top:6px;
+  }
+  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
+  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
+  .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
+  /* 파이프라인 단계 흐름 */
+  .flow{display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; margin:6px 0 4px}
+  .step{
+    flex:1 1 0; min-width:120px;
+    border:1px solid var(--border); border-radius:12px; padding:13px 14px;
+    background:rgba(255,255,255,.03);
+  }
+  .step .t{font-family:'Jua',sans-serif; font-size:14px; color:var(--accent); margin-bottom:3px}
+  .step p{margin:0; font-size:13px; line-height:1.6; color:var(--inkSoft)}
+  .arrow{display:flex; align-items:center; color:var(--inkSoft); font-size:20px}
+  @media (max-width:760px){ .arrow{transform:rotate(90deg)} }
+
+  .compare{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:6px}
+  @media (max-width:760px){ .compare{grid-template-columns:1fr} }
+  .cmp{border:1px solid var(--border); border-radius:14px; padding:18px 20px; background:rgba(255,255,255,.03)}
+  .cmp h3{font-family:'Jua',sans-serif; font-size:18px; margin:0 0 8px; display:flex; align-items:center; gap:8px}
+  .cmp p{margin:0; font-size:15px; line-height:1.75; color:var(--inkSoft)}
+  .cmp b{color:var(--accent)}
+
+  .reasons{display:flex; flex-direction:column; gap:12px}
+  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
+  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
+  .reason .ic .material-icons-round{font-size:20px}
+  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
+  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
+  .reason b{color:var(--accent)}
+
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav">
+      <a href="#sec-01"><span class="n">01</span> 브라우저 ONNX 호출어</a>
+      <a href="#sec-02"><span class="n">02</span> 모델 FRR·FAR 균형</a>
+      <a href="#sec-03"><span class="n">03</span> STT·TTS 엔진 선택</a>
+      <a href="#sec-04"><span class="n">04</span> mel-spectrogram</a>
+    </nav>
+  </div>
 
   <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 05</p>
-    <h1 class="jua">호출어와 STT·TTS 기능</h1>
+    <p class="eyebrow">Q&amp;A · 05 · 호출어와 STT·TTS</p>
+    <h1 class="jua">호출어와 STT·TTS</h1>
     <p class="member">담당 · 박우림</p>
 
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">graphic_eq</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>박우림 님이 작성할 <b style="color:var(--ink)">호출어와 STT·TTS 기능</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+    <!-- ───────────────────────────── 01 ───────────────────────────── -->
+    <section id="sec-01" class="section">
+      <div class="sec-head">
+        <div class="sec-num">01</div>
+        <h2 class="jua">호출어를 서버가 아니라 브라우저에서 ONNX 로 듣는다</h2>
+      </div>
+
+      <p class="lead">
+        호출어("에듀핑/고고핑/노리암")는 서버로 보내지 않고 <b>브라우저에서 직접</b> 인식합니다.
+        호출어가 들릴 때만 서버 게이트를 열어, 항상 켜진 마이크 부담을 덜어냅니다.
+      </p>
+
+      <div class="flow">
+        <div class="step"><div class="t">① VAD</div><p>사람 목소리 구간만 통과</p></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="t">② Mel-spec</div><p>멜스펙트로그램 변환</p></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="t">③ Embedding</div><p>임베딩 추출</p></div>
+        <div class="arrow">→</div>
+        <div class="step"><div class="t">④ 분류기</div><p>로봇별 호출어 점수화</p></div>
+      </div>
+
+      <div class="callout" style="margin-top:18px">
+        <span class="material-icons-round">tune</span>
+        <p>
+          점수 <span class="k">임계값 0.9</span> 를 <b>연속 2프레임</b> 넘겨야 호출로 인정 — 단발 잡음으로는 깨어나지 않습니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- ───────────────────────────── 02 ───────────────────────────── -->
+    <section id="sec-02" class="section">
+      <div class="sec-head">
+        <div class="sec-num">02</div>
+        <h2 class="jua">호출어 모델 — 오탐(FAR)과 놓침(FRR)의 균형</h2>
+      </div>
+
+      <p class="lead">
+        호출어 모델은 <b>못 알아듣는 비율(FRR)</b>과 <b>엉뚱하게 깨는 비율(FAR)</b>의 트레이드오프입니다 —
+        한쪽을 낮추면 다른쪽이 오릅니다. 둘 다 낮추려 학습 데이터와 옵션을 다듬었습니다.
+      </p>
+
+      <img src="../../slides/assets/media/diagrams/wake-roc.png"
+           alt="세 로봇 호출어 sweep ROC — production 모델이 좌상단"
+           style="display:block;width:100%;border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+      <div class="ph" style="display:none">
+        <span class="material-icons-round">show_chart</span>
+        <div>호출어 sweep ROC</div>
+        <code>slides/assets/media/diagrams/wake-roc.png</code>
+      </div>
+      <p style="font-size:13px;color:var(--inkSoft);margin:10px 2px 20px;line-height:1.6">
+        세 로봇 sweep ROC — production(굵은 선)이 모두 좌상단(FRR·FAR 동시에 낮음).
+      </p>
+
+      <div class="callout" style="margin-top:18px">
+        <span class="material-icons-round">science</span>
+        <p>
+          <span class="k">px</span> (prefix oversample) — "에듀"처럼 <b>앞 두 글자만 말한 가짜</b>를 학습 중 N배 더 보여줘 두 글자에 안 속게 한다.
+          <span class="k">nw</span> (negative weight) — <b>오답(negative) 페널티를 N배</b>로 키워 "의심스러우면 거부". 둘 다 키우면 FAR↓·FRR↑ → 로봇별로 낮춰 균형을 잡았다.
+        </p>
+      </div>
+
+      <div class="callout" style="margin-top:14px">
+        <span class="material-icons-round">insights</span>
+        <p>
+          production 은 ROC 좌상단 — AUC <span class="k">eduping 0.973 · gogoping 0.970 · noriarm 0.956</span>.
+          noriarm 은 AUC 최고 모델 대신, 모음이 비슷한 단어 오인식을 잡아주는 모델을 일부러 골랐습니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- ───────────────────────────── 03 ───────────────────────────── -->
+    <section id="sec-03" class="section">
+      <div class="sec-head">
+        <div class="sec-num">03</div>
+        <h2 class="jua">STT·TTS 엔진은 어떤 것을 골랐나</h2>
+      </div>
+
+      <div class="compare">
+        <div class="cmp">
+          <h3 style="color:var(--accent)"><span class="material-icons-round">hearing</span> STT (음성→텍스트)</h3>
+          <p>WebRTC 로 올라온 음성을 <b>Silero VAD</b> 로 발화 구간만 잘라
+             <b>faster-whisper</b>(한국어)로 받아쓴다. GPU 면 small·float16, CPU 면 base·int8.</p>
+        </div>
+        <div class="cmp">
+          <h3 style="color:var(--accent)"><span class="material-icons-round">campaign</span> TTS (텍스트→음성)</h3>
+          <p>답변을 <b>edge-tts</b>(ko-KR-InJoonNeural)로 합성해 WebRTC 오디오로 보내고,
+             브라우저가 음절에 맞춰 <b>입 모양(lip-sync)</b>.</p>
+        </div>
+      </div>
+
+      <p class="lead" style="font-size:15px;margin:16px 0 16px">
+        STT 인식률을 위해 현재 모드에서 나올 단어를 <b>힌트로 주입</b> —
+        활동어·목적지·음식 이름을 Whisper 디코딩 힌트로 넣어 짧은 발음의 오인식을 줄인다.
+      </p>
+
+      <div class="callout">
+        <span class="material-icons-round">flash_on</span>
+        <p>
+          TTS 도중 호출어가 다시 들리면 <span class="k">barge-in</span> 으로 즉시 끊고 새 사이클 —
+          WebRTC 에코 제거 덕에 로봇이 자기 목소리엔 깨어나지 않습니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- ───────────────────────────── 04 ───────────────────────────── -->
+    <section id="sec-04" class="section">
+      <div class="sec-head">
+        <div class="sec-num">04</div>
+        <h2 class="jua">mel-spectrogram — 소리를 그림으로</h2>
+      </div>
+
+      <p class="lead">
+        호출어 파이프라인의 ② 단계입니다. 마이크 소리(PCM, 숫자 배열)를 AI 가 알아보기 쉽게
+        <b>"시간 × 음높이 × 세기"의 2D 그림</b>으로 바꾼 것입니다.
+      </p>
+
+      <img src="../../slides/assets/media/diagrams/mel-spec-example.png"
+           alt="mel-spectrogram 예시 — 가로 시간, 세로 mel 음높이, 밝기 세기"
+           style="display:block;width:100%;border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+      <div class="ph" style="display:none">
+        <span class="material-icons-round">graphic_eq</span>
+        <div>mel-spectrogram 예시</div>
+        <code>slides/assets/media/diagrams/mel-spec-example.png</code>
+      </div>
+      <p style="font-size:13px;color:var(--inkSoft);margin:10px 2px 20px;line-height:1.6">
+        가로 = 시간, 세로 = mel 음높이, 밝기 = 그 시점·음높이의 소리 세기.
+        가로로 뻗은 줄무늬가 사람 목소리의 하모닉입니다.
+      </p>
+
+      <div class="reasons">
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">graphic_eq</span></div>
+          <div><h4>왜 "그림"으로?</h4><p>raw 숫자 배열보다 "어떤 소리인지" 특징이 잘 드러나, 거의 모든 음성 AI 의 표준 입력 형식이다.</p></div>
+        </div>
+        <div class="reason">
+          <div class="ic"><span class="material-icons-round">unfold_more</span></div>
+          <div><h4>왜 "mel"?</h4><p>사람은 저주파의 음높이 차이를 더 세밀하게 구별한다. 그 청각 특성에 맞춰 세로축을 저주파는 촘촘, 고주파는 듬성하게 휜 척도가 mel 이다.</p></div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <script>
