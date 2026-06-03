@@ -13,7 +13,7 @@
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#B98CFF;
     --accentSoft:rgba(185,140,255,.16);
-    --topbar-h:64px;
+    --topbar-h:80px;
   }
   *{box-sizing:border-box}
   html,body{margin:0; padding:0; height:100%;}
@@ -32,32 +32,32 @@
   .topbar{
     position:fixed; top:0; left:0; right:0; z-index:50;
     min-height:var(--topbar-h);
-    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
-    padding:10px 22px;
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:13px 28px;
     background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
     border-bottom:1px solid var(--border);
   }
   .back{
     flex:0 0 auto;
-    display:inline-flex; align-items:center; gap:6px;
+    display:inline-flex; align-items:center; gap:8px;
     background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
-    padding:7px 14px; border-radius:999px; cursor:pointer;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:18px;
+    padding:11px 22px; border-radius:999px; cursor:pointer;
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
 
-  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav{display:flex; flex-wrap:wrap; gap:9px; margin:0}
   .sec-nav a{
-    display:inline-flex; align-items:center; gap:6px;
+    display:inline-flex; align-items:center; gap:8px;
     background:var(--accentSoft); border:1px solid rgba(185,140,255,.55);
-    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
-    padding:6px 11px; border-radius:999px; text-decoration:none;
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:17px;
+    padding:9px 16px; border-radius:999px; text-decoration:none;
     transition:transform .15s, background .15s, border-color .15s;
   }
   .sec-nav a:hover{transform:translateY(-1px); background:rgba(185,140,255,.32); border-color:var(--accent)}
   .sec-nav a.active{background:linear-gradient(135deg,var(--accent),#7FE0B8); color:#16131F; border-color:transparent}
-  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a .n{color:var(--accent); font-size:14px}
   .sec-nav a.active .n{color:#16131F}
 
   /* 슬라이드 — 한 항목 = 한 화면 가득 (PPT 스타일) */
@@ -86,7 +86,7 @@
     letter-spacing:.2em; margin:0 0 10px;
   }
   .slide h2{
-    font-family:'Jua',sans-serif; font-size:48px; margin:0 0 28px;
+    font-family:'Jua',sans-serif; font-size:52px; margin:0 0 28px;
     display:flex; align-items:center; gap:20px;
   }
   .secnum{
@@ -96,19 +96,19 @@
     display:flex; align-items:center; justify-content:center;
   }
 
-  h3{font-family:'Jua',sans-serif; font-size:26px; color:#7FE0B8; margin:22px 0 10px}
+  h3{font-family:'Jua',sans-serif; font-size:29px; color:#7FE0B8; margin:22px 0 10px}
   h3:first-child{margin-top:0}
-  p{line-height:1.7; font-size:21px; margin:8px 0; color:var(--ink)}
+  p{line-height:1.7; font-size:23px; margin:8px 0; color:var(--ink)}
   ul{margin:8px 0 12px; padding-left:28px}
-  li{line-height:1.7; font-size:21px; margin:8px 0; color:var(--ink)}
+  li{line-height:1.7; font-size:23px; margin:8px 0; color:var(--ink)}
   b{color:#fff}
-  .lead{font-size:23px; line-height:1.7; margin:0 0 18px}
+  .lead{font-size:25px; line-height:1.7; margin:0 0 18px}
   .lead b{color:var(--accent)}
 
   .chip{display:inline-block; background:rgba(255,255,255,.05); color:var(--inkSoft);
-    border:1px solid var(--border); border-radius:999px; padding:6px 18px; font-size:18px; margin:5px 6px 0 0}
+    border:1px solid var(--border); border-radius:999px; padding:7px 19px; font-size:19px; margin:5px 6px 0 0}
   .pill{display:inline-block; background:var(--accentSoft); color:var(--accent);
-    border-radius:8px; padding:2px 14px; font-weight:700; font-size:21px}
+    border-radius:8px; padding:2px 14px; font-weight:700; font-size:22px}
 
   /* 개요(hero) */
   .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px}
@@ -125,7 +125,7 @@
   .metric .num{font-family:'Jua',sans-serif; font-size:46px; color:var(--accent); line-height:1;
     background:linear-gradient(90deg,var(--accent),#7FE0B8);
     -webkit-background-clip:text; background-clip:text; color:transparent;}
-  .metric .lab{color:var(--inkSoft); font-size:18px; margin-top:12px}
+  .metric .lab{color:var(--inkSoft); font-size:19px; margin-top:12px}
 
   /* 2단 split */
   .split{display:grid; grid-template-columns:1.1fr 1fr; gap:42px; align-items:center; flex:1; min-height:0}
@@ -137,10 +137,10 @@
     border-radius:18px; border:1px solid var(--border); object-fit:contain;
     box-shadow:0 18px 50px rgba(0,0,0,.5);
   }
-  figcaption{color:var(--inkSoft); font-size:17px; margin-top:14px}
+  figcaption{color:var(--inkSoft); font-size:19px; margin-top:14px}
 
   /* table */
-  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:20px}
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:22px}
   th,td{border:1px solid var(--border); padding:14px 18px; text-align:center}
   th{background:rgba(255,255,255,.05); color:var(--ink); font-family:'Jua',sans-serif; font-weight:400}
   td b{color:var(--accent)}
@@ -153,12 +153,12 @@
     padding:18px 22px; margin:16px 0;
   }
   .callout .material-icons-round{color:#F2C200; font-size:30px; margin-top:2px}
-  .callout p{margin:0; line-height:1.65; font-size:20px}
+  .callout p{margin:0; line-height:1.65; font-size:22px}
   .callout b{color:#F2C200}
 
   /* timeline */
   .timeline{list-style:none; padding-left:6px; margin:8px 0}
-  .timeline li{position:relative; padding:22px 0 22px 38px; border-left:3px solid var(--border); margin-left:6px; font-size:23px; line-height:1.65}
+  .timeline li{position:relative; padding:22px 0 22px 38px; border-left:3px solid var(--border); margin-left:6px; font-size:25px; line-height:1.65}
   .timeline li::before{content:""; position:absolute; left:-10px; top:30px; width:18px; height:18px; border-radius:50%;
     background:var(--accent); border:3px solid var(--surface)}
   .timeline .date{font-family:'Jua',sans-serif; color:var(--accent); margin-right:12px}
@@ -167,23 +167,23 @@
   .techgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
   @media (max-width:760px){ .techgrid{grid-template-columns:1fr 1fr} }
   .t{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:16px; padding:22px 24px}
-  .t .name{font-family:'Jua',sans-serif; color:var(--accent); font-size:22px; margin-bottom:8px}
-  .t .desc{font-size:17px; color:var(--inkSoft); line-height:1.55}
+  .t .name{font-family:'Jua',sans-serif; color:var(--accent); font-size:24px; margin-bottom:8px}
+  .t .desc{font-size:19px; color:var(--inkSoft); line-height:1.55}
 
   /* problem-solution */
   .psgrid{display:grid; grid-template-columns:1fr 1fr; gap:20px}
   @media (max-width:760px){ .psgrid{grid-template-columns:1fr} }
   .ps{border:1px solid var(--border); border-radius:16px; padding:22px 24px; background:rgba(255,255,255,.03)}
-  .ps .prob{color:#FF9A8B; font-family:'Jua',sans-serif; font-size:21px}
-  .ps .sol{color:#7FE0B8; font-family:'Jua',sans-serif; font-size:21px; margin-top:8px}
-  .ps p{font-size:18px; color:var(--inkSoft); margin:10px 0 0; line-height:1.55}
+  .ps .prob{color:#FF9A8B; font-family:'Jua',sans-serif; font-size:23px}
+  .ps .sol{color:#7FE0B8; font-family:'Jua',sans-serif; font-size:23px; margin-top:8px}
+  .ps p{font-size:20px; color:var(--inkSoft); margin:10px 0 0; line-height:1.55}
 
   /* brag grid */
   .braggrid{display:grid; grid-template-columns:1fr 1fr; gap:0 44px}
   @media (max-width:760px){ .braggrid{grid-template-columns:1fr} }
-  .brag{border-bottom:1px dashed var(--border); padding:18px 0}
-  .brag .bt{font-family:'Jua',sans-serif; color:#fff; font-size:21px}
-  .brag .bd{font-size:17px; color:var(--inkSoft); margin-top:6px; line-height:1.55}
+  .brag{border-bottom:1px dashed var(--border); padding:28px 0}
+  .brag .bt{font-family:'Jua',sans-serif; color:#fff; font-size:28px}
+  .brag .bd{font-size:21px; color:var(--inkSoft); margin-top:10px; line-height:1.6}
 
   .hint{
     position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
@@ -206,11 +206,8 @@
       <a href="#overview">개요</a>
       <a href="#sec-01"><span class="n">01</span> 데이터셋</a>
       <a href="#sec-02"><span class="n">02</span> 모방학습</a>
-      <a href="#sec-03"><span class="n">03</span> 학습 최적화</a>
-      <a href="#sec-04"><span class="n">04</span> 게임 진행</a>
-      <a href="#sec-05"><span class="n">05</span> 추론 양상</a>
-      <a href="#sec-06"><span class="n">06</span> 이슈 &amp; 변경</a>
-      <a href="#sec-07"><span class="n">07</span> UI 구성</a>
+      <a href="#sec-03"><span class="n">03</span> 학습 안정화</a>
+      <a href="#sec-04"><span class="n">04</span> 게임 진행 &amp; UI</a>
       <a href="#sec-tech">사용 기술</a>
       <a href="#sec-hard">어려웠던 점</a>
       <a href="#sec-brag">자랑</a>
@@ -237,13 +234,10 @@
   <!-- 01 데이터셋 -->
   <section class="slide" id="sec-01">
     <div class="inner">
-      <p class="slide-no">01 / 10</p>
+      <p class="slide-no">01 / 04</p>
       <h2><span class="secnum">1</span> 데이터셋 수집</h2>
       <div class="split">
         <div>
-          <h3>모델 정하기 — SmolVLA → ACT</h3>
-          <p>같은 조건으로 학습했을 때 SmolVLA가 ACT보다 성능이 떨어지고 학습 시간도
-             <b>3배</b>나 오래 걸려서 <b>ACT</b>로 결정했습니다.</p>
           <h3>에피소드 구성</h3>
           <p>사람과 로봇이 번갈아 큰 것부터 순서대로 쌓습니다.</p>
           <p>
@@ -320,7 +314,7 @@
       <h2><span class="secnum">4</span> 게임 진행을 원활하게 하기 위한 추가 요소</h2>
       <h3>중단 시 홈포즈 복귀로 위험 최소화</h3>
       <p>중단 시 모터가 바로 꺼지면 위험하고 사람이 잡아줘야 했습니다. 유치원생을 고려해
-         중단 시 <b>3초간 천천히 홈포즈로 복귀한 후</b> 종료하도록 했습니다.
+         중단 시 <b>자동으로 3초간 천천히 홈포즈로 복귀한 후</b> 종료하도록 했습니다.
          홈포즈는 시작 시 관절값으로 추출하고, 관절값 편차로 <b>사용자 차례</b>를 인식합니다.</p>
       <h3>백그라운드 모델 사전 로딩</h3>
       <p>세션 시작 시 HF 멀티스레딩 제한 + 백그라운드 캐싱을 적용하고, 가위바위보 카드 노출
@@ -422,9 +416,8 @@
       <div class="psgrid">
         <div class="ps"><div class="prob">SmolVLA 성능 부족 &amp; 학습 3배</div><div class="sol">→ ACT로 전환</div><p>성능·속도 우위인 ACT를 메인 정책으로 채택.</p></div>
         <div class="ps"><div class="prob">블럭을 잘 못 집음 / 좁은 영역만</div><div class="sol">→ 정면 정렬 + 영역 점진 확장</div><p>정면·90도 고정, 좁은 영역 검증 후 전 영역으로 확장.</p></div>
-        <div class="ps"><div class="prob">흰색 블럭 정확도 낮음</div><div class="sol">→ 누적 이어학습</div><p>부족분만 추가 녹화해 이어 학습이 더 효과적.</p></div>
-        <div class="ps"><div class="prob">사람 차례에 로봇이 계속 움직임</div><div class="sol">→ 비율 집착↓ + 누적 학습</div><p>누적 학습하니 빈 구역(첫 턴)도 정지.</p></div>
-        <div class="ps" style="grid-column:1 / -1"><div class="prob">환경 변화(책상 각도)로 추론 흐트러짐</div><div class="sol">→ ROI 시작 조건 도입</div><p>HSV + inRange로 70 % 인식 시에만 추론, 재학습 없이 해결.</p></div>
+        <div class="ps"><div class="prob">흰색 부분 정확도 낮음 · 사람 차례에 로봇 움직임</div><div class="sol">→ 비율에 대한 강박 ↓ + 이어서학습</div><p>부족분만 추가 녹화해 이어 학습으로 해결.</p></div>
+        <div class="ps"><div class="prob">환경 변화(책상 각도)로 추론 흐트러짐</div><div class="sol">→ ROI 시작 조건 도입</div><p>HSV + inRange로 70 % 인식 시에만 추론, 재학습 없이 해결.</p></div>
       </div>
     </div>
   </section>
@@ -439,9 +432,8 @@
         <div class="brag"><div class="bt">"누적 이어학습" 노하우</div><div class="bd">양상 보고 부족분을 이어 학습하는 방식이 더 빠르고 효과적임을 입증.</div></div>
         <div class="brag"><div class="bt">ROI로 환경 민감성 우회</div><div class="bd">재학습 없이 HSV ROI로 실전 해결 (최종 데모 성공).</div></div>
         <div class="brag"><div class="bt">가위바위보 앙상블 인식</div><div class="bd">2개 분류기 가중 투표 + margin 확보 시 확정하는 견고한 구조.</div></div>
-        <div class="brag"><div class="bt">유치원생 안전 설계</div><div class="bd">중단 시 3초간 홈포즈 복귀 후 종료 — 아이가 잡을 필요 없음.</div></div>
+        <div class="brag"><div class="bt">유치원생 안전 설계</div><div class="bd">아이가 블럭을 놓는 동안 로봇팔이 멈춰 있어, 손이 부딪힐 일이 없도록.</div></div>
         <div class="brag"><div class="bt">지연 절감 사전 로딩</div><div class="bd">카드 노출 시간에 모델을 미리 로드해 흐름이 끊기지 않음.</div></div>
-        <div class="brag"><div class="bt">멀티모달 UX</div><div class="bd">음성 + 터치 시작, 음성 안내·결과, 실시간 카드·오버레이.</div></div>
       </div>
     </div>
   </section>
