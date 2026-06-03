@@ -12,81 +12,347 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#3FD9A6;
+    --accentSoft:rgba(63,217,166,.16);
+    --accent2:#7FE0B8;
+    --topbar-h:64px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0}
+  html,body{margin:0; padding:0; height:100%;}
   body{
     background:var(--bg); color:var(--ink);
     font-family:'Pretendard Variable',system-ui,sans-serif;
-    opacity:0; transition:opacity .3s ease; min-height:100vh;
+    opacity:0; transition:opacity .3s ease;
+    overflow-x:hidden; overflow-y:scroll;
+    scroll-snap-type:y mandatory; scroll-behavior:smooth;
+    word-break:keep-all; overflow-wrap:break-word;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+
+  /* 상단 고정 바 — 뒤로가기 버튼 + 섹션 뱃지 */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    min-height:var(--topbar-h);
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+    padding:10px 22px;
+    background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
-    display:inline-flex; align-items:center; gap:6px;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
-    padding:8px 16px; border-radius:999px; cursor:pointer;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
+    padding:7px 14px; border-radius:999px; cursor:pointer;
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accentSoft); border:1px solid rgba(63,217,166,.55);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
+    padding:6px 11px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s, border-color .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(63,217,166,.32); border-color:var(--accent)}
+  .sec-nav a.active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F; border-color:transparent}
+  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a.active .n{color:#16131F}
+
+  /* 슬라이드 — 한 항목 = 한 화면 (PPT 스타일) */
+  .slide{
+    min-height:100vh; height:100vh;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--topbar-h) + 22px) 3vw 30px; overflow:hidden;
+  }
+  .inner{
+    width:100%; max-width:1700px; height:100%;
+    display:flex; flex-direction:column; justify-content:center; overflow:auto;
+    padding:46px 58px;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(63,217,166,.06), transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(255,255,255,.08); border-radius:28px;
+    box-shadow:0 28px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(63,217,166,.04) inset;
+  }
+  .slide-no{color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:17px; letter-spacing:.2em; margin:0 0 10px}
+  .slide h2{font-family:'Jua',sans-serif; font-size:44px; margin:0 0 26px; display:flex; align-items:center; gap:20px}
+  .secnum{
+    flex:0 0 auto; width:66px; height:66px; border-radius:18px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F;
+    font-family:'Jua',sans-serif; font-size:30px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  h3{font-family:'Jua',sans-serif; font-size:24px; color:var(--accent2); margin:20px 0 8px}
+  h3:first-child{margin-top:0}
+  p{line-height:1.7; font-size:20px; margin:8px 0; color:var(--ink)}
+  ul{margin:8px 0 12px; padding-left:26px}
+  li{line-height:1.7; font-size:20px; margin:7px 0; color:var(--ink)}
+  b{color:#fff}
+  .lead{font-size:22px; line-height:1.7; margin:0 0 16px}
+  .lead b{color:var(--accent)}
+
+  .chip{display:inline-block; background:rgba(255,255,255,.05); color:var(--inkSoft);
+    border:1px solid var(--border); border-radius:999px; padding:6px 16px; font-size:17px; margin:5px 6px 0 0}
+  .pill{display:inline-block; background:var(--accentSoft); color:var(--accent);
+    border-radius:8px; padding:2px 12px; font-weight:700; font-size:20px}
+  code{background:rgba(255,255,255,.07); padding:1px 7px; border-radius:5px; font-size:.88em; color:#A8FFE0; font-family:ui-monospace,monospace}
+
+  /* 개요(hero) */
+  .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px}
+  .hero .kicker{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:20px}
+  .hero h1{
+    font-family:'Jua',sans-serif; font-size:100px; margin:14px 0 8px; line-height:1.1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero .sub{color:var(--inkSoft); font-size:23px; margin:0 0 40px}
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; width:100%; max-width:1300px}
+  @media (max-width:760px){ .metrics{grid-template-columns:repeat(2,1fr)} }
+  .metric{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:30px 22px}
+  .metric .num{font-family:'Jua',sans-serif; font-size:46px; line-height:1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .metric .lab{color:var(--inkSoft); font-size:18px; margin-top:12px}
+
+  /* 2단 split */
+  .split{display:grid; grid-template-columns:1.05fr 1fr; gap:42px; align-items:center; flex:1; min-height:0}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  /* 6단계 스텝 */
+  .steps{list-style:none; padding:0; margin:6px 0 0; display:flex; flex-direction:column; gap:11px}
+  .steps li{display:flex; gap:15px; align-items:flex-start; border:1px solid var(--border); border-radius:14px; padding:14px 18px; background:rgba(255,255,255,.03)}
+  .steps .sn{flex:0 0 auto; width:34px; height:34px; border-radius:10px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:18px; display:flex; align-items:center; justify-content:center}
+  .steps .st{font-size:19px; line-height:1.55}
+  .steps .st b{color:#fff}
+  .steps .par{color:var(--accent); font-size:15px; font-family:ui-monospace,monospace}
+
+  /* 모노스페이스 흐름 박스 */
+  .flowbox{background:rgba(0,0,0,.34); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin:10px 0 0;
+    font-family:ui-monospace,monospace; font-size:15.5px; line-height:2.05; color:var(--inkSoft); overflow-x:auto; white-space:pre}
+  .flowbox b{color:var(--ink)} .flowbox .a{color:var(--accent)}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:19px}
+  th,td{border:1px solid var(--border); padding:13px 17px; text-align:left; vertical-align:top}
+  th{background:rgba(255,255,255,.05); color:var(--ink); font-family:'Jua',sans-serif; font-weight:400}
+  td{color:var(--inkSoft)} td b{color:var(--accent)}
+
+  /* callout */
+  .callout{display:flex; gap:14px; align-items:flex-start;
+    background:rgba(63,217,166,.07); border:1px solid rgba(63,217,166,.30);
+    border-left:4px solid var(--accent); border-radius:14px; padding:17px 21px; margin:16px 0 0}
+  .callout .material-icons-round{color:var(--accent); font-size:28px; margin-top:2px}
+  .callout p{margin:0; line-height:1.65; font-size:19px}
+  .callout b{color:var(--accent)} .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
+  /* tech grid */
+  .techgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px}
+  @media (max-width:760px){ .techgrid{grid-template-columns:1fr 1fr} }
+  .t{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:16px; padding:20px 22px}
+  .t .name{font-family:'Jua',sans-serif; color:var(--accent); font-size:21px; margin-bottom:7px}
+  .t .desc{font-size:16px; color:var(--inkSoft); line-height:1.55}
+
+  /* problem-solution */
+  .psgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  @media (max-width:760px){ .psgrid{grid-template-columns:1fr} }
+  .ps{border:1px solid var(--border); border-radius:16px; padding:20px 22px; background:rgba(255,255,255,.03)}
+  .ps .prob{color:#FF9A8B; font-family:'Jua',sans-serif; font-size:20px}
+  .ps .sol{color:var(--accent2); font-family:'Jua',sans-serif; font-size:20px; margin-top:8px}
+  .ps p{font-size:17px; color:var(--inkSoft); margin:9px 0 0; line-height:1.55}
+
+  /* brag grid */
+  .braggrid{display:grid; grid-template-columns:1fr 1fr; gap:0 44px}
+  @media (max-width:760px){ .braggrid{grid-template-columns:1fr} }
+  .brag{border-bottom:1px dashed var(--border); padding:17px 0}
+  .brag .bt{font-family:'Jua',sans-serif; color:#fff; font-size:20px}
+  .brag .bd{font-size:16px; color:var(--inkSoft); margin-top:6px; line-height:1.55}
+
+  .hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
+    color:var(--inkSoft); font-size:12px; background:rgba(36,31,51,.85); border:1px solid var(--border);
+    border-radius:999px; padding:6px 14px}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
-
-  <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 12</p>
-    <h1 class="jua">숨바꼭질</h1>
-    <p class="member">담당 · 이강택</p>
-
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">visibility_off</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>이강택 님이 작성할 <b style="color:var(--ink)">숨바꼭질</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+  <!-- 상단 바: ⚠️ 뒤로가기 버튼(반드시 유지) + 섹션 인덱스 뱃지 -->
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav" id="secNav">
+      <a href="#overview">개요</a>
+      <a href="#sec-01"><span class="n">01</span> 게임 흐름</a>
+      <a href="#sec-02"><span class="n">02</span> 그룹 순찰</a>
+      <a href="#sec-03"><span class="n">03</span> 카메라 제어</a>
+      <a href="#sec-04"><span class="n">04</span> 얼굴 인식</a>
+    </nav>
   </div>
+
+  <!-- 개요 -->
+  <section class="slide" id="overview">
+    <div class="inner">
+      <div class="hero">
+        <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
+        <h1>숨바꼭질</h1>
+        <div class="sub">검증된 동작 블록을 6단계로 엮고, 얼굴 인식으로 등록 아동을 사람 없이 자동으로 찾는 술래 로봇 · 담당 이강택</div>
+        <div class="metrics">
+          <div class="metric"><div class="num">6단계</div><div class="lab">게임 흐름 — BT Sequence</div></div>
+          <div class="metric"><div class="num">랜덤 순찰</div><div class="lab">그룹 순찰 — 매판 다른 동선</div></div>
+          <div class="metric"><div class="num">카메라 모터 제어</div><div class="lab">카메라 제어 — pan/tilt sweep</div></div>
+          <div class="metric"><div class="num">InsightFace</div><div class="lab">얼굴 인식 — 등록 아동만</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 게임 흐름 -->
+  <section class="slide" id="sec-01">
+    <div class="inner">
+      <p class="slide-no">01 / 04</p>
+      <h2><span class="secnum">1</span> 게임 흐름 — 6단계 BT Sequence</h2>
+      <ul class="steps">
+        <li><span class="sn">1</span><span class="st"><b>놀이구역으로 이동</b> <span class="par">move_to_play</span><br>술래 로봇이 정해진 놀이구역까지 자율주행으로 이동합니다. 도착하면 위쪽을 바라보도록 돌아 "이제 시작" 자세를 잡습니다.</span></li>
+        <li><span class="sn">2</span><span class="st"><b>참가 아동 모집</b> <span class="par">recruit</span><br>교사가 화면에서 이번 판에 참가할 아이들을 등록합니다. 등록이 끝날 때까지 로봇은 그 자리에서 기다립니다.</span></li>
+        <li><span class="sn">3</span><span class="st"><b>30초 카운트다운</b> <span class="par">countdown</span><br>술래가 30초를 셉니다. 동시에 아래쪽으로 몸을 돌려 벽을 보고 숫자를 세는 술래 연출을 합니다.</span></li>
+        <li><span class="sn">4</span><span class="st"><b>순찰하며 찾기</b> <span class="par">patrol</span><br>정해진 순찰 지점들을 돌며 각 지점에서 멈춰 카메라로 주변을 둘러봅니다. 그 사이 등록된 아이를 모두 찾으면 바로 다음 단계로 넘어갑니다.</span></li>
+        <li><span class="sn">5</span><span class="st"><b>놀이구역으로 복귀</b> <span class="par">return</span><br>순찰을 마치면 다시 놀이구역으로 돌아옵니다. 돌아오는 길에 아이를 발견해도 잡은 것으로 인정합니다.</span></li>
+        <li><span class="sn">6</span><span class="st"><b>게임 종료</b> <span class="par">end</span><br>"끝!" 화면을 띄우고, 교사가 "대기로"를 누를 때까지 그 화면을 유지합니다.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 02 그룹 순찰 -->
+  <section class="slide" id="sec-02">
+    <div class="inner">
+      <p class="slide-no">02 / 04</p>
+      <h2><span class="secnum">2</span> 그룹 순찰 — 매판 다른 동선</h2>
+      <div class="split">
+        <div>
+          <p class="lead">순찰 경로(<code>search_waypoints</code>)는 박아둔 고정 경로가 아니라, 진입할 때마다 <b>동적으로</b> 짭니다.</p>
+          <h3>① 그룹으로 묶기</h3>
+          <p><code>waypoints.yaml</code>의 각 지점엔 <code>group</code>(카테고리) 필드 — 같은 공간끼리 묶입니다. UI의 "N 카테고리" = 이 그룹 수.</p>
+          <h3>② 그룹 순서 = 랜덤</h3>
+          <p><code>random.shuffle</code>로 <b>어느 카테고리부터 돌지를 매 게임 섞습니다</b> → 술래 동선이 매판 달라져 아이들이 예측 못 함.</p>
+          <h3>③ 그룹 안 = 최근접(NN)</h3>
+          <p>한 그룹 안에선 <b>가장 가까운 지점부터</b> 그리디로 이어 붙임 → 왔다갔다 없이 효율적으로 훑음.</p>
+        </div>
+        <div>
+          <div class="flowbox"><b>waypoints.yaml</b>(group)
+  → 그룹별 묶기
+  → <span class="a">shuffle</span>(그룹 순서)
+  → 그룹 내 <span class="a">NN</span> 정렬
+  → 펼친 vertex list
+  → <b>search_waypoints</b> → BT patrol</div>
+          <div class="callout">
+            <span class="material-icons-round">hub</span>
+            <p><b>역할분리.</b> "무엇을 어떤 순서로 돌지"는 <span class="k">control-service</span>가, "그 리스트대로 돌며 찾기"는 <span class="k">BT</span>가. → 순찰 정책이 바뀌어도 BT 코드는 안 깨집니다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 카메라 제어 -->
+  <section class="slide" id="sec-03">
+    <div class="inner">
+      <p class="slide-no">03 / 04</p>
+      <h2><span class="secnum">3</span> 2축 카메라 제어 — 몸 안 돌리고 넓게 보기</h2>
+      <p class="lead">
+        Vic Pinky는 앞바퀴 구동 + 뒤로 긴 차체라, 몸을 돌리면 좁은 곳에서 <b>긴 뒤꽁무니가 벽에 부딪힐 위험</b>이 있습니다.
+        그래서 순찰 중 시야 확보는 <b>로봇 몸은 가만히 둔 채 카메라 2축(pan/tilt) 서보만</b> 움직여 전담합니다.
+      </p>
+
+      <h3>카메라 sweep — 한 자리에서 좌우로 천천히 훑기</h3>
+      <div class="flowbox">① 도착 직후 <span class="a">0.5초 정지</span>   — 잔여 흔들림을 먼저 정리해 또렷하게
+② <span class="a">tilt 130°</span> 로 카메라를 내려 아이 눈높이를 본다
+③ pan <span class="a">90°(정면) → 10°(왼쪽·5초 응시) → 170°(오른쪽·5초 응시) → 90°(정면)</span>
+   을 <span class="a">20°/s</span> 로 천천히 훑는다   (한 지점당 약 26초)</div>
+
+      <div class="callout">
+        <span class="material-icons-round">videocam</span>
+        <p><b>몸통 회전과 카메라 회전은 완전히 분리.</b> 좁은 통로에서 <b>몸은 돌리지 않고 카메라만 좌우로 천천히 훑어</b> 넓은 시야를 확보 → 구석에 숨은 아이도 놓치지 않습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 얼굴 인식 -->
+  <section class="slide" id="sec-04">
+    <div class="inner">
+      <p class="slide-no">04 / 04</p>
+      <h2><span class="secnum">4</span> 얼굴 인식 — 사람 없이 등록 아동만 자동 FOUND</h2>
+      <div class="split">
+        <div>
+          <h3>검출 → 임베딩 → 비교</h3>
+          <ul>
+            <li><b>검출(SCRFD)</b> — InsightFace <code>buffalo_l</code>, <code>det_size 640²</code>로 얼굴 검출</li>
+            <li><b>임베딩(ArcFace)</b> — 얼굴 한 장 → <b>512-d 벡터</b>. angular margin 사전학습이라 <b>아이마다 추가 학습 0</b>, 등록 사진 임베딩만 DB에</li>
+            <li><b>비교(pgvector)</b> — DB와 <b>cosine 거리</b>(<code>&lt;=&gt;</code>)로 최근접 한 명</li>
+          </ul>
+          <p style="font-size:16.5px;margin-top:14px"><b style="color:var(--accent)">임계 거리(cutoff) 0.7</b> — 가장 가까운 한 명을 뽑되, 그 거리가 <b>0.7보다 멀면 "등록 아동 아님"으로 거부</b>합니다. 닮은 아이가 있어도 거리가 임계 밖이면 잡지 않아 오인을 막습니다.</p>
+        </div>
+        <div>
+          <h3>쓰인 기술</h3>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="t"><div class="name">MediaPipe Face Detection</div><div class="desc"><b>(로봇 화면)</b> 구글의 가벼운 얼굴 검출기. 매 프레임 얼굴 위치를 빠르게 잡아 추적합니다 — 가벼워 실시간으로 돕니다.</div></div>
+            <div class="t"><div class="name">InsightFace · buffalo_l</div><div class="desc"><b>(서버)</b> 정확한 신원 판정을 맡는 얼굴 인식 패키지. 안에 얼굴 검출기(<b>SCRFD</b>)와 인식기(<b>ArcFace</b>)가 함께 들어 있습니다.</div></div>
+            <div class="t"><div class="name">ArcFace — 얼굴 임베딩</div><div class="desc">얼굴 한 장을 <b>512차원 숫자 벡터</b>로 바꿉니다. "같은 사람은 가깝게, 다른 사람은 멀게" 학습돼 있어, <b>아이마다 따로 학습할 필요 없이</b> 등록 사진 한 장이면 됩니다.</div></div>
+            <div class="t"><div class="name">pgvector</div><div class="desc">데이터베이스에서 임베딩끼리 거리를 비교해, 등록 아동 중 <b>가장 닮은 한 명</b>을 빠르게 찾아줍니다.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint">탭 클릭 · ↑ ↓ 방향키 · 휠 스크롤로 슬라이드 이동</div>
 
   <script>
     requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+
     function backToQna() {
       var ov = document.getElementById('page-fade');
       ov.style.opacity = '1';
       setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
     }
+
+    // 현재 슬라이드 nav 하이라이트
+    var slides = Array.from(document.querySelectorAll('.slide'));
+    var links  = Array.from(document.querySelectorAll('#secNav a'));
+    var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = byId(en.target.id);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { threshold: 0.55 });
+    slides.forEach(function(s){ obs.observe(s); });
+
+    // 방향키 ↑↓ 로 슬라이드 이동
+    var current = function(){
+      var top = window.scrollY + window.innerHeight * 0.5;
+      for (var i = 0; i < slides.length; i++) {
+        var r = slides[i].getBoundingClientRect();
+        var y = r.top + window.scrollY;
+        if (top >= y && top < y + slides[i].offsetHeight) return i;
+      }
+      return 0;
+    };
+    var go = function(i){
+      var n = Math.max(0, Math.min(slides.length - 1, i));
+      slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); go(current() + 1); }
+      if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); go(current() - 1); }
+      if (e.key === 'Escape') { backToQna(); }
+    });
   </script>
 </body>
 </html>

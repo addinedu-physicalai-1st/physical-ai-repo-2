@@ -12,81 +12,338 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#3FD9A6;
+    --accentSoft:rgba(63,217,166,.16);
+    --accent2:#7FE0B8;
+    --topbar-h:64px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0}
+  html,body{margin:0; padding:0; height:100%;}
   body{
     background:var(--bg); color:var(--ink);
     font-family:'Pretendard Variable',system-ui,sans-serif;
-    opacity:0; transition:opacity .3s ease; min-height:100vh;
+    opacity:0; transition:opacity .3s ease;
+    overflow-x:hidden; overflow-y:scroll;
+    scroll-snap-type:y mandatory; scroll-behavior:smooth;
+    word-break:keep-all; overflow-wrap:break-word;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    min-height:var(--topbar-h);
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+    padding:10px 22px;
+    background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
-    display:inline-flex; align-items:center; gap:6px;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
-    padding:8px 16px; border-radius:999px; cursor:pointer;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
+    padding:7px 14px; border-radius:999px; cursor:pointer;
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accentSoft); border:1px solid rgba(63,217,166,.55);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
+    padding:6px 11px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s, border-color .15s;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(63,217,166,.32); border-color:var(--accent)}
+  .sec-nav a.active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F; border-color:transparent}
+  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a.active .n{color:#16131F}
+
+  .slide{
+    min-height:100vh; height:100vh;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--topbar-h) + 22px) 3vw 30px; overflow:hidden;
+  }
+  .inner{
+    width:100%; max-width:1700px; height:100%;
+    display:flex; flex-direction:column; justify-content:flex-start; overflow:auto;
+    padding:46px 58px;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(63,217,166,.06), transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(255,255,255,.08); border-radius:28px;
+    box-shadow:0 28px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(63,217,166,.04) inset;
+  }
+  .slide-no{color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:17px; letter-spacing:.2em; margin:0 0 10px}
+  .slide h2{font-family:'Jua',sans-serif; font-size:44px; margin:0 0 26px; display:flex; align-items:center; gap:20px}
+  .secnum{
+    flex:0 0 auto; width:66px; height:66px; border-radius:18px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F;
+    font-family:'Jua',sans-serif; font-size:30px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  h3{font-family:'Jua',sans-serif; font-size:24px; color:var(--accent2); margin:20px 0 8px}
+  h3:first-child{margin-top:0}
+  p{line-height:1.7; font-size:20px; margin:8px 0; color:var(--ink)}
+  ul{margin:8px 0 12px; padding-left:26px}
+  li{line-height:1.7; font-size:20px; margin:7px 0; color:var(--ink)}
+  b{color:#fff}
+  .lead{font-size:22px; line-height:1.7; margin:0 0 16px}
+  .lead b{color:var(--accent)}
+
+  .chip{display:inline-block; background:rgba(255,255,255,.05); color:var(--inkSoft);
+    border:1px solid var(--border); border-radius:999px; padding:6px 16px; font-size:17px; margin:5px 6px 0 0}
+  .pill{display:inline-block; background:var(--accentSoft); color:var(--accent);
+    border-radius:8px; padding:2px 12px; font-weight:700; font-size:20px}
+  code{background:rgba(255,255,255,.07); padding:1px 7px; border-radius:5px; font-size:.88em; color:#A8FFE0; font-family:ui-monospace,monospace}
+
+  .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px}
+  .hero .kicker{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:20px}
+  .hero h1{
+    font-family:'Jua',sans-serif; font-size:96px; margin:14px 0 8px; line-height:1.1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero .sub{color:var(--inkSoft); font-size:23px; margin:0 0 40px}
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:22px; width:100%; max-width:1300px}
+  @media (max-width:760px){ .metrics{grid-template-columns:repeat(2,1fr)} }
+  .metric{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:30px 22px}
+  .metric .num{font-family:'Jua',sans-serif; font-size:44px; line-height:1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .metric .lab{color:var(--inkSoft); font-size:18px; margin-top:12px}
+
+  .split{display:grid; grid-template-columns:1.05fr 1fr; gap:42px; align-items:center; flex:1; min-height:0}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .reasons{list-style:none; padding:0; margin:6px 0 0; display:flex; flex-direction:column; gap:11px}
+  .reasons li{display:flex; gap:15px; align-items:flex-start; border:1px solid var(--border); border-radius:14px; padding:14px 18px; background:rgba(255,255,255,.03)}
+  .reasons .rn{flex:0 0 auto; width:34px; height:34px; border-radius:10px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:18px; display:flex; align-items:center; justify-content:center}
+  .reasons .rt{font-size:18px; line-height:1.55}
+  .reasons .rt b{color:#fff}
+
+  .flowbox{background:rgba(0,0,0,.34); border:1px solid var(--border); border-radius:12px; padding:16px 20px; margin:10px 0 0;
+    font-family:ui-monospace,monospace; font-size:15px; line-height:2.0; color:var(--inkSoft); overflow-x:auto; white-space:pre}
+  .flowbox b{color:var(--ink)} .flowbox .a{color:var(--accent)}
+
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:19px}
+  th,td{border:1px solid var(--border); padding:13px 17px; text-align:left; vertical-align:top}
+  th{background:rgba(255,255,255,.05); color:var(--ink); font-family:'Jua',sans-serif; font-weight:400}
+  td{color:var(--inkSoft)} td b{color:var(--accent)}
+
+  .callout{display:flex; gap:14px; align-items:flex-start;
+    background:rgba(63,217,166,.07); border:1px solid rgba(63,217,166,.30);
+    border-left:4px solid var(--accent); border-radius:14px; padding:17px 21px; margin:16px 0 0}
+  .callout .material-icons-round{color:var(--accent); font-size:28px; margin-top:2px}
+  .callout p{margin:0; line-height:1.65; font-size:19px}
+  .callout b{color:var(--accent)} .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+  .callout.bug{background:rgba(242,194,0,.08); border-color:rgba(242,194,0,.32); border-left-color:#F2C200}
+  .callout.bug .material-icons-round{color:#F2C200} .callout.bug b{color:#F2C200} .callout.bug .k{color:#F2C200}
+
+  .techgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px}
+  @media (max-width:760px){ .techgrid{grid-template-columns:1fr 1fr} }
+  .t{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:16px; padding:20px 22px}
+  .t .name{font-family:'Jua',sans-serif; color:var(--accent); font-size:21px; margin-bottom:7px}
+  .t .desc{font-size:16px; color:var(--inkSoft); line-height:1.55}
+
+  .psgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  @media (max-width:760px){ .psgrid{grid-template-columns:1fr} }
+  .ps{border:1px solid var(--border); border-radius:16px; padding:20px 22px; background:rgba(255,255,255,.03)}
+  .ps .prob{color:#FF9A8B; font-family:'Jua',sans-serif; font-size:20px}
+  .ps .sol{color:var(--accent2); font-family:'Jua',sans-serif; font-size:20px; margin-top:8px}
+  .ps p{font-size:17px; color:var(--inkSoft); margin:9px 0 0; line-height:1.55}
+
+  .braggrid{display:grid; grid-template-columns:1fr 1fr; gap:0 44px}
+  @media (max-width:760px){ .braggrid{grid-template-columns:1fr} }
+  .brag{border-bottom:1px dashed var(--border); padding:17px 0}
+  .brag .bt{font-family:'Jua',sans-serif; color:#fff; font-size:20px}
+  .brag .bd{font-size:16px; color:var(--inkSoft); margin-top:6px; line-height:1.55}
+
+  .hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
+    color:var(--inkSoft); font-size:12px; background:rgba(36,31,51,.85); border:1px solid var(--border);
+    border-radius:999px; padding:6px 14px}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
-
-  <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 07</p>
-    <h1 class="jua">자율주행 이동</h1>
-    <p class="member">담당 · 이강택</p>
-
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">navigation</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>이강택 님이 작성할 <b style="color:var(--ink)">자율주행 이동</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav" id="secNav">
+      <a href="#overview">개요</a>
+      <a href="#sec-flow"><span class="n">01</span> 동작 흐름</a>
+      <a href="#sec-01"><span class="n">02</span> vertex</a>
+      <a href="#sec-02"><span class="n">03</span> 회전 안전</a>
+      <a href="#sec-03"><span class="n">04</span> 런타임 대응</a>
+    </nav>
   </div>
+
+  <!-- 개요 -->
+  <section class="slide" id="overview">
+    <div class="inner">
+      <div class="hero">
+        <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
+        <h1>자율주행 이동</h1>
+        <div class="sub">"놀이방으로 가" 한마디로 — 좌표에 의미를 부여한 vertex 그래프로 좁은 교실을 안전하게 주행 · 담당 이강택</div>
+        <div class="metrics">
+          <div class="metric"><div class="num">Vertex</div><div class="lab">좌표를 의미있게</div></div>
+          <div class="metric"><div class="num">회전 안전</div><div class="lab">can_rotate · heading-aware</div></div>
+          <div class="metric"><div class="num">Collision Detector</div><div class="lab">사물 충돌 — 즉시 정지 (LiDAR)</div></div>
+          <div class="metric"><div class="num">Proximity</div><div class="lab">사람 근접 — 멈춤·우회 (depth)</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 동작 흐름 -->
+  <section class="slide" id="sec-flow">
+    <div class="inner">
+      <p class="slide-no">01 / 04</p>
+      <h2><span class="secnum">1</span> 동작 흐름 — "놀이방으로 가" 한마디부터 도착까지</h2>
+      <div class="reasons" style="display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:12px;margin:auto 0">
+        <div style="display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:13px;padding:12px 16px;background:rgba(255,255,255,.03)"><span class="rn">①</span><span class="rt"><b>명령</b><br>교사가 UI 버튼이나 음성("놀이방으로 가")으로 목적지를 지정합니다. 모든 명령은 한 곳(SetGoal)으로 모여, 대기(IDLE)에서 <b>이동(GOTO) 모드</b>로 전환됩니다.</span></div>
+        <div style="display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:13px;padding:12px 16px;background:rgba(255,255,255,.03)"><span class="rn">②</span><span class="rt"><b>목적지·출발 확인</b><br>로봇이 지금 어디 있는지(현재 위치)를 읽어 <b>가장 가까운 vertex를 출발점</b>으로 잡고, 명령받은 이름에 해당하는 <b>목적지 vertex</b>를 확인합니다.</span></div>
+        <div style="display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:13px;padding:12px 16px;background:rgba(255,255,255,.03)"><span class="rn">③</span><span class="rt"><b>경로 생성</b><br>출발~목적지를 그래프 위에서 <b>최단 경로(Dijkstra)</b>로 탐색해 지날 vertex 순서를 만듭니다. 위험한 회전이 필요한 길은 <b>제외하여 경로가 생성</b>됩니다.</span></div>
+        <div style="display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:13px;padding:12px 16px;background:rgba(255,255,255,.03)"><span class="rn">④</span><span class="rt"><b>이동</b><br>만든 vertex를 순서대로 이어 주행합니다. 가는 중 <b>회전 안전 지점에서만</b> 방향을 틀고, 앞에 <b>사람·사물이 가까워지면</b> 멈추거나 우회합니다.</span></div>
+        <div style="display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:13px;padding:12px 16px;background:rgba(255,255,255,.03)"><span class="rn">⑤</span><span class="rt"><b>도착</b><br>마지막 vertex에 도착하면 주행을 마치고, <b>"도착했습니다"</b>를 음성과 화면으로 알려 교사에게 완료를 표시합니다.</span></div>
+        <div style="display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-radius:13px;padding:12px 16px;background:rgba(255,255,255,.03)"><span class="rn">⑥</span><span class="rt"><b>대기</b><br>작업이 끝나면 다시 <b>대기(IDLE)</b> 상태로 돌아가, 다음 명령(다른 목적지·다른 모드)을 기다립니다.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 vertex -->
+  <section class="slide" id="sec-01">
+    <div class="inner">
+      <p class="slide-no">02 / 04</p>
+      <h2><span class="secnum">2</span> vertex — 좌표를 의미있게</h2>
+      <div class="split">
+        <div>
+          <p class="lead">좌표가 아니라 <b>의미있는 장소에 이름을 붙인 vertex 그래프</b> 위에 길을 짭니다. (Nav2 표준 Route Server를 자체 <code>graph_router</code>로 구현)</p>
+          <ul class="reasons">
+            <li><span class="rn">①</span><span class="rt"><b>의미 명령</b> — "놀이방으로 가". 공간이 바뀌면 <code>waypoints.yaml</code> 점만 옮김 → <b>코드 수정 0</b></span></li>
+            <li><span class="rn">②</span><span class="rt"><b>좁은 길 정확 통과</b> — 문(0.885m) 한가운데 vertex를 박아 <b>그 좌표를 정확히 조준</b></span></li>
+            <li><span class="rn">③</span><span class="rt"><b>안전 정거장</b> — 멈춤·회전·복구를 <b>검증된 안전 지점에서만</b></span></li>
+          </ul>
+        </div>
+        <div>
+          <h3>vertex · lane 이란?</h3>
+          <p style="font-size:16.5px"><b>vertex</b> = 맵 위 의미있는 지점에 이름·좌표를 붙인 점 (놀이방·충전소입구·복-4 …).<br><b>lane</b> = 두 vertex 를 잇는 이동 가능한 선. 둘이 모여 <b>위상 그래프</b>가 됩니다.</p>
+          <div class="flowbox">충전소입구 ─ 복-6 ─ 복-5 ─ 복-4 ─ 복-3 ─ ⋯   (점=vertex · 선=lane)
+
+목적지 <span class="a">"충전소입구"</span> 한 단어
+   → 최단 경로 탐색(Dijkstra)
+   → <b>[복-4 → 복-5 → 복-6 → 충전소입구]</b></div>
+          <p style="font-size:16px;color:var(--inkSoft);margin-top:12px">그래프 = 점 <b style="color:var(--accent)">30개</b> + 차선 <b style="color:var(--accent)">36개</b>(전부 양방향). 사람은 좌표를 몰라도 <b style="color:var(--accent)">이름만 부르면</b> 로봇이 점들을 이어 길을 짭니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 회전 안전 -->
+  <section class="slide" id="sec-02">
+    <div class="inner">
+      <p class="slide-no">03 / 04</p>
+      <h2><span class="secnum">3</span> 회전 안전 — 안전한 곳에서만 돌기</h2>
+      <p class="lead">
+        <b>HW 문제:</b> 구동 바퀴가 <b>앞</b>, 차체가 <b>뒤로 깁니다</b>(footprint 앞 +0.10m · 뒤 −0.50m). 회전중심에서 뒤 모서리까지가 멀어,
+        제자리 회전하면 <b>긴 뒤꽁무니가 반경 0.57m 호를 휩씁니다</b> — 통로 반폭(~0.5m)을 넘겨 벽을 칩니다.
+        diff-drive라 돌 수는 있지만, <b>"돌아도 되는 곳에서만"</b> 돌게 막았습니다.
+      </p>
+      <div class="split">
+        <div>
+          <h3>① 계획 — 위험한 회전 경로를 안 만든다</h3>
+          <p style="font-size:17px">경로 탐색이 로봇의 <b>현재 방향(heading)까지 함께</b> 봅니다 (상태 = vertex + 방향 8칸). 좁은 지점에서 <b>가던 방향과 135°를 넘게 틀어지는 차선(=U턴·급선회)은 거부</b> → 그런 경로가 <b>아예 생성되지 않습니다</b>.</p>
+          <h3>② 주행 — 안전 지점에서만 제자리 회전</h3>
+          <p style="font-size:17px"><code>can_rotate</code> 지점에 도착했을 때만 다음 차선 방향으로 <b>정렬 회전 후 직진</b>합니다 (허용 ~5.7°, ~30°/s). 좁은 통로엔 비스듬히 들어가 벽을 긁지 않고, <b>미리 몸을 정렬해 직선으로</b> 진입합니다.</p>
+        </div>
+        <div>
+          <h3>회전 안전 지점 (can_rotate) — 5개</h3>
+          <p><span class="chip">복도</span><span class="chip">충전소</span><span class="chip">놀-상-회</span><span class="chip">놀-하-회</span><span class="chip">수-회</span></p>
+          <p style="font-size:16px;color:var(--inkSoft)">넓어서 회전해도 안전한 곳만 화이트리스트로 지정. 이름의 <b style="color:var(--accent)">"-회"가 곧 회전(回) 전용 지점</b> — 좁은 차선이 만나는 길목의 방향 전환을 여기서만 합니다.</p>
+          <div class="callout">
+            <span class="material-icons-round">alt_route</span>
+            <p><b>실제 사례.</b> 반대편 충전소로 복귀할 때 좁은 통로에서 U턴하지 않고, <span class="k">복-4 → 복-4-1(옆 차선) → 복-5 → 충전소입구</span> 처럼 <b>안전 지점을 경유하는 우회 경로</b>를 자동으로 찾습니다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 근접 안전 -->
+  <section class="slide" id="sec-03">
+    <div class="inner">
+      <p class="slide-no">04 / 04</p>
+      <h2><span class="secnum">4</span> 런타임 대응 — 사람(proximity) + 사물(collision)</h2>
+      <p class="lead">주행 중 마주치는 근접 상황을 <b>서로 다른 센서 두 개로 따로</b> 막습니다 — <b>사물은 LiDAR</b>, <b>사람은 depth 카메라</b>. 역할이 달라 한쪽이 놓쳐도 보완합니다.</p>
+      <div class="split">
+        <div>
+          <h3>사물 — collision detector (LiDAR)</h3>
+          <p style="font-size:18px">LiDAR <b>StopZone</b>(정면 0.3m) 안에 무언가 들어오면 <b>즉시 멈춥니다</b> — 충돌 직전의 마지막 반사 정지.</p>
+          <div class="callout">
+            <span class="material-icons-round">sensors</span>
+            <p>nav2 표준 <b>Collision Monitor</b>를 그대로 사용 — 주행 명령을 받아 위험 구역이면 속도를 0 으로 막습니다.</p>
+          </div>
+        </div>
+        <div>
+          <h3>사람 — proximity (depth)</h3>
+          <p style="font-size:18px">정면 <b>0.7m</b> 사람은 충돌 위험이 아니라 <b>사회적 상황</b>으로 다룹니다. 즉시 멈추기만 하지 않고 기다렸다 비켜 갑니다:</p>
+          <table style="font-size:17px">
+            <tr><td><b>멈춤</b></td><td>정면 0.7m 안에 사람 → 정지</td></tr>
+            <tr><td><b>재개</b></td><td>1초 이상 확실히 비키면 → 다시 출발</td></tr>
+            <tr><td><b>우회</b></td><td>10초째 안 비키면 → 막힌 곳 빼고 새 길로</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint">탭 클릭 · ↑ ↓ 방향키 · 휠 스크롤로 슬라이드 이동</div>
 
   <script>
     requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+
     function backToQna() {
       var ov = document.getElementById('page-fade');
       ov.style.opacity = '1';
       setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
     }
+
+    var slides = Array.from(document.querySelectorAll('.slide'));
+    var links  = Array.from(document.querySelectorAll('#secNav a'));
+    var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = byId(en.target.id);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { threshold: 0.55 });
+    slides.forEach(function(s){ obs.observe(s); });
+
+    var current = function(){
+      var top = window.scrollY + window.innerHeight * 0.5;
+      for (var i = 0; i < slides.length; i++) {
+        var r = slides[i].getBoundingClientRect();
+        var y = r.top + window.scrollY;
+        if (top >= y && top < y + slides[i].offsetHeight) return i;
+      }
+      return 0;
+    };
+    var go = function(i){
+      var n = Math.max(0, Math.min(slides.length - 1, i));
+      slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); go(current() + 1); }
+      if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); go(current() - 1); }
+      if (e.key === 'Escape') { backToQna(); }
+    });
   </script>
 </body>
 </html>

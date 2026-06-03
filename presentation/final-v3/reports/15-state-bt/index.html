@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>State + BT · Q&A 보고서 — 이강택</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root{
+    --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
+    --border:rgba(255,255,255,.10); --accent:#3FD9A6;
+    --accentSoft:rgba(63,217,166,.16);
+    --accent2:#7FE0B8;
+    --topbar-h:64px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; padding:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard Variable',system-ui,sans-serif;
+    opacity:0; transition:opacity .3s ease;
+    overflow-x:hidden; overflow-y:scroll;
+    scroll-snap-type:y mandatory; scroll-behavior:smooth;
+    word-break:keep-all; overflow-wrap:break-word;
+  }
+  .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    min-height:var(--topbar-h);
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+    padding:10px 22px;
+    background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .back{
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border);
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
+    padding:7px 14px; border-radius:999px; cursor:pointer;
+    transition:color .15s, border-color .15s, transform .15s;
+  }
+  .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accentSoft); border:1px solid rgba(63,217,166,.55);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
+    padding:6px 11px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s, border-color .15s;
+  }
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(63,217,166,.32); border-color:var(--accent)}
+  .sec-nav a.active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F; border-color:transparent}
+  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a.active .n{color:#16131F}
+
+  .slide{
+    min-height:100vh; height:100vh;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--topbar-h) + 22px) 3vw 30px; overflow:hidden;
+  }
+  .inner{
+    width:100%; max-width:1700px; height:100%;
+    display:flex; flex-direction:column; justify-content:center; overflow:auto;
+    padding:42px 54px;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(63,217,166,.06), transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(255,255,255,.08); border-radius:28px;
+    box-shadow:0 28px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(63,217,166,.04) inset;
+  }
+  .slide-no{color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:16px; letter-spacing:.2em; margin:0 0 8px}
+  .slide h2{font-family:'Jua',sans-serif; font-size:40px; margin:0 0 22px; display:flex; align-items:center; gap:18px}
+  .secnum{
+    flex:0 0 auto; width:62px; height:62px; border-radius:17px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F;
+    font-family:'Jua',sans-serif; font-size:28px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  h3{font-family:'Jua',sans-serif; font-size:22px; color:var(--accent2); margin:18px 0 7px}
+  h3:first-child{margin-top:0}
+  p{line-height:1.65; font-size:18px; margin:7px 0; color:var(--ink)}
+  ul{margin:7px 0 11px; padding-left:24px}
+  li{line-height:1.6; font-size:17px; margin:6px 0; color:var(--ink)}
+  b{color:#fff}
+  .lead{font-size:20px; line-height:1.65; margin:0 0 14px}
+  .lead b{color:var(--accent)}
+
+  .pill{display:inline-block; background:var(--accentSoft); color:var(--accent); border-radius:8px; padding:2px 12px; font-weight:700; font-size:18px}
+  .chip{display:inline-block; background:rgba(255,255,255,.05); color:var(--inkSoft); border:1px solid var(--border); border-radius:999px; padding:6px 15px; font-size:16px; margin:5px 6px 0 0}
+  .chip b{color:var(--accent)}
+  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.85em; color:#A8FFE0; font-family:ui-monospace,monospace}
+
+  .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px}
+  .hero .kicker{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:19px}
+  .hero h1{
+    font-family:'Jua',sans-serif; font-size:84px; margin:14px 0 8px; line-height:1.1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero .sub{color:var(--inkSoft); font-size:21px; margin:0 0 38px; max-width:920px}
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:20px; width:100%; max-width:1240px}
+  @media (max-width:760px){ .metrics{grid-template-columns:repeat(2,1fr)} }
+  .metric{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px 20px}
+  .metric .num{font-family:'Jua',sans-serif; font-size:40px; line-height:1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .metric .lab{color:var(--inkSoft); font-size:17px; margin-top:11px}
+
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:34px; align-items:start; flex:1; min-height:0}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .reasons{list-style:none; padding:0; margin:6px 0 0; display:flex; flex-direction:column; gap:9px}
+  .reasons li{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:13px; padding:12px 16px; background:rgba(255,255,255,.03)}
+  .reasons .rn{flex:0 0 auto; width:30px; height:30px; border-radius:9px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:15px; display:flex; align-items:center; justify-content:center}
+  .reasons .rt{font-size:16px; line-height:1.5}
+  .reasons .rt b{color:#fff}
+
+  .flowbox{background:rgba(0,0,0,.34); border:1px solid var(--border); border-radius:12px; padding:14px 18px; margin:10px 0 0;
+    font-family:ui-monospace,monospace; font-size:14px; line-height:1.95; color:var(--inkSoft); overflow-x:auto; white-space:pre}
+  .flowbox b{color:var(--ink)} .flowbox .a{color:var(--accent)}
+
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:16.5px}
+  th,td{border:1px solid var(--border); padding:10px 13px; text-align:left; vertical-align:top}
+  th{background:rgba(255,255,255,.05); color:var(--ink); font-family:'Jua',sans-serif; font-weight:400}
+  td{color:var(--inkSoft)} td b{color:var(--accent)}
+
+  .callout{display:flex; gap:13px; align-items:flex-start;
+    background:rgba(63,217,166,.07); border:1px solid rgba(63,217,166,.30);
+    border-left:4px solid var(--accent); border-radius:14px; padding:15px 19px; margin:14px 0 0}
+  .callout .material-icons-round{color:var(--accent); font-size:26px; margin-top:2px}
+  .callout p{margin:0; line-height:1.6; font-size:17px}
+  .callout b{color:var(--accent)} .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+
+  .t{background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:14px; padding:16px 18px}
+  .t .name{font-family:'Jua',sans-serif; color:var(--accent); font-size:19px; margin-bottom:6px}
+  .t .desc{font-size:16px; color:var(--inkSoft); line-height:1.55}
+
+  .hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
+    color:var(--inkSoft); font-size:12px; background:rgba(36,31,51,.85); border:1px solid var(--border);
+    border-radius:999px; padding:6px 14px}
+  #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
+</style>
+</head>
+<body>
+  <div id="page-fade"></div>
+
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav" id="secNav">
+      <a href="#overview">개요</a>
+      <a href="#sec-01"><span class="n">01</span> 2층 구조</a>
+      <a href="#sec-02"><span class="n">02</span> FSM</a>
+      <a href="#sec-03"><span class="n">03</span> BT (main·sub)</a>
+      <a href="#sec-04"><span class="n">04</span> leaf 설계</a>
+    </nav>
+  </div>
+
+  <!-- 개요 -->
+  <section class="slide" id="overview">
+    <div class="inner">
+      <div class="hero">
+        <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
+        <h1>State + BT</h1>
+        <div class="sub">로봇의 두뇌 — <b style="color:var(--accent2)">"언제 무슨 모드"(FSM)</b> 와 <b style="color:var(--accent2)">"그 모드를 어떻게"(BT)</b> 를 2층으로 분리하고, 뼈대를 고정해 leaf 만 갈아끼운다 · 담당 이강택</div>
+        <div class="metrics">
+          <div class="metric"><div class="num">2층</div><div class="lab">FSM(언제) + BT(어떻게)</div></div>
+          <div class="metric"><div class="num">10 state</div><div class="lab">13 trigger 상태기계</div></div>
+          <div class="metric"><div class="num">10 + 5</div><div class="lab">MainTree + SubTree</div></div>
+          <div class="metric"><div class="num">leaf 교체</div><div class="lab">뼈대 고정 · 6인 협업</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 2층 구조 -->
+  <section class="slide" id="sec-01">
+    <div class="inner">
+      <p class="slide-no">01 / 04</p>
+      <h2><span class="secnum">1</span> 2층 구조 — FSM + BT</h2>
+      <p class="lead">로봇의 두뇌를 둘로 나눴습니다 — <b>FSM</b> 이 "<b>언제 무슨 모드</b>인가"를, <b>BT</b> 가 "<b>그 모드를 어떻게</b> 수행하나"를 맡습니다. state 하나에 트리 하나.</p>
+      <div class="split">
+        <div>
+          <ul class="reasons">
+            <li><span class="rn">F</span><span class="rt"><b>FSM</b> (<code>robot_fsm.py</code>) — 10 state · 13 trigger 의 순수 상태기계. "지금 어느 모드".</span></li>
+            <li><span class="rn">B</span><span class="rt"><b>BT</b> (<code>main.py</code> + trees + behaviors) — 그 모드를 실제로 수행하는 트리. 10Hz tick 으로 돌며 FSM 변화에 맞춰 트리를 swap.</span></li>
+          </ul>
+          <div class="callout">
+            <span class="material-icons-round">layers</span>
+            <p><b>뼈대 고정 + leaf 교체.</b> 폴더·상태·트리는 뼈대로 박아두고, 규약을 통일한 <b>leaf(동작)만 각자 추가</b> → <span class="k">6명이 코드에서 안 부딪힌다</span>.</p>
+          </div>
+        </div>
+        <div>
+          <h3>의존 방향은 한 방향</h3>
+          <div class="flowbox">fsm
+ → main_trees   (상태별 껍데기)
+ → sub_trees    (재사용 동작)
+ → behaviors    (leaf = 동작 하나)
+ → <span class="a">interfaces</span>    (ROS 경계)
+ → rclpy</div>
+          <p style="font-size:15.5px;color:var(--inkSoft);margin-top:10px">leaf 는 ROS 를 <b style="color:var(--accent)">직접 만지지 않고</b> <code>interfaces</code>(nav2_client·camera_pan_client·ui_publisher …)를 통해서만 닿습니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 FSM -->
+  <section class="slide" id="sec-02">
+    <div class="inner">
+      <p class="slide-no">02 / 04</p>
+      <h2><span class="secnum">2</span> FSM — 언제 무슨 모드인가</h2>
+      <p class="lead">10개 모드를 <b>상태기계</b>로 두고 "어떤 상황에 어디로 갈 수 있나"를 <b>표로 선언</b>했습니다. (<code>transitions</code> 라이브러리)</p>
+      <div>
+        <span class="chip">대기 <b>IDLE</b></span><span class="chip">충전 <b>CHARGING</b></span>
+        <span class="chip">작업 <b>GOTO</b></span><span class="chip"><b>FOLLOW</b></span><span class="chip"><b>LULLABY</b></span><span class="chip"><b>HIDEANDSEEK</b></span>
+        <span class="chip">수동 <b>MANUAL</b></span><span class="chip">복귀 <b>RETURNING</b></span><span class="chip"><b>LOW_BATTERY_RETURNING</b></span>
+        <span class="chip">장애 <b>ERROR</b></span>
+      </div>
+      <ul style="margin-top:14px">
+        <li><b>작업 모드끼리 바로 전환</b> — GOTO·FOLLOW·LULLABY·HIDEANDSEEK 는 IDLE 안 거치고 서로 직접 (트리 swap 1회).</li>
+        <li><b>외부는 상태를 직접 못 바꾼다</b> — UI·Control Server 는 <code>SetGoal.srv</code> 로 <b>요청만</b> 하고, 실제 전이는 FSM 내부 규칙이 판단.</li>
+        <li><b>허용 안 한 전이는 조용히 무시</b> — 잘못된 명령이 와도 엉뚱하게 안 움직임(안전).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 03 BT main/sub -->
+  <section class="slide" id="sec-03">
+    <div class="inner">
+      <p class="slide-no">03 / 04</p>
+      <h2><span class="secnum">3</span> BT — main 트리 / sub 트리로 나눈 게 핵심</h2>
+      <div class="split">
+        <div>
+          <div class="t"><div class="name">MainTree (상태별 1개)</div><div class="desc">"이 모드 전체"를 담는 최상위 트리. 모양은 늘 <b>Parallel(monitor + body)</b> — 핵심 동작(body)과 감시(monitor: 배터리·맵경계·HW·사람근접·명령수신)를 <b>매 tick 같이</b> 돌려 <b>"일하면서 동시에 감시"</b>. state 10개 = MainTree 10개.</div></div>
+          <div class="t" style="margin-top:11px"><div class="name">SubTree (재사용 동작 덩어리)</div><div class="desc">이동·순찰·복귀·자장가·숨바꼭질 같은 <b>실제 행동</b>을 묶은 트리. MainTree 의 <b>body 자리</b>에 꽂힌다. (5종)</div></div>
+        </div>
+        <div>
+          <div class="flowbox">MainTree (상태별)
+   = <span class="a">Parallel</span>
+       ├─ monitor leaves   (배터리·맵경계·HW·
+       │                    사람근접·명령수신)
+       └─ body = <span class="a">SubTree</span>     (재사용 동작)</div>
+          <div class="callout">
+            <span class="material-icons-round">extension</span>
+            <p><b>같은 SubTree 를 여러 state 가 레고처럼 재사용.</b> 이동 SubTree(<code>BT_goto_sub</code>)는 GOTO 뿐 아니라 <span class="k">숨바꼭질의 이동·복귀 단계</span>에서도 그대로 씁니다. → 새 모드는 sub 를 <b>조합만</b> 하면 된다.</p>
+          </div>
+          <p style="font-size:15px;color:var(--inkSoft);margin-top:10px">10개 MainTree 가 전부 같은 모양이라, 조립은 <code>_shell.py</code> 한 곳에 모으고 <b style="color:var(--accent)">state 별 차이(어떤 monitor·어떤 body)는 flag 로만</b> 준다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 leaf 설계 -->
+  <section class="slide" id="sec-04">
+    <div class="inner">
+      <p class="slide-no">04 / 04</p>
+      <h2><span class="secnum">4</span> leaf 설계 — 동작 하나의 규약</h2>
+      <p class="lead">leaf = 트리의 잎 = <b>동작 하나</b>(이동·회전·감시 등). 6명이 각자 추가해도 안 깨지게 <b>규약을 통일</b>했습니다.</p>
+      <div class="split">
+        <div>
+          <ul class="reasons">
+            <li><span class="rn">1</span><span class="rt"><b>모양·ROS 접근 통일</b> — 모든 leaf 가 같은 시그니처(<code>name, context</code>)로 시작하고, ROS 는 직접 안 만지고 <code>ctx</code>(인터페이스)로만 호출.</span></li>
+            <li><span class="rn">2</span><span class="rt"><b>끝낼 때 뒷정리</b> — 트리가 갈릴 때 진행 중이던 작업(nav goal 등)을 반드시 cancel → <b>좀비 동작을 안 남김</b>.</span></li>
+          </ul>
+        </div>
+        <div>
+          <h3>두 종류로 역할 구분</h3>
+          <table>
+            <tr><th>종류</th><th>하는 일</th></tr>
+            <tr><td><b>Monitor</b><br>(감시)</td><td>계속 지켜보다 <b>이상이 생길 때 1번만</b> 알린다 (배터리·맵경계·사람근접 …).</td></tr>
+            <tr><td><b>Action</b><br>(행동)</td><td>끝나면 <b>SUCCESS</b> · 실패면 <b>FAILURE</b> (이동·회전·도킹 …).</td></tr>
+          </table>
+          <div class="callout">
+            <span class="material-icons-round">groups</span>
+            <p><b>구조가 깔끔해서 협업이 쉽다.</b> 뼈대(폴더·상태·트리)는 고정, 규약 통일된 <b>leaf 만 각자 추가</b> → 6명이 동시에 작업해도 충돌이 적다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint">탭 클릭 · ↑ ↓ 방향키 · 휠 스크롤로 슬라이드 이동</div>
+
+  <script>
+    requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+
+    function backToQna() {
+      var ov = document.getElementById('page-fade');
+      ov.style.opacity = '1';
+      setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
+    }
+
+    var slides = Array.from(document.querySelectorAll('.slide'));
+    var links  = Array.from(document.querySelectorAll('#secNav a'));
+    var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = byId(en.target.id);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { threshold: 0.55 });
+    slides.forEach(function(s){ obs.observe(s); });
+
+    var current = function(){
+      var top = window.scrollY + window.innerHeight * 0.5;
+      for (var i = 0; i < slides.length; i++) {
+        var r = slides[i].getBoundingClientRect();
+        var y = r.top + window.scrollY;
+        if (top >= y && top < y + slides[i].offsetHeight) return i;
+      }
+      return 0;
+    };
+    var go = function(i){
+      var n = Math.max(0, Math.min(slides.length - 1, i));
+      slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); go(current() + 1); }
+      if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); go(current() - 1); }
+      if (e.key === 'Escape') { backToQna(); }
+    });
+  </script>
+</body>
+</html>
