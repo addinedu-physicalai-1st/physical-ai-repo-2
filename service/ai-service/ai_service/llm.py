@@ -888,7 +888,7 @@ async def _ollama_chat(
     if top_k is not None and top_k > 0:
         options["top_k"] = top_k
     payload: dict[str, Any] = {
-        "model": model or settings.ollama_model,
+        "model": model or settings.ollama_chat_model,
         "messages": messages,
         "stream": False,
         "keep_alive": settings.ollama_keep_alive,
@@ -918,7 +918,6 @@ async def warmup_ollama_models() -> None:
     host = settings.ollama_host.rstrip("/")
     ka = settings.ollama_keep_alive
     models = {
-        settings.ollama_model,
         settings.ollama_chat_model,
         settings.ollama_report_model,
         settings.ollama_report_validate_model,

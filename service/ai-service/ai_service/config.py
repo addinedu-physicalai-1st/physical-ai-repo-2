@@ -9,8 +9,7 @@ from dataclasses import dataclass
 @dataclass
 class Settings:
     ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:0.5b"
-    # 잡담(chat) 전용 — 의도 분류(ollama_model)보다 크게 둘 수 있음. `ollama pull qwen2.5:3b` 필요.
+    # 잡담(chat) 전용. 의도 분류는 규칙 기반 핸들러(intents/)가 처리하므로 별도 LLM 불필요. `ollama pull qwen2.5:3b` 필요.
     ollama_chat_model: str = "qwen2.5:3b"
     # 일과 보고서 JSON 전용 — 타임라인·규칙 준수에 3b 보다 유리. `ollama pull qwen2.5:7b` 필요.
     # VRAM 이 빠듯하면 `qwen2.5:3b` 로 낮춰도 됨(잡담과 동일 모델).
@@ -68,7 +67,6 @@ EMBED_DIM = 1024
 REQUIRED_OLLAMA_MODELS: tuple[str, ...] = tuple(
     dict.fromkeys(
         (
-            settings.ollama_model,
             settings.ollama_chat_model,
             settings.ollama_report_model,
             settings.ollama_report_validate_model,
