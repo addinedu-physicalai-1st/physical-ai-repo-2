@@ -142,6 +142,13 @@
   pre.yaml{background:rgba(0,0,0,.34); border:1px solid var(--border); border-radius:12px; padding:14px 18px; margin:10px 0 0;
     font-family:ui-monospace,monospace; font-size:14px; line-height:1.7; color:var(--inkSoft); overflow-x:auto}
 
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:16px; flex:1; min-height:0; margin-top:4px}
+  .charts figure{margin:0; display:flex; flex-direction:column; min-height:0; gap:8px;
+    background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:12px}
+  .charts img{width:100%; flex:1; min-height:0; object-fit:contain; background:#fff; border-radius:8px; padding:6px}
+  .charts figcaption{font-size:14.5px; line-height:1.5; color:var(--inkSoft)}
+  .charts figcaption b{color:var(--accent)}
+
   .hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
     color:var(--inkSoft); font-size:12px; background:rgba(36,31,51,.85); border:1px solid var(--border);
     border-radius:999px; padding:6px 14px}
@@ -157,11 +164,12 @@
     </button>
     <nav class="sec-nav" id="secNav">
       <a href="#overview">개요</a>
-      <a href="#sec-01"><span class="n">01</span> 12서버</a>
+      <a href="#sec-01"><span class="n">01</span> 주요 구성</a>
       <a href="#sec-02"><span class="n">02</span> BT Navigator</a>
-      <a href="#sec-03"><span class="n">03</span> 경로·회전</a>
-      <a href="#sec-04"><span class="n">04</span> Planner·Controller</a>
-      <a href="#sec-05"><span class="n">05</span> 안전</a>
+      <a href="#sec-03"><span class="n">03</span> Route Server</a>
+      <a href="#sec-04"><span class="n">04</span> Controller·Planner</a>
+      <a href="#sec-cost"><span class="n">05</span> Costmap</a>
+      <a href="#sec-05"><span class="n">06</span> 안전</a>
     </nav>
   </div>
 
@@ -171,38 +179,36 @@
       <div class="hero">
         <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
         <h1>Nav2 Navigation Stack</h1>
-        <div class="sub">Nav2 표준 12서버를 우리 환경(좁은 통로 + 깊이카메라 안전 + 의미적 라우팅)에 맞춰 골라 쓰고, 위상 라우팅만 자체 모듈로 갈아끼웠다 · 담당 이강택</div>
+        <div class="sub">Nav2 스택 기반 자율주행 — 좁은 통로 환경에 맞게 구성 · 담당 이강택</div>
         <div class="metrics">
-          <div class="metric"><div class="num">10 / 2</div><div class="lab">표준 사용 / 자체 대체</div></div>
-          <div class="metric"><div class="num">45 run</div><div class="lab">DOE 로 Planner·Controller 선정</div></div>
-          <div class="metric"><div class="num">0.885m</div><div class="lab">가장 좁은 문 (환경 제약)</div></div>
-          <div class="metric"><div class="num">3종</div><div class="lab">LiDAR·depth·proximity 안전</div></div>
+          <div class="metric"><div class="num" style="font-size:23px;line-height:1.2">NavigateToPose</div><div class="lab">BT Navigator — vertex chain + preempt</div></div>
+          <div class="metric"><div class="num" style="font-size:23px;line-height:1.2">graph_router</div><div class="lab">Route Server 자체 대체 — vertex·Dijkstra·can_rotate</div></div>
+          <div class="metric"><div class="num" style="font-size:23px;line-height:1.2">ThetaStar · RPP</div><div class="lab">Planner·Controller — DOE 로 선정</div></div>
+          <div class="metric"><div class="num" style="font-size:23px;line-height:1.2">Collision Monitor</div><div class="lab">LiDAR StopZone — 실시간 충돌 정지</div></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 01 12서버 -->
+  <!-- 01 핵심 구성요소 -->
   <section class="slide" id="sec-01">
     <div class="inner">
-      <p class="slide-no">01 / 05</p>
-      <h2><span class="secnum">1</span> Nav2 12서버 — 사용(10) / 대체(2)</h2>
-      <p class="lead">Nav2 는 <b>독립 모듈 서버 여럿을 Behavior Tree 가 오케스트레이션</b>하는 구조. 우리는 표준을 최대한 살리고, <b>위상 라우팅만</b> 자체 <code>graph_router</code> 로 갈아끼웠다.</p>
+      <p class="slide-no">01 / 06</p>
+      <h2><span class="secnum">1</span> Nav2 주요 구성요소 — 대부분 그대로 활용 + Route Server 자체 대체</h2>
+      <p class="lead">Nav2 는 <b>BT Navigator 가 Behavior Tree 로 독립 모듈들을 오케스트레이션</b>하는 구조. 우리는 Nav2 구성요소를 최대한 그대로 쓰고, <b>위상 라우팅(Route Server)만</b> 자체 <code>graph_router</code> 로 갈아끼웠다.</p>
       <table>
-        <thead><tr><th>서버</th><th>GogoPing</th><th></th></tr></thead>
+        <thead><tr><th>주요 구성요소</th><th>GogoPing 선택</th></tr></thead>
         <tbody>
-          <tr><td><b>BT Navigator</b></td><td>NavigateToPose — graph_router 가 vertex chain</td><td class="ok">사용</td></tr>
-          <tr><td><b>Planner Server</b></td><td>ThetaStar (any-angle 직선)</td><td class="ok">사용</td></tr>
-          <tr><td><b>Controller Server</b></td><td>RPP (Regulated Pure Pursuit)</td><td class="ok">사용</td></tr>
-          <tr><td><b>Smoother Server</b></td><td>SimpleSmoother — SmoothPath best-effort</td><td class="ok">사용</td></tr>
-          <tr><td><b>Behavior Server</b></td><td>spin·backup·drive_on_heading·wait (recovery)</td><td class="ok">사용</td></tr>
-          <tr><td><b>Velocity Smoother</b></td><td>cmd_vel 가속·속도 평활 (20Hz)</td><td class="ok">사용</td></tr>
-          <tr><td><b>Collision Monitor</b></td><td>LiDAR StopZone 으로 nav cmd_vel gate</td><td class="ok">사용</td></tr>
-          <tr><td><b>Costmap 2D · Map+AMCL · Lifecycle</b></td><td>격자 환경모델 · 위치추정 · 수명주기</td><td class="ok">사용</td></tr>
-          <tr><td><b>Route Server</b></td><td>→ 자체 <code>graph_router</code> (위상 라우팅)</td><td class="no">대체</td></tr>
-          <tr><td><b>Waypoint Follower</b></td><td>→ 자체 <code>graph_router</code> (기동만)</td><td class="no">대체</td></tr>
+          <tr><td><b>BT Navigator</b></td><td><b>NavigateToPose</b> + preempt (vertex chain)</td></tr>
+          <tr><td><b>Route Server</b></td><td><code>graph_router</code> 자체 대체 — vertex·다익스트라·can_rotate</td></tr>
+          <tr><td><b>Planner Server</b></td><td><b>ThetaStar</b> (any-angle 직선)</td></tr>
+          <tr><td><b>Controller Server</b></td><td><b>RPP</b> (Regulated Pure Pursuit)</td></tr>
+          <tr><td><b>Costmap 2D</b></td><td>global+local 격자 환경모델 — Planner·Controller 가 참조</td></tr>
+          <tr><td><b>Collision Monitor</b></td><td>LiDAR StopZone 으로 nav cmd_vel 즉시 정지</td></tr>
+          <tr><td><b>AMCL</b></td><td>정적맵 위 위치추정 (map→odom)</td></tr>
         </tbody>
       </table>
+      <p style="font-size:15px;color:var(--inkSoft);margin-top:2px">※ 주요만 추렸음 — 그 외 Nav2 보조 노드(Smoother·Behavior·Velocity Smoother 등)도 기본값으로 함께 구동.</p>
       <div class="callout">
         <span class="material-icons-round">layers</span>
         <p><b>자율주행 3단계:</b> <span class="k">Route Server(graph_router)</span> 가 지날 vertex 결정 → <span class="k">Planner</span> 가 구간 전역경로(ThetaStar) → <span class="k">Controller</span> 가 추종 cmd_vel(RPP).</p>
@@ -212,123 +218,251 @@
 
   <!-- 02 BT Navigator -->
   <section class="slide" id="sec-02">
-    <div class="inner">
-      <p class="slide-no">02 / 05</p>
-      <h2><span class="secnum">2</span> BT Navigator — NavigateToPose + preempt</h2>
-      <p class="lead">navigator plugin 3종 중 <b>NavigateToPose</b> 선택 — 우리는 <b>vertex 마다 멈추고 판단하는 reactor 구조</b>(사람반응·회전·복구 개입점)라서.</p>
+    <div class="inner" style="justify-content:flex-start">
+      <p class="slide-no">02 / 06</p>
+      <h2><span class="secnum">2</span> BT Navigator — NavigateToPose</h2>
+      <p class="lead"><code>graph_router</code> 가 경로를 소유 → <b>vertex 마다 제어권을 돌려받아</b> 그 틈에 직접 개입한다. 그 "한 구간 실행" 인터페이스가 <b>NavigateToPose</b>. 결정적 이유는 <b>can_rotate</b>.</p>
       <table>
-        <thead><tr><th>navigator</th><th>단위</th><th>중간 개입</th><th>채택</th></tr></thead>
+        <thead><tr><th>BT Navigator navigator 3종</th><th>단위</th><th>중간 vertex</th><th>채택</th></tr></thead>
         <tbody>
-          <tr><td><b>NavigateToPose</b></td><td>단일 목표</td><td><b class="ok">쉬움</b> (호출 사이)</td><td class="ok">✅</td></tr>
-          <tr><td>NavigateThroughPoses</td><td>pose 리스트</td><td>어려움 (통째 전달)</td><td class="no">✕</td></tr>
-          <tr><td>FollowWaypoints</td><td>좌표 리스트</td><td>제한적</td><td class="no">✕</td></tr>
+          <tr><td><b>NavigateToPose</b></td><td>단일 목표</td><td><b class="ok">멈춤 선택 자유</b> (preempt 로 연속화)</td><td class="ok">✅</td></tr>
+          <tr><td>NavigateThroughPoses</td><td>pose 리스트</td><td>안 멈추고 통과 (연속 궤적)</td><td class="no">✕</td></tr>
+          <tr><td>FollowWaypoints</td><td>좌표 리스트</td><td>매 지점 정지 (task 실행용)</td><td class="no">✕</td></tr>
         </tbody>
       </table>
-      <div class="callout">
-        <span class="material-icons-round">fast_forward</span>
-        <p><b>해결한 문제 — vertex 마다 끊김(stutter).</b> NavigateToPose 를 순진하게 chain 하면 vertex 마다 도착=정지→재출발로 cmd_vel 이 끊긴다.
-          → <b>preempt(선점)</b>: 도착 <b>0.5m 전</b> 다음 vertex goal 을 미리 발사 → nav2 가 현재 goal 을 자동 교체 → <b>멈춤 없이 통과</b>.
-          예외 2: <span class="k">마지막 segment</span>(도착 정밀도)·<span class="k">can_rotate vertex</span>(제자리 회전).</p>
+      <div>
+        <div>
+          <h3>결정적 이유 — can_rotate (정지+회전)</h3>
+          <p style="font-size:16.5px">좁은 통로에선 안전한 vertex 에서 <b>멈춰 정렬 회전</b> 후 직진해야 한다(뒤로 긴 차체가 곡선으로 돌면 벽 침). 그런데 <b>NavigateThroughPoses 는 중간 vertex 에서 안 멈추고 통과</b>(연속 궤적 설계)라 이 회전을 못 끼운다.</p>
+          <p style="font-size:16.5px">→ <b>구간마다 제어권을 돌려받는 NavigateToPose</b> 라야 그 틈에 graph_router 가 <b>정지+회전</b>을 넣을 수 있다.</p>
+          <div class="callout">
+            <span class="material-icons-round">fast_forward</span>
+            <p><b>끊김은 preempt 로 해결.</b> 한 구간씩 보내면 vertex 마다 도착=정지→재출발로 cmd_vel 이 끊긴다. → 도착 <b>0.5m 전 다음 goal 을 미리 발사</b>해 nav2 가 자동 교체 → <b>멈춤 없이 통과</b>. (정지가 필요한 <code>can_rotate</code>·마지막 vertex 만 예외)</p>
+          </div>
+          <div class="callout">
+            <span class="material-icons-round">check_circle</span>
+            <p><b>정리.</b> "안 멈추고 흐르는 구간"은 preempt 로, "멈춰 돌아야 하는 안전 지점"은 can_rotate 로 — <b>한 구조(NavigateToPose 구간 실행) 안에서 둘 다</b> 해결한다.</p>
+          </div>
+        </div>
       </div>
-      <p style="font-size:16px;color:var(--inkSoft);margin-top:14px">→ NavigateThroughPoses 의 <b style="color:var(--accent)">연속성</b> + NavigateToPose 의 <b style="color:var(--accent)">vertex 제어</b>를 동시에 확보.</p>
     </div>
   </section>
 
   <!-- 03 경로계획 + 회전 안전 -->
   <section class="slide" id="sec-03">
     <div class="inner">
-      <p class="slide-no">03 / 05</p>
-      <h2><span class="secnum">3</span> 경로계획 + 회전 안전 — graph_router</h2>
+      <p class="slide-no">03 / 06</p>
+      <h2><span class="secnum">3</span> Vertex · 다익스트라 · can_rotate</h2>
+      <p class="lead">Nav2 <b>Route Server</b>(그래프 라우팅)의 개념을 자체 <code>graph_router</code> 로 구현 — 세 가지를 직접 풀었다.</p>
+
       <div class="split">
         <div>
-          <h3>vertex 그래프 (Route Server 대체)</h3>
-          <p style="font-size:16.5px">좌표가 아니라 <b>이름 붙인 vertex 그래프</b> 위에 길을 짠다. <code>waypoints.yaml</code>(vertex 35) + <code>lanes.yaml</code>(lane 41).</p>
-          <ul class="reasons">
-            <li><span class="rn">①</span><span class="rt"><b>의미</b> — "놀이방" 한 단어, 공간 바뀌면 yaml 만 (코드 0)</span></li>
-            <li><span class="rn">②</span><span class="rt"><b>그래프</b> — Dijkstra 최단 vertex 시퀀스</span></li>
-            <li><span class="rn">③</span><span class="rt"><b>동적</b> — 사람 만나면 런타임 reroute</span></li>
-            <li><span class="rn">④</span><span class="rt"><b>안전 정거장</b> — 멈춤·회전·복구는 vertex 에서만</span></li>
+          <h3>① Vertex — 좌표를 의미있게</h3>
+          <p style="font-size:16px">원점 기준 <code>(x, y)</code> 숫자가 아니라 <b>"놀이방·수면실·복도"</b> 처럼 <b>이름 붙인 지점(vertex)</b> 으로 공간을 다루고 싶었다.</p>
+          <ul>
+            <li>admin·음성·스케줄이 <b>"놀이방으로 가"</b> 한 단어로 수렴 — 좌표 변환 불필요</li>
+            <li>공간이 바뀌어도 <b>yaml 의 점만 갱신</b> (코드 변경 0)</li>
+            <li>vertex = 의미 단위 <b>+ 사전 검증된 정거장</b></li>
           </ul>
-          <div class="callout bug">
-            <span class="material-icons-round">bug_report</span>
-            <p><b>함정.</b> 현재 위치를 <code>/odom</code> 에서 읽어 출발 vertex 오선택 → 빙 도는 우회. <b>TF map→base_link 통일</b>로 해결.</p>
-          </div>
+          <h3>② 다익스트라 — 거쳐갈 노드 최소화</h3>
+          <p style="font-size:15.5px"><b>다익스트라란</b> — 가중 그래프에서 한 출발점→목표까지 <b>누적 비용이 최소인 경로</b>를 찾는 알고리즘. 출발점에서 가까운(비용 작은) vertex 부터 차례로 확정해 나가 <b>최단 경로를 보장</b>한다.</p>
+          <p style="font-size:16px">우린 <b>vertex = 노드, lane = 간선, 비용 = 거리(+방향 전환)</b> 로 두고 출발→목적지 최단 경로(거쳐갈 vertex·거리 최소)를 자동 계산.</p>
+          <div class="flowbox">현재 위치 <b>TF</b> → 최근접 vertex
+   └─ <span class="a">Dijkstra</span> → vertex 시퀀스
+      └─ <span class="a">NavigateToPose</span> chain</div>
         </div>
         <div>
-          <h3>회전 안전 — can_rotate + heading-aware</h3>
-          <p style="font-size:16.5px"><b>HW 문제:</b> 구동륜 앞 + 차체 뒤로 김 → 제자리 회전 시 <b>뒤꽁무니가 0.57m 반경</b> sweep > 통로 반폭(~0.5m) → 벽 충돌.</p>
+          <h3>③ can_rotate — 좁은 길 회전 위험 자체 처리</h3>
+          <p style="font-size:16px">유치원 실내라 <b>좁은 통로가 많다</b>(가장 좁은 문 0.885m). 구동륜 앞·차체 뒤로 길어, 좁은 길서 <b>제자리 180° 회전 = 차체 후미(0.57m 반경)가 벽을 침</b> → 위험.</p>
           <ul>
-            <li><b>계획</b> — heading-aware Dijkstra: 상태 <code>(vertex, heading)</code>, non-can_rotate 에서 <b>135° 초과 전이 거부</b> → 좁은 곳 U턴 경로 안 만듦</li>
-            <li><b>주행</b> — <code>can_rotate</code> 지점(5개: 출입구·충전소·놀-상-회·놀-하-회·수-회)에서만 정렬 회전 후 직진 (~5.7°, 30°/s)</li>
+            <li><b>계획</b> — heading-aware Dijkstra 가 좁은 곳 <b>U턴 경로를 아예 안 만듦</b> (방향차 135° 초과 전이 거부)</li>
+            <li><b>주행</b> — 넓은 <code>can_rotate</code> 지점에서만 멈춰 정렬 회전 후 직진 (~5.7°, 30°/s, <code>cmd_vel_raw</code>)</li>
           </ul>
-          <div class="callout bug">
-            <span class="material-icons-round">bug_report</span>
-            <p><b>함정.</b> 회전 cmd 를 <code>/cmd_vel</code> 직행 → safety 정지(0)와 충돌해 STUCK. → <code>cmd_vel_raw</code> 단일 경유로 분리.</p>
+          <div class="callout">
+            <span class="material-icons-round">insights</span>
+            <p>Nav2 는 어디가 회전 안전한지 모른다(<code>use_rotate_to_heading=false</code> — 통로 한복판서 회전 시도). 그 판단을 <b>위상 계층(graph_router)이 vertex 단위로</b> 끌어올렸다.</p>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 04 Planner·Controller DOE -->
+  <!-- 04 Planner·Controller DOE — 설계 + 후보 -->
   <section class="slide" id="sec-04">
     <div class="inner">
-      <p class="slide-no">04 / 05</p>
-      <h2><span class="secnum">4</span> Planner·Controller — 데이터(DOE)로 선정</h2>
-      <p class="lead">planner 3 × controller 3 = 9조합. 전부 튜닝하면 시간 폭발 → <b>9조합을 nav2 기본값으로 동일 조건 측정 → 이긴 1개에만 튜닝</b>(노동 1/9). 환경·HW만 9개 똑같이 고정해 공정 비교.</p>
+      <p class="slide-no">04 / 06</p>
+      <h2><span class="secnum">4</span> Controller + Planner Server — 후보와 실험 설계</h2>
+      <p class="lead">planner 3 × controller 3 = <b>9조합</b>. 전부 손튜닝하면 시간 폭발 → <b>9조합을 모두 nav2 기본값(default)으로 동일 조건 측정 → 이긴 1개에만 튜닝</b>(노동 1/9).</p>
       <div class="split">
         <div>
-          <h3>가설 → 검증</h3>
+          <h3>Planner 후보 3종 <span style="font-size:14px;color:var(--inkSoft)">(vertex 사이 전역경로)</span></h3>
           <table>
-            <tr><th>계층</th><th>예측</th><th>결과</th></tr>
-            <tr><td>Planner</td><td><b>ThetaStar</b><br>(lane 직선 추종)</td><td>lane_dev <b>1위 0.068</b> ✅</td></tr>
-            <tr><td>Controller</td><td><b>RPP</b><br>(좁은길 부드러움)</td><td>각저크 <b>0.45</b> vs DWB 0.81 ✅</td></tr>
+            <tr><th>Planner</th><th>원리</th><th>우리 맵에서</th></tr>
+            <tr><td>NavFn</td><td>costmap 격자 위 Dijkstra/A* (Nav2 기본)</td><td>가볍지만 8방향 격자라 <b style="color:#FF9A8B">계단형 톱니</b></td></tr>
+            <tr><td>Smac2D</td><td>A* + smoother, cost-aware(통로 중앙으로 당김)</td><td>통로중앙 선호. but dense vertex서 <b style="color:#FF9A8B">회전·XTE 하위</b></td></tr>
+            <tr><td><b>ThetaStar ★</b></td><td>any-angle A* — 부모와 <b>직선(line-of-sight)</b>으로 이어 격자 톱니 제거</td><td><b>lane 을 직선으로 깔끔히 추종</b></td></tr>
           </table>
-          <p style="font-size:15.5px;color:var(--inkSoft)">Gazebo 동선 1바퀴 × <b style="color:var(--accent)">45 run</b> rosbag → 15지표 자동 산출 → Borda 순위. <b style="color:var(--accent)">MPPI 는 CPU 굶주림으로 0/5 전멸</b>(odom 33→2~6Hz).</p>
         </div>
         <div>
-          <h3>핵심 지표 (↓ 좋음)</h3>
+          <h3>Controller 후보 3종 <span style="font-size:14px;color:var(--inkSoft)">(경로 따라 cmd_vel)</span></h3>
           <table>
-            <tr><th>지표</th><th>ThetaStar·RPP</th><th>비교</th></tr>
-            <tr><td>각저크</td><td><b>0.45</b></td><td>DWB 0.81</td></tr>
-            <tr><td>lane_dev</td><td><b>0.068</b></td><td>Smac2D 0.122</td></tr>
-            <tr><td>XTE(실 plan)</td><td><b>0.037</b></td><td>DWB 0.039</td></tr>
-            <tr><td>clearance</td><td><b>0.384m</b></td><td>Smac2D-RPP 0.387 (동일)</td></tr>
+            <tr><th>Controller</th><th>원리</th><th>우리 맵에서</th></tr>
+            <tr><td><b>RPP ★</b></td><td>전방주시점(lookahead) 추종 + 곡률 따라 <b>자동 감속</b></td><td><b>부드러움·좁은길 안정</b></td></tr>
+            <tr><td>DWB</td><td>여러 궤적 후보를 뿌려 <b>critic 점수</b>로 best 선택 (Nav2 기본)</td><td>안정 but <b style="color:#FF9A8B">거침(각저크 ~2배)</b></td></tr>
+            <tr><td>MPPI</td><td>샘플링 기반 예측제어(MPC)</td><td>강력하나 <b style="color:#FF9A8B">CPU 폭발 → 전멸</b></td></tr>
           </table>
-          <div class="callout">
-            <span class="material-icons-round">emoji_events</span>
-            <p>Borda 🥇 ThetaStar-DWB 63 / 🥈 ThetaStar-RPP 61(2점 차). <b>planner 는 데이터로 ThetaStar 확정</b>, controller 는 <b>용도(운반·아이 옆 → 부드러움)로 RPP</b> 채택.</p>
-          </div>
         </div>
       </div>
-      <pre class="yaml">planner: ThetaStarPlanner — how_many_corners 8, w_traversal 2.0
-controller: RPP — desired_linear_vel 0.2, lookahead 1.2, use_rotate_to_heading false   (sim·real 통일)</pre>
+      <div class="callout">
+        <span class="material-icons-round">lightbulb</span>
+        <p><b>목표:</b> 좁은 통로 + vertex 라우팅이라 <b>lane 을 직선으로 따르는 planner</b> + <b>좁은 길에서 부드러운 controller</b> 가 필요.</p>
+      </div>
     </div>
   </section>
 
-  <!-- 05 안전 -->
-  <section class="slide" id="sec-05">
+  <!-- 04 · 측정 방법 (rosbag → 지표) -->
+  <section class="slide" id="sec-04m">
     <div class="inner">
-      <p class="slide-no">05 / 05</p>
-      <h2><span class="secnum">5</span> 안전 — Collision Monitor · safety_filter · proximity</h2>
-      <p class="lead">세 안전 장치가 <b>서로 다른 센서·계층</b>에서 독립 동작. 앞 둘은 cmd_vel 을 막는 반사 정지, proximity 는 경로 계층의 사회적 대응.</p>
-      <div class="flowbox">controller(cmd_vel_nav) → <span class="a">collision_monitor</span> → velocity_smoother → <span class="a">safety_filter</span> → /gogoping/cmd_vel → 바퀴</div>
-      <div class="split" style="margin-top:14px">
+      <p class="slide-no">04 · 측정 방법</p>
+      <h2><span class="secnum">4</span> rosbag 로그 → 15개 평가지표</h2>
+      <p class="lead">Gazebo 에서 실제 동선(수면실→놀이방→복귀 도킹) 1바퀴를 <b>9조합 × 5회 = 45 run</b> 주행하고, 매 run 을 <b><code>rosbag(mcap)</code> 으로 통째 기록</b> → 스크립트가 로그에서 지표를 자동 산출.</p>
+      <div class="split">
         <div>
-          <h3>Collision Monitor (LiDAR · 사물)</h3>
-          <p style="font-size:16px">LiDAR <code>scan_filtered</code> <b>StopZone</b>(앞 0.40m·좌우 0.20m) 안 점 → <b>즉시 cmd_vel 0</b>. nav 주행만 거치고 FOLLOW reactive 는 우회.</p>
-          <h3>safety_filter (D435 depth · 근접)</h3>
-          <p style="font-size:16px">depth <code>safety_stop</code> 시 cmd_vel 0 override. <b>비대칭</b> — 전진만 차단, 후진·회전은 통과(탈출). chatter hold 1s.</p>
+          <h3>어떤 로그를 뽑았나</h3>
+          <table>
+            <tr><th>기록 토픽</th><th>여기서 뽑은 것</th></tr>
+            <tr><td><code>/odom</code></td><td>실제 궤적 → 주행시간·경로길이·평균속도·총회전량</td></tr>
+            <tr><td><code>/cmd_vel</code></td><td>속도 미분 → 각저크·선저크(부드러움)</td></tr>
+            <tr><td><code>/plan</code></td><td>실제 vs 계획 경로 오차 → XTE</td></tr>
+            <tr><td><code>route_path</code></td><td>graph_router 경로 추종 → lane_dev·frechet</td></tr>
+            <tr><td><code>/amcl_pose</code></td><td>위치추정 흔들림 → AMCL drift</td></tr>
+            <tr><td><code>costmap</code>·<code>scan</code></td><td>장애물 최소거리(clearance)·근접 감속</td></tr>
+          </table>
         </div>
         <div>
-          <h3>proximity (사람 사회적 대응)</h3>
-          <p style="font-size:16px">정면 <b>1.0m</b> 안 사람 → graph_router 가 같은 액션 안에서:</p>
+          <h3>어떤 지표로 묶었나 <span style="font-size:14px;color:var(--inkSoft)">(총 15)</span></h3>
+          <ul class="reasons">
+            <li><span class="rn">A</span><span class="rt"><b>부드러움</b> — 각저크 · 선저크</span></li>
+            <li><span class="rn">B</span><span class="rt"><b>경로 추종</b> — XTE · lane_dev · frechet</span></li>
+            <li><span class="rn">C</span><span class="rt"><b>안전</b> — 장애물 최소거리 · costmap 반응</span></li>
+            <li><span class="rn">D</span><span class="rt"><b>위치추정</b> — AMCL drift</span></li>
+            <li><span class="rn">E</span><span class="rt"><b>효율</b> — 주행시간 · 경로길이 · 평균속도 · 총회전량 · planner 지연 · CPU</span></li>
+            <li><span class="rn">F</span><span class="rt"><b>신뢰성</b> — reliability(완주율)</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="flowbox">[주행] → <span class="a">rosbag(mcap)</span> 통째 기록  →  <span class="a">extract_metrics.py</span> (run 당 15지표 산출)  →  <span class="a">compare_runs.py</span> (45 run 집계 → Borda 순위)</div>
+    </div>
+  </section>
+
+  <!-- 04 · 실험 결과 차트 -->
+  <section class="slide" id="sec-04b">
+    <div class="inner">
+      <p class="slide-no">04 · 실험 결과</p>
+      <h2><span class="secnum">4</span> DOE 결과 — 45 run 측정</h2>
+      <div class="charts">
+        <figure>
+          <img src="https://images.prismic.io/asd0821/aiAsMgeQX7-eWqSw_1_%EC%99%84%EC%A3%BC%EB%A7%A4%ED%8A%B8%EB%A6%AD%EC%8A%A4.png?auto=format,compress" alt="완주 매트릭스">
+          <figcaption><b>① 완주 매트릭스</b> — MPPI 3행 전부 0/5 전멸(sampling MPC 연산폭발 → odom 33→2~6Hz). RPP·DWB 6조합만 30/30 완주 → 실효 비교 대상 확정.</figcaption>
+        </figure>
+        <figure>
+          <img src="https://images.prismic.io/asd0821/aiAsMweQX7-eWqSy_2_%EC%A2%85%ED%95%A9%EC%88%9C%EC%9C%84.png?auto=format,compress" alt="Borda 종합순위">
+          <figcaption><b>② Borda 종합순위</b> — 15지표 등수합. ThetaStar-DWB 63 / ThetaStar-RPP 61 가 1·2위 독식 → <b>planner 는 데이터로 ThetaStar 확정</b>.</figcaption>
+        </figure>
+        <figure>
+          <img src="https://images.prismic.io/asd0821/aiAsNQeQX7-eWqSz_3_%ED%95%B5%EC%8B%AC%EC%A7%80%ED%91%9C.png?auto=format,compress" alt="핵심 지표 4종">
+          <figcaption><b>③ 핵심 지표</b> — 주행시간은 박빙(200~208s)이나 각저크(부드러움)·lane_dev(경로추종)는 ThetaStar 계열이 뚜렷이 우수.</figcaption>
+        </figure>
+        <figure>
+          <img src="https://images.prismic.io/asd0821/aiAsNgeQX7-eWqS0_4_RPP_vs_DWB.png?auto=format,compress" alt="RPP vs DWB 각저크">
+          <figcaption><b>④ RPP vs DWB 각저크</b> — 어떤 planner와 묶어도 RPP 가 DWB의 ~절반. <b>2점 차 동급이면 운반·아이 옆엔 부드러운 RPP</b>.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · 채택 논리 -->
+  <section class="slide" id="sec-04c">
+    <div class="inner">
+      <p class="slide-no">04 · 채택 논리</p>
+      <h2><span class="secnum">4</span> 왜 ThetaStar-RPP 인가</h2>
+      <div class="split">
+        <div>
+          <h3>핵심 지표 (↓ 좋을수록)</h3>
           <table>
-            <tr><td><b>PAUSE</b></td><td>1.0m 안 → goal cancel·정지</td></tr>
+            <tr><th>지표</th><th>RPP</th><th>DWB</th></tr>
+            <tr><td>각저크 (부드러움)</td><td><b>0.45</b></td><td>0.81</td></tr>
+            <tr><td>XTE (실 plan 추종)</td><td><b>0.037</b></td><td>0.039</td></tr>
+            <tr><td>lane_dev (상위 lane)</td><td>0.107</td><td><b>0.085</b></td></tr>
+            <tr><td>주행시간 (s)</td><td>206</td><td><b>201</b></td></tr>
+          </table>
+          <p style="font-size:15px;color:var(--inkSoft);margin-top:6px">planner 는 <code>lane_dev·drift·총회전량</code> 1위로 <b style="color:var(--accent)">ThetaStar 확정</b> — 남은 선택은 controller(RPP vs DWB)뿐.</p>
+        </div>
+        <div>
+          <h3>controller 는 "점수"가 아니라 "용도"로 결정</h3>
+          <ul class="reasons">
+            <li><span class="rn">①</span><span class="rt">Borda <b>DWB 63 vs RPP 61 = 2점 차</b> → 통계적 무의미(주행 ~5초 차).</span></li>
+            <li><span class="rn">②</span><span class="rt">우리 용도는 <b>물건 운반 + 아이 옆 주행</b> → 1초 빠름보다 <b>덜 흔들림</b>이 가치. RPP 각저크가 DWB의 절반.</span></li>
+            <li><span class="rn">③</span><span class="rt"><b>경로 추종(<code>XTE</code>)은 RPP 가 우수</b> (0.037&lt;0.039).</span></li>
+          </ul>
+          <div class="callout">
+            <span class="material-icons-round">verified</span>
+            <p>좁은 통로일수록 DWB 궤적 샘플은 벽에 막혀 떨리고 <b>RPP(전방주시)는 안정</b>. → 거의 같은 점수 + 우리 용도 = <b>RPP 채택</b>. 이긴 ThetaStar-RPP 1개에만 튜닝 집중(노동 1/9).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 Costmap -->
+  <section class="slide" id="sec-cost">
+    <div class="inner">
+      <p class="slide-no">05 / 06</p>
+      <h2><span class="secnum">5</span> Costmap 2D — 좁은 문에 맞춘 inflation</h2>
+      <p class="lead">지점은 vertex 로, planner·controller 는 실험으로 정했고 — costmap 은 그 위에서 <b>"문만 통과되게"</b> inflation 만 최소로 맞췄다. <span style="color:var(--inkSoft)">(inflation = 벽 주변 비용을 부풀려 떨어져 돌게)</span></p>
+      <div class="split">
+        <div>
+          <h3>왜 작게 잡았나</h3>
+          <p style="font-size:16.5px">가장 좁은 문 <b>0.885m</b>, 차체 폭 <b>0.525m</b> → 문 양옆 여유는 <b>각 ~0.18m</b> 뿐. inflation 을 크게 잡으면 양옆 비용이 <b>문 한가운데서 겹쳐</b> → 통로가 <b class="no">막힌 것처럼</b> 보여 경로를 못 만든다.</p>
+          <table>
+            <tr><th>파라미터</th><th>global</th><th>local</th><th>왜 이렇게</th></tr>
+            <tr><td><code>inflation_radius</code></td><td><b>0.35</b></td><td><b>0.10</b></td><td>작게 — 좁은 문이 안 막히게 (기본 0.55↓)</td></tr>
+            <tr><td><code>cost_scaling_factor</code></td><td><b>4.0</b></td><td><b>4.0</b></td><td>크게 — 벽 근처만 가파르게 → 벽에 덜 붙음 (기본 3.0↑)</td></tr>
+          </table>
+        </div>
+        <div>
+          <div class="flowbox">inflation 크게 → 양옆 비용이 가운데서 겹침 → <span class="no">✕ 막힘</span>
+inflation 작게 → 가운데 통과 폭 확보       → <span class="a">✅ 통과</span></div>
+          <div class="callout">
+            <span class="material-icons-round">call_split</span>
+            <p>벽 가까이 붙여 통과시키되 <b>실제 충돌은 footprint(정확한 차체 모양)</b> 가 막는다. <b>동적</b> 사람·사물 충돌은 costmap 이 아니라 <span class="k">안전 계층</span> 담당.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 안전 -->
+  <section class="slide" id="sec-05">
+    <div class="inner">
+      <p class="slide-no">06 / 06</p>
+      <h2><span class="secnum">6</span> 안전 — Collision Monitor + proximity(사람 경로 우회) + safety_filter</h2>
+      <p class="lead">세 안전 장치가 <b>서로 다른 센서</b>로 독립 동작 — 발동 거리는 모두 <b>차체 앞쪽 기준</b>. <b>Collision Monitor·safety_filter</b> 는 cmd_vel 을 막는 반사 정지, <b>proximity</b> 는 사회적 대응.</p>
+      <div class="split" style="margin-top:14px">
+        <div>
+          <h3>safety_filter — D435 depth · <span class="ok">앞 0.8m</span></h3>
+          <p style="font-size:16px"><b>깊이 카메라 기반 근접 정지 장치.</b> 차체 앞 0.8m 안 장애물 감지 → cmd_vel 0 override. <b>가장 멀리서 선제 정지</b>. <b>비대칭</b> — 전진만 막고 후진·회전은 통과(끼었을 때 탈출). chatter hold 1s.</p>
+          <h3>Collision Monitor — LiDAR · <span class="ok">앞 0.3m</span></h3>
+          <p style="font-size:16px"><b>Nav2 표준 라이다 충돌 정지 노드.</b> <code>scan_filtered</code> 로 차체 앞 0.3m 안에 점이 들어오면 <b>즉시 cmd_vel 0</b>. 사물·벽 가리지 않는 <b>최후 하드 정지</b> — 가장 가까운 마지막 방어선.</p>
+        </div>
+        <div>
+          <h3>proximity — 사람 · <span class="ok">앞 0.6m</span></h3>
+          <p style="font-size:16px"><b>사람 전용 경로 대응 장치(person-only).</b> 정면 차체 앞 0.6m 안 사람은 충돌 위험이 아니라 <b>"사람이 길 막음 = 사회적 상황"</b> 으로 보고, graph_router 가 같은 주행 액션 안에서 3분기로 대응:</p>
+          <table>
+            <tr><td><b>PAUSE</b></td><td>0.6m 안 사람 → goal cancel·정지</td></tr>
             <tr><td><b>RESUME</b></td><td>1초 비킴 → 재주행</td></tr>
             <tr><td><b>REROUTE</b></td><td>10초 안 비킴 → blocked 등록·재탐색</td></tr>
           </table>
-          <p style="font-size:15px;color:var(--inkSoft)">충돌 안전과 분리한 사회적 상황(person-only). LiDAR(사물)·depth(사람)·proximity 가 서로 보완.</p>
         </div>
       </div>
     </div>
@@ -348,11 +482,13 @@ controller: RPP — desired_linear_vel 0.2, lookahead 1.2, use_rotate_to_heading
     var slides = Array.from(document.querySelectorAll('.slide'));
     var links  = Array.from(document.querySelectorAll('#secNav a'));
     var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    // 서브화면(sec-04b·sec-04c …)은 베이스 섹션(sec-04) 뱃지로 매핑
+    var navIdFor = function(id){ var m = id.match(/^(sec-\d+)[a-z]$/); return m ? m[1] : id; };
     var obs = new IntersectionObserver(function(entries){
       entries.forEach(function(en){
         if (en.isIntersecting) {
           links.forEach(function(a){ a.classList.remove('active'); });
-          var a = byId(en.target.id);
+          var a = byId(navIdFor(en.target.id));
           if (a) a.classList.add('active');
         }
       });

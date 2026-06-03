@@ -4,26 +4,23 @@
 
 ## Root composite
 
-`build_active_main_tree("MainTree[FOLLOW]", ctx, body=StubFollow(), task_body=True, ...)`
+`build_active_main_tree("MainTree[FOLLOW]", ctx, body=FollowTrack("FollowTrack", ctx), task_body=True, ...)`
 
 ```
 Parallel(SuccessOnSelected=[body])
-├─ BatteryLowMonitor        common/battery_low_monitor.md        (✅ ≤20% → battery_low → LOW_BATTERY_RETURNING)
+├─ BatteryLowMonitor        common/battery_low_monitor.md        (✅ ≤15% → battery_low → LOW_BATTERY_RETURNING)
 ├─ MapBoundaryMonitor       common/map_boundary_monitor.md       (✅ 맵 밖 → fault → ERROR)
 ├─ HardwareHealthMonitor    common/hardware_health_monitor.md    (✅ LIDAR/odom staleness → fault)
 ├─ CommandListener          common/command_listener.md           (✅ cancel / 다른 state 전이)
-└─ body: StubFollow                                              (☐ BT_follow_sub 미구현 — 영구 RUNNING)
+└─ body: FollowTrack        ../behaviors/perception.md           (✅ /gogoping/tracking_state → TARGET_* 브리지)
 ```
 
-`CollisionMonitor` 제외 — 사람 추종(REACTIVE)은 nav2 controller 를 안 거쳐(cmd_vel_raw 직접) collision_monitor gate 대상이 아니고, 추종 중 사람을 정지시키면 안 됨.
+`CollisionMonitor`·`ProximitySafetyMonitor` 제외 — 추종은 가까운 게 정상이라 근접 정지 대상이 아님. 실제 추종 제어(cmd_vel)는 `follow_node` 가 담당하고, 본 트리는 FOLLOW state 유지 + perception 반영(관측·표시).
 
-### StubFollow 정책
+### FollowTrack body (구 StubFollow 대체 완료)
 
-현재 body 는 `StubFollow()` — 항상 RUNNING 을 리턴하는 placeholder.
-`task_done` 자동 발화 없음 — `cancel` / 다른 `*_request` 로만 FOLLOW 상태를 빠져나올 수 있다.
-
-`BT_follow_sub` 구현 완료 후 `StubFollow` 를 `build_follow_subtree(ctx)` 로 교체 예정.
-([status.md](../status.md) 의 BT_follow_sub 항목 ☐ 참조)
+body 는 단일 leaf `FollowTrack` — `/gogoping/tracking_state` 를 구독해 `TARGET_*` blackboard 로 브리지하며 **영구 RUNNING**(`task_done` 자동 발화 없음 → `cancel` / 다른 `*_request` 로만 이탈).
+SubTree(`BT_follow_sub`) 는 **존재하지 않는다** — 구 `_stubs/stub_follow.py` placeholder 는 legacy(미사용).
 
 ## 진입 trigger
 
@@ -45,8 +42,8 @@ Parallel(SuccessOnSelected=[body])
 | `battery_low` | LOW_BATTERY_RETURNING | `battery_low_monitor` |
 | `fault` | ERROR | `map_boundary_monitor` / `hardware_health_monitor` |
 
-※ `task_done` 자동 발화 없음 — `StubFollow` 가 영구 RUNNING 이므로 body SUCCESS 미발생.
-`BT_follow_sub` 구현 후 완료 경로 추가 예정.
+※ `task_done` 자동 발화 없음 — `FollowTrack` 이 영구 RUNNING 이므로 body SUCCESS 미발생.
+추종은 `cancel` / 다른 `*_request` 로만 이탈한다.
 
 ## 사용 behavior
 
@@ -54,10 +51,10 @@ Parallel(SuccessOnSelected=[body])
 - [map_boundary_monitor](../behaviors/common.md#map_boundary_monitor)
 - [hardware_health_monitor](../behaviors/common.md#hardware_health_monitor)
 - [command_listener](../behaviors/common.md#command_listener)
-- [BT_follow_sub](BT_follow_sub.md) — 추종 로직 (☐ 미구현)
+- [FollowTrack](../behaviors/perception.md) — tracking_state → TARGET_* 브리지 (body)
 
 ## 상태
 
 - 코드: ✅ ([BT_follow_main.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/BT_follow_main.py))
 - shell helper: [`_shell.py`](../../src/gogoping/gogoping_modes/gogoping_modes/bt/trees/main_trees/_shell.py)
-- body: `StubFollow` (☐ — BT_follow_sub 구현 후 교체 예정)
+- body: `FollowTrack` ✅ ([perception/follow_track.py](../../src/gogoping/gogoping_modes/gogoping_modes/bt/behaviors/perception/follow_track.py)) — SubTree 아님 (구 StubFollow 대체 완료)

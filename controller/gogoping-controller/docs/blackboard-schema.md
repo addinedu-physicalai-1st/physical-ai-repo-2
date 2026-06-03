@@ -35,7 +35,7 @@ GogoPing BT 의 공유 변수 (`bt/blackboard.py` 의 `Keys` 상수) 와 R/W 권
 | 키 | 타입 | W | R | 비고 |
 |---|---|---|---|---|
 | `target_visible` | `bool` | `FollowTrack` | `is_target_visible`, `wait_for_reappear` | follow 대상 보임 (= tracking_state.matched) |
-| `target_pose` | `geometry_msgs/PoseStamped` | (미구현 — `FollowTrack` 미작성, map pose 변환 필요) | `maintain_distance` | base_link 기준 대상 pose |
+| `target_pose` | `geometry_msgs/PoseStamped` | (`FollowTrack` 구현됨이나 거리·bbox만 브리지 — map-frame pose 변환은 미사용) | `maintain_distance` | base_link 기준 대상 pose |
 | `target_face_bbox` | `tuple[int,int,int,int]` | `FollowTrack` | `face_tracking` | 카메라 frame px (x1,y1,x2,y2) — matched 일 때 |
 | `target_seen_at` | `float` (epoch sec) | `FollowTrack` | `wait_for_reappear`, `face_tracking` | 마지막 감지 시각 — matched 일 때 갱신 |
 | `found` | `bool` | `child_face_tracker` | `found_child` | 숨바꼭질 — 아이 발견 |

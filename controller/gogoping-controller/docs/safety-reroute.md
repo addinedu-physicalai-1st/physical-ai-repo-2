@@ -41,7 +41,7 @@ Publish 주기: 10 Hz.
 
 ## 3. 정면 박스 정의 (robot frame)
 
-- forward: `0 ~ PERSON_FRONT_DIST_M (1.5m)`
+- forward: `0 ~ PERSON_FRONT_DIST_M (0.9m)`
 - lateral: `±PERSON_LATERAL_LIMIT_M (±0.5m)`
 
 YOLO bbox 의 image 중심 픽셀 → depth → robot frame:
@@ -79,7 +79,7 @@ graph_router 는 GOTO / HIDEANDSEEK / RETURNING / LOW_BATTERY_RETURNING 의 vert
 ## 9. config 상수 (gogoping_perception/config.py)
 
 ```python
-PERSON_FRONT_DIST_M = 1.5
+PERSON_FRONT_DIST_M = 0.9
 PERSON_LATERAL_LIMIT_M = 0.5
 WALL_FRONT_DIST_M = 0.5
 CAMERA_FX_PX = 615.0

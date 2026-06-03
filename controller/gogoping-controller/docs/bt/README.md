@@ -32,7 +32,7 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 |---|---|
 | [trees/BT_idle_main.md](trees/BT_idle_main.md) | IDLE state — 명령 대기 + battery 감시 |
 | [trees/BT_goto_main.md](trees/BT_goto_main.md) | GOTO — 지정 vertex 이동. body=BT_goto_sub |
-| [trees/BT_follow_main.md](trees/BT_follow_main.md) | FOLLOW — 사람 추종. body=StubFollow (BT_follow_sub 미구현) |
+| [trees/BT_follow_main.md](trees/BT_follow_main.md) | FOLLOW — 사람 추종. body=FollowTrack (leaf, SubTree 아님) |
 | [trees/BT_lullaby_main.md](trees/BT_lullaby_main.md) | LULLABY — 자장가 재생. body=BT_lullaby_sub |
 | [trees/BT_hide_and_seek_main.md](trees/BT_hide_and_seek_main.md) | HIDEANDSEEK — 숨바꼭질 (현재 patrol-only). body=BT_hide_and_seek_sub |
 | [trees/BT_manual_main.md](trees/BT_manual_main.md) | MANUAL — torque off 모드, 사용자가 직접 밀어 이동. monitor + ManualTorqueHold + cancel/return listener |
@@ -41,7 +41,7 @@ py_trees 기반 GogoPing Behavior Tree — 트리/behavior 별 상세 문서.
 | [trees/BT_low_battery_returning_main.md](trees/BT_low_battery_returning_main.md) | LOW_BATTERY_RETURNING — 배터리 자동 복귀 lockdown (CommandListener 없음) |
 | [trees/BT_error_main.md](trees/BT_error_main.md) | ERROR — terminal (StopAll → Notify → Log) |
 | [trees/BT_goto_sub.md](trees/BT_goto_sub.md) | 이동 — Sequence(NavigateToVertex + UIPublish). 운반은 follow + goto chain |
-| [trees/BT_follow_sub.md](trees/BT_follow_sub.md) | 추종 — 정상 ↔ Loss Recovery |
+| ~~trees/BT_follow_sub.md~~ | ❌ 미존재 — FOLLOW body 는 SubTree 가 아니라 `FollowTrack` leaf (perception). 구 stub 문서 잔존 |
 | [trees/BT_lullaby_sub.md](trees/BT_lullaby_sub.md) | 자장가 — UI mp3 재생, WaitForExit |
 | [trees/BT_hide_and_seek_sub.md](trees/BT_hide_and_seek_sub.md) | 숨바꼭질 1회 (숨기 → 카운트 → 탐색 → 복귀) |
 | [trees/BT_return_sub.md](trees/BT_return_sub.md) | 도킹 복귀 시퀀스 (NavTo → Align → Approach → Verify) |

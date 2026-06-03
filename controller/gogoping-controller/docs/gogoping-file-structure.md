@@ -168,8 +168,8 @@ controller/gogoping-controller/src/gogoping/
         │   │       │                     #   grep -rn "STUB:" controller/gogoping-controller/ 로 검색.
         │   │       ├── __init__.py
         │   │       ├── _base.py                     # StubRunningThenSuccess (30 tick → SUCCESS) + StubInfiniteRunning (항상 RUNNING)
-        │   │       ├── stub_follow.py               # BT_follow_sub 자리 — 무한 RUNNING (사람 보이는 한 RUNNING 의미). BT_follow_main body 로 사용 중
-        │   │       └── stub_hideseek.py             # ★ 사용 안 함 — BT_hide_and_seek_main 이 build_hide_and_seek_sub(ctx) 호출. 파일은 잔존 (다른 stub 정리 시 함께 삭제)
+        │   │       ├── stub_follow.py               # ★ 사용 안 함(legacy) — FOLLOW body 는 FollowTrack(perception) 으로 대체됨. 파일만 잔존
+        │   │       └── stub_hideseek.py             # ★ 사용 안 함(legacy) — BT_hide_and_seek_main 이 build_hide_and_seek_sub(ctx) 호출. 파일만 잔존
         │   │
         │   └── trees/                    # BT 트리 조립 (한 파일 = 한 트리 전체)
         │       ├── __init__.py
@@ -180,7 +180,7 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_charging_main.py               # CHARGING — BatteryFullMonitor + MapBoundary + HW + CommandListener (✅)
         │       │   ├── BT_idle_main.py                   # IDLE — BatteryLow + IdleTimeout + MapBoundary + HW + CommandListener (✅)
         │       │   ├── BT_goto_main.py                   # GOTO — task_body=True. body=BT_goto_sub (✅)
-        │       │   ├── BT_follow_main.py                 # FOLLOW — task_body=True. body=StubFollow (BT_follow_sub 미완성 ☐)
+        │       │   ├── BT_follow_main.py                 # FOLLOW — task_body=True. body=FollowTrack (perception leaf, SubTree 아님) (✅)
         │       │   ├── BT_lullaby_main.py                # LULLABY — task_body=True. body=BT_lullaby_sub (LullabyAudio leaf, 영구 RUNNING) (✅)
         │       │   ├── BT_hide_and_seek_main.py          # HIDEANDSEEK — task_body=True. body=BT_hide_and_seek_sub (patrol-only) (✅)
         │       │   ├── BT_manual_main.py                 # MANUAL — Parallel(ManualTorqueHold + MapBoundaryMonitor + CommandListener). 자동 monitor 미배치 ✅
@@ -188,10 +188,9 @@ controller/gogoping-controller/src/gogoping/
         │       │   ├── BT_low_battery_returning_main.py  # LOW_BATTERY_RETURNING — MapBoundary + HW + BT_return_sub. lockdown (CommandListener 없음) (✅)
         │       │   └── BT_error_main.py                  # ERROR — Parallel(StopAllMotors). 진입 즉시 cmd_vel=0 + torque OFF. terminal — 재시작만 회복 ✅
         │       │
-        │       └── sub_trees/            # SubTree (mode/task 단위 5개 + 빌딩 블록)
+        │       └── sub_trees/            # SubTree (실제 파일 5개: goto·hide_and_seek·lullaby·patrol·return). FOLLOW 은 SubTree 없음(FollowTrack leaf)
         │           ├── __init__.py
         │           ├── BT_goto_sub.py            # 이동 — Sequence(NavigateToVertex + UIPublish)
-        │           ├── BT_follow_sub.py          # 추종 — 정상 ↔ Loss Recovery (제자리 탐색)
         │           ├── BT_lullaby_sub.py         # 자장가 — LullabyAudio 단일 leaf (UI 가 mp3 재생, BT 는 publish only) (✅)
         │           ├── BT_hide_and_seek_sub.py   # 숨바꼭질 — build_hide_and_seek_sub(ctx) (✅ patrol-only 첫 구현. BB.search_waypoints 읽어 build_patrol_sub 호출. 빈 리스트 Failure leaf). 진짜 hideseek (인식/FOUND) 확장 ☐ → docs/bt/trees/BT_hide_and_seek_sub.md
         │           ├── BT_patrol_sub.py          # ★ 빌딩 블록 (mode/task 단위 아님) — build_patrol_sub(ctx, waypoints) 로 vertex 마다 Sequence(SelectVertex + NavigateToVertex + PanCameraSweep) 동적 생성 + FailureIsSuccess 로 감싸 skip-on-failure (✅) → docs/bt/trees/BT_patrol_sub.md
@@ -215,9 +214,9 @@ controller/gogoping-controller/src/gogoping/
         │
         └── utils/                        # 공통 helper / 순수 함수
             ├── __init__.py
-            ├── waypoints_client.py       # control-server REST 에서 patrol 가져오기 (hide-and-seek 등) (✅)
-            │                             #   실패 시 ${PINGDER_BT_CACHE_DIR:-/tmp/pingder}/<name>.json 캐시 fallback
-            └── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수) (✅)
+            ├── safety_flags.py           # 시연/디버그 안전 토글(disable_*_safety 등) 읽기 helper — 6곳에서 사용 (✅)
+            ├── goal_reconciler.py        # SetGoal Goal → 적절한 FSM trigger 매핑 (순수 함수) (✅ command_listener 사용)
+            └── waypoints_client.py       # ⚠️ orphan(미사용) — repo 어디서도 import 안 됨. control-server REST patrol 가져오기용으로 작성됐으나 현재 미연결
                                           #   command_listener 가 import. ROS 의존성 0 → 단위 테스트 13 pass
             
             

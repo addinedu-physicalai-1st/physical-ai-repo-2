@@ -700,7 +700,16 @@ class MapView(QWidget):
                 fm = qp.fontMetrics()
                 tw = fm.horizontalAdvance(w["name"]) + 6
                 th = fm.height() + 2
-                lbl = QRectF(p.x() - tw / 2, p.y() + r + 2, tw, th)
+                # 특정 노드는 라벨 위치를 옮겨 겹침 방지
+                _lpos = {"놀-5": "up", "복-1": "up", "복-5": "right"}.get(w["name"], "down")
+                if _lpos == "up":
+                    lbl = QRectF(p.x() - tw / 2, p.y() - r - 2 - th, tw, th)
+                elif _lpos == "right":
+                    lbl = QRectF(p.x() + r + 4, p.y() - th / 2, tw, th)
+                elif _lpos == "left":
+                    lbl = QRectF(p.x() - r - 4 - tw, p.y() - th / 2, tw, th)
+                else:
+                    lbl = QRectF(p.x() - tw / 2, p.y() + r + 2, tw, th)
                 qp.setPen(Qt.NoPen)
                 qp.setBrush(QBrush(QColor(255, 255, 255, 210)))
                 qp.drawRoundedRect(lbl, 3, 3)
@@ -959,6 +968,18 @@ class WaypointMapCard(QFrame):
         )
         self._btn_edit.clicked.connect(self._on_edit_toggle)
 
+        # 전체화면(크게 보기) — 맵을 큰 창에 띄워 라벨을 또렷하게 본다
+        self._btn_fullscreen = QPushButton("⛶ 크게 보기")
+        self._btn_fullscreen.setCursor(Qt.PointingHandCursor)
+        self._btn_fullscreen.setFixedHeight(28)
+        self._btn_fullscreen.setStyleSheet(
+            "QPushButton { background: #FFFFFF; color: #1A6B8A; "
+            "border: 1.5px solid #5BB9E0; border-radius: 8px; "
+            "padding: 0 14px; font-weight: 600; font-size: 12px; }"
+            "QPushButton:hover { background: #EAF6FB; }"
+        )
+        self._btn_fullscreen.clicked.connect(self._open_fullscreen)
+
         # 편집 모드 툴바 — ON 일 때만 visible
         self._btn_add_node = self._make_edit_button("+ 노드 생성", "#00A86B")
         self._btn_add_lane = self._make_edit_button("+ 간선 연결", "#00A86B")
@@ -984,6 +1005,8 @@ class WaypointMapCard(QFrame):
         header.addWidget(self._title)
         header.addStretch(1)
         header.addWidget(self._status)
+        header.addSpacing(8)
+        header.addWidget(self._btn_fullscreen)
         header.addSpacing(8)
         header.addWidget(self._btn_edit)
         header.addSpacing(8)
@@ -1057,6 +1080,38 @@ class WaypointMapCard(QFrame):
         self._sse = _SseThread(f"{control_url}/waypoints/events", self)
         self._sse.event_received.connect(self._dispatcher.handle)
         self._sse.start()
+
+    def _open_fullscreen(self) -> None:
+        """현재 맵을 큰 창(maximized)에 띄워 라벨을 또렷하게 본다. 현재 데이터 스냅샷 복사."""
+        from PyQt5.QtWidgets import QDialog
+        dlg = QDialog(self)
+        dlg.setWindowTitle("실내 맵 · 웨이포인트 — 크게 보기")
+        dlg.setWindowFlags(Qt.Window)
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(0, 0, 0, 0)
+        view = MapView()
+        src = self._map
+        view.set_waypoints(list(getattr(src, "_waypoints", []) or []))
+        view.set_lanes(list(getattr(src, "_lanes", []) or []))
+        view.set_display_mode(getattr(src, "_display_mode", "graph") or "graph")
+        rt = getattr(src, "_route", None)
+        if rt:
+            view.set_route(list(rt))
+        rp = getattr(src, "_route_points", None)
+        if rp:
+            view.set_route_points(list(rp))
+        cur = getattr(src, "_current_name", None)
+        if cur:
+            view.set_current(cur)
+        rb = getattr(src, "_robot", None)
+        if isinstance(rb, dict):
+            view.set_robot(rb.get("x", 0.0), rb.get("y", 0.0), rb.get("yaw", 0.0))
+        pl = getattr(src, "_plan", None)
+        if pl:
+            view.set_plan(list(pl))
+        lay.addWidget(view)
+        self._fs_dialog = dlg   # GC 방지 (modeless)
+        dlg.showMaximized()
 
     def _on_toggle_add_node(self) -> None:
         """[+ 노드 생성] 토글 — ADD_NODE 모드 진입/이탈.
