@@ -81,16 +81,17 @@ GOTO
 
 
 FOLLOW
-  main: `build_active_main_tree(body=build_follow_subtree(ctx), task_body=True, ...)`
-        Parallel (SuccessOnSelected=[FollowSubTree])
+  main: `build_active_main_tree(body=FollowTrack("FollowTrack", ctx), task_body=True, ...)`
+        Parallel (SuccessOnSelected=[body])
         ├─ BatteryLowMonitor      (✅)
         ├─ MapBoundaryMonitor     (✅)
         ├─ HardwareHealthMonitor  (✅)
-        ├─ CommandListener        (✅)   ※ CollisionMonitor 없음 — 사람 추종은 collision gate 무관
-        └─ FollowSubTree          (🟡 StubFollow 로 대체 중 — 진짜 follow 미완성)
+        ├─ CommandListener        (✅)   ※ CollisionMonitor·ProximitySafety 없음 — 추종은 가까운 게 정상
+        └─ FollowTrack            (✅ perception/follow_track.py — /gogoping/tracking_state → TARGET_* 브리지)
 
-  sub: BT_follow_sub — StubFollow (stub: InfiniteRunning)
-       ※ 사람 보이는 한 RUNNING, 잃으면 Loss Recovery (☐ 미구현)
+  sub: 없음 — body 가 단일 leaf `FollowTrack` (SubTree 아님).
+       실제 추종 제어(cmd_vel)는 follow_node 가 담당, 본 트리는 FOLLOW 유지 + perception 반영.
+       (구 StubFollow placeholder 는 legacy — `_stubs/stub_follow.py` 잔존하나 미사용)
 
 
 LULLABY
