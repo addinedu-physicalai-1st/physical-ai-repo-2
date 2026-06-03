@@ -1,9 +1,9 @@
 """양방향 teleop WS 브리지 (woobuntu — 실물 follower 머신).
 
 control-service 와 단일 WebSocket 연결 (role=robot):
-  수신  leader JSON  → /eduping/leader/joint_states (로컬 publish)
+  수신  leader 바이너리 frame → /eduping/leader/joint_states (로컬 publish)
                        → leader_passthrough_node 가 구독해 JTC + 속도조절 → 실물 follower
-  송신  /joint_states (실물 follower) → follower JSON → control-service
+  송신  /joint_states (실물 follower) → follower 바이너리 frame → control-service
                        → doctor push loop → StateFrame → doctor 3D (three.js)
 
 a-2 (eduping↔doctor ROS 도메인 분리) 에서 leader / follower joint 스트림은 ROS DDS
@@ -12,7 +12,8 @@ a-2 (eduping↔doctor ROS 도메인 분리) 에서 leader / follower joint 스�
 doctor three.js 는 반드시 이 노드가 올려보낸 실물 /joint_states 로 움직여야 함
 (로컬 mock 아님) → 시뮬/실제 불일치 방지.
 
-Wire format: 양방향 모두 JSON text — {"name": [...], "position": [...]}.
+Wire format: 양방향 모두 바이너리 joint frame (joint_codec.MSG_JOINTS 0x03) —
+관절 이름은 CANONICAL_JOINTS 고정 순서로 암시, mask + int16(×10000).
 
 Params:
     control_url       (str,   default ws://localhost:8000)
@@ -22,7 +23,6 @@ Params:
 """
 from __future__ import annotations
 
-import json
 import threading
 import time
 
@@ -30,6 +30,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from websockets.sync.client import connect as ws_connect
+
+from eduarm.joint_codec import decode_joints, encode_joints
 
 
 PATH = "/ws/eduping/teleop?role=robot"
@@ -85,7 +87,7 @@ class TeleopWsRobot(Node):
                 backoff = 1.0
                 try:
                     for raw in ws:  # 수신 leader 프레임 (concurrent send 는 _on_follower)
-                        self._on_leader_text(raw)
+                        self._on_leader_frame(raw)
                 except Exception:
                     pass
             except Exception as exc:
@@ -95,19 +97,17 @@ class TeleopWsRobot(Node):
             self._stop.wait(backoff)
             backoff = min(backoff * 2, 30.0)
 
-    def _on_leader_text(self, raw) -> None:
-        if isinstance(raw, bytes):
-            raw = raw.decode("utf-8", "ignore")
+    def _on_leader_frame(self, raw) -> None:
+        if not isinstance(raw, (bytes, bytearray)):
+            return  # binary frame 만 처리 (text 는 무시)
         try:
-            obj = json.loads(raw)
-            names = obj["name"]
-            positions = obj["position"]
-        except (ValueError, KeyError, TypeError):
+            names, positions = decode_joints(bytes(raw))
+        except ValueError:
             return
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = [str(n) for n in names]
-        msg.position = [float(p) for p in positions]
+        msg.name = names
+        msg.position = positions
         self._leader_pub.publish(msg)
 
     # ── follower /joint_states → WS 송신 ───────────────────────────────
@@ -120,12 +120,9 @@ class TeleopWsRobot(Node):
             ws = self._ws
         if ws is None:
             return
-        payload = json.dumps({
-            "name": list(msg.name),
-            "position": [float(p) for p in msg.position],
-        })
+        payload = encode_joints(msg.name, msg.position)
         try:
-            ws.send(payload)
+            ws.send(payload)  # binary frame
         except Exception as exc:
             self.get_logger().debug(f"WS send failed (will reconnect): {exc}")
 

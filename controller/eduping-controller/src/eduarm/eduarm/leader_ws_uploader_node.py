@@ -13,7 +13,8 @@
 a-2 (eduping↔doctor ROS 도메인 분리) 에서 leader 를 ROS DDS 로 cross-machine
 보내면 도달 안 함 — FSR(fsr_ws_uploader) 와 동일하게 WebSocket 으로 우회.
 
-Wire format: JSON text — {"name": [...], "position": [...]}.
+Wire format: 바이너리 joint frame (joint_codec.MSG_JOINTS 0x03) — 관절 이름은
+CANONICAL_JOINTS 고정 순서로 암시, mask + int16(×10000). JSON 대비 1/10 이하.
 
 Params:
     control_url  (str,   default ws://localhost:8000)  control-service base URL
@@ -21,7 +22,6 @@ Params:
 """
 from __future__ import annotations
 
-import json
 import threading
 import time
 
@@ -29,6 +29,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from websockets.sync.client import connect as ws_connect
+
+from eduarm.joint_codec import encode_joints
 
 
 PATH = "/ws/eduping/teleop?role=leader_src"
@@ -92,12 +94,9 @@ class LeaderWsUploader(Node):
             ws = self._ws
         if ws is None:
             return
-        payload = json.dumps({
-            "name": list(msg.name),
-            "position": [float(p) for p in msg.position],
-        })
+        payload = encode_joints(msg.name, msg.position)
         try:
-            ws.send(payload)
+            ws.send(payload)  # binary frame
         except Exception as exc:
             self.get_logger().debug(f"WS send failed (will reconnect): {exc}")
 

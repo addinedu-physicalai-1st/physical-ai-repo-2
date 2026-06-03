@@ -21,15 +21,18 @@ FSR(/ws/eduping/stetho) 와 동일하게 WebSocket 으로 우회.
 active gate — doctor UI "Telehealth 시작/정지" 이벤트가 ``set_active`` 호출.
 정지 상태에선 leader 프레임을 robot 으로 forward 안 함 → follower 마지막 위치 hold.
 
-Wire format: 양방향 모두 JSON text — {"name": [...], "position": [...]}.
+Wire format: 양방향 모두 바이너리 joint frame (streaming.teleop_protocol MSG_JOINTS
+0x03). leader 프레임은 relay 가 디코드 없이 bytes 그대로 forward 하고, follower
+프레임만 디코드해 (names, positions) 콜백으로 넘긴다 (three.js StateFrame 소스).
 """
 from __future__ import annotations
 
-import json
 import logging
 from typing import Callable, Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
+
+from control_service.streaming.teleop_protocol import decode_joints
 
 log = logging.getLogger(__name__)
 
@@ -79,28 +82,26 @@ class TeleopRelayHub:
             self._robot = None
             log.info("teleop relay robot gone")
 
-    def _on_follower_text(self, text: str) -> None:
+    def _on_follower_bytes(self, data: bytes) -> None:
         cb = self._follower_cb
         if cb is None:
             return
         try:
-            obj = json.loads(text)
-            names = obj["name"]
-            positions = obj["position"]
-        except (ValueError, KeyError, TypeError):
+            names, positions = decode_joints(data)
+        except ValueError:
             return
         cb(names, positions)
 
     # ── leader_src (doctor uploader) ────────────────────────────────────
-    async def forward_leader(self, text: str) -> None:
-        """active 일 때만 robot 으로 leader 프레임 전달."""
+    async def forward_leader(self, data: bytes) -> None:
+        """active 일 때만 robot 으로 leader 프레임 전달 (디코드 없이 bytes 그대로)."""
         if not self._active:
             return
         ws = self._robot
         if ws is None:
             return
         try:
-            await ws.send_text(text)
+            await ws.send_bytes(data)
         except Exception:
             # robot 끊김 — unregister 는 robot 핸들러 finally 에서.
             pass
@@ -125,23 +126,17 @@ def build_router(hub: TeleopRelayHub) -> APIRouter:
                     msg = await ws.receive()
                     if msg.get("type") == "websocket.disconnect":
                         break
-                    text = msg.get("text")
-                    if text is None:
-                        raw = msg.get("bytes")
-                        text = raw.decode("utf-8", "ignore") if raw else None
-                    if text:
-                        hub._on_follower_text(text)
+                    raw = msg.get("bytes")
+                    if raw:
+                        hub._on_follower_bytes(raw)
             else:  # leader_src
                 while True:
                     msg = await ws.receive()
                     if msg.get("type") == "websocket.disconnect":
                         break
-                    text = msg.get("text")
-                    if text is None:
-                        raw = msg.get("bytes")
-                        text = raw.decode("utf-8", "ignore") if raw else None
-                    if text:
-                        await hub.forward_leader(text)
+                    raw = msg.get("bytes")
+                    if raw:
+                        await hub.forward_leader(raw)
         except WebSocketDisconnect:
             pass
         finally:
