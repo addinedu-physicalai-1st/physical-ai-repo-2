@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nav2 Navigation Stack · Q&A 보고서 — 이강택</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<style>
+  :root{
+    --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
+    --border:rgba(255,255,255,.10); --accent:#3FD9A6;
+    --accentSoft:rgba(63,217,166,.16);
+    --accent2:#7FE0B8;
+    --topbar-h:64px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; padding:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Pretendard Variable',system-ui,sans-serif;
+    opacity:0; transition:opacity .3s ease;
+    overflow-x:hidden; overflow-y:scroll;
+    scroll-snap-type:y mandatory; scroll-behavior:smooth;
+    word-break:keep-all; overflow-wrap:break-word;
+  }
+  .jua{font-family:'Jua','Pretendard Variable',sans-serif}
+
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    min-height:var(--topbar-h);
+    display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+    padding:10px 22px;
+    background:rgba(22,19,31,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+  }
+  .back{
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border);
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
+    padding:7px 14px; border-radius:999px; cursor:pointer;
+    transition:color .15s, border-color .15s, transform .15s;
+  }
+  .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
+
+  .sec-nav{display:flex; flex-wrap:wrap; gap:6px; margin:0}
+  .sec-nav a{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--accentSoft); border:1px solid rgba(63,217,166,.55);
+    color:var(--ink); font-family:'Jua',sans-serif; font-size:12.5px;
+    padding:6px 11px; border-radius:999px; text-decoration:none;
+    transition:transform .15s, background .15s, border-color .15s;
+  }
+  .sec-nav a:hover{transform:translateY(-1px); background:rgba(63,217,166,.32); border-color:var(--accent)}
+  .sec-nav a.active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F; border-color:transparent}
+  .sec-nav a .n{color:var(--accent); font-size:11.5px}
+  .sec-nav a.active .n{color:#16131F}
+
+  .slide{
+    min-height:100vh; height:100vh;
+    scroll-snap-align:start; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(var(--topbar-h) + 22px) 3vw 30px; overflow:hidden;
+  }
+  .inner{
+    width:100%; max-width:1700px; height:100%;
+    display:flex; flex-direction:column; justify-content:center; overflow:auto;
+    padding:42px 54px;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(63,217,166,.06), transparent 60%),
+      linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(255,255,255,.08); border-radius:28px;
+    box-shadow:0 28px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(63,217,166,.04) inset;
+  }
+  .slide-no{color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:16px; letter-spacing:.2em; margin:0 0 8px}
+  .slide h2{font-family:'Jua',sans-serif; font-size:40px; margin:0 0 22px; display:flex; align-items:center; gap:18px}
+  .secnum{
+    flex:0 0 auto; width:62px; height:62px; border-radius:17px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#16131F;
+    font-family:'Jua',sans-serif; font-size:28px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  h3{font-family:'Jua',sans-serif; font-size:22px; color:var(--accent2); margin:18px 0 7px}
+  h3:first-child{margin-top:0}
+  p{line-height:1.65; font-size:18px; margin:7px 0; color:var(--ink)}
+  ul{margin:7px 0 11px; padding-left:24px}
+  li{line-height:1.6; font-size:17px; margin:6px 0; color:var(--ink)}
+  b{color:#fff}
+  .lead{font-size:20px; line-height:1.65; margin:0 0 14px}
+  .lead b{color:var(--accent)}
+
+  .pill{display:inline-block; background:var(--accentSoft); color:var(--accent); border-radius:8px; padding:2px 12px; font-weight:700; font-size:18px}
+  code{background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; font-size:.85em; color:#A8FFE0; font-family:ui-monospace,monospace}
+
+  .hero{height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px}
+  .hero .kicker{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:19px}
+  .hero h1{
+    font-family:'Jua',sans-serif; font-size:78px; margin:14px 0 8px; line-height:1.1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero .sub{color:var(--inkSoft); font-size:21px; margin:0 0 38px; max-width:900px}
+  .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:20px; width:100%; max-width:1240px}
+  @media (max-width:760px){ .metrics{grid-template-columns:repeat(2,1fr)} }
+  .metric{background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:28px 20px}
+  .metric .num{font-family:'Jua',sans-serif; font-size:42px; line-height:1;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .metric .lab{color:var(--inkSoft); font-size:17px; margin-top:11px}
+
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:34px; align-items:start; flex:1; min-height:0}
+  @media (max-width:880px){ .split{grid-template-columns:1fr} }
+
+  .reasons{list-style:none; padding:0; margin:6px 0 0; display:flex; flex-direction:column; gap:9px}
+  .reasons li{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:13px; padding:12px 16px; background:rgba(255,255,255,.03)}
+  .reasons .rn{flex:0 0 auto; width:30px; height:30px; border-radius:9px; background:var(--accentSoft); color:var(--accent); font-family:'Jua',sans-serif; font-size:16px; display:flex; align-items:center; justify-content:center}
+  .reasons .rt{font-size:16px; line-height:1.5}
+  .reasons .rt b{color:#fff}
+
+  .flowbox{background:rgba(0,0,0,.34); border:1px solid var(--border); border-radius:12px; padding:14px 18px; margin:10px 0 0;
+    font-family:ui-monospace,monospace; font-size:14px; line-height:1.95; color:var(--inkSoft); overflow-x:auto; white-space:pre}
+  .flowbox b{color:var(--ink)} .flowbox .a{color:var(--accent)}
+
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:16.5px}
+  th,td{border:1px solid var(--border); padding:10px 13px; text-align:left; vertical-align:top}
+  th{background:rgba(255,255,255,.05); color:var(--ink); font-family:'Jua',sans-serif; font-weight:400}
+  td{color:var(--inkSoft)} td b{color:var(--accent)}
+  .ok{color:var(--accent)} .no{color:#FF9A8B}
+
+  .callout{display:flex; gap:13px; align-items:flex-start;
+    background:rgba(63,217,166,.07); border:1px solid rgba(63,217,166,.30);
+    border-left:4px solid var(--accent); border-radius:14px; padding:15px 19px; margin:14px 0 0}
+  .callout .material-icons-round{color:var(--accent); font-size:26px; margin-top:2px}
+  .callout p{margin:0; line-height:1.6; font-size:17px}
+  .callout b{color:var(--accent)} .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
+  .callout.bug{background:rgba(242,194,0,.08); border-color:rgba(242,194,0,.32); border-left-color:#F2C200}
+  .callout.bug .material-icons-round{color:#F2C200} .callout.bug b{color:#F2C200} .callout.bug .k{color:#F2C200}
+
+  pre.yaml{background:rgba(0,0,0,.34); border:1px solid var(--border); border-radius:12px; padding:14px 18px; margin:10px 0 0;
+    font-family:ui-monospace,monospace; font-size:14px; line-height:1.7; color:var(--inkSoft); overflow-x:auto}
+
+  .hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); z-index:40;
+    color:var(--inkSoft); font-size:12px; background:rgba(36,31,51,.85); border:1px solid var(--border);
+    border-radius:999px; padding:6px 14px}
+  #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
+</style>
+</head>
+<body>
+  <div id="page-fade"></div>
+
+  <div class="topbar">
+    <button class="back jua" onclick="backToQna()">
+      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+    </button>
+    <nav class="sec-nav" id="secNav">
+      <a href="#overview">개요</a>
+      <a href="#sec-01"><span class="n">01</span> 12서버</a>
+      <a href="#sec-02"><span class="n">02</span> BT Navigator</a>
+      <a href="#sec-03"><span class="n">03</span> 경로·회전</a>
+      <a href="#sec-04"><span class="n">04</span> Planner·Controller</a>
+      <a href="#sec-05"><span class="n">05</span> 안전</a>
+    </nav>
+  </div>
+
+  <!-- 개요 -->
+  <section class="slide" id="overview">
+    <div class="inner">
+      <div class="hero">
+        <div class="kicker">사랑의 에듀핑 · 핑더가든</div>
+        <h1>Nav2 Navigation Stack</h1>
+        <div class="sub">Nav2 표준 12서버를 우리 환경(좁은 통로 + 깊이카메라 안전 + 의미적 라우팅)에 맞춰 골라 쓰고, 위상 라우팅만 자체 모듈로 갈아끼웠다 · 담당 이강택</div>
+        <div class="metrics">
+          <div class="metric"><div class="num">10 / 2</div><div class="lab">표준 사용 / 자체 대체</div></div>
+          <div class="metric"><div class="num">45 run</div><div class="lab">DOE 로 Planner·Controller 선정</div></div>
+          <div class="metric"><div class="num">0.885m</div><div class="lab">가장 좁은 문 (환경 제약)</div></div>
+          <div class="metric"><div class="num">3종</div><div class="lab">LiDAR·depth·proximity 안전</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 12서버 -->
+  <section class="slide" id="sec-01">
+    <div class="inner">
+      <p class="slide-no">01 / 05</p>
+      <h2><span class="secnum">1</span> Nav2 12서버 — 사용(10) / 대체(2)</h2>
+      <p class="lead">Nav2 는 <b>독립 모듈 서버 여럿을 Behavior Tree 가 오케스트레이션</b>하는 구조. 우리는 표준을 최대한 살리고, <b>위상 라우팅만</b> 자체 <code>graph_router</code> 로 갈아끼웠다.</p>
+      <table>
+        <thead><tr><th>서버</th><th>GogoPing</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><b>BT Navigator</b></td><td>NavigateToPose — graph_router 가 vertex chain</td><td class="ok">사용</td></tr>
+          <tr><td><b>Planner Server</b></td><td>ThetaStar (any-angle 직선)</td><td class="ok">사용</td></tr>
+          <tr><td><b>Controller Server</b></td><td>RPP (Regulated Pure Pursuit)</td><td class="ok">사용</td></tr>
+          <tr><td><b>Smoother Server</b></td><td>SimpleSmoother — SmoothPath best-effort</td><td class="ok">사용</td></tr>
+          <tr><td><b>Behavior Server</b></td><td>spin·backup·drive_on_heading·wait (recovery)</td><td class="ok">사용</td></tr>
+          <tr><td><b>Velocity Smoother</b></td><td>cmd_vel 가속·속도 평활 (20Hz)</td><td class="ok">사용</td></tr>
+          <tr><td><b>Collision Monitor</b></td><td>LiDAR StopZone 으로 nav cmd_vel gate</td><td class="ok">사용</td></tr>
+          <tr><td><b>Costmap 2D · Map+AMCL · Lifecycle</b></td><td>격자 환경모델 · 위치추정 · 수명주기</td><td class="ok">사용</td></tr>
+          <tr><td><b>Route Server</b></td><td>→ 자체 <code>graph_router</code> (위상 라우팅)</td><td class="no">대체</td></tr>
+          <tr><td><b>Waypoint Follower</b></td><td>→ 자체 <code>graph_router</code> (기동만)</td><td class="no">대체</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <span class="material-icons-round">layers</span>
+        <p><b>자율주행 3단계:</b> <span class="k">Route Server(graph_router)</span> 가 지날 vertex 결정 → <span class="k">Planner</span> 가 구간 전역경로(ThetaStar) → <span class="k">Controller</span> 가 추종 cmd_vel(RPP).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 BT Navigator -->
+  <section class="slide" id="sec-02">
+    <div class="inner">
+      <p class="slide-no">02 / 05</p>
+      <h2><span class="secnum">2</span> BT Navigator — NavigateToPose + preempt</h2>
+      <p class="lead">navigator plugin 3종 중 <b>NavigateToPose</b> 선택 — 우리는 <b>vertex 마다 멈추고 판단하는 reactor 구조</b>(사람반응·회전·복구 개입점)라서.</p>
+      <table>
+        <thead><tr><th>navigator</th><th>단위</th><th>중간 개입</th><th>채택</th></tr></thead>
+        <tbody>
+          <tr><td><b>NavigateToPose</b></td><td>단일 목표</td><td><b class="ok">쉬움</b> (호출 사이)</td><td class="ok">✅</td></tr>
+          <tr><td>NavigateThroughPoses</td><td>pose 리스트</td><td>어려움 (통째 전달)</td><td class="no">✕</td></tr>
+          <tr><td>FollowWaypoints</td><td>좌표 리스트</td><td>제한적</td><td class="no">✕</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <span class="material-icons-round">fast_forward</span>
+        <p><b>해결한 문제 — vertex 마다 끊김(stutter).</b> NavigateToPose 를 순진하게 chain 하면 vertex 마다 도착=정지→재출발로 cmd_vel 이 끊긴다.
+          → <b>preempt(선점)</b>: 도착 <b>0.5m 전</b> 다음 vertex goal 을 미리 발사 → nav2 가 현재 goal 을 자동 교체 → <b>멈춤 없이 통과</b>.
+          예외 2: <span class="k">마지막 segment</span>(도착 정밀도)·<span class="k">can_rotate vertex</span>(제자리 회전).</p>
+      </div>
+      <p style="font-size:16px;color:var(--inkSoft);margin-top:14px">→ NavigateThroughPoses 의 <b style="color:var(--accent)">연속성</b> + NavigateToPose 의 <b style="color:var(--accent)">vertex 제어</b>를 동시에 확보.</p>
+    </div>
+  </section>
+
+  <!-- 03 경로계획 + 회전 안전 -->
+  <section class="slide" id="sec-03">
+    <div class="inner">
+      <p class="slide-no">03 / 05</p>
+      <h2><span class="secnum">3</span> 경로계획 + 회전 안전 — graph_router</h2>
+      <div class="split">
+        <div>
+          <h3>vertex 그래프 (Route Server 대체)</h3>
+          <p style="font-size:16.5px">좌표가 아니라 <b>이름 붙인 vertex 그래프</b> 위에 길을 짠다. <code>waypoints.yaml</code>(vertex 35) + <code>lanes.yaml</code>(lane 41).</p>
+          <ul class="reasons">
+            <li><span class="rn">①</span><span class="rt"><b>의미</b> — "놀이방" 한 단어, 공간 바뀌면 yaml 만 (코드 0)</span></li>
+            <li><span class="rn">②</span><span class="rt"><b>그래프</b> — Dijkstra 최단 vertex 시퀀스</span></li>
+            <li><span class="rn">③</span><span class="rt"><b>동적</b> — 사람 만나면 런타임 reroute</span></li>
+            <li><span class="rn">④</span><span class="rt"><b>안전 정거장</b> — 멈춤·회전·복구는 vertex 에서만</span></li>
+          </ul>
+          <div class="callout bug">
+            <span class="material-icons-round">bug_report</span>
+            <p><b>함정.</b> 현재 위치를 <code>/odom</code> 에서 읽어 출발 vertex 오선택 → 빙 도는 우회. <b>TF map→base_link 통일</b>로 해결.</p>
+          </div>
+        </div>
+        <div>
+          <h3>회전 안전 — can_rotate + heading-aware</h3>
+          <p style="font-size:16.5px"><b>HW 문제:</b> 구동륜 앞 + 차체 뒤로 김 → 제자리 회전 시 <b>뒤꽁무니가 0.57m 반경</b> sweep > 통로 반폭(~0.5m) → 벽 충돌.</p>
+          <ul>
+            <li><b>계획</b> — heading-aware Dijkstra: 상태 <code>(vertex, heading)</code>, non-can_rotate 에서 <b>135° 초과 전이 거부</b> → 좁은 곳 U턴 경로 안 만듦</li>
+            <li><b>주행</b> — <code>can_rotate</code> 지점(5개: 출입구·충전소·놀-상-회·놀-하-회·수-회)에서만 정렬 회전 후 직진 (~5.7°, 30°/s)</li>
+          </ul>
+          <div class="callout bug">
+            <span class="material-icons-round">bug_report</span>
+            <p><b>함정.</b> 회전 cmd 를 <code>/cmd_vel</code> 직행 → safety 정지(0)와 충돌해 STUCK. → <code>cmd_vel_raw</code> 단일 경유로 분리.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 Planner·Controller DOE -->
+  <section class="slide" id="sec-04">
+    <div class="inner">
+      <p class="slide-no">04 / 05</p>
+      <h2><span class="secnum">4</span> Planner·Controller — 데이터(DOE)로 선정</h2>
+      <p class="lead">planner 3 × controller 3 = 9조합. 전부 튜닝하면 시간 폭발 → <b>9조합을 nav2 기본값으로 동일 조건 측정 → 이긴 1개에만 튜닝</b>(노동 1/9). 환경·HW만 9개 똑같이 고정해 공정 비교.</p>
+      <div class="split">
+        <div>
+          <h3>가설 → 검증</h3>
+          <table>
+            <tr><th>계층</th><th>예측</th><th>결과</th></tr>
+            <tr><td>Planner</td><td><b>ThetaStar</b><br>(lane 직선 추종)</td><td>lane_dev <b>1위 0.068</b> ✅</td></tr>
+            <tr><td>Controller</td><td><b>RPP</b><br>(좁은길 부드러움)</td><td>각저크 <b>0.45</b> vs DWB 0.81 ✅</td></tr>
+          </table>
+          <p style="font-size:15.5px;color:var(--inkSoft)">Gazebo 동선 1바퀴 × <b style="color:var(--accent)">45 run</b> rosbag → 15지표 자동 산출 → Borda 순위. <b style="color:var(--accent)">MPPI 는 CPU 굶주림으로 0/5 전멸</b>(odom 33→2~6Hz).</p>
+        </div>
+        <div>
+          <h3>핵심 지표 (↓ 좋음)</h3>
+          <table>
+            <tr><th>지표</th><th>ThetaStar·RPP</th><th>비교</th></tr>
+            <tr><td>각저크</td><td><b>0.45</b></td><td>DWB 0.81</td></tr>
+            <tr><td>lane_dev</td><td><b>0.068</b></td><td>Smac2D 0.122</td></tr>
+            <tr><td>XTE(실 plan)</td><td><b>0.037</b></td><td>DWB 0.039</td></tr>
+            <tr><td>clearance</td><td><b>0.384m</b></td><td>Smac2D-RPP 0.387 (동일)</td></tr>
+          </table>
+          <div class="callout">
+            <span class="material-icons-round">emoji_events</span>
+            <p>Borda 🥇 ThetaStar-DWB 63 / 🥈 ThetaStar-RPP 61(2점 차). <b>planner 는 데이터로 ThetaStar 확정</b>, controller 는 <b>용도(운반·아이 옆 → 부드러움)로 RPP</b> 채택.</p>
+          </div>
+        </div>
+      </div>
+      <pre class="yaml">planner: ThetaStarPlanner — how_many_corners 8, w_traversal 2.0
+controller: RPP — desired_linear_vel 0.2, lookahead 1.2, use_rotate_to_heading false   (sim·real 통일)</pre>
+    </div>
+  </section>
+
+  <!-- 05 안전 -->
+  <section class="slide" id="sec-05">
+    <div class="inner">
+      <p class="slide-no">05 / 05</p>
+      <h2><span class="secnum">5</span> 안전 — Collision Monitor · safety_filter · proximity</h2>
+      <p class="lead">세 안전 장치가 <b>서로 다른 센서·계층</b>에서 독립 동작. 앞 둘은 cmd_vel 을 막는 반사 정지, proximity 는 경로 계층의 사회적 대응.</p>
+      <div class="flowbox">controller(cmd_vel_nav) → <span class="a">collision_monitor</span> → velocity_smoother → <span class="a">safety_filter</span> → /gogoping/cmd_vel → 바퀴</div>
+      <div class="split" style="margin-top:14px">
+        <div>
+          <h3>Collision Monitor (LiDAR · 사물)</h3>
+          <p style="font-size:16px">LiDAR <code>scan_filtered</code> <b>StopZone</b>(앞 0.40m·좌우 0.20m) 안 점 → <b>즉시 cmd_vel 0</b>. nav 주행만 거치고 FOLLOW reactive 는 우회.</p>
+          <h3>safety_filter (D435 depth · 근접)</h3>
+          <p style="font-size:16px">depth <code>safety_stop</code> 시 cmd_vel 0 override. <b>비대칭</b> — 전진만 차단, 후진·회전은 통과(탈출). chatter hold 1s.</p>
+        </div>
+        <div>
+          <h3>proximity (사람 사회적 대응)</h3>
+          <p style="font-size:16px">정면 <b>1.0m</b> 안 사람 → graph_router 가 같은 액션 안에서:</p>
+          <table>
+            <tr><td><b>PAUSE</b></td><td>1.0m 안 → goal cancel·정지</td></tr>
+            <tr><td><b>RESUME</b></td><td>1초 비킴 → 재주행</td></tr>
+            <tr><td><b>REROUTE</b></td><td>10초 안 비킴 → blocked 등록·재탐색</td></tr>
+          </table>
+          <p style="font-size:15px;color:var(--inkSoft)">충돌 안전과 분리한 사회적 상황(person-only). LiDAR(사물)·depth(사람)·proximity 가 서로 보완.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint">탭 클릭 · ↑ ↓ 방향키 · 휠 스크롤로 슬라이드 이동</div>
+
+  <script>
+    requestAnimationFrame(function () { document.body.style.opacity = '1'; });
+
+    function backToQna() {
+      var ov = document.getElementById('page-fade');
+      ov.style.opacity = '1';
+      setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
+    }
+
+    var slides = Array.from(document.querySelectorAll('.slide'));
+    var links  = Array.from(document.querySelectorAll('#secNav a'));
+    var byId = function(id){ return links.find(function(a){ return a.getAttribute('href') === '#' + id; }); };
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting) {
+          links.forEach(function(a){ a.classList.remove('active'); });
+          var a = byId(en.target.id);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { threshold: 0.55 });
+    slides.forEach(function(s){ obs.observe(s); });
+
+    var current = function(){
+      var top = window.scrollY + window.innerHeight * 0.5;
+      for (var i = 0; i < slides.length; i++) {
+        var r = slides[i].getBoundingClientRect();
+        var y = r.top + window.scrollY;
+        if (top >= y && top < y + slides[i].offsetHeight) return i;
+      }
+      return 0;
+    };
+    var go = function(i){
+      var n = Math.max(0, Math.min(slides.length - 1, i));
+      slides[n].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    window.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); go(current() + 1); }
+      if (e.key === 'ArrowUp'   || e.key === 'PageUp')   { e.preventDefault(); go(current() - 1); }
+      if (e.key === 'Escape') { backToQna(); }
+    });
+  </script>
+</body>
+</html>

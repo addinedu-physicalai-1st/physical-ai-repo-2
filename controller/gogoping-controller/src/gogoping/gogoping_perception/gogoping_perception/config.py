@@ -111,7 +111,7 @@ YOLO_NAV_MODES: tuple[str, ...] = (
     # LULLABY 제외 — 제자리 모드라 proximity 주행정지 무의미, YOLO 불필요 (디버깅 결정)
 )
 # 정면 박스 (robot frame, m) — graph_router 의 사람 감지 영역
-PERSON_FRONT_DIST_M: float = 1.8   # 사람 정면 1.8m 정지 (일단)
+PERSON_FRONT_DIST_M: float = 1.0   # 사람 정면 1.0m proximity 정지·우회 임계
 PERSON_LATERAL_LIMIT_M: float = 0.5
 # 카메라 intrinsic (D435 default — 실측 후 튜닝)
 CAMERA_FX_PX: float = 615.0
