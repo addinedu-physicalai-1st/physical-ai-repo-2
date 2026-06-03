@@ -11,34 +11,66 @@
       <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:0">GogoPing · 자율주행 팀</h2>
     </div>
 
-    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:32px;min-height:0">
+    <div style="flex:1;display:flex;justify-content:space-around;align-items:center;gap:32px;min-height:0">
 
       <!-- 노영주 -->
-      <div style="display:flex;background:var(--surface);border:2px solid var(--mintInk);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
-        <div style="width:50%;background:#0a0d14;overflow:hidden;display:flex;align-items:center;justify-content:center">
-          <img src="slides/assets/team/youngju_face.jpg" alt="노영주" style="width:100%;height:100%;object-fit:cover;object-position:center top"
+      <div style="display:flex;align-items:stretch;background:var(--surface);height:580px;border:2px solid var(--mintInk);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
+        <div class="team-photo-box" style="width:273px;height:100%;background:#0a0d14;overflow:hidden;position:relative">
+          <img src="slides/assets/team/youngju_face.jpg?v=18" alt="노영주" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top"
                onerror="this.outerHTML='&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:120px;color:var(--mintSoft)&quot;&gt;person&lt;/span&gt;'"/>
         </div>
-        <div style="flex:1;padding:22px 22px;display:flex;flex-direction:column;justify-content:center;gap:10px">
-          <h3 class="font-display" style="font-size:1.6em;color:var(--mintInk);margin:0;line-height:1">노영주</h3>
-          <p style="font-size:0.62em;color:var(--inkSoft);margin:0;line-height:1.55">교사 추종<br>Follow Mode<br>YOLO + ByteTrack + ReID<br>WebRTC 영상</p>
+        <div style="width:273px;height:100%;padding:32px 24px;display:flex;flex-direction:column;justify-content:center;gap:24px;box-sizing:border-box">
+          <div>
+            <h3 class="font-display" style="font-size:1.7em;color:var(--mintInk);margin:0 0 8px;line-height:1">노영주</h3>
+            <div style="height:2px;background:linear-gradient(90deg,var(--mintInk),transparent);border-radius:1px"></div>
+          </div>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:18px">
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--mintInk);flex-shrink:0">directions_walk</span>
+              <span>추종 기능</span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.25">
+              <span class="material-icons-round" style="font-size:22px;color:var(--mintInk);flex-shrink:0">visibility</span>
+              <span>사람 인식<br><span style="font-size:0.78em;color:var(--inkSoft);letter-spacing:0.04em">YOLO · ReID</span></span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.25">
+              <span class="material-icons-round" style="font-size:22px;color:var(--mintInk);flex-shrink:0">videocam</span>
+              <span>영상 송출<br><span style="font-size:0.78em;color:var(--inkSoft);letter-spacing:0.04em">WebRTC</span></span>
+            </li>
+          </ul>
         </div>
       </div>
 
       <!-- 이강택 -->
-      <div style="display:flex;background:var(--surface);border:2px solid var(--mintInk);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
-        <div style="width:50%;background:#0a0d14;overflow:hidden;display:flex;align-items:center;justify-content:center">
-          <img src="slides/assets/team/kangtaek_face.png" alt="이강택" style="width:100%;height:100%;object-fit:cover;object-position:center top"
+      <div style="display:flex;align-items:stretch;background:var(--surface);height:580px;border:2px solid var(--mintInk);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
+        <div class="team-photo-box" style="width:273px;height:100%;background:#0a0d14;overflow:hidden;position:relative">
+          <img src="slides/assets/team/kangtaek_face.png?v=18" alt="이강택" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top"
                onerror="this.outerHTML='&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:120px;color:var(--mintSoft)&quot;&gt;person&lt;/span&gt;'"/>
         </div>
-        <div style="flex:1;padding:22px 22px;display:flex;flex-direction:column;justify-content:center;gap:10px">
-          <h3 class="font-display" style="font-size:1.6em;color:var(--mintInk);margin:0;line-height:1">이강택</h3>
-          <p style="font-size:0.62em;color:var(--inkSoft);margin:0;line-height:1.55">SLAM · Navigation<br>Nav2 · Path Planner<br>VicPinky 베이스<br>행동트리 (py_trees)</p>
+        <div style="width:273px;height:100%;padding:32px 24px;display:flex;flex-direction:column;justify-content:center;gap:24px;box-sizing:border-box">
+          <div>
+            <h3 class="font-display" style="font-size:1.7em;color:var(--mintInk);margin:0 0 8px;line-height:1">이강택</h3>
+            <div style="height:2px;background:linear-gradient(90deg,var(--mintInk),transparent);border-radius:1px"></div>
+          </div>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:18px">
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.25">
+              <span class="material-icons-round" style="font-size:22px;color:var(--mintInk);flex-shrink:0">explore</span>
+              <span>자율주행<br><span style="font-size:0.78em;color:var(--inkSoft);letter-spacing:0.04em">가이드</span></span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--mintInk);flex-shrink:0">visibility_off</span>
+              <span>숨바꼭질</span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--mintInk);flex-shrink:0">alt_route</span>
+              <span>사람 인식 경로 재설정</span>
+            </li>
+          </ul>
         </div>
       </div>
 
     </div>
   </div>
 
-  <aside class="notes">GogoPing(자율주행) 팀 — 노영주, 이강택.</aside>
+  <aside class="notes">GogoPing(자율주행) 팀 — 노영주(추종/인식/영상), 이강택(SLAM/자율주행·가이드/숨바꼭질).</aside>
 </section>

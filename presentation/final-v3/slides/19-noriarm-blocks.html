@@ -1,21 +1,44 @@
-<section>
+<section data-arch-flow>
+  <style>
+    .ovr-flow-lav{position:absolute;top:14px;left:14px;right:14px;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none}
+    .ovr-flow-lav .n{display:flex;align-items:center;gap:8px;background:rgba(15,18,28,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1.5px solid rgba(168,85,247,0.4);border-radius:10px;padding:7px 14px;opacity:0.55;filter:saturate(0.65);transform:scale(0.97);transition:all .35s cubic-bezier(0.2,0.8,0.2,1)}
+    .ovr-flow-lav .n.on{opacity:1;filter:none;transform:scale(1.04);background:rgba(168,85,247,0.92);border-color:var(--lavInk);box-shadow:0 0 24px rgba(168,85,247,0.55)}
+    .ovr-flow-lav .n .num{font-family:'Jua';font-size:14px;color:var(--lavInk);width:18px;text-align:center;flex:0 0 auto}
+    .ovr-flow-lav .n.on .num{color:#fff}
+    .ovr-flow-lav .n .lab{font-family:'Jua';font-size:13px;color:#fff;letter-spacing:0.02em}
+    .ovr-flow-lav .arrow{font-size:18px;color:rgba(168,85,247,0.45);font-weight:700;flex:0 0 auto;transition:color .35s}
+    .ovr-flow-lav .arrow.on{color:var(--lavInk)}
+    .arr-drv{position:absolute;left:-9999px;top:-9999px}
+  </style>
   <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;align-items:center;gap:10px">
       <span class="chip chip-lavender" style="font-size:0.55em">NORIARM · 1</span>
       <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">블럭쌓기 — ACT 모방학습</h2>
       <span class="chip chip-butter" style="font-size:0.5em">★ 메인</span>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+    <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <div class="ovr-flow-lav">
+        <div class="n" data-step="1,2,3,4,5"><span class="num">1</span><span class="lab">파랑·사람</span></div>
+        <span class="arrow" data-flow="2,3,4,5">→</span>
+        <div class="n" data-step="2,3,4,5"><span class="num">2</span><span class="lab">노랑·노리암</span></div>
+        <span class="arrow" data-flow="3,4,5">→</span>
+        <div class="n" data-step="3,4,5"><span class="num">3</span><span class="lab">초록·사람</span></div>
+        <span class="arrow" data-flow="4,5">→</span>
+        <div class="n" data-step="4,5"><span class="num">4</span><span class="lab">흰색·노리암</span></div>
+        <span class="arrow" data-flow="5">→</span>
+        <div class="n" data-step="5"><span class="num">5</span><span class="lab">홈포지션</span></div>
+      </div>
       <video src="slides/assets/media/noriarm/blocks.mp4" loop playsinline data-press-to-play
              style="max-width:100%;max-height:100%;object-fit:contain"
-             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/noriarm/blocks.mp4&lt;br&gt;&lt;span style=&quot;font-size:0.7em&quot;&gt;pull-assets.sh 실행 후 표시됨&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;'"></video>
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;noriarm/blocks.mp4&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+    <div class="arr-drv" aria-hidden="true">
+      <span class="fragment" data-archstep="1"></span>
+      <span class="fragment" data-archstep="2"></span>
+      <span class="fragment" data-archstep="3"></span>
+      <span class="fragment" data-archstep="4"></span>
+      <span class="fragment" data-archstep="5"></span>
     </div>
   </div>
-  <aside class="notes">
-    블럭쌓기. 사람과 NoriArm 이 번갈아 블럭을 쌓는 협동 놀이.
-    가위바위보 선공 정하기는 데모 단순화로 사람=가위·로봇=보 고정 → 사람 선공. RPS 재생 동안 백그라운드로 ACT 정책 GPU 로드.
-    ACT 정책(HuggingFace jisoo3/act_game_block_stacking_0521)이 사람 ROI 비워짐을 감지해 로봇 차례에 자기 색 블럭을 픽업·스택·홈 복귀.
-    /joint_states 의 HOME 복귀 2회를 종료 신호로 사용.
-    rerun.io 시각화로 정책 입력 + 검출 bbox 를 한 화면에 — 데모 직전 디버깅에 결정적.
-  </aside>
+  <aside class="notes">블럭쌓기 — 영상 상단 5단계 블록 overlay: 파랑(사람) → 노랑(노리암) → 초록(사람) → 흰색(노리암) → 홈포지션.</aside>
 </section>

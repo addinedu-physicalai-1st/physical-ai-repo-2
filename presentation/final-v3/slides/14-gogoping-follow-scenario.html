@@ -1,0 +1,63 @@
+<section>
+  <style>
+    .scn-mint-fork{position:relative;width:1280px;height:720px;padding:0;box-sizing:border-box}
+    .scn-mint-fork h2{font-family:'Jua';font-size:1.65em;color:var(--ink);margin:0}
+    .scn-mint-fork .hdr{position:absolute;top:220px;left:60px;display:flex;align-items:center;gap:14px;z-index:5}
+    .scn-mint-fork .blk{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:rgba(74,222,128,0.16);border:2px solid var(--mintInk);border-radius:12px;box-sizing:border-box}
+    .scn-mint-fork .blk.main{width:90px;height:72px}
+    .scn-mint-fork .blk.cond{width:100px;height:50px;background:rgba(74,222,128,0.08);border-style:dashed;border-color:rgba(74,222,128,0.7)}
+    .scn-mint-fork .blk .n{font-family:'Jua';font-size:18px;color:var(--mintInk);line-height:1}
+    .scn-mint-fork .blk .l{font-family:'Jua';font-size:13px;color:var(--ink);line-height:1.1;text-align:center;white-space:nowrap}
+    .scn-mint-fork .blk.cond .l{font-size:13px;color:var(--inkSoft)}
+    .scn-mint-fork .blk.cond .lab{font-family:'Jua';font-size:9px;color:var(--mintInk);letter-spacing:0.12em;opacity:0.85;line-height:1}
+    .scn-mint-fork .stage{position:absolute;top:165px;left:60px;right:60px;height:480px}
+  </style>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-90px;left:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--skySoft);bottom:-60px;right:-40px;opacity:0.28"></div>
+  </div>
+  <div class="layer scn-mint-fork">
+    <div class="hdr">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 1</span>
+      <h2>교사 추종 — 시나리오</h2>
+    </div>
+
+    <div class="stage">
+      <!-- Stage coordinates: width≈1180, height≈480. Main row center y=235. -->
+      <!-- Main blocks (gap 60 between) -->
+      <div class="blk main" style="left:30px;top:199px"><span class="n">1</span><span class="l">트리거</span></div>
+      <div class="blk main" style="left:220px;top:199px"><span class="n">2</span><span class="l">얼굴 매칭</span></div>
+      <div class="blk main" style="left:410px;top:199px"><span class="n">3</span><span class="l">객체 등록</span></div>
+      <div class="blk main" style="left:600px;top:199px"><span class="n">4</span><span class="l">추종</span></div>
+      <div class="blk main" style="left:1060px;top:199px"><span class="n">5</span><span class="l">대기</span></div>
+
+      <!-- Branch condition boxes -->
+      <div class="blk cond" style="left:830px;top:120px"><span class="lab">CONDITION</span><span class="l">스캔 실패</span></div>
+      <div class="blk cond" style="left:830px;top:310px"><span class="lab">CONDITION</span><span class="l">음성 정지</span></div>
+
+      <!-- SVG connectors -->
+      <svg style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none">
+        <defs>
+          <marker id="ar-mint-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3FD9A6"/></marker>
+        </defs>
+        <!-- Main row arrows (block right edge x=block_left+90 → next block left, 100px gap) -->
+        <path d="M 120 235 L 215 235" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)"/>
+        <path d="M 310 235 L 405 235" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)"/>
+        <path d="M 500 235 L 595 235" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)"/>
+
+        <!-- Branch up: 추종 right (690, 235) → 스캔실패 left (830, 145) -->
+        <path d="M 690 235 C 760 235, 760 145, 825 145" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)" opacity="0.95"/>
+        <!-- Merge up: 스캔실패 right (930, 145) → 대기 left (1060, 235) -->
+        <path d="M 930 145 C 1000 145, 1000 235, 1055 235" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)" opacity="0.95"/>
+
+        <!-- Branch down: 추종 right (690, 235) → 음성정지 left (830, 335) -->
+        <path d="M 690 235 C 760 235, 760 335, 825 335" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)" opacity="0.95"/>
+        <!-- Merge down: 음성정지 right (930, 335) → 대기 left (1060, 235) -->
+        <path d="M 930 335 C 1000 335, 1000 235, 1055 235" stroke="#3FD9A6" stroke-width="2.5" fill="none" marker-end="url(#ar-mint-s)" opacity="0.95"/>
+      </svg>
+    </div>
+  </div>
+  <aside class="notes">
+    교사 추종 시나리오 — 4 추종 박스에서 git-branch 형태로 갈라져 두 조건 박스 (스캔 실패 / 음성 정지) 거쳐 5 대기 로 합류.
+  </aside>
+</section>

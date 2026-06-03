@@ -317,12 +317,13 @@ html, body {
   .r { opacity: 1 !important; transform: none !important; }
 }
 
-/* video speed controls overlay */
+/* video speed controls overlay — 숨김 (default rate 는 main.js 에서 자동 적용) */
 .video-speed{
   position:absolute; bottom:10px; right:14px; display:flex; gap:4px;
-  z-index:10; opacity:0; transition:opacity .15s;
+  z-index:10; opacity:0; pointer-events:none; transition:opacity .15s;
+  visibility:hidden;
 }
-.video-speed.show, *:hover > .video-speed { opacity:1; }
+.video-speed.show, *:hover > .video-speed { opacity:0; visibility:hidden; }
 .video-speed button{
   background:rgba(20,16,28,0.78); color:#fff;
   border:1px solid rgba(255,255,255,0.18); border-radius:6px;
@@ -350,4 +351,14 @@ html, body {
   -webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;color:transparent;
   animation:shine 6s linear infinite;
+}
+
+/* team card photo — reveal.js 기본 img margin/border/background 제거 */
+.team-photo-box img {
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  max-width: none !important;
+  max-height: none !important;
+  box-shadow: none !important;
 }

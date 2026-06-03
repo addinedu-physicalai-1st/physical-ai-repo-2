@@ -1,209 +1,129 @@
 <section>
-  <div style="height:720px;width:1280px;box-sizing:border-box;padding:50px 100px;display:flex;flex-direction:column;gap:14px">
+  <div style="height:720px;width:1280px;box-sizing:border-box;padding:34px 60px 28px;display:flex;flex-direction:column;gap:16px">
 
     <!-- 헤더 -->
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex:0 0 auto">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <span class="chip chip-sky" style="font-size:0.55em">SPRINT MANAGEMENT</span>
-        <h2 class="font-display" style="font-size:1.3em;color:var(--ink);margin:0">스프린트 관리</h2>
+        <h2 class="font-display" style="font-size:1.4em;color:var(--ink);margin:0">스프린트 관리</h2>
       </div>
       <div style="display:flex;align-items:center;gap:10px;color:var(--inkSoft);font-family:'Jua';font-size:0.55em">
-        <span><span style="color:var(--ink)">7 Sprints</span> · 04.23 → 06.04</span>
-        <span style="opacity:0.4">|</span>
-        <span><span style="color:var(--mint)">59 done</span> / 64 · <span style="color:var(--mint)">92%</span></span>
+        <span><span style="color:var(--ink)">7 Sprints</span></span>
+        <span style="opacity:0.4">·</span>
+        <span style="color:var(--mint)">All Done ✓</span>
       </div>
     </div>
 
-    <!-- Row 1: S1 → S2 → S3 → S4 -->
-    <div style="flex:1;display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr 24px 1fr;align-items:stretch;min-height:0">
+    <!-- Row 1: S1 ❯ S2 ❯ S3 ❯ S4 -->
+    <div style="flex:1;display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr 28px 1fr;gap:0;align-items:stretch;min-height:0">
 
       <!-- S1 -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--babypink);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="background:var(--surface);border:1.5px solid var(--babypink);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(255,111,134,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--babypink);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">01</span>
-          </div>
-          <span style="color:var(--mint);font-family:'Jua';font-size:0.6em">1✓</span>
+          <span style="font-family:'Jua';color:var(--babypink);font-size:2em;line-height:1">01</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(255,111,134,0.10);padding:3px 9px;border-radius:999px">2일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">Apr 23 — 24</div>
-        <span style="background:var(--babypinkSoft);color:var(--babypink);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">2d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"주제와 UR"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--babypink);border-radius:50%"></span>프로젝트 주제 정하기</li>
-        </ul>
+        <div style="height:1px;background:rgba(255,111,134,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--babypink);font-size:0.7em;line-height:1.3">주제 · UR</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">프로젝트 주제 정하기</p>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:center;color:var(--inkSoft);font-family:'Jua';font-size:1.3em">›</div>
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--babypink);font-family:'Jua';font-size:2em;line-height:1;opacity:0.7">❯</div>
 
       <!-- S2 -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--butter);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="background:var(--surface);border:1.5px solid var(--butter);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(255,210,94,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--butter);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">02</span>
-          </div>
-          <span style="color:var(--mint);font-family:'Jua';font-size:0.6em">9✓</span>
+          <span style="font-family:'Jua';color:var(--butter);font-size:2em;line-height:1">02</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(255,210,94,0.10);padding:3px 9px;border-radius:999px">6일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">Apr 25 — 30</div>
-        <span style="background:var(--butterSoft);color:var(--butter);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">6d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"상세 설계 완료"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--butter);border-radius:50%"></span>UR · SR · Architecture</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--butter);border-radius:50%"></span>Folder · docs sync</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--butter);border-radius:50%"></span>Vic Pinky 셋업 · teleop</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--butter);border-radius:50%"></span>슬리퍼·빨래 기술조사</li>
-        </ul>
+        <div style="height:1px;background:rgba(255,210,94,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--butter);font-size:0.7em;line-height:1.3">상세 설계</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">UR · SR · 아키텍처<br/>Vic Pinky 셋업</p>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:center;color:var(--inkSoft);font-family:'Jua';font-size:1.3em">›</div>
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--butter);font-family:'Jua';font-size:2em;line-height:1;opacity:0.7">❯</div>
 
       <!-- S3 -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--mint);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="background:var(--surface);border:1.5px solid var(--mint);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(63,217,166,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--mint);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">03</span>
-          </div>
-          <span style="color:var(--mint);font-family:'Jua';font-size:0.6em">9✓</span>
+          <span style="font-family:'Jua';color:var(--mint);font-size:2em;line-height:1">03</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(63,217,166,0.10);padding:3px 9px;border-radius:999px">6일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">May 2 — 7</div>
-        <span style="background:var(--mintSoft);color:var(--mint);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">6d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"scaffold 구현·할당"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>가게·블록 기술조사</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>양팔/한팔 놀이 설계</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>gogoping keyboard teleop</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>robot-ui · portal UI</li>
-        </ul>
+        <div style="height:1px;background:rgba(63,217,166,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--mint);font-size:0.7em;line-height:1.3">scaffold 구현</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">놀이 설계 · gogoping<br/>robot-ui · portal</p>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:center;color:var(--inkSoft);font-family:'Jua';font-size:1.3em">›</div>
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--mint);font-family:'Jua';font-size:2em;line-height:1;opacity:0.7">❯</div>
 
-      <!-- S4 (PEAK) -->
-      <div style="background:var(--surface);border:1px solid var(--sky);border-top:3px solid var(--sky);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0;box-shadow:0 0 0 1px var(--sky) inset, 0 4px 16px rgba(91,182,255,0.10);position:relative">
-        <div style="position:absolute;top:-1px;right:10px;background:var(--sky);color:var(--canvas);font-size:0.35em;padding:1px 7px;border-radius:0 0 5px 5px;font-family:'Jua';letter-spacing:0.1em;font-weight:700">PEAK</div>
+      <!-- S4 -->
+      <div style="background:var(--surface);border:1.5px solid var(--sky);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(91,182,255,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--sky);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">04</span>
-          </div>
-          <span style="color:var(--mint);font-family:'Jua';font-size:0.75em">15✓</span>
+          <span style="font-family:'Jua';color:var(--sky);font-size:2em;line-height:1">04</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(91,182,255,0.10);padding:3px 9px;border-radius:999px">7일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">May 8 — 14</div>
-        <span style="background:var(--skySoft);color:var(--sky);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">7d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"구현 week1"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--sky);border-radius:50%"></span>등하원 · 율동 구현</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--sky);border-radius:50%"></span>OX · 블록 녹화 · 3js</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--sky);border-radius:50%"></span>시뮬·CAD 맵 · 수면실</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--sky);border-radius:50%"></span>2축 카메라 · nav graph</li>
-        </ul>
+        <div style="height:1px;background:rgba(91,182,255,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--sky);font-size:0.7em;line-height:1.3">구현 week 1</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">등하원 · 율동 · OX<br/>블록 · 3js · 카메라</p>
       </div>
 
     </div>
 
-    <!-- Connector arrow row (S4 ↓ S5) — small line -->
-    <div style="display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr 24px 1fr;height:14px;flex:0 0 14px">
-      <div style="grid-column:7;display:flex;align-items:center;justify-content:center;color:var(--mint);font-family:'Jua';font-size:1.1em;line-height:1">↓</div>
+    <!-- Wrap arrow row (S4 ↓ S5) — height 충분히 키워서 화살표가 위/아래 카드와 겹치지 않게 -->
+    <div style="display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr 28px 1fr;height:38px;flex:0 0 38px">
+      <div style="grid-column:7;display:flex;align-items:center;justify-content:center;color:var(--sky);font-family:'Jua';font-size:1.3em;line-height:1;opacity:0.75">⤵</div>
     </div>
 
-    <!-- Row 2: KPI [S7] ← [S6] ← [S5] -->
-    <div style="flex:1;display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr 24px 1fr;align-items:stretch;min-height:0">
+    <!-- Row 2 (역순): SUMMARY ❮ S7 ❮ S6 ❮ S5 (S5가 S4 바로 아래) -->
+    <div style="flex:1;display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr 28px 1fr;gap:0;align-items:stretch;min-height:0">
 
-      <!-- KPI -->
-      <div style="background:linear-gradient(135deg,var(--surface),rgba(63,217,166,0.05));border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;gap:6px;min-width:0">
-        <div>
-          <p style="margin:0;color:var(--inkSoft);font-family:'Jua';font-size:0.42em;letter-spacing:0.2em">PROGRESS</p>
-          <p style="margin:4px 0 0;color:var(--ink);font-family:'Jua';font-size:0.55em">프로젝트 진척</p>
-        </div>
-        <div style="display:flex;align-items:baseline;gap:6px">
-          <span style="font-family:'Jua';color:var(--mint);font-size:1.9em;line-height:1">91<span style="font-size:0.45em">%</span></span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="color:var(--ink);font-family:'Jua';font-size:0.5em"><span style="color:var(--mint)">58</span>/64 done</span>
-          <span style="background:var(--babypinkSoft);color:var(--babypink);font-size:0.38em;padding:1px 6px;border-radius:999px;font-family:'Jua';letter-spacing:0.08em">D-2</span>
-        </div>
-        <div style="height:1px;background:var(--border)"></div>
-        <div style="display:flex;flex-direction:column;gap:3px">
-          <span style="color:var(--inkSoft);font-size:0.45em">Velocity peak <span style="color:var(--sky)">S4 · 15</span></span>
-          <span style="color:var(--inkSoft);font-size:0.45em">잔여 <span style="color:var(--butter)">1 🔄</span> · <span style="color:var(--sky)">2 ○</span></span>
-        </div>
+      <!-- Summary (DONE) — column 1 -->
+      <div style="background:linear-gradient(135deg,rgba(63,217,166,0.18),rgba(185,140,255,0.18));border:1.5px solid var(--mint);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;text-align:center;min-width:0;box-shadow:0 4px 18px rgba(63,217,166,0.18)">
+        <span style="color:var(--mint);font-family:'Jua';font-size:2.4em;line-height:1">✓</span>
+        <p style="margin:0;font-family:'Jua';color:var(--ink);font-size:0.85em;line-height:1.2">7주 완주</p>
+        <p style="margin:0;color:var(--inkSoft);font-family:'Jua';font-size:0.55em;letter-spacing:0.05em">All Done</p>
       </div>
 
-      <div></div>
+      <!-- arrow S7 → SUMMARY (좌측 향, butter 색) -->
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--butter);font-family:'Jua';font-size:2em;line-height:1;opacity:0.7">❮</div>
 
-      <!-- S7 (NOW) -->
-      <div style="background:var(--surface);border:1px solid var(--butter);border-top:3px solid var(--butter);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0;box-shadow:0 0 0 1px var(--butter) inset, 0 4px 16px rgba(255,210,94,0.12);position:relative">
-        <div style="position:absolute;top:-1px;right:10px;background:var(--butter);color:var(--canvas);font-size:0.35em;padding:1px 7px;border-radius:0 0 5px 5px;font-family:'Jua';letter-spacing:0.1em;font-weight:700">● NOW</div>
+      <!-- S7 -->
+      <div style="background:var(--surface);border:1.5px solid var(--butter);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(255,210,94,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--butter);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">07</span>
-          </div>
-          <span style="color:var(--butter);font-family:'Jua';font-size:0.55em">1✓·1🔄·2○</span>
+          <span style="font-family:'Jua';color:var(--butter);font-size:2em;line-height:1">07</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(255,210,94,0.10);padding:3px 9px;border-radius:999px">5일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">May 30 — Jun 3</div>
-        <span style="background:var(--butterSoft);color:var(--butter);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">5d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"발표 준비"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--mint);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>✓ 하이파이브 (FN-68)</li>
-          <li style="color:var(--butter);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--butter);border-radius:50%"></span>🔄 숨바꼭질 (FN-73)</li>
-          <li style="color:var(--sky);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--sky);border-radius:50%"></span>○ 발표 자료 (FN-13)</li>
-          <li style="color:var(--sky);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--sky);border-radius:50%"></span>○ 발표 스크립트 (FN-14)</li>
-        </ul>
+        <div style="height:1px;background:rgba(255,210,94,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--butter);font-size:0.7em;line-height:1.3">발표 준비</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">하이파이브 · 숨바꼭질<br/>발표 자료</p>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:center;color:var(--inkSoft);font-family:'Jua';font-size:1.3em">‹</div>
+      <!-- arrow S6 → S7 (좌측 향, mint 색) -->
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--mint);font-family:'Jua';font-size:2em;line-height:1;opacity:0.7">❮</div>
 
-      <!-- S6 (DEMO) -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--mint);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0;position:relative">
-        <div style="position:absolute;top:-1px;right:10px;background:var(--mint);color:var(--canvas);font-size:0.35em;padding:1px 7px;border-radius:0 0 5px 5px;font-family:'Jua';letter-spacing:0.1em;font-weight:700">DEMO</div>
+      <!-- S6 -->
+      <div style="background:var(--surface);border:1.5px solid var(--mint);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(63,217,166,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--mint);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">06</span>
-          </div>
-          <span style="color:var(--mint);font-family:'Jua';font-size:0.6em">10✓</span>
+          <span style="font-family:'Jua';color:var(--mint);font-size:2em;line-height:1">06</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(63,217,166,0.10);padding:3px 9px;border-radius:999px">7일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">May 22 — 28</div>
-        <span style="background:var(--mintSoft);color:var(--mint);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">7d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"테스트 · 데모"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>데모 5종 촬영</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>가게 · 블록 UI 통합</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>추종 · LLM 노이즈 ↓</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--mint);border-radius:50%"></span>판넬 A1</li>
-        </ul>
+        <div style="height:1px;background:rgba(63,217,166,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--mint);font-size:0.7em;line-height:1.3">테스트 · 데모</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">데모 5종 · UI 통합<br/>추종 · 판넬</p>
       </div>
 
-      <div style="display:flex;align-items:center;justify-content:center;color:var(--inkSoft);font-family:'Jua';font-size:1.3em">‹</div>
+      <!-- arrow S5 → S6 (좌측 향, lavender 색) -->
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--lavender);font-family:'Jua';font-size:2em;line-height:1;opacity:0.7">❮</div>
 
-      <!-- S5 -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--lavender);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+      <!-- S5 — column 7, S4 바로 아래 -->
+      <div style="background:var(--surface);border:1.5px solid var(--lavender);border-radius:14px;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 4px 18px rgba(185,140,255,0.08)">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px">
-          <div style="display:flex;align-items:baseline;gap:5px">
-            <span style="font-family:'Jua';color:var(--lavender);font-size:0.45em;letter-spacing:0.18em">SPRINT</span>
-            <span style="font-family:'Jua';color:var(--ink);font-size:1.25em;line-height:1">05</span>
-          </div>
-          <span style="color:var(--mint);font-family:'Jua';font-size:0.6em">13✓</span>
+          <span style="font-family:'Jua';color:var(--lavender);font-size:2em;line-height:1">05</span>
+          <span style="font-family:'Jua';color:var(--inkSoft);font-size:0.55em;background:rgba(185,140,255,0.10);padding:3px 9px;border-radius:999px">7일</span>
         </div>
-        <div style="color:var(--inkSoft);font-family:'Jua';font-size:0.48em">May 15 — 21</div>
-        <span style="background:var(--lavenderSoft);color:var(--lavender);font-size:0.4em;padding:1px 6px;border-radius:999px;font-family:'Jua';align-self:flex-start">7d</span>
-        <p style="margin:1px 0 0;color:var(--inkSoft);font-style:italic;font-size:0.44em;line-height:1.3">"구현 week2"</p>
-        <div style="height:1px;background:var(--border);margin:1px 0"></div>
-        <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;flex:1">
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--lavender);border-radius:50%"></span>무궁화 · OX 데모</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--lavender);border-radius:50%"></span>LLM 속도 · openarm 제한</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--lavender);border-radius:50%"></span>카메라 외장 · 태블릿거치</li>
-          <li style="color:var(--ink);font-size:0.48em;line-height:1.35;padding-left:8px;position:relative"><span style="position:absolute;left:0;top:5px;width:3px;height:3px;background:var(--lavender);border-radius:50%"></span>가이드 · 데모 시나리오</li>
-        </ul>
+        <div style="height:1px;background:rgba(185,140,255,0.20)"></div>
+        <p style="margin:0;font-family:'Jua';color:var(--lavender);font-size:0.7em;line-height:1.3">구현 week 2</p>
+        <p style="margin:auto 0 0;color:var(--inkSoft);font-size:0.55em;line-height:1.45">무궁화 · LLM 속도<br/>openarm · 가이드</p>
       </div>
 
     </div>
@@ -211,7 +131,6 @@
   </div>
 
   <aside class="notes">
-    7주 7개 Sprint snake. S1 (1) · S2 (9) · S3 (9) · S4 (15 PEAK) · S5 (13) · S6 (10 DEMO) · S7 (현재 NOW · 1✓+1🔄+2○).
-    좌측 KPI: 92% 진척 (59/64), D-2, velocity peak S4.
+    7주 7개 Sprint flow with chevron arrows. S1 → S2 → S3 → S4 ⤵ S5 → S6 → S7 → ✓ Done. 각 카드 색깔 outlined.
   </aside>
 </section>

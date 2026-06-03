@@ -2,91 +2,470 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="pragma" content="no-cache" />
 <title>가게놀이 기능 · Q&A 보고서 — 최민성</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+
 <style>
   :root{
-    --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
-    --border:rgba(255,255,255,.10); --accent:#FFD25E;
+    --bg:#16131F; --surface:#241F33; --surface2:#1B1727; --ink:#F4EFE8; --inkSoft:#A79FB4;
+    --border:rgba(255,255,255,.10); --accent:#FFD25E; --accentSoft:rgba(255,210,94,.16);
+    --good:#3FD9A6; --bad:#FF6F86;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{
-    background:var(--bg); color:var(--ink);
-    font-family:'Pretendard Variable',system-ui,sans-serif;
-    opacity:0; transition:opacity .3s ease; min-height:100vh;
-  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--ink); height:100%}
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
+
+  /* Reveal 본 발표 톤으로 덮어쓰기 */
+  .reveal{
+    font-family:'Pretendard Variable',system-ui,sans-serif;
+    color:var(--ink); font-size:24px;
+  }
+  .reveal .slides{ text-align:left }
+  .reveal .slides > section, .reveal .slides > section > section{
+    padding:46px 60px 50px; height:720px;
+    display:flex !important; flex-direction:column; justify-content:flex-start;
+  }
+  .reveal h1,.reveal h2,.reveal h3,.reveal h4{
+    font-family:'Jua','Pretendard Variable',sans-serif;
+    text-transform:none; color:var(--ink); letter-spacing:-.005em; margin:0;
+  }
+  .reveal h1{ font-size:72px; line-height:1.1 }
+  .reveal h2{ font-size:46px; line-height:1.15; margin-bottom:8px }
+  .reveal h3{ font-size:22px }
+  .reveal p{ font-size:20px; line-height:1.55; color:var(--ink); margin:0 }
+  .reveal a{ color:var(--accent) }
+  .reveal section img, .reveal section video{ margin:0; border:0; box-shadow:none; max-width:none; max-height:none }
+
+  .kicker{ color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.22em; font-size:14px; margin:0 0 12px !important }
+  .sub{ color:var(--inkSoft); font-size:19px; line-height:1.55; margin:0 0 18px !important }
+  .sub b{ color:var(--ink) }
+
+  /* ⚠️ 뒤로가기 버튼 — Reveal 바깥 fixed */
   .back{
-    position:fixed; top:22px; left:24px; z-index:10;
+    position:fixed; top:18px; left:22px; z-index:1000;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
-    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:14px;
     padding:8px 16px; border-radius:999px; cursor:pointer;
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
-  .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
-  .placeholder{
-    border:1.5px dashed var(--border); border-radius:18px;
-    padding:48px 36px; text-align:center; background:var(--surface);
+  .crumb{
+    position:fixed; top:24px; right:24px; z-index:1000;
+    color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:13px; letter-spacing:.08em;
   }
-  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
-  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
-  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
-  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
-  #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
+  .crumb b{color:var(--accent)}
+
+  /* Reveal slide number 색상 */
+  .reveal .slide-number{
+    background:rgba(22,19,31,.7); color:var(--ink); font-family:'Jua',sans-serif;
+    border:1px solid var(--border); border-radius:999px; padding:6px 14px;
+  }
+  .reveal .controls{ color:var(--accent) }
+
+  /* 커버 */
+  .cover{
+    background:radial-gradient(900px 500px at 28% 25%, rgba(255,210,94,.10), transparent),
+               radial-gradient(700px 500px at 78% 80%, rgba(63,217,166,.06), transparent);
+    justify-content:center !important;
+  }
+  .cover .name{ color:var(--inkSoft); font-size:18px; margin-top:18px !important }
+  .cover .name b{ color:var(--accent); font-family:'Jua',sans-serif }
+
+  /* 시각자료 카드 — row 자동 (영상/이미지 자기 비율) → 외곽선이 실제 영역에 맞음 */
+  .grid{ display:grid; gap:14px; grid-auto-rows:auto; min-height:0; align-items:start }
+  .g2{ grid-template-columns:repeat(2,1fr) }
+  .g3{ grid-template-columns:repeat(3,1fr) }
+  .g4{ grid-template-columns:repeat(4,1fr) }
+  .g5{ grid-template-columns:repeat(5,1fr) }
+  .g3x2{ grid-template-columns:repeat(3,1fr) }
+  .vc{
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    min-height:0;
+  }
+  .vc img, .vc video{
+    display:block; width:100%; height:auto;
+    background:#000;
+  }
+  .vc .meta{ padding:10px 14px; flex:0 0 auto }
+  .vc .t{ font-family:'Jua',sans-serif; font-size:18px; color:var(--ink); margin:0 }
+  .vc .d{ font-size:15px; color:var(--inkSoft); margin:4px 0 0; line-height:1.5 }
+
+  /* split layout — 좌우 균등 + row height 슬라이드 가용 공간만 */
+  .split{ display:grid; grid-template-columns:1.25fr 1fr;
+          grid-template-rows:minmax(0, 1fr);
+          gap:24px; align-items:stretch; flex:1; min-height:0; overflow:hidden }
+  .split > *{ min-height:0; min-width:0; overflow:hidden }
+  .split > *:nth-child(2){ display:flex; flex-direction:column; justify-content:center; overflow:visible }
+  .hero-img{
+    background:transparent; border:none; box-shadow:none;
+    display:flex; align-items:center; justify-content:center;
+    height:100%; min-height:0; overflow:hidden;
+  }
+  .hero-img img{
+    display:block; width:100%; height:auto; max-height:100%;
+    object-fit:contain;
+    border:1px solid var(--border); border-radius:14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.5);
+    background:#0c0a13;
+  }
+
+  /* 통계 카드 */
+  .stats{ display:flex; flex-wrap:wrap; gap:12px; margin:0 0 14px }
+  .stat{
+    flex:1; min-width:120px;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-radius:14px; padding:14px 18px;
+  }
+  .stat .l{ color:var(--inkSoft); font-size:13px; margin-bottom:6px }
+  .stat .v{ font-family:'Jua',sans-serif; font-size:38px; line-height:1; color:var(--ink) }
+  .stat.good .v{ color:var(--good) }
+  .stat.bad .v{ color:var(--bad) }
+  .stat.accent .v{ color:var(--accent) }
+
+  /* 콜아웃 */
+  .callout{
+    display:flex; gap:12px; align-items:flex-start;
+    background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-left:4px solid var(--accent); border-radius:12px;
+    padding:14px 18px;
+  }
+  .callout.bad{ border-left-color:var(--bad) }
+  .callout.good{ border-left-color:var(--good) }
+  .callout .material-icons-round{ color:var(--accent); font-size:22px; margin-top:2px; flex-shrink:0 }
+  .callout.bad .material-icons-round{ color:var(--bad) }
+  .callout.good .material-icons-round{ color:var(--good) }
+  .callout p{ margin:0; line-height:1.6; font-size:16px; color:var(--ink) }
+  .callout .k{ color:var(--accent); font-family:'Jua',sans-serif }
+
+  /* 비교 카드 */
+  .compare{ display:grid; grid-template-columns:1fr 1fr; gap:14px }
+  .cmp{ border:1px solid var(--border); border-radius:12px; padding:16px 22px; background:rgba(255,255,255,.03) }
+  .cmp h3{ font-family:'Jua',sans-serif; font-size:22px; margin:0 0 8px; display:flex; align-items:center; gap:10px }
+  .cmp p{ margin:0; font-size:18px; line-height:1.6; color:var(--inkSoft) }
+
+  /* 타임라인 */
+  .timeline{ display:flex; flex-direction:column; gap:5px }
+  .tl{ display:grid; grid-template-columns:130px 1fr; gap:18px; padding:8px 0; border-bottom:1px dashed var(--border); font-size:16px }
+  .tl:last-child{ border-bottom:none }
+  .tl .d{ color:var(--accent); font-family:'Jua',sans-serif }
+  .tl .t{ color:var(--inkSoft); line-height:1.5 }
+  .tl .t b{ color:var(--ink) }
+
+  /* 페이드 */
+  #page-fade{ position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none }
 </style>
 </head>
 <body>
-  <div id="page-fade"></div>
+<div id="page-fade"></div>
 
-  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
-  <button class="back jua" onclick="backToQna()">
-    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-  </button>
+<!-- ⚠️ Q&A 인덱스 복귀 버튼 (필수) -->
+<button class="back jua" onclick="backToQna()">
+  <span class="material-icons-round" style="font-size:18px;vertical-align:-4px">arrow_back</span> Q&amp;A
+</button>
+<div class="crumb">가게놀이 기능 · <b>최민성</b></div>
 
-  <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 09</p>
-    <h1 class="jua">가게놀이 기능</h1>
-    <p class="member">담당 · 최민성</p>
+<div class="reveal">
+  <div class="slides">
 
-    <!--
-      ════════════════════════════════════════════════════════════════
-      여기부터 자유롭게 보고서를 작성하세요.
-      규칙 (presentation/final-v3/CLAUDE.md 참조):
-        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
-        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
-           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
-             업로드:  scripts/prismic/upload.sh
-             예)  <img src="https://images.prismic.io/.../foo.png" />
-        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
-           덱과 톤이 맞습니다.
-      ════════════════════════════════════════════════════════════════
-    -->
-    <div class="placeholder">
-      <span class="material-icons-round">storefront</span>
-      <h2 class="jua">보고서 준비 중</h2>
-      <p>최민성 님이 작성할 <b style="color:var(--ink)">가게놀이 기능</b> 상세 보고서 자리입니다.</p>
-      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
-    </div>
+    <!-- 01 · COVER -->
+    <section class="cover">
+      <p class="kicker">Q&amp;A · 09 · NORIARM</p>
+      <h1 class="jua">가게놀이 기능</h1>
+      <p class="sub" style="font-size:22px; margin-top:14px !important">
+        Grounding 진단 → 원인 추적 → 입력 전처리 → YOLO 정제 → 최종 모델 선택<br>
+        <b>2026-05-12 → 05-26</b> · 14일의 작업 흐름
+      </p>
+      <p class="name">담당 · <b>최민성</b></p>
+    </section>
+
+    <!-- 03 · DATASET -->
+    <section>
+      <p class="kicker">03 · DATASET</p>
+      <h2 class="jua">5종 객체 × 다중 시점 · 625 episode</h2>
+      <p class="sub"><b>store_play_v2_en</b> · 625 ep / 653k frames. 대표 episode 에 YOLO bbox 오버레이 — 라벨 품질 + 데이터셋 동시 검증.</p>
+      <div class="grid g4" style="flex:1">
+        <div class="vc">
+          <video src="assets-local/strawberry_top.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">딸기 서빙 (top)</p><p class="d">ep000 · YOLO bbox 오버레이</p></div>
+        </div>
+        <div class="vc">
+          <video src="assets-local/broccoli_top.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">브로콜리 서빙 (top)</p><p class="d">ep050 · 5종 동시 인식</p></div>
+        </div>
+        <div class="vc">
+          <video src="assets-local/grapes_top.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">포도 서빙 (top)</p><p class="d">ep100 · 흩어진 알갱이 bbox 까다로움</p></div>
+        </div>
+        <div class="vc">
+          <video src="assets-local/kiwi_wristR.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">키위 (wrist_right)</p><p class="d">ep150 · grasp 직전 거리 정보</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 · GROUNDING 60% -->
+    <section>
+      <p class="kicker">04 · DIAGNOSIS ★</p>
+      <h2 class="jua">SmolVLA Grounding 정확도 <span style="color:var(--accent)">60%</span></h2>
+      <div class="split">
+        <div class="hero-img">
+          <img src="https://images.prismic.io/minsung/ah0uXweQX7-eWd96_day02_05-13am_grounding_summary.png?auto=format,compress" alt="grounding summary">
+        </div>
+        <div>
+          <p class="sub">75 episode 의 grasp 직전 frame × 5 prompt 정량 평가. random (20%) 의 3 배지만 이상치 (90%) 와는 30%p 격차.</p>
+          <div class="stats">
+            <div class="stat accent"><div class="l">전체</div><div class="v">60%</div></div>
+            <div class="stat good"><div class="l">딸기</div><div class="v">73%</div></div>
+            <div class="stat bad"><div class="l">키위</div><div class="v">53%</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 · 2 GROUP -->
+    <section>
+      <p class="kicker">05 · WHY</p>
+      <h2 class="jua">왜 헷갈리는가 — <span style="color:var(--accent)">2 그룹</span>으로 묶임</h2>
+      <p class="sub">VLM cross-attention 직접 시각화. prompt 가 바뀌어도 모델은 5종을 두 묶음으로만 인식.</p>
+      <div class="grid g2" style="flex:1; gap:32px; align-items:start">
+        <div class="vc">
+          <img src="https://images.prismic.io/minsung/ah0uWweQX7-eWd92_day02_05-13am_attention_top_zoom_8prompts.png?auto=format,compress" alt="attention 8 prompts">
+          <div class="meta"><p class="t">Top 카메라 attention (8 prompt)</p><p class="d">prompt 8개 별 attention heatmap — 2 그룹으로 분리</p></div>
+        </div>
+        <div class="vc">
+          <img src="https://images.prismic.io/minsung/ah0uWgeQX7-eWd91_day02_05-13am_attention_correlation_matrix.png?auto=format,compress" alt="attention corr">
+          <div class="meta"><p class="t">Prompt-Prompt attention 유사도 매트릭스</p><p class="d">5×5 — 비대각선도 0.8+, prompt 변화에 거의 무반응</p></div>
+        </div>
+      </div>
+      <div class="compare" style="margin-top:14px">
+        <div class="cmp"><h3 style="color:var(--good)"><span class="material-icons-round">group_work</span> Group A</h3><p>딸기 · 포도 · 키위</p></div>
+        <div class="cmp"><h3 style="color:var(--accent)"><span class="material-icons-round">group_work</span> Group B</h3><p>브로콜리 · 파인애플</p></div>
+      </div>
+    </section>
+
+    <!-- 06 · ACTION -->
+    <section>
+      <p class="kicker">06 · ACTION</p>
+      <h2 class="jua">Action 도 같은 패턴 — 신호가 흐림</h2>
+      <div class="split">
+        <div class="grid" style="gap:12px">
+          <div class="vc"><img src="https://images.prismic.io/minsung/ah0uWQeQX7-eWd90_day02_05-13am_action_trajectory_5prompts.png?auto=format,compress"><div class="meta"><p class="t">5 prompt × 50-step 궤적</p></div></div>
+          <div class="vc"><img src="https://images.prismic.io/minsung/ah0uWAeQX7-eWd9z_day02_05-13am_action_L2_distance_matrix.png?auto=format,compress"><div class="meta"><p class="t">Prompt 간 action L2 거리</p></div></div>
+        </div>
+        <div>
+          <p class="sub">초반 step 거의 동일 → step 20+ 부터 갈라짐. 평균 차이 <b style="color:var(--accent)">6%</b> — 반응은 하지만 grasp 까지 필요한 만큼은 안 만들어짐.</p>
+          <div class="callout">
+            <span class="material-icons-round">timeline</span>
+            <p>작은 차이가 누적되며 다른 객체로 향함. <span class="k">prompt → action</span> 신호 경로가 흐릿하다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 · VISION ABLATION -->
+    <section>
+      <p class="kicker">07 · SMOKING GUN ★</p>
+      <h2 class="jua">결정적 증거 — 모델은 <span style="color:var(--bad)">vision 을 거의 안 본다</span></h2>
+      <div class="split">
+        <div class="hero-img">
+          <img src="https://images.prismic.io/minsung/ah0uhgeQX7-eWd-Q_day03_05-13pm_vision_ablation_black_vs_shuf.png?auto=format,compress" alt="vision ablation">
+        </div>
+        <div>
+          <p class="sub">vision 입력을 <b>검정</b> · <b>픽셀 셔플</b> 로 바꿔도 action 변화량 측정.</p>
+          <div class="stats">
+            <div class="stat bad"><div class="l">action MSE</div><div class="v">0.08%</div></div>
+            <div class="stat"><div class="l">의미</div><div class="v" style="font-size:22px">vision 미사용</div></div>
+          </div>
+          <div class="callout bad">
+            <span class="material-icons-round">lightbulb</span>
+            <p><span class="k" style="color:var(--bad)">결론:</span> 모델이 <b>prompt + state</b> 만으로 학습 분포를 외움. 추가 학습보다 <b style="color:var(--accent)">입력단 개선</b>이 정답.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 · GROUNDING-DINO -->
+    <section>
+      <p class="kicker">08 · SOLUTION C1</p>
+      <h2 class="jua">Grounding-DINO 로 target 만 명시</h2>
+      <p class="sub">Open-vocab detector 가 prompt 받아 5종 직접 검출. 추가 학습 불필요.</p>
+      <div class="grid g5 photo-grid" style="flex:1">
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0ugAeQX7-eWd-N_day03_05-13pm_gdino_strawberry.png?auto=format,compress"><div class="meta"><p class="t">딸기</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0ufQeQX7-eWd-K_day03_05-13pm_gdino_grape.png?auto=format,compress"><div class="meta"><p class="t">포도</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0ufgeQX7-eWd-L_day03_05-13pm_gdino_kiwi.png?auto=format,compress"><div class="meta"><p class="t">키위</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0ufAeQX7-eWd-J_day03_05-13pm_gdino_broccoli.png?auto=format,compress"><div class="meta"><p class="t">브로콜리</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0ufweQX7-eWd-M_day03_05-13pm_gdino_pineapple.png?auto=format,compress"><div class="meta"><p class="t">파인애플</p></div></div>
+      </div>
+    </section>
+
+    <!-- 09 · ROI MASK -->
+    <section>
+      <p class="kicker">09 · ROI MASK</p>
+      <h2 class="jua">VLA 가 실제로 받는 입력</h2>
+      <p class="sub">YOLO bbox 영역만 살리고 나머지 검정 처리. 실제 ROI mask 적용 영상으로 학습 분포 영향 검증.</p>
+      <div class="grid g3" style="flex:1">
+        <div class="vc">
+          <video src="assets-local/roi_kiwi_top_roi.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">kiwi · top ROI</p><p class="d">ep405 · ROI mask 적용 추론</p></div>
+        </div>
+        <div class="vc">
+          <video src="assets-local/roi_grape_top_roi.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">grape · top ROI</p><p class="d">ep415 · 흩어진 알갱이도 검출</p></div>
+        </div>
+        <div class="vc">
+          <video src="assets-local/roi_pineapple_top_roi.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">pineapple · top ROI</p><p class="d">ep400 · target 만 살리고 grasp</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 · YOLO R1-R8 -->
+    <section>
+      <p class="kicker">10 · YOLO ACTIVE LEARNING</p>
+      <h2 class="jua">실패 케이스 라벨 → 재학습 · R2 → R8</h2>
+      <p class="sub">총 13 라운드 중 핵심 3 단계 — 정량 검증 (R4), 클래스 확장 (R7), failure fix (R8). <b>YOLOv8n × 13 라운드 누적 학습 ~2.1 시간</b>.</p>
+      <div class="grid g3" style="flex:1">
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0uiAeQX7-eWd-S_day03_05-13pm_yolo_r4_confusion_matrix.png?auto=format,compress"><div class="meta"><p class="t">★ R4 confusion (844 장)</p><p class="d">P=0.999 · R=0.996 — 정량 baseline</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0ujgeQX7-eWd-Y_day05_05-16_yolo_r7_results.png?auto=format,compress"><div class="meta"><p class="t">R7 — bell button 추가</p><p class="d">5 → 7 class · 서빙 신호</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0uvweQX7-eWd-c_day07_05-20_yolo_r8_results.png?auto=format,compress"><div class="meta"><p class="t">R8 — dead ep 보강</p><p class="d">반복 실패 18 case fix</p></div></div>
+      </div>
+    </section>
+
+    <!-- 11 · R7 ANNOT DEMO -->
+    <section>
+      <p class="kicker">11 · R7 ANNOT DEMO</p>
+      <h2 class="jua">정제 결과 — 실시간 bbox 오버레이</h2>
+      <p class="sub">R2 영상 대비 안정성 ↑. 손목 카메라 정확도도 R6 → R7 단계에서 개선.</p>
+      <div class="grid g2" style="flex:1">
+        <div class="vc">
+          <video src="assets-local/r7_annot_top.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">R7 annot — top 5종</p><p class="d">실시간 bbox · 안정성 검증</p></div>
+        </div>
+        <div class="vc">
+          <video src="assets-local/r7_annot_wristR.mp4" controls preload="metadata" muted playsinline></video>
+          <div class="meta"><p class="t">R7 annot — wrist_right 5종</p><p class="d">손목 카메라 R6 → R7 개선</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12 · STABILIZATION -->
+    <section>
+      <p class="kicker">12 · STABILIZATION</p>
+      <h2 class="jua">Hysteresis + ByteTrack · R9 → R13 v2</h2>
+      <p class="sub">YOLO confidence 진동 → bbox 깜빡임 → 추론 spike. dual threshold + tracker 로 해결. R12/R13 (튜닝 라운드) 생략.</p>
+      <div class="grid g3" style="flex:1">
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0uwAeQX7-eWd-e_day08_05-21_yolo_r10_results_hysteresis.png?auto=format,compress"><div class="meta"><p class="t">R10 — Hysteresis</p><p class="d">검출 0.40 / 유지 0.25 · 깜빡임 ↓</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0uwQeQX7-eWd-f_day08_05-21_yolo_r11_results_tracker.png?auto=format,compress"><div class="meta"><p class="t">R11 — ByteTrack</p><p class="d">짧은 가림에도 track 유지</p></div></div>
+        <div class="vc"><img src="https://images.prismic.io/minsung/ah0uzgeQX7-eWd-n_day09_05-23_yolo_r13v2_results_final.png?auto=format,compress"><div class="meta"><p class="t">★ R13 v2 — Production</p><p class="d">aug 강화 + class_weights</p></div></div>
+      </div>
+    </section>
+
+    <!-- 13 · PHASE 6 DEMO -->
+    <section>
+      <p class="kicker">13 · PHASE 6 ★</p>
+      <h2 class="jua">최종 추론 데모 · 5종</h2>
+      <p class="sub">Phase 6 SmolVLA + R13 v2 YOLO. <b>ACT phase5 (50k → 200k step) ~64 시간 학습</b> · SmolVLA 는 학습머신 (RTX 5090) 별도 학습.</p>
+      <div class="grid g3x2 phase6-views" style="flex:1; gap:10px">
+        <div class="vc"><video src="https://minsung.cdn.prismic.io/minsung/ah0uyweQX7-eWd-k_day09_05-23_phase6_strawberry.mp4" controls preload="metadata" muted playsinline></video><div class="meta"><p class="t">딸기 (ep575)</p></div></div>
+        <div class="vc"><video src="https://minsung.cdn.prismic.io/minsung/ah0uxgeQX7-eWd-h_day09_05-23_phase6_grape.mp4" controls preload="metadata" muted playsinline></video><div class="meta"><p class="t">포도 (ep585)</p></div></div>
+        <div class="vc"><video src="https://minsung.cdn.prismic.io/minsung/ah0uyAeQX7-eWd-i_day09_05-23_phase6_kiwi.mp4" controls preload="metadata" muted playsinline></video><div class="meta"><p class="t">키위 (ep595)</p></div></div>
+        <div class="vc"><video src="https://minsung.cdn.prismic.io/minsung/ah0uwweQX7-eWd-g_day09_05-23_phase6_broccoli.mp4" controls preload="metadata" muted playsinline></video><div class="meta"><p class="t">브로콜리 (ep605)</p></div></div>
+        <div class="vc"><video src="https://minsung.cdn.prismic.io/minsung/ah0uyQeQX7-eWd-j_day09_05-23_phase6_pineapple.mp4" controls preload="metadata" muted playsinline></video><div class="meta"><p class="t">파인애플 (ep615)</p></div></div>
+      </div>
+    </section>
+
+    <!-- 14 · ACT vs SmolVLA -->
+    <section>
+      <p class="kicker">14 · DECISION ★</p>
+      <h2 class="jua">ACT vs SmolVLA — <span style="color:var(--good)">ACT 채택</span></h2>
+      <div class="split">
+        <div class="grid g2" style="gap:10px">
+          <div class="vc"><img src="https://images.prismic.io/minsung/ah0uzweQX7-eWd-o_day10_05-26_eval_act_vs_smolvla.png?auto=format,compress"><div class="meta"><p class="t">★ 종합 4-panel</p></div></div>
+          <div class="vc"><img src="https://images.prismic.io/minsung/ah0u0AeQX7-eWd-p_day10_05-26_eval_deep_analysis.png?auto=format,compress"><div class="meta"><p class="t">Deep — 12 joint MSE</p></div></div>
+          <div class="vc"><img src="https://images.prismic.io/minsung/ah0u0geQX7-eWd-r_day10_05-26_eval_root_cause.png?auto=format,compress"><div class="meta"><p class="t">Root cause</p></div></div>
+          <div class="vc"><img src="https://images.prismic.io/minsung/ah0u0QeQX7-eWd-q_day10_05-26_eval_jitter.png?auto=format,compress"><div class="meta"><p class="t">Jitter</p></div></div>
+        </div>
+        <div>
+          <p class="sub">n=1 정확도는 비슷. 결정타는 <b style="color:var(--accent)">chunk staleness 민감도</b>.</p>
+          <div class="stats" style="margin-bottom:12px">
+            <div class="stat bad"><div class="l">SmolVLA</div><div class="v">+180%</div></div>
+            <div class="stat good"><div class="l">ACT</div><div class="v">+33%</div></div>
+          </div>
+          <div class="callout good">
+            <span class="material-icons-round">check_circle</span>
+            <p>closed-loop 에서 ACT 가 훨씬 안정적. 실물 떨림·실패율 ↓ → <span class="k" style="color:var(--good)">ACT 최종 채택.</span></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div>
+</div>
 
-  <script>
-    requestAnimationFrame(function () { document.body.style.opacity = '1'; });
-    function backToQna() {
-      var ov = document.getElementById('page-fade');
-      ov.style.opacity = '1';
-      setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    center: false,
+    slideNumber: 'c/t',
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    minScale: 0.2,
+    maxScale: 2.0,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    controls: true,
+    progress: true,
+    keyboard: {
+      27: function () { backToQna(); }, // Esc → Q&A 복귀
+    },
+  });
+
+  /* 슬라이드 전환 — 이전 영상 정지/리셋, 새 슬라이드 영상 자동재생 (muted 필수) */
+  function autoplayCurrent(section){
+    if(!section) return;
+    section.querySelectorAll('video').forEach(function(v){
+      try{
+        v.muted = true;
+        v.playsInline = true;
+        v.currentTime = 0;
+        var p = v.play();
+        if(p && p.catch) p.catch(function(){ /* 사용자 제스처 전 거부될 수 있음 — 무시 */ });
+      }catch(e){}
+    });
+  }
+  Reveal.on('slidechanged', function (event) {
+    if (event.previousSlide) {
+      event.previousSlide.querySelectorAll('video').forEach(function (v) {
+        try { v.pause(); v.currentTime = 0; } catch (e) {}
+      });
     }
-  </script>
+    autoplayCurrent(event.currentSlide);
+  });
+  /* Reveal 준비되면 현재 슬라이드도 자동재생 시도 */
+  Reveal.on('ready', function(event){ autoplayCurrent(event.currentSlide); });
+
+  function backToQna() {
+    var ov = document.getElementById('page-fade');
+    ov.style.opacity = '1';
+    ov.style.pointerEvents = 'auto';
+    setTimeout(function () { window.location.href = '../../index.html#/qna'; }, 300);
+  }
+</script>
 </body>
 </html>

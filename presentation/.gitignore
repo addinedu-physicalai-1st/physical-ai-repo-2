@@ -1,0 +1,7 @@
+# 발표 데크 영상·사진 — 용량 커서 git 에 안 넣음.
+# 재생성: bash final-v3/pull-assets.sh  (또는 python3 final-v3/pull-assets.py)
+final-*/slides/assets/media/
+*.dn.mov
+*.dn.mp4
+*.dn.webm
+final-*/reports/*/assets-local/

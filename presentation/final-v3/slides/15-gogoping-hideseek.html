@@ -1,0 +1,47 @@
+<section data-arch-flow>
+  <style>
+    .ovr-flow-mint{position:absolute;top:14px;left:14px;right:14px;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none}
+    .ovr-flow-mint .n{display:flex;align-items:center;gap:8px;background:rgba(15,18,28,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1.5px solid rgba(74,222,128,0.4);border-radius:10px;padding:7px 14px;opacity:0.55;filter:saturate(0.65);transform:scale(0.97);transition:all .35s cubic-bezier(0.2,0.8,0.2,1)}
+    .ovr-flow-mint .n.on{opacity:1;filter:none;transform:scale(1.04);background:rgba(74,222,128,0.92);border-color:var(--mintInk);box-shadow:0 0 24px rgba(74,222,128,0.55)}
+    .ovr-flow-mint .n .num{font-family:'Jua';font-size:14px;color:var(--mintInk);width:18px;text-align:center;flex:0 0 auto}
+    .ovr-flow-mint .n.on .num{color:#0a0d14}
+    .ovr-flow-mint .n.on .lab{color:#0a0d14}
+    .ovr-flow-mint .n .lab{font-family:'Jua';font-size:13px;color:#fff;letter-spacing:0.02em}
+    .ovr-flow-mint .arrow{font-size:18px;color:rgba(74,222,128,0.45);font-weight:700;flex:0 0 auto;transition:color .35s}
+    .ovr-flow-mint .arrow.on{color:var(--mintInk)}
+    .arr-drv{position:absolute;left:-9999px;top:-9999px}
+  </style>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 3</span>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">숨바꼭질</h2>
+    </div>
+    <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <div class="ovr-flow-mint">
+        <div class="n" data-step="1,2,3,4,5,6"><span class="num">1</span><span class="lab">이동</span></div>
+        <span class="arrow" data-flow="2,3,4,5,6">→</span>
+        <div class="n" data-step="2,3,4,5,6"><span class="num">2</span><span class="lab">등록</span></div>
+        <span class="arrow" data-flow="3,4,5,6">→</span>
+        <div class="n" data-step="3,4,5,6"><span class="num">3</span><span class="lab">카운트</span></div>
+        <span class="arrow" data-flow="4,5,6">→</span>
+        <div class="n" data-step="4,5,6"><span class="num">4</span><span class="lab">순찰</span></div>
+        <span class="arrow" data-flow="5,6">→</span>
+        <div class="n" data-step="5,6"><span class="num">5</span><span class="lab">복귀</span></div>
+        <span class="arrow" data-flow="6">→</span>
+        <div class="n" data-step="6"><span class="num">6</span><span class="lab">종료</span></div>
+      </div>
+      <video src="slides/assets/media/gogoping/hideseek-demo.mp4" loop playsinline data-press-to-play data-default-rate="1"
+             style="max-width:100%;max-height:100%;object-fit:contain"
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;gogoping/hideseek-demo.mp4&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+    <div class="arr-drv" aria-hidden="true">
+      <span class="fragment" data-archstep="1"></span>
+      <span class="fragment" data-archstep="2"></span>
+      <span class="fragment" data-archstep="3"></span>
+      <span class="fragment" data-archstep="4"></span>
+      <span class="fragment" data-archstep="5"></span>
+      <span class="fragment" data-archstep="6"></span>
+    </div>
+  </div>
+  <aside class="notes">숨바꼭질 — 영상 상단 4단계 블록 overlay.</aside>
+</section>

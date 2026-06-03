@@ -222,8 +222,7 @@
       <h2><span class="secnum">2</span> vertex — 좌표를 의미있게</h2>
       <div class="split">
         <div>
-          <p class="lead">좌표가 아니라 <b>의미있는 장소에 이름을 붙인 vertex 그래프</b> 위에 길을 짭니다.<br><span style="font-size:0.8em;color:var(--inkSoft)">(Nav2 표준 Route Server를 자체 <code>graph_router</code>로 구현)</span></p>
-          <p style="font-size:16px"><b>vertex</b> = 맵 위 의미있는 지점에 이름·좌표를 붙인 점 (놀이방·충전소입구·복-4 …).<br><b>lane</b> = 두 vertex 를 잇는 선. 둘이 모여 <b>위상 그래프</b>.</p>
+          <p class="lead">좌표가 아니라 <b>의미있는 장소에 이름을 붙인 vertex 그래프</b> 위에 길을 짭니다. (Nav2 표준 Route Server를 자체 <code>graph_router</code>로 구현)</p>
           <ul class="reasons">
             <li><span class="rn">①</span><span class="rt"><b>의미 명령</b> — "놀이방으로 가". 공간이 바뀌면 <code>waypoints.yaml</code> 점만 옮김 → <b>코드 수정 0</b></span></li>
             <li><span class="rn">②</span><span class="rt"><b>좁은 길 정확 통과</b> — 문(0.885m) 한가운데 vertex를 박아 <b>그 좌표를 정확히 조준</b></span></li>
@@ -231,8 +230,14 @@
           </ul>
         </div>
         <div>
-          <div style="border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.22);padding:10px 8px"><img src="https://images.prismic.io/asd0821/aiAGvweQX7-eWpvL_Screenshotfrom2026-06-0319-49-06.png?auto=format,compress" alt="실내 맵 · 웨이포인트 그래프" style="max-height:56vh;width:auto;max-width:100%;display:block;margin:0 auto;border-radius:10px"/></div>
-          <p style="font-size:14px;color:var(--inkSoft);margin:8px 0 0;text-align:center">실제 실내 맵 — vertex(점) <b style="color:var(--accent)">30개</b> · lane(선) <b style="color:var(--accent)">36개</b>. 색칠 = 공간(수면실·놀이방·통로·출입구·충전소)</p>
+          <h3>vertex · lane 이란?</h3>
+          <p style="font-size:16.5px"><b>vertex</b> = 맵 위 의미있는 지점에 이름·좌표를 붙인 점 (놀이방·충전소입구·복-4 …).<br><b>lane</b> = 두 vertex 를 잇는 이동 가능한 선. 둘이 모여 <b>위상 그래프</b>가 됩니다.</p>
+          <div class="flowbox">충전소입구 ─ 복-6 ─ 복-5 ─ 복-4 ─ 복-3 ─ ⋯   (점=vertex · 선=lane)
+
+목적지 <span class="a">"충전소입구"</span> 한 단어
+   → 최단 경로 탐색(Dijkstra)
+   → <b>[복-4 → 복-5 → 복-6 → 충전소입구]</b></div>
+          <p style="font-size:16px;color:var(--inkSoft);margin-top:12px">그래프 = 점 <b style="color:var(--accent)">30개</b> + 차선 <b style="color:var(--accent)">36개</b>(전부 양방향). 사람은 좌표를 몰라도 <b style="color:var(--accent)">이름만 부르면</b> 로봇이 점들을 이어 길을 짭니다.</p>
         </div>
       </div>
     </div>
@@ -243,24 +248,25 @@
     <div class="inner">
       <p class="slide-no">03 / 04</p>
       <h2><span class="secnum">3</span> 회전 안전 — 안전한 곳에서만 돌기</h2>
+      <p class="lead">
+        <b>HW 문제:</b> 구동 바퀴가 <b>앞</b>, 차체가 <b>뒤로 깁니다</b>(footprint 앞 +0.10m · 뒤 −0.50m). 회전중심에서 뒤 모서리까지가 멀어,
+        제자리 회전하면 <b>긴 뒤꽁무니가 반경 0.57m 호를 휩씁니다</b> — 통로 반폭(~0.5m)을 넘겨 벽을 칩니다.
+        diff-drive라 돌 수는 있지만, <b>"돌아도 되는 곳에서만"</b> 돌게 막았습니다.
+      </p>
       <div class="split">
         <div>
-          <p style="font-size:17.5px;line-height:1.65"><b style="color:var(--accent)">HW 환경:</b> 구동 바퀴가 <b>앞</b>, 차체가 <b>뒤로 깁니다</b>(footprint 앞 +0.10m·뒤 −0.50m). 제자리 회전하면 <b>긴 차체 후미가 반경 0.57m 호를 휩쓸어</b> 통로 반폭(~0.5m)을 넘겨 벽을 칩니다. diff-drive라 돌 수는 있지만 <b>"돌아도 되는 곳에서만"</b> 돌게 막았습니다.</p>
-          <h3 style="font-size:20px;margin:14px 0 5px">① 계획 — 위험한 회전 경로를 안 만든다</h3>
-          <p style="font-size:17px">경로 탐색이 로봇의 <b>현재 방향(heading)까지</b> 봅니다. 좁은 지점에서 <b>135°를 넘게 틀어지는 차선(=U턴)은 거부</b> → 그런 경로가 아예 생성되지 않습니다.</p>
-          <h3 style="font-size:20px;margin:14px 0 5px">② 주행 — 안전 지점에서만 제자리 회전</h3>
-          <p style="font-size:17px"><code>can_rotate</code> 지점에서만 다음 차선 방향으로 <b>정렬 회전 후 직진</b>합니다(허용 ~5.7°, ~30°/s). 비스듬히 들어가 벽을 긁지 않고 미리 정렬해 직선 진입.</p>
+          <h3>① 계획 — 위험한 회전 경로를 안 만든다</h3>
+          <p style="font-size:17px">경로 탐색이 로봇의 <b>현재 방향(heading)까지 함께</b> 봅니다 (상태 = vertex + 방향 8칸). 좁은 지점에서 <b>가던 방향과 135°를 넘게 틀어지는 차선(=U턴·급선회)은 거부</b> → 그런 경로가 <b>아예 생성되지 않습니다</b>.</p>
+          <h3>② 주행 — 안전 지점에서만 제자리 회전</h3>
+          <p style="font-size:17px"><code>can_rotate</code> 지점에 도착했을 때만 다음 차선 방향으로 <b>정렬 회전 후 직진</b>합니다 (허용 ~5.7°, ~30°/s). 좁은 통로엔 비스듬히 들어가 벽을 긁지 않고, <b>미리 몸을 정렬해 직선으로</b> 진입합니다.</p>
         </div>
         <div>
-          <div style="display:flex;gap:8px">
-            <div style="flex:1;height:30vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center"><video src="https://asd0821.cdn.prismic.io/asd0821/aiAgEQeQX7-eWp_6_can_rotate2.mp4" autoplay loop muted playsinline style="max-width:100%;max-height:100%;display:block;object-fit:contain"></video></div>
-            <div style="flex:1;height:30vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center"><video src="https://asd0821.cdn.prismic.io/asd0821/aiAgDweQX7-eWp_4_can_rotate1.mp4" autoplay loop muted playsinline style="max-width:100%;max-height:100%;display:block;object-fit:contain"></video></div>
-          </div>
-          <h3 style="font-size:19px;margin:16px 0 5px">회전 안전 지점 (can_rotate) — 5개</h3>
-          <p style="margin:4px 0 0"><span class="chip">복도</span><span class="chip">충전소</span><span class="chip">놀-상-회</span><span class="chip">놀-하-회</span><span class="chip">수-회</span></p>
-          <div class="callout" style="margin-top:10px">
+          <h3>회전 안전 지점 (can_rotate) — 5개</h3>
+          <p><span class="chip">복도</span><span class="chip">충전소</span><span class="chip">놀-상-회</span><span class="chip">놀-하-회</span><span class="chip">수-회</span></p>
+          <p style="font-size:16px;color:var(--inkSoft)">넓어서 회전해도 안전한 곳만 화이트리스트로 지정. 이름의 <b style="color:var(--accent)">"-회"가 곧 회전(回) 전용 지점</b> — 좁은 차선이 만나는 길목의 방향 전환을 여기서만 합니다.</p>
+          <div class="callout">
             <span class="material-icons-round">alt_route</span>
-            <p style="font-size:15px"><b>실제 사례.</b> 반대편 충전소 복귀 시 좁은 통로 U턴 대신 <span class="k">복-4 → 복-4-1 → 복-5 → 충전소입구</span> 처럼 <b>안전 지점을 경유하는 우회 경로</b>를 자동 생성.</p>
+            <p><b>실제 사례.</b> 반대편 충전소로 복귀할 때 좁은 통로에서 U턴하지 않고, <span class="k">복-4 → 복-4-1(옆 차선) → 복-5 → 충전소입구</span> 처럼 <b>안전 지점을 경유하는 우회 경로</b>를 자동으로 찾습니다.</p>
           </div>
         </div>
       </div>
@@ -281,17 +287,15 @@
             <span class="material-icons-round">sensors</span>
             <p>nav2 표준 <b>Collision Monitor</b>를 그대로 사용 — 주행 명령을 받아 위험 구역이면 속도를 0 으로 막습니다.</p>
           </div>
-          <div style="margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#000"><video src="https://asd0821.cdn.prismic.io/asd0821/aiAfsQeQX7-eWp_w_collision_detector_cropped.mp4" autoplay loop muted playsinline style="width:100%;display:block;max-height:32vh;object-fit:contain"></video></div>
         </div>
         <div>
           <h3>사람 — proximity (depth)</h3>
-          <p style="font-size:18px">정면 <b>0.6m</b> 사람은 충돌 위험이 아니라 <b>사회적 상황</b>으로 다룹니다. 즉시 멈추기만 하지 않고 기다렸다 비켜 갑니다:</p>
+          <p style="font-size:18px">정면 <b>0.7m</b> 사람은 충돌 위험이 아니라 <b>사회적 상황</b>으로 다룹니다. 즉시 멈추기만 하지 않고 기다렸다 비켜 갑니다:</p>
           <table style="font-size:17px">
-            <tr><td><b>멈춤</b></td><td>정면 0.6m 안에 사람 → 정지</td></tr>
+            <tr><td><b>멈춤</b></td><td>정면 0.7m 안에 사람 → 정지</td></tr>
             <tr><td><b>재개</b></td><td>1초 이상 확실히 비키면 → 다시 출발</td></tr>
             <tr><td><b>우회</b></td><td>10초째 안 비키면 → 막힌 곳 빼고 새 길로</td></tr>
           </table>
-          <div style="margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#000"><img src="https://images.prismic.io/asd0821/aiAeGgeQX7-eWp_A_proximity.gif?auto=format,compress" alt="proximity 시연" style="width:100%;display:block;max-height:32vh;object-fit:contain"/></div>
         </div>
       </div>
     </div>

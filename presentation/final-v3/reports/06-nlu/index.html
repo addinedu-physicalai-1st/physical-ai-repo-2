@@ -12,10 +12,8 @@
   :root{
     --bg:#16131F; --surface:#241F33; --ink:#F4EFE8; --inkSoft:#A79FB4;
     --border:rgba(255,255,255,.10); --accent:#B98CFF;
-    --accentSoft:rgba(185,140,255,.16);
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
   html,body{margin:0}
   body{
     background:var(--bg); color:var(--ink);
@@ -23,16 +21,9 @@
     opacity:0; transition:opacity .3s ease; min-height:100vh;
   }
   .jua{font-family:'Jua','Pretendard Variable',sans-serif}
-  .topbar{
-    position:fixed; top:0; left:0; right:0; z-index:10;
-    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
-    padding:14px 24px;
-    background:rgba(22,19,31,.85); backdrop-filter:blur(8px);
-    border-bottom:1px solid var(--border);
-  }
   /* ⚠️ 뒤로가기 버튼 — 반드시 유지 (Q&A 인덱스로 복귀) */
   .back{
-    flex:0 0 auto;
+    position:fixed; top:22px; left:24px; z-index:10;
     display:inline-flex; align-items:center; gap:6px;
     background:var(--surface); border:1px solid var(--border);
     color:var(--inkSoft); font-family:'Jua',sans-serif; font-size:15px;
@@ -40,203 +31,53 @@
     transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .wrap{max-width:1100px; margin:0 auto; padding:92px 36px 80px}
+  .wrap{max-width:960px; margin:0 auto; padding:96px 32px 80px}
   .eyebrow{color:var(--accent); font-family:'Jua',sans-serif; letter-spacing:.2em; font-size:14px; margin:0}
-  h1{font-family:'Jua',sans-serif; font-size:42px; margin:8px 0 4px}
-  .member{color:var(--inkSoft); font-size:16px; margin:0 0 22px}
-
-  .sec-nav{display:flex; flex-wrap:wrap; gap:10px; margin:0}
-  .sec-nav a{
-    display:inline-flex; align-items:center; gap:8px;
-    background:var(--accentSoft); border:1px solid var(--accent);
-    color:var(--ink); font-family:'Jua',sans-serif; font-size:14px;
-    padding:8px 16px; border-radius:999px; text-decoration:none;
-    transition:transform .15s, background .15s;
+  h1{font-family:'Jua',sans-serif; font-size:40px; margin:8px 0 4px}
+  .member{color:var(--inkSoft); font-size:16px; margin:0 0 40px}
+  .placeholder{
+    border:1.5px dashed var(--border); border-radius:18px;
+    padding:48px 36px; text-align:center; background:var(--surface);
   }
-  .sec-nav a:hover{transform:translateY(-1px); background:rgba(185,140,255,.26)}
-  .sec-nav a .n{color:var(--accent); font-size:13px}
-
-  .section{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:20px; padding:30px 34px; margin-bottom:28px;
-    scroll-margin-top:84px;
-  }
-  .sec-head{display:flex; align-items:center; gap:14px; margin-bottom:24px}
-  .sec-num{
-    flex:0 0 auto; width:44px; height:44px; border-radius:12px;
-    background:var(--accentSoft); color:var(--accent);
-    font-family:'Jua',sans-serif; font-size:20px;
-    display:flex; align-items:center; justify-content:center;
-  }
-  .sec-head h2{font-family:'Jua',sans-serif; font-size:24px; margin:0}
-
-  .lead{font-size:17px; line-height:1.85; margin:0 0 18px}
-  .lead b{color:var(--accent)}
-
-  .callout{
-    display:flex; gap:12px; align-items:flex-start;
-    background:rgba(255,255,255,.04); border:1px solid var(--border);
-    border-left:3px solid var(--accent); border-radius:12px;
-    padding:16px 18px; margin-top:6px;
-  }
-  .callout .material-icons-round{color:var(--accent); font-size:22px; margin-top:1px}
-  .callout p{margin:0; line-height:1.75; font-size:15px; color:var(--ink)}
-  .callout .k{color:var(--accent); font-family:'Jua',sans-serif}
-
-  .compare{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:6px}
-  @media (max-width:760px){ .compare{grid-template-columns:1fr} }
-  .cmp{border:1px solid var(--border); border-radius:14px; padding:18px 20px; background:rgba(255,255,255,.03)}
-  .cmp h3{font-family:'Jua',sans-serif; font-size:18px; margin:0 0 8px; display:flex; align-items:center; gap:8px}
-  .cmp p{margin:0; font-size:15px; line-height:1.75; color:var(--inkSoft)}
-  .cmp b{color:var(--accent)}
-
-  .reasons{display:flex; flex-direction:column; gap:12px}
-  .reason{display:flex; gap:13px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.03)}
-  .reason .ic{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--accentSoft); color:var(--accent); display:flex; align-items:center; justify-content:center}
-  .reason .ic .material-icons-round{font-size:20px}
-  .reason h4{font-family:'Jua',sans-serif; font-size:15px; margin:0 0 3px; color:var(--ink)}
-  .reason p{margin:0; font-size:14px; line-height:1.7; color:var(--inkSoft)}
-  .reason b{color:var(--accent)}
-
-  /* 발화 → 결과 예시 */
-  .ex{display:flex; flex-direction:column; gap:10px; margin:4px 0}
-  .ex-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
-  .say{
-    background:rgba(255,255,255,.05); border:1px solid var(--border);
-    border-radius:999px; padding:8px 16px; font-size:15px; color:var(--ink);
-  }
-  .say .q{color:var(--inkSoft); font-size:13px; margin-right:6px}
-  .ex-row .material-icons-round{color:var(--accent); font-size:20px}
-  .hit{font-family:'Jua',sans-serif; font-size:14px; color:var(--accent)}
-  .hit small{display:block; color:var(--inkSoft); font-family:'Pretendard Variable',sans-serif; font-size:12px; margin-top:2px}
-
+  .placeholder .material-icons-round{font-size:56px; color:var(--accent); opacity:.85}
+  .placeholder h2{font-family:'Jua',sans-serif; font-size:22px; margin:16px 0 8px}
+  .placeholder p{color:var(--inkSoft); line-height:1.8; margin:4px 0; font-size:15px}
+  code{background:rgba(255,255,255,.06); padding:1px 6px; border-radius:5px; font-size:.92em}
   #page-fade{position:fixed; inset:0; z-index:9998; background:var(--bg); opacity:0; transition:opacity .3s ease; pointer-events:none}
 </style>
 </head>
 <body>
   <div id="page-fade"></div>
 
-  <div class="topbar">
-    <button class="back jua" onclick="backToQna()">
-      <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
-    </button>
-    <nav class="sec-nav">
-      <a href="#sec-01"><span class="n">01</span> LLM·STT·TTS 최적화</a>
-      <a href="#sec-02"><span class="n">02</span> STT 오인식 회복</a>
-      <a href="#sec-03"><span class="n">03</span> 잡담 fallback</a>
-    </nav>
-  </div>
+  <!-- ⚠️ 이 뒤로가기 버튼은 반드시 유지하세요 (Q&A 인덱스로 복귀) -->
+  <button class="back jua" onclick="backToQna()">
+    <span class="material-icons-round" style="font-size:18px">arrow_back</span> Q&amp;A
+  </button>
 
   <div class="wrap">
-    <p class="eyebrow">Q&amp;A · 06 · 자연어 처리</p>
+    <p class="eyebrow">Q&amp;A · 06</p>
     <h1 class="jua">자연어 처리</h1>
     <p class="member">담당 · 박우림</p>
 
-    <!-- ───────────────────────────── 01 ───────────────────────────── -->
-    <section id="sec-01" class="section">
-      <div class="sec-head">
-        <div class="sec-num">01</div>
-        <h2 class="jua">LLM·STT·TTS 최적화 방법</h2>
-      </div>
-
-      <p class="lead">
-        무거운 LLM·STT·TTS 는 <b>꼭 필요할 때만, 가볍게</b> 돌도록 최적화했습니다.
-      </p>
-
-      <div class="reasons">
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">psychology</span></div>
-          <div>
-            <h4>LLM — 호출 자체를 줄인다</h4>
-            <p>의도 분류는 규칙 기반 핸들러가 처리해 <b>LLM 호출을 생략</b>(잡담만 LLM). 모델은 메모리에 상주(keep-alive) + 부팅 시 프리로드(warmup)로 콜드스타트를 피하고, <b>잡담 3b·보고서 7b</b>로 크기를 나눠 응답 길이·컨텍스트를 제한한다.</p>
-          </div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">hearing</span></div>
-          <div>
-            <h4>STT — 필요한 구간만, 가볍게</h4>
-            <p>faster-whisper 를 <b>GPU면 small·float16 / CPU면 base·int8</b> 로 자동 전환. <b>Silero VAD</b> 로 발화 구간만 잘라 돌려 헛연산을 줄이고, 현재 모드 단어를 <b>힌트로 주입</b>해 짧은 발음도 빠르고 정확히.</p>
-          </div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">campaign</span></div>
-          <div>
-            <h4>TTS — 첫마디를 빨리</h4>
-            <p>edge-tts neural 로 합성하되, 다 끝나길 기다리지 않고 만들어지는 조각을 <b>즉시 WebRTC 로 흘려보내(스트리밍)</b> 답이 길어도 첫마디가 바로 들리게 한다.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ───────────────────────────── 02 ───────────────────────────── -->
-    <section id="sec-02" class="section">
-      <div class="sec-head">
-        <div class="sec-num">02</div>
-        <h2 class="jua">STT 오인식을 어떻게 되살리나</h2>
-      </div>
-
-      <p class="lead">
-        받아쓰기는 띄어쓰기·끝음절을 자주 흘립니다("수면실"→"면실"). 이런 변형을 <b>3단계</b>로 흡수합니다.
-      </p>
-
-      <div class="reasons">
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">space_bar</span></div>
-          <div><h4>① 공백 제거 후 부분일치</h4><p>공백을 지우고 비교 → 띄어쓰기 오인식도 잡는다.</p></div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">blur_on</span></div>
-          <div><h4>② bigram Jaccard 유사도</h4><p>글자 2-그램 유사도로 fuzzy 매칭 → 첫 음절 빠진 발화도 흡수.</p></div>
-        </div>
-        <div class="reason">
-          <div class="ic"><span class="material-icons-round">spellcheck</span></div>
-          <div><h4>③ STT 변형 alias 사전</h4><p>"놀이반→놀이방", "면실→수면실" 등 자주 틀리는 변형을 교정.</p></div>
-        </div>
-      </div>
-
-      <div class="ex" style="margin-top:18px">
-        <div class="ex-row">
-          <span class="say"><span class="q">발화</span>무궁화 꽃이 피었습니다</span>
-          <span class="material-icons-round">arrow_forward</span>
-          <span class="hit">모드 전환 · 무궁화꽃이 피었습니다<small>공백 제거 후 부분일치</small></span>
-        </div>
-        <div class="ex-row">
-          <span class="say"><span class="q">발화</span>충전서 갈거야</span>
-          <span class="material-icons-round">arrow_forward</span>
-          <span class="hit">이동 · 충전소<small>alias 교정 + "가" 패턴</small></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ───────────────────────────── 03 ───────────────────────────── -->
-    <section id="sec-03" class="section">
-      <div class="sec-head">
-        <div class="sec-num">03</div>
-        <h2 class="jua">규칙에 안 걸리면 — 잡담 fallback</h2>
-      </div>
-
-      <p class="lead">
-        어떤 핸들러에도 안 걸리는 말("심심해")은 <b>로컬 LLM(qwen2.5)</b> 으로 넘겨 짧은 대답을 만듭니다.
-        클라우드 없이 로컬에서 돌려 외부 의존·비용 없이 동작합니다.
-      </p>
-
-      <div class="callout">
-        <span class="material-icons-round">shield</span>
-        <p>
-          LLM 은 느릴 수 있어 <span class="k">2단계 타임아웃</span> — 기본 프롬프트가 늦으면 짧은 프롬프트로 재시도,
-          그래도 안 되면 "한 번만 더 말해줄래요?" 안내로 마무리해 <b>대화가 멈춰 보이지 않게</b> 합니다.
-        </p>
-      </div>
-
-      <div class="callout" style="margin-top:14px">
-        <span class="material-icons-round">child_friendly</span>
-        <p>
-          응답 스타일도 강제 — <span class="k">1~3문장·존댓말·외래어 금지</span>, 1인칭 대신 이름("에듀핑이"),
-          정답형 질문(메뉴·시간)은 사실 먼저 답하고 공감을 덧붙입니다.
-        </p>
-      </div>
-    </section>
-
+    <!--
+      ════════════════════════════════════════════════════════════════
+      여기부터 자유롭게 보고서를 작성하세요.
+      규칙 (presentation/final-v3/CLAUDE.md 참조):
+        1. 상단 "← Q&A" 뒤로가기 버튼은 반드시 남겨두세요.
+        2. 이미지·영상 등 asset 은 저장소에 커밋하지 말고 반드시
+           Prismic CDN 에 업로드한 뒤 그 URL 을 사용하세요.
+             업로드:  scripts/prismic/upload.sh
+             예)  <img src="https://images.prismic.io/.../foo.png" />
+        3. 디자인 토큰(--accent, --surface, --ink ...)을 그대로 쓰면
+           덱과 톤이 맞습니다.
+      ════════════════════════════════════════════════════════════════
+    -->
+    <div class="placeholder">
+      <span class="material-icons-round">forum</span>
+      <h2 class="jua">보고서 준비 중</h2>
+      <p>박우림 님이 작성할 <b style="color:var(--ink)">자연어 처리</b> 상세 보고서 자리입니다.</p>
+      <p>asset 은 <code>scripts/prismic/upload.sh</code> 로 Prismic 에 올린 뒤 URL 로 삽입하세요.</p>
+    </div>
   </div>
 
   <script>

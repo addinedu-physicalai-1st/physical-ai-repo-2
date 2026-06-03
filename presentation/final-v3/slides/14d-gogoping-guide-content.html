@@ -1,0 +1,48 @@
+<section>
+  <style>
+    .gd2-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden}
+    .gd2-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mintInk)}
+    .gd2-card .num{position:absolute;right:14px;top:8px;font-family:'Jua';font-size:32px;color:rgba(74,222,128,0.22);line-height:1}
+    .gd2-card h3{font-family:'Jua';font-size:0.85em;color:var(--ink);margin:0;line-height:1.15}
+    .gd2-card .desc{color:var(--inkSoft);font-size:0.6em;line-height:1.4;margin:0}
+    .gd2-card .desc b{color:var(--mintInk)}
+  </style>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-90px;left:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);bottom:-60px;right:-40px;opacity:0.28"></div>
+  </div>
+  <div class="layer" style="padding:28px 56px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 2</span>
+      <h2 class="font-display" style="font-size:1.55em;color:var(--ink);margin:0">가이드 기능 설명</h2>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1.1fr;gap:18px;min-height:0">
+
+      <!-- LEFT: 4 cards stacked -->
+      <div style="display:grid;grid-template-columns:1fr;grid-template-rows:repeat(4,1fr);gap:10px;min-height:0">
+        <div class="gd2-card"><span class="num">1</span><h3>의미로 명령하는 그래프</h3><p class="desc">좌표 대신 <b>vertex</b> 로 "놀이방으로 가" 한마디</p></div>
+        <div class="gd2-card"><span class="num">2</span><h3>Nav2 + AMCL 자율주행</h3><p class="desc"><b>NavigateToPose</b> action 으로 vertex 그래프 위 경로 계획 · costmap 으로 장애물 회피</p></div>
+        <div class="gd2-card"><span class="num">3</span><h3>위험 차선 사전 거부</h3><p class="desc"><b>Heading-aware Dijkstra</b> — 135° 넘는 급선회 제외</p></div>
+        <div class="gd2-card"><span class="num">4</span><h3>회전은 안전한 곳에서만</h3><p class="desc"><b>can_rotate 5개 지점</b> 화이트리스트</p></div>
+      </div>
+
+      <!-- RIGHT: video (사람 긴급정지) -->
+      <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:'Jua';font-size:0.62em;color:var(--mintInk);letter-spacing:0.08em">사람 긴급정지 — Depth Proximity</span>
+        </div>
+        <div style="flex:1;min-height:0;border-radius:12px;overflow:hidden;border:1.5px solid rgba(74,222,128,0.4)">
+          <video src="slides/assets/media/gogoping/guide-stop.mp4" loop muted playsinline data-press-to-play data-default-rate="2"
+                 style="width:100%;height:100%;object-fit:cover;display:block"
+                 onerror="this.outerHTML='&lt;div style=&quot;color:#fff&quot;&gt;guide-stop.mp4&lt;/div&gt;'"></video>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    가이드 — 좌측 사람 긴급정지 영상 (Depth Proximity 안전 정지), 우측 5 핵심 카드.
+  </aside>
+</section>

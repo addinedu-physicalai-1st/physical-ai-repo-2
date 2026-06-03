@@ -38,8 +38,7 @@
     .archx .n.db .label { font-size:10px; }
     .archx .n.db .icon { font-size:18px; margin-bottom:1px; }
 
-    .archx .n.robot { background:linear-gradient(170deg,rgba(244,114,182,0.14),rgba(244,114,182,0.03)); border:1.5px solid rgba(244,114,182,0.36); padding:14px 16px; align-items:flex-start; justify-content:flex-start; text-align:left; }
-    .archx .n.robot .tag { min-height:14px; }
+    .archx .n.robot { background:linear-gradient(170deg,rgba(244,114,182,0.14),rgba(244,114,182,0.03)); border:1.5px solid rgba(244,114,182,0.36); padding:10px 16px; align-items:flex-start; justify-content:flex-start; text-align:left; }
     .archx .n.robot .rhead { min-height:62px; }
     .archx .n.robot.on { box-shadow:0 0 0 1px rgba(244,114,182,0.75),0 0 28px rgba(244,114,182,0.5); border-color:#f472b6; }
     .archx .n.robot .icon, .archx .n.robot .tag { color:#f472b6; }
@@ -47,25 +46,34 @@
     .archx .n.robot .rhead { display:flex; align-items:center; gap:12px; width:100%; margin-bottom:10px; }
     .archx .n.robot .rhead img { width:62px; height:62px; object-fit:contain; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px; flex:0 0 auto; }
     .archx .n.robot .rhead .label { font-size:24px; }
-    .archx .n.robot .board { margin-top:8px; width:100%; min-height:48px; }
+    .archx .n.robot .board { margin-top:12px; width:100%; min-height:70px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; }
     .archx .n.robot .board:first-of-type { margin-top:0; }
-    .archx .n.robot .board .btitle { font-family:'Jua'; font-size:11px; letter-spacing:0.16em; color:#f472b6; opacity:0.85; margin-bottom:5px; min-height:13px; }
-    .archx .n.robot .hw-row { display:flex; flex-wrap:nowrap; gap:3px; align-content:flex-start; min-height:22px; overflow:hidden; }
-    .archx .n.robot .hw { display:inline-flex; align-items:center; gap:3px; font-size:12px; color:#e2e8f0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:5px; padding:2px 5px; font-weight:500; height:22px; box-sizing:border-box; flex-shrink:0; line-height:1; white-space:nowrap; }
-    .archx .n.robot .hw .material-icons-round { font-size:15px; color:#f472b6; }
+    .archx .n.robot .board .btitle { font-family:'Jua'; font-size:14px; letter-spacing:0.16em; color:#f472b6; opacity:0.95; text-align:center; margin:0; }
+    .archx .n.robot .hw-row { display:flex; flex-wrap:nowrap; gap:3px; align-content:flex-start; min-height:26px; overflow:hidden; }
+    .archx .n.robot .hw { display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#e2e8f0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:3px 6px; font-weight:500; height:26px; box-sizing:border-box; flex-shrink:0; line-height:1; white-space:nowrap; }
+    .archx .n.robot .hw .material-icons-round { font-size:18px; color:#f472b6; }
+
+    .archx .n.robot .board.pc-frame { border:1.5px solid rgba(96,165,250,0.55); border-radius:8px; padding:10px 10px 8px; margin-top:10px; position:relative; }
+    .archx .n.robot .board.pc-frame::before { content:'PC'; position:absolute; top:-8px; left:12px; background:#171b29; font-family:'Jua'; font-size:10px; letter-spacing:0.22em; color:#60a5fa; padding:0 6px; font-weight:700; line-height:1; }
+
+    .archx .n.robot .board.arduino-frame { border:1.5px solid rgba(0,179,184,0.65); border-radius:8px; padding:10px 10px 8px; margin-top:12px; position:relative; }
+    .archx .n.robot .board.arduino-frame::before { content:'ARDUINO'; position:absolute; top:-8px; left:12px; background:#171b29; font-family:'Jua'; font-size:10px; letter-spacing:0.22em; color:#00b3b8; padding:0 6px; font-weight:700; line-height:1; }
+
+    .archx .n.robot .board.raspberry-frame { border:1.5px solid rgba(232,84,135,0.6); border-radius:8px; padding:10px 10px 8px; margin-top:12px; position:relative; }
+    .archx .n.robot .board.raspberry-frame::before { content:'RASPBERRY PI 5'; position:absolute; top:-8px; left:12px; background:#171b29; font-family:'Jua'; font-size:10px; letter-spacing:0.22em; color:#e85487; padding:0 6px; font-weight:700; line-height:1; }
 
     .archx svg.lines { position:absolute; left:0; top:0; width:1280px; height:720px; pointer-events:none; }
     .archx svg.lines path { fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:0.38; transition:opacity 0.4s ease, stroke-width 0.3s; }
     .archx svg.lines path.on { opacity:1; stroke-width:2.6; filter:drop-shadow(0 0 6px currentColor); animation:edge-pulse 1.6s ease-in-out infinite; }
     @keyframes edge-pulse { 0%,100% { stroke-width:2.4; } 50% { stroke-width:3; } }
 
-    .archx svg.lines text { font-family:system-ui,sans-serif; font-size:10.5px; font-weight:700; opacity:0.22; transition:opacity 0.4s; paint-order:stroke; stroke:rgba(10,13,20,0.95); stroke-width:5; stroke-linecap:round; stroke-linejoin:round; }
-    .archx svg.lines text.on { opacity:1; font-size:11.5px; }
+    .archx svg.lines text { font-family:system-ui,sans-serif; font-size:13px; font-weight:700; opacity:0.32; transition:opacity 0.4s; paint-order:stroke; stroke:rgba(10,13,20,0.95); stroke-width:5; stroke-linecap:round; stroke-linejoin:round; }
+    .archx svg.lines text.on { opacity:1; font-size:14px; }
 
-    .archx .ribbon { position:absolute; left:6px; font-family:'Jua'; letter-spacing:0.28em; font-size:14px; opacity:0.95; text-shadow:0 0 8px currentColor; }
-    .archx .ribbon-app { top:118px; color:#60a5fa; }
-    .archx .ribbon-svc { top:222px; color:#4ade80; }
-    .archx .ribbon-rob { top:498px; color:#f472b6; }
+    .archx .ribbon { position:absolute; font-family:'Jua'; letter-spacing:0.16em; font-size:16px; opacity:1; text-shadow:0 0 6px currentColor; line-height:1; transform:translate(-50%,-50%); white-space:nowrap; }
+    .archx .ribbon-app { left:42px; top:127px; color:#60a5fa; }
+    .archx .ribbon-svc { left:24px; top:235px; color:#4ade80; }
+    .archx .ribbon-rob { left:26px; top:530px; color:#f472b6; }
 
     .archx .drv { position:absolute; left:-9999px; top:-9999px; }
   </style>
@@ -95,149 +103,112 @@
         <marker id="m-pink-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#f472b6"/></marker>
       </defs>
 
-      <!-- Step 2: SERVICE — all internal + APP↔SERVICE -->
-      <!-- Browser → Web: vertical at x=220, between APP bottom (162) and SVC top (200) -->
-      <path data-flow="2" d="M 220,162 L 220,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
-      <text data-flow="2" x="228" y="186" fill="#60a5fa">HTTP·WS</text>
+      <!-- Browser → Web (APP↔SERVICE): vertical at x=220 -->
+      <path data-flow="2,4,6" d="M 220,162 L 220,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
+      <text data-flow="2,4,6" x="228" y="186" fill="#60a5fa">HTTP·WS</text>
 
-      <!-- Admin → Control: vertical at x=640 -->
-      <path data-flow="2" d="M 640,162 L 640,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
-      <text data-flow="2" x="648" y="186" fill="#60a5fa">HTTP·WS</text>
+      <!-- Admin → Control (APP↔SERVICE): vertical at x=640 -->
+      <path data-flow="2,5" d="M 640,162 L 640,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
+      <text data-flow="2,5" x="648" y="186" fill="#60a5fa">HTTP·WS</text>
 
-      <!-- Web → Control: horizontal at y=230, gap (320→440) = 120px label space -->
-      <path data-flow="2" d="M 320,230 L 440,230" stroke="#4ade80" marker-start="url(#m-green-rev)" marker-end="url(#m-green)"/>
-      <text data-flow="2" x="338" y="223" fill="#4ade80">HTTP·WS</text>
+      <!-- Web → Control (SERVICE internal): horizontal at y=230 -->
+      <path data-flow="2,4,6" d="M 320,230 L 440,230" stroke="#4ade80" marker-start="url(#m-green-rev)" marker-end="url(#m-green)"/>
+      <text data-flow="2,4,6" x="338" y="223" fill="#4ade80">HTTP·WS</text>
 
-      <!-- Control → DB: horizontal at y=230, gap (840→860) = 20px -->
-      <path data-flow="2" d="M 840,230 L 860,230" stroke="#f59e0b" marker-start="url(#m-orange-rev)" marker-end="url(#m-orange)"/>
-      <text data-flow="2" x="813" y="222" fill="#f59e0b">TCP</text>
+      <!-- Control → DB (SERVICE internal): horizontal at y=230 -->
+      <path data-flow="2,4,5,6" d="M 840,230 L 890,230" stroke="#f59e0b" marker-start="url(#m-orange-rev)" marker-end="url(#m-orange)"/>
+      <text data-flow="2,4,5,6" x="865" y="222" fill="#f59e0b" text-anchor="middle">TCP</text>
 
-      <!-- Control → AI: route ABOVE SERVICE row at y=180 (in gap between APP and SVC) -->
-      <path data-flow="2" d="M 840,200 L 840,182 L 1040,182 L 1040,200" stroke="#a855f7" marker-start="url(#m-purple-rev)" marker-end="url(#m-purple)"/>
-      <text data-flow="2" x="912" y="176" fill="#a855f7">HTTP·WS</text>
+      <!-- Control → AI (SERVICE internal): route ABOVE at y=182 -->
+      <path data-flow="2,4,5,6" d="M 815,200 L 815,182 L 1070,182 L 1070,200" stroke="#a855f7" marker-start="url(#m-purple-rev)" marker-end="url(#m-purple)"/>
+      <text data-flow="2,4,5,6" x="942" y="176" fill="#a855f7" text-anchor="middle">HTTP·WS</text>
 
-      <!-- Step 3: Control → EduPing: L-shape with horizontal at y=330 -->
-      <path data-flow="3" d="M 480,270 L 480,330 L 220,330 L 220,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
-      <text data-flow="3" x="240" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
+      <!-- Control → EduPing: L-shape (scenarios ①·②) -->
+      <path data-flow="4" d="M 480,270 L 480,330 L 220,330 L 220,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
+      <text data-flow="4" x="240" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
 
-      <!-- Step 4: Control → GogoPing: straight vertical at x=640 -->
-      <path data-flow="4" d="M 640,270 L 640,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
-      <text data-flow="4" x="494" y="318" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
+      <!-- Control → GogoPing: straight vertical at x=640 (scenario ③ GogoPing) -->
+      <path data-flow="5" d="M 640,270 L 640,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
+      <text data-flow="5" x="640" y="320" fill="#f472b6" text-anchor="middle">WS · ROS2 · WebRTC · HTTP</text>
 
-      <!-- Step 5: Control → NoriArm: L-shape with horizontal at y=330 -->
-      <path data-flow="5" d="M 800,270 L 800,330 L 1000,330 L 1000,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
-      <text data-flow="5" x="822" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
+      <!-- Control → NoriArm: L-shape (scenario ③ NoriArm) -->
+      <path data-flow="6" d="M 800,270 L 800,330 L 1000,330 L 1000,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
+      <text data-flow="6" x="822" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
     </svg>
 
     <!-- APP layer -->
-    <div class="n app" data-step="1" style="left:120px;top:92px;width:200px;height:70px">
+    <div class="n app" data-step="1,4,6" style="left:120px;top:92px;width:200px;height:70px">
       <span class="material-icons-round icon">person</span>
       <div class="label">Portal Browser</div>
       <div class="sublabel">학부모 · 교사 · 의사</div>
     </div>
-    <div class="n app" data-step="1" style="left:540px;top:92px;width:200px;height:70px">
+    <div class="n app" data-step="1,5" style="left:540px;top:92px;width:200px;height:70px">
       <span class="material-icons-round icon">admin_panel_settings</span>
       <div class="label">Admin App</div>
       <div class="sublabel">운영 관제</div>
     </div>
 
     <!-- SERVICE layer -->
-    <div class="n svc" data-step="2" style="left:120px;top:200px;width:200px;height:70px">
+    <div class="n svc" data-step="2,4,6" style="left:120px;top:200px;width:200px;height:70px">
       <span class="material-icons-round icon">dns</span>
       <div class="label">Portal Web</div>
     </div>
-    <div class="n hub" data-step="2" style="left:440px;top:200px;width:400px;height:70px">
+    <div class="n hub" data-step="2,4,5,6" style="left:440px;top:200px;width:400px;height:70px">
       <span class="material-icons-round icon">hub</span>
       <div class="label">Control Service</div>
     </div>
-    <div class="n db" data-step="2" style="left:860px;top:210px;width:60px;height:50px;padding:4px">
+    <div class="n db" data-step="2,4,5,6" style="left:890px;top:210px;width:60px;height:50px;padding:4px">
       <span class="material-icons-round icon">storage</span>
       <div class="label">Control DB</div>
     </div>
-    <div class="n ai" data-step="2" style="left:940px;top:200px;width:200px;height:70px">
+    <div class="n ai" data-step="2,4,5,6" style="left:980px;top:200px;width:180px;height:70px">
       <span class="material-icons-round icon">memory</span>
       <div class="label">AI Service</div>
     </div>
 
     <!-- ROBOTS layer -->
-    <div class="n robot" data-step="3" style="left:120px;top:360px;width:340px;height:340px">
-      <div class="tag">EDUPING · 양팔 로봇</div>
+    <div class="n robot" data-step="3,4" style="left:120px;top:360px;width:360px;height:340px">
       <div class="rhead">
         <img src="slides/assets/robots/eduping.png" alt="EduPing"/>
         <div class="label">EduPing</div>
       </div>
-      <div class="board">
+      <div class="board pc-frame">
         <div class="btitle">MAIN BOARD</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">mic</span>Mic</span>
-          <span class="hw"><span class="material-icons-round">volume_up</span>Speaker</span>
-          <span class="hw"><span class="material-icons-round">videocam</span>D435 RGB+depth</span>
-        </div>
+      </div>
+      <div class="board arduino-frame">
+        <div class="btitle">STETHOSCOPE</div>
       </div>
       <div class="board">
         <div class="btitle">ARM (OPENARM)</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">electric_bolt</span>DAMIAO BLDC ×16</span>
-        </div>
-      </div>
-      <div class="board">
-        <div class="btitle">STETHOSCOPE</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">monitor_heart</span>FSR Pressure</span>
-        </div>
       </div>
     </div>
 
-    <div class="n robot" data-step="4" style="left:470px;top:360px;width:340px;height:340px">
-      <div class="tag">GOGOPING · 자율 주행</div>
+    <div class="n robot" data-step="3,5" style="left:490px;top:360px;width:360px;height:340px">
       <div class="rhead">
         <img src="slides/assets/robots/gogoping.png" alt="GogoPing"/>
         <div class="label">GogoPing</div>
       </div>
-      <div class="board">
+      <div class="board pc-frame">
         <div class="btitle">MAIN BOARD</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">mic</span>Mic</span>
-          <span class="hw"><span class="material-icons-round">volume_up</span>Speaker</span>
-        </div>
       </div>
-      <div class="board">
+      <div class="board raspberry-frame">
         <div class="btitle">VIC PINKY (BASE)</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">radar</span>RPLiDAR C1</span>
-          <span class="hw"><span class="material-icons-round">bolt</span>DC Motor ×2</span>
-          <span class="hw"><span class="material-icons-round">battery_full</span>Battery</span>
-        </div>
       </div>
-      <div class="board">
-        <div class="btitle">CAMERA BOARD (ARDUINO)</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">videocam</span>D435 RGB+Depth</span>
-          <span class="hw"><span class="material-icons-round">tune</span>Servo ×2 (Pan/Tilt)</span>
-        </div>
+      <div class="board arduino-frame">
+        <div class="btitle">CAMERA BOARD</div>
       </div>
     </div>
 
-    <div class="n robot" data-step="5" style="left:820px;top:360px;width:340px;height:340px">
-      <div class="tag">NORIARM · OMX ×3</div>
+    <div class="n robot" data-step="3,6" style="left:860px;top:360px;width:360px;height:340px">
       <div class="rhead">
         <img src="slides/assets/robots/noriarm.png" alt="NoriArm"/>
         <div class="label">NoriArm</div>
       </div>
-      <div class="board">
+      <div class="board pc-frame">
         <div class="btitle">MAIN BOARD</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">mic</span>Mic</span>
-          <span class="hw"><span class="material-icons-round">volume_up</span>Speaker</span>
-          <span class="hw"><span class="material-icons-round">videocam</span>Top Cam</span>
-        </div>
       </div>
       <div class="board">
         <div class="btitle">NORIARM BOARD (U2D2)</div>
-        <div class="hw-row">
-          <span class="hw"><span class="material-icons-round">settings</span>Dynamixel ×6</span>
-          <span class="hw"><span class="material-icons-round">videocam</span>Gripper Cam ×2</span>
-        </div>
       </div>
     </div>
 
@@ -248,6 +219,7 @@
       <span class="fragment" data-archstep="3"></span>
       <span class="fragment" data-archstep="4"></span>
       <span class="fragment" data-archstep="5"></span>
+      <span class="fragment" data-archstep="6"></span>
     </div>
   </div>
 

@@ -1,43 +1,186 @@
-<section class="title-slide">
-  <div class="bg-deco">
-    <!-- 큰 회전 글로우 (배경) -->
-    <div class="spin-slow" style="position:absolute;width:900px;height:900px;top:50%;left:50%;transform:translate(-50%,-50%);background:conic-gradient(from 0deg, var(--babypinkSoft), var(--lavenderSoft), var(--mintSoft), var(--butterSoft), var(--babypinkSoft));border-radius:50%;opacity:0.35;filter:blur(60px);z-index:0"></div>
+<section class="title-slide" data-autoplay-anim>
+  <style>
+    /* stage */
+    .title-slide .reveal-stage{position:absolute !important;top:0;left:0;right:0;bottom:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 60%,#2d1d2e 0%,#1d1428 35%,#0f0a1a 80%);perspective:1400px;z-index:10}
 
-    <!-- 떠다니는 블롭 -->
-    <div class="blob drift-1" style="width:380px;height:380px;background:var(--babypinkSoft);top:-100px;left:-80px"></div>
-    <div class="blob drift-2" style="width:320px;height:320px;background:var(--mintSoft);bottom:-90px;right:-60px"></div>
-    <div class="blob pulse-glow" style="width:240px;height:240px;background:var(--lavenderSoft);top:80px;right:120px;border-radius:50%"></div>
-    <div class="blob pulse-glow" style="width:160px;height:160px;background:var(--butterSoft);bottom:120px;left:140px;border-radius:50%;animation-delay:1.5s"></div>
+    /* doors */
+    .reveal-door{position:absolute;top:0;bottom:0;width:50%;z-index:6;transform-origin:left center;box-shadow:inset 0 0 60px rgba(0,0,0,0.4),0 0 30px rgba(0,0,0,0.5)}
+    .reveal-door.left{left:0;border-right:3px solid #b07a96;background:linear-gradient(90deg,#d88aa8 0%,#b66989 100%)}
+    .reveal-door.right{right:0;border-left:3px solid #b07a96;background:linear-gradient(270deg,#d88aa8 0%,#b66989 100%);transform-origin:right center}
+    .reveal-door::before{content:'';position:absolute;top:9%;bottom:9%;left:9%;right:9%;border:3px solid rgba(255,255,255,0.45);border-radius:10px;box-shadow:inset 0 0 30px rgba(255,255,255,0.12)}
+    .reveal-door::after{content:'';position:absolute;top:38%;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,#f8d4b8 0%,#e8a888 60%,#c87858 100%);border:5px solid #fff;box-shadow:0 0 18px rgba(0,0,0,0.3),inset 0 0 10px rgba(255,200,150,0.3)}
+    .reveal-door.left::after{right:30px}
+    .reveal-door.right::after{left:30px}
+    .door-handle{position:absolute;top:50%;width:8px;height:42px;background:linear-gradient(180deg,#f5e8d4,#a48868);border-radius:4px;transform:translateY(-50%);box-shadow:0 0 6px rgba(0,0,0,0.4);z-index:7}
+    .door-handle.l{right:18px}
+    .door-handle.r{left:18px}
 
-    <div class="dots"></div>
+    /* === beams (synced to door open stages) === */
+    .beam{position:absolute;top:50%;left:50%;width:2.5px;height:170vh;background:linear-gradient(180deg,transparent 0%,rgba(255,232,180,0.85) 25%,rgba(255,248,220,0.95) 50%,rgba(255,232,180,0.85) 75%,transparent 100%);transform-origin:center center;opacity:0;z-index:5;mix-blend-mode:screen;filter:blur(0.4px)}
 
-    <!-- 작은 액센트 (별·점) -->
-    <span style="position:absolute;top:120px;right:200px;width:18px;height:18px;background:var(--babypink);border-radius:50%;animation:pulse-glow 3s ease-in-out infinite"></span>
-    <span style="position:absolute;top:200px;left:180px;width:12px;height:12px;background:var(--mintInk);border-radius:50%;animation:pulse-glow 3s ease-in-out infinite;animation-delay:0.8s"></span>
-    <span style="position:absolute;bottom:160px;right:260px;width:10px;height:10px;background:var(--butter);border-radius:50%;animation:pulse-glow 3s ease-in-out infinite;animation-delay:1.4s"></span>
-    <span style="position:absolute;top:480px;left:100px;width:36px;height:36px;border:3px solid var(--lavInk);border-radius:50%;opacity:0.7;animation:pulse-glow 5s ease-in-out infinite"></span>
-    <span style="position:absolute;bottom:80px;right:140px;width:46px;height:46px;border:3px dashed var(--skyInk);border-radius:50%;opacity:0.6;animation:spin-slow 18s linear infinite"></span>
-  </div>
+    /* stage 1 — first crack, vertical beam alone */
+    .beam.b1{animation:beam-life 2.6s 0.7s ease-out forwards;transform:translate(-50%,-50%) rotate(0deg)}
+    /* stage 2 — small crack, ±15° */
+    .beam.b2{animation:beam-life 2.6s 1.5s ease-out forwards;transform:translate(-50%,-50%) rotate(15deg)}
+    .beam.b3{animation:beam-life 2.6s 1.6s ease-out forwards;transform:translate(-50%,-50%) rotate(-15deg)}
+    /* stage 3 — medium open, ±30° */
+    .beam.b4{animation:beam-life 2.4s 2.4s ease-out forwards;transform:translate(-50%,-50%) rotate(30deg)}
+    .beam.b5{animation:beam-life 2.4s 2.5s ease-out forwards;transform:translate(-50%,-50%) rotate(-30deg)}
+    /* stage 4 — wider open, ±50° */
+    .beam.b6{animation:beam-life 2.2s 3.2s ease-out forwards;transform:translate(-50%,-50%) rotate(50deg)}
+    .beam.b7{animation:beam-life 2.2s 3.3s ease-out forwards;transform:translate(-50%,-50%) rotate(-50deg)}
+    /* stage 5 — almost full, ±75° */
+    .beam.b8{animation:beam-life 2.0s 3.8s ease-out forwards;transform:translate(-50%,-50%) rotate(75deg)}
+    .beam.b9{animation:beam-life 2.0s 3.9s ease-out forwards;transform:translate(-50%,-50%) rotate(-75deg)}
 
-  <div class="layer flex flex-col items-center justify-center text-center" style="min-height:680px;padding:0 80px;position:relative;z-index:2">
+    /* tiny crack hint before doors move */
+    .crack-hint{position:absolute;top:0;bottom:0;left:50%;width:2px;background:linear-gradient(180deg,transparent 35%,rgba(255,232,180,0.6) 50%,transparent 65%);transform:translateX(-50%);box-shadow:0 0 12px rgba(255,232,180,0.5);z-index:5;opacity:0;animation:crack-hint 1.8s 0.3s ease-out forwards}
 
-    <p class="r font-display" style="--i:0;font-size:0.95em;color:var(--inkSoft);margin:0;letter-spacing:0.4em">━━  소개합니다  ━━</p>
+    /* inside ambient */
+    .inside-bg{position:absolute;inset:0;z-index:1;opacity:0;animation:inside-fade 2s 3.6s ease-out forwards}
+    .spin-glow-soft{position:absolute;width:900px;height:900px;top:50%;left:50%;transform:translate(-50%,-50%);background:conic-gradient(from 0deg,var(--babypinkSoft),var(--lavenderSoft),var(--mintSoft),var(--butterSoft),var(--babypinkSoft));border-radius:50%;opacity:0.35;filter:blur(60px);animation:spin-slow 28s linear infinite}
+    .bubble{position:absolute;border-radius:50%;filter:blur(40px);opacity:0.7}
+    .bubble.b1{width:300px;height:300px;background:var(--babypinkSoft);top:-80px;left:-60px;animation:floaty 8s ease-in-out infinite}
+    .bubble.b2{width:280px;height:280px;background:var(--mintSoft);bottom:-70px;right:-50px;animation:floaty 9s ease-in-out infinite reverse}
+    .bubble.b3{width:200px;height:200px;background:var(--butterSoft);top:60px;right:100px;animation:floaty 7s ease-in-out infinite}
+    .bubble.b4{width:180px;height:180px;background:var(--lavenderSoft);bottom:80px;left:120px;animation:floaty 10s ease-in-out infinite reverse}
+    .accent-dot{position:absolute;border-radius:50%;animation:twinkle 3s ease-in-out infinite}
+    .accent-dot.a1{top:120px;right:200px;width:16px;height:16px;background:var(--babypink);animation-delay:0s}
+    .accent-dot.a2{top:200px;left:180px;width:12px;height:12px;background:var(--mintInk);animation-delay:0.8s}
+    .accent-dot.a3{bottom:160px;right:260px;width:10px;height:10px;background:var(--butterInk);animation-delay:1.4s}
+    .accent-dot.a4{bottom:120px;left:160px;width:14px;height:14px;background:var(--lavInk);animation-delay:2.1s}
+    .ring{position:absolute;border-radius:50%;opacity:0.65}
+    .ring.r1{top:480px;left:100px;width:36px;height:36px;border:3px solid var(--lavInk);animation:twinkle 5s ease-in-out infinite}
+    .ring.r2{bottom:80px;right:140px;width:46px;height:46px;border:3px dashed var(--skyInk);animation:spin-slow 20s linear infinite}
 
-    <h1 class="r font-display shine-text" style="--i:1;font-size:7em;line-height:1.05;margin:32px 0 0;letter-spacing:-0.03em;display:inline-block">
-      pingdergarten
-    </h1>
+    /* logo (original design, after doors fully open) */
+    .inside-logo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:4;padding:0 80px}
+    .inside-logo .auto-r{opacity:0;transform:translateY(16px);animation:auto-r 0.65s cubic-bezier(0.2,0.8,0.2,1) forwards}
 
-    <p class="r font-display" style="--i:2;font-size:1.6em;color:var(--ink);margin:38px 0 0;line-height:1.4">
-      유치원에 들어온 <span style="color:var(--babypink)">세 친구</span>
-    </p>
+    /* === doors open GRADUALLY in stages, synced with beams === */
+    .reveal-door.left{animation:door-open-left 5.0s 0.5s cubic-bezier(0.4,0,0.6,1) forwards}
+    .reveal-door.right{animation:door-open-right 5.0s 0.5s cubic-bezier(0.4,0,0.6,1) forwards}
 
-    <div class="r" style="--i:3;margin-top:42px;display:flex;align-items:center;gap:18px;font-size:0.85em;font-family:'Jua';color:var(--inkSoft);letter-spacing:0.05em">
-      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--babypink);border-radius:50%"></span>EduPing</span>
-      <span style="opacity:0.4">·</span>
-      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--mintInk);border-radius:50%"></span>GogoPing</span>
-      <span style="opacity:0.4">·</span>
-      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--lavInk);border-radius:50%"></span>NoriArm</span>
+    /* keyframes */
+    @keyframes crack-hint{
+      0%{opacity:0;width:1px}
+      30%{opacity:0.6;width:2px}
+      80%{opacity:0.4;width:2px}
+      100%{opacity:0;width:2px;visibility:hidden}
+    }
+    @keyframes beam-life{
+      0%{opacity:0;width:1px;filter:blur(1.5px)}
+      18%{opacity:0.95;width:2.5px;filter:blur(0.4px)}
+      55%{opacity:0.7;width:2.5px}
+      100%{opacity:0;width:1px;filter:blur(2px);visibility:hidden}
+    }
+    /* gradual door open — staged: crack→pause→pop→pause→swing wide */
+    @keyframes door-open-left{
+      0%   {transform:translateX(0)         rotateY(0deg);  opacity:1}
+      4%   {transform:translateX(-1%)       rotateY(-1deg); opacity:1}
+      14%  {transform:translateX(-2.5%)     rotateY(-2deg); opacity:1}
+      20%  {transform:translateX(-3%)       rotateY(-2deg); opacity:1}
+      28%  {transform:translateX(-9%)       rotateY(-5deg); opacity:1}
+      34%  {transform:translateX(-10%)      rotateY(-5deg); opacity:1}
+      50%  {transform:translateX(-25%)      rotateY(-10deg);opacity:1}
+      66%  {transform:translateX(-50%)      rotateY(-14deg);opacity:1}
+      80%  {transform:translateX(-85%)      rotateY(-12deg);opacity:1}
+      100% {transform:translateX(-150%)     rotateY(-8deg); opacity:0;visibility:hidden}
+    }
+    @keyframes door-open-right{
+      0%   {transform:translateX(0)         rotateY(0deg);  opacity:1}
+      4%   {transform:translateX(1%)        rotateY(1deg);  opacity:1}
+      14%  {transform:translateX(2.5%)      rotateY(2deg);  opacity:1}
+      20%  {transform:translateX(3%)        rotateY(2deg);  opacity:1}
+      28%  {transform:translateX(9%)        rotateY(5deg);  opacity:1}
+      34%  {transform:translateX(10%)       rotateY(5deg);  opacity:1}
+      50%  {transform:translateX(25%)       rotateY(10deg); opacity:1}
+      66%  {transform:translateX(50%)       rotateY(14deg); opacity:1}
+      80%  {transform:translateX(85%)       rotateY(12deg); opacity:1}
+      100% {transform:translateX(150%)      rotateY(8deg);  opacity:0;visibility:hidden}
+    }
+    @keyframes auto-r{
+      0%{opacity:0;transform:translateY(16px)}
+      100%{opacity:1;transform:translateY(0)}
+    }
+    @keyframes inside-fade{
+      0%{opacity:0}
+      100%{opacity:1}
+    }
+    @keyframes twinkle{
+      0%,100%{opacity:0.4;transform:scale(0.85)}
+      50%{opacity:1;transform:scale(1.15)}
+    }
+    @keyframes spin-slow{
+      0%{transform:translate(-50%,-50%) rotate(0)}
+      100%{transform:translate(-50%,-50%) rotate(360deg)}
+    }
+    @keyframes floaty{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(-18px)}
+    }
+  </style>
+
+  <div class="reveal-stage">
+    <!-- ambient inside background -->
+    <div class="inside-bg">
+      <div class="spin-glow-soft"></div>
+      <div class="bubble b1"></div>
+      <div class="bubble b2"></div>
+      <div class="bubble b3"></div>
+      <div class="bubble b4"></div>
+      <span class="accent-dot a1"></span>
+      <span class="accent-dot a2"></span>
+      <span class="accent-dot a3"></span>
+      <span class="accent-dot a4"></span>
+      <span class="ring r1"></span>
+      <span class="ring r2"></span>
     </div>
 
+    <!-- crack hint glow -->
+    <div class="crack-hint"></div>
+
+    <!-- beams shoot through the widening gap as doors open in stages -->
+    <span class="beam b1"></span>
+    <span class="beam b2"></span>
+    <span class="beam b3"></span>
+    <span class="beam b4"></span>
+    <span class="beam b5"></span>
+    <span class="beam b6"></span>
+    <span class="beam b7"></span>
+    <span class="beam b8"></span>
+    <span class="beam b9"></span>
+
+    <!-- doors -->
+    <div class="reveal-door left"><span class="door-handle l"></span></div>
+    <div class="reveal-door right"><span class="door-handle r"></span></div>
+
+    <!-- inside content (original logo design) -->
+    <div class="inside-logo">
+      <p class="auto-r font-display" style="animation-delay:4.4s;font-size:0.95em;color:var(--inkSoft);margin:0;letter-spacing:0.4em">━━  소개합니다  ━━</p>
+      <h1 class="auto-r font-display shine-text" style="animation-delay:4.6s;font-size:7em;line-height:1.05;margin:32px 0 0;letter-spacing:-0.03em;display:inline-block">pingdergarten</h1>
+      <p class="auto-r font-display" style="animation-delay:4.8s;font-size:1.6em;color:var(--ink);margin:38px 0 0;line-height:1.4">유치원에 들어온 <span style="color:var(--babypink)">세 친구</span></p>
+      <div class="auto-r" style="animation-delay:5.0s;margin-top:42px;display:flex;align-items:center;gap:18px;font-size:0.85em;font-family:'Jua';color:var(--inkSoft);letter-spacing:0.05em">
+        <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--babypink);border-radius:50%"></span>EduPing</span>
+        <span style="opacity:0.4">·</span>
+        <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--mintInk);border-radius:50%"></span>GogoPing</span>
+        <span style="opacity:0.4">·</span>
+        <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:14px;height:14px;background:var(--lavInk);border-radius:50%"></span>NoriArm</span>
+      </div>
+    </div>
   </div>
+
+  <aside class="notes">
+    유치원 입장 — 보물상자 천천히 열듯:
+    0.3s 빛 hint (가운데 작은 줄기)
+    0.5–5.5s 양문이 5 단계 천천히 열림:
+      stage 1 (0.7s):  문 2.5% 균열 → 수직 빛줄기 b1 발사
+      stage 2 (1.5s):  문 9% 열림 → ±15° 빛줄기 b2/b3
+      stage 3 (2.4s):  문 25% 열림 → ±30° 빛줄기 b4/b5
+      stage 4 (3.2s):  문 50% 열림 → ±50° 빛줄기 b6/b7
+      stage 5 (3.8s):  문 85% 열림 → ±75° 빛줄기 b8/b9
+      end (5.5s):      문 완전히 화면 밖
+    3.6s 안쪽 ambient 페이드인
+    4.4–5.0s 로고 등장 (원래 shine-text)
+  </aside>
 </section>

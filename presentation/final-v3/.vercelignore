@@ -5,11 +5,6 @@ README.md
 slides/assets/media/**
 
 # Re-include used media (mirror grep of slides/*.html for assets/media/...)
-# 호출어 Q&A 보고서(reports/05) 가 참조하는 ROC 이미지
-!slides/assets/media/diagrams/
-!slides/assets/media/diagrams/wake-roc.png
-!slides/assets/media/diagrams/wake-roc-gen.png
-!slides/assets/media/diagrams/mel-spec-example.png
 !slides/assets/media/pov.mp4
 !slides/assets/media/eduping/
 !slides/assets/media/eduping/dance.mp4

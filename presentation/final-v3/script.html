@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>pingdergarten · 발표 대본</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Material+Icons+Round&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0; background:#0a0d14; color:#e2e8f0; font-family:'Pretendard Variable',system-ui,sans-serif; line-height:1.6; }
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 32px 80px; }
+  header { text-align:center; padding:60px 0 40px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:48px; }
+  header h1 { font-family:'Jua',sans-serif; font-size:42px; color:#fff; margin:0 0 12px; letter-spacing:-0.01em; }
+  header p { color:#94a3b8; margin:0; font-size:16px; letter-spacing:0.05em; }
+  header .meta { display:flex; justify-content:center; gap:24px; margin-top:18px; }
+  header .meta span { background:rgba(255,255,255,0.06); padding:6px 14px; border-radius:999px; font-size:13px; color:#cbd5e1; }
+  .part { margin-top:56px; }
+  .part-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; padding-bottom:12px; border-bottom:2px solid; }
+  .part-header .label { font-family:'Jua',sans-serif; font-size:13px; letter-spacing:0.3em; opacity:0.7; }
+  .part-header h2 { font-family:'Jua',sans-serif; font-size:28px; margin:0; color:#fff; }
+  .part-header .count { margin-left:auto; font-size:13px; color:#64748b; }
+  .slide { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:20px 24px; margin-bottom:14px; transition:all 0.2s ease; }
+  .slide:hover { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.18); }
+  .slide-head { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .slide-num { font-family:'Jua',sans-serif; font-size:16px; color:#64748b; min-width:42px; }
+  .slide-title { font-family:'Jua',sans-serif; font-size:16px; color:#cbd5e1; flex:1; }
+  .slide-file { font-family:monospace; font-size:11px; color:#475569; }
+  .script { color:#e2e8f0; font-size:15px; line-height:1.65; padding-left:52px; }
+  .script p { margin:6px 0; }
+  .script b { color:#fff; font-weight:600; }
+  .script em { color:#94a3b8; font-style:normal; font-size:13px; }
+  .script ul { padding-left:18px; margin:6px 0; }
+  .step-block { background:rgba(96,165,250,0.06); border-left:3px solid #60a5fa; padding:10px 14px; margin:8px 0; border-radius:6px; }
+  .step-block .step-name { font-family:'Jua',sans-serif; font-size:13px; color:#60a5fa; letter-spacing:0.1em; margin-bottom:4px; }
+  /* PART 색깔 */
+  .part.hook .part-header { border-color:#94a3b8; } .part.hook .part-header h2, .part.hook .part-header .label { color:#94a3b8; }
+  .part.setup .part-header { border-color:#22c55e; } .part.setup .part-header h2, .part.setup .part-header .label { color:#22c55e; }
+  .part.eduping .part-header { border-color:#f472b6; } .part.eduping .part-header h2, .part.eduping .part-header .label { color:#f472b6; }
+  .part.gogoping .part-header { border-color:#4ade80; } .part.gogoping .part-header h2, .part.gogoping .part-header .label { color:#4ade80; }
+  .part.noriarm .part-header { border-color:#fbbf24; } .part.noriarm .part-header h2, .part.noriarm .part-header .label { color:#fbbf24; }
+  .part.closing .part-header { border-color:#a855f7; } .part.closing .part-header h2, .part.closing .part-header .label { color:#a855f7; }
+  footer { text-align:center; margin-top:80px; padding-top:32px; border-top:1px solid rgba(255,255,255,0.1); color:#64748b; font-size:13px; }
+  @media print { body { background:#fff; color:#000; } .slide { background:#f8fafc; border-color:#e2e8f0; } .step-block { background:#eff6ff; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>pingdergarten · 사랑의 에듀핑</h1>
+  <p>발표 대본 · 약 20분 · 49 슬라이드</p>
+  <div class="meta">
+    <span>ADDINEDU VLA 최종 프로젝트</span>
+    <span>2026-06-04</span>
+    <span>발표: 최민성</span>
+  </div>
+</header>
+
+<div class="part hook">
+  <div class="part-header"><span class="label">HOOK</span><h2>도입</h2><span class="count">1-6</span></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[1]</span><span class="slide-title">핑더가든 (커버)</span><span class="slide-file">01-title.html</span></div><div class="script">"안녕하세요. 저희는 ADDINEDU VLA 최종 프로젝트 팀 <b>'사랑의 에듀핑'</b> 입니다. 유치원에 활기를, 선생님께 여유를 드리기 위해 만든 교육보조로봇 3종, <b>pingdergarten</b> 을 소개하겠습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[2]</span><span class="slide-title">POV 1인칭 영상</span><span class="slide-file">02-pov-video.html</span></div><div class="script">"먼저 유치원 선생님의 하루를 1인칭 시점으로 보겠습니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[3]</span><span class="slide-title">무엇을 만들어야 했나</span><span class="slide-file">02b-dev-question.html</span></div><div class="script">"방금 보신 것처럼 유치원 선생님은 정말 바쁩니다. 그래서 저희는 선생님을 돕는 로봇을 만들기로 결정했습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[4]</span><span class="slide-title">하고 싶었던 것</span><span class="slide-file">03-want.html</span></div><div class="script">"선생님이 직면한 4가지 문제가 있습니다. 첫째, 놀이 시간에 여러 아이가 동시에 도움을 청하는데 손은 둘뿐. 둘째, 율동을 가르치며 아이들 모습을 촬영할 수 없음. 셋째, 무거운 교구를 혼자 나르기 힘듦. 넷째, 하루 일과 기록이 너무 바쁨. <b>이 문제들을 해결하기 위해 저희는 세 친구를 만들었습니다.</b>"</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[5]</span><span class="slide-title">핑더가든 reveal</span><span class="slide-file">04b-reveal.html</span></div><div class="script">"저희가 만든 것은 <b>EduPing</b>, <b>GogoPing</b>, 그리고 <b>NoriArm</b> 세 가지 로봇입니다. 이들이 유치원에서 어떻게 활약하는지 차례대로 보여드리겠습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[6]</span><span class="slide-title">목차</span><span class="slide-file">05-toc.html</span></div><div class="script">"오늘 발표는 총 6부로 나뉩니다. ① 시스템과 기술 스택, ② EduPing 양팔 로봇, ③ GogoPing 자율주행, ④ NoriArm 매니퓰레이터, ⑤ 프로젝트 프로세스, 마지막으로 ⑥ 팀 소개 및 Q&A."</div></div>
+</div>
+
+<div class="part setup">
+  <div class="part-header"><span class="label">SETUP</span><h2>시스템 구성</h2><span class="count">7-12</span></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[7]</span><span class="slide-title">그래서 필요했던 것</span><span class="slide-file">04-need.html</span></div><div class="script">"저희가 필요한 로봇은 세 가지. <b>선생님과 닮고 춤도 춰주는 친구 (EduPing)</b>, <b>선생님보다 힘 센 친구 (GogoPing)</b>, <b>아이들과 함께 놀고 배우는 친구 (NoriArm)</b>."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[8]</span><span class="slide-title">필수 요건</span><span class="slide-file">04c-required.html</span></div><div class="script">"세 로봇 모두 공통 필수 요건이 있습니다. <b>선생님 일손을 덜고 아이들이 자연스럽게 다가갈 수 있어야</b> 하고, <b>교사가 직접 조작·명령할 수 있어야</b> 합니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[9]</span><span class="slide-title">로봇 하드웨어</span><span class="slide-file">07b-hardware.html</span></div><div class="script">"하드웨어 구성입니다. <b>EduPing</b> 은 OpenArm 양팔과 D435 깊이 카메라. <b>GogoPing</b> 은 Vic Pinky 모바일 베이스, RPLiDAR C1, D435. <b>NoriArm</b> 은 교실 3대 — Dynamixel 6축 팔과 웹캠."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[10]</span><span class="slide-title">시스템 아키텍처 ★ 6 step 동적</span><span class="slide-file">06-system.html</span></div><div class="script">
+    <div class="step-block"><div class="step-name">STEP 1 — APP</div>"<b>학부모, 의사</b>는 Portal Browser 로, <b>운영자</b>는 Admin App 으로 시스템에 접속합니다."</div>
+    <div class="step-block"><div class="step-name">STEP 2 — SERVICE</div>"모든 요청은 <b>Portal Web</b> 을 거쳐 핵심 허브인 <b>Control Service</b> 로 모입니다. <b>AI Service</b> 가 LLM·Vision 추론을, <b>DB</b> 가 세션·이벤트 기록을 담당합니다."</div>
+    <div class="step-block"><div class="step-name">STEP 3 — ROBOTS</div>"각 로봇은 <b>자체 PC 와 UI 를 보유</b> — 아이는 로봇 화면을 직접 터치하거나 음성으로 명령할 수 있습니다."</div>
+    <div class="step-block"><div class="step-name">STEP 4 — 등하원 시나리오</div>"아이가 등원하면 EduPing 카메라가 얼굴을 인식 (AI Service), 양팔로 하이파이브, 이벤트는 DB 에 기록, Portal Web 으로 학부모에게 등원 알림."</div>
+    <div class="step-block"><div class="step-name">STEP 5 — 자율주행 가이드</div>"교사가 Admin 에서 강당 안내 요청 → Control → GogoPing 자율주행. 사람을 만나면 카메라 인식 (AI)·로그 저장 (DB) 으로 경로 재설정."</div>
+    <div class="step-block"><div class="step-name">STEP 6 — 놀이 (NoriArm)</div>"아이가 NoriArm UI 에서 가게놀이 선택 → Control → AI Service LLM 으로 요청 분류 → NoriArm 이 ACT 학습 모델로 픽업. 결과는 DB 에 저장되고 Portal 로 학부모 보고서에 반영."</div>
+  </div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[11]</span><span class="slide-title">기술 스택</span><span class="slide-file">07-tech-stack.html</span></div><div class="script">"기술 스택은 5가지. <b>Robot 제어</b> ROS2 Jazzy + Nav2 + py_trees, <b>Vision</b> YOLOv8 + ByteTrack + InsightFace + MediaPipe, <b>모방학습</b> LeRobot ACT, <b>Voice·LLM</b> Web Speech + Ollama qwen2.5, <b>협업</b> GitHub + Confluence + Jira."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[12]</span><span class="slide-title">하루 일과 시나리오</span><span class="slide-file">07c-daily-scenario.html</span></div><div class="script">"아이의 하루는 5단계. 등원 시 EduPing 인사·하이파이브 → 놀이 시간엔 세 로봇 함께 활동 → 낮잠 시간 GogoPing 자장가 → 오후 교사 보조 → 하원 시 다시 EduPing 인사. <b>상시 원격진찰도 가능</b>."</div></div>
+</div>
+
+<div class="part eduping">
+  <div class="part-header"><span class="label">PART 02</span><h2>EduPing · 양팔 로봇</h2><span class="count">13-25</span></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[13]</span><span class="slide-title">EduPing 인트로</span><span class="slide-file">08-eduping-section.html</span></div><div class="script">"이제 EduPing 을 상세히 소개합니다. 양팔 로봇으로 <b>등하원, 율동, 무궁화꽃, 원격진찰</b> 4가지 기능을 수행합니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[14]</span><span class="slide-title">등하원 시나리오</span><span class="slide-file">09-eduping-arrival-scenario.html</span></div><div class="script">"등하원은 4단계. ① 카메라로 얼굴 인식 → ② 등록 정보 매칭 → ③ 손 탐색 → ④ 하이파이브."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[15]</span><span class="slide-title">등하원 영상</span><span class="slide-file">09-eduping-arrival.html</span></div><div class="script">"실제 하이파이브 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[16]</span><span class="slide-title">등하원 기술</span><span class="slide-file">09b-eduping-arrival-content.html</span></div><div class="script">"기술적으로, <b>D435 깊이 카메라로 손의 3D 좌표를 역투영</b> → 로봇 목표점으로 변환. <b>IK→FK 폐쇄 루프</b>로 오차를 <b>20cm → 2cm</b> 로 줄였습니다. MuJoCo 디지털 트윈에서 먼저 검증한 뒤 실물 OpenArm 시연."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[17]</span><span class="slide-title">율동 시나리오</span><span class="slide-file">10-eduping-dance-scenario.html</span></div><div class="script">"율동은 3단계. ① 선생님이 팔을 직접 움직여 녹화 → ② 키프레임 추출 → ③ 재생 으로 EduPing 이 같은 율동 반복."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[18]</span><span class="slide-title">율동 영상</span><span class="slide-file">10-eduping-dance.html</span></div><div class="script">"율동 재현 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[19]</span><span class="slide-title">율동 기술</span><span class="slide-file">10b-eduping-dance-content.html</span></div><div class="script">"선생님이 팔을 움직이면 <b>16개 모터 각도를 50Hz 로 샘플링</b> 해 motion.yaml 저장. 시간·관절 라디안 키프레임은 선형 보간으로 부드럽게 이동. <b>WebSocket 한 채널</b> 로 같은 시간에 동작과 음악이 정확히 동기."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[20]</span><span class="slide-title">무궁화꽃 시나리오</span><span class="slide-file">11-eduping-hibiscus-scenario.html</span></div><div class="script">"무궁화꽃이 피었습니다는 5단계. 아이 진입 → 준비 자세 → 노래 시작 → 움직임 관찰 → 움직인 아이 탈락."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[21]</span><span class="slide-title">무궁화꽃 영상</span><span class="slide-file">11-eduping-hibiscus.html</span></div><div class="script">"게임 진행 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[22]</span><span class="slide-title">무궁화꽃 기술</span><span class="slide-file">11b-eduping-hibiscus-content.html</span></div><div class="script">"핵심은 <b>audio.currentTime 단일 시계</b> 로 노래·팔 동작·움직임 관찰을 동기화. <b>MediaPipe + InsightFace</b> 로 여러 아이 동시 인식. <b>SAD 이미지 차이 + 2단 임계값</b> 으로 움직임을 정교하게 판정."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[23]</span><span class="slide-title">원격진찰 개요</span><span class="slide-file">12-eduping-doctor-preview.html</span></div><div class="script">"원격진찰은 의사와 환자를 실시간으로 연결합니다. 좌측 의사 Leader UI, 우측 환자 UI. <b>의사 팔 움직임이 로봇에 직결</b>, <b>깊이 카메라 3D 점구름이 의사 화면 전송</b>."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[24]</span><span class="slide-title">원격진찰 영상</span><span class="slide-file">12-eduping-doctor.html</span></div><div class="script">"4분할 화면 — 의사 UI / 환자 UI / 의사 실사 / 환자 실사." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[25]</span><span class="slide-title">원격진찰 기술</span><span class="slide-file">12b-eduping-doctor-content.html</span></div><div class="script">"<b>의사 → 로봇</b>: Leader Teleop 으로 팔 관절각 직결. <b>로봇 → 의사</b>: D435 깊이 영상 1m 필터 + 3D 점구름 전송. <b>의사 ↔ 환자</b>: WebRTC P2P 로 영상·음성 브라우저 직통, 제어 서버는 신호만 중계. <b>FSR 청진 센서</b> 데이터도 의사에게."</div></div>
+</div>
+
+<div class="part gogoping">
+  <div class="part-header"><span class="label">PART 03</span><h2>GogoPing · 자율주행</h2><span class="count">26-36</span></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[26]</span><span class="slide-title">GogoPing 인트로</span><span class="slide-file">13-gogoping-section.html</span></div><div class="script">"이제 GogoPing 을 소개합니다. 자율주행 로봇으로 <b>교사 추종, 가이드, 숨바꼭질</b> 게임을 진행합니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[27]</span><span class="slide-title">교사 추종 시나리오</span><span class="slide-file">14-gogoping-follow-scenario.html</span></div><div class="script">"교사 추종은 6단계. 음성 명령 시작 → 교사 얼굴 인식 → 객체 등록 → 추적 → 음성 정지 → 대기."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[28]</span><span class="slide-title">추종 영상</span><span class="slide-file">14-gogoping-follow.html</span></div><div class="script">"실제 추종 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[29]</span><span class="slide-title">추종 기술</span><span class="slide-file">14b-gogoping-follow-content.html</span></div><div class="script">"<b>InsightFace</b> 로 교사 얼굴 등록, <b>OSNet 신체 임베딩</b> 누적. <b>YOLO 검출 + ByteTrack 추적</b>, 매 프레임 OSNet 유사도 최대 궤적 재선택. <b>외형 유사도 + RPLiDAR 거리 연속성 이중 게이트</b>로 닮은 사람 제외. 포즈 랜드마크로 사람 아닌 물체 필터링."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[30]</span><span class="slide-title">가이드 지도</span><span class="slide-file">14c-gogoping-guide-map.html</span></div><div class="script">"가이드는 시뮬과 운영이 동일한 지도. 좌측 <b>Gazebo 3D 시뮬</b> (Nav2·AMCL 검증). 우측 <b>Admin App vertex 그래프</b> — 놀이방, 수면실, 통로, 충전소."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[31]</span><span class="slide-title">가이드 시나리오</span><span class="slide-file">14c-gogoping-guide-scenario.html</span></div><div class="script">"가이드는 6단계. 음성·UI 목적지 명령 → 현재 위치에서 출발 vertex 확정 → 경로 생성 → 아이 데려가기 → 도착 → 대기."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[32]</span><span class="slide-title">가이드 영상</span><span class="slide-file">14c-gogoping-guide.html</span></div><div class="script">"vertex 그래프 따라 자율주행 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[33]</span><span class="slide-title">가이드 기술</span><span class="slide-file">14d-gogoping-guide-content.html</span></div><div class="script">"의미로 명령하는 <b>vertex 기반 그래프</b> — '놀이방으로 가' 라고 말하면 이동. <b>Nav2 NavigateToPose</b> 액션 + costmap 으로 장애물 회피. <b>Heading-aware Dijkstra</b> 로 135° 이상 급선회 제외, <b>회전은 5개 화이트리스트 지점에서만</b>. 사람이 앞에 나타나면 깊이 센서 근접도 감지로 긴급 정지."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[34]</span><span class="slide-title">숨바꼭질 시나리오</span><span class="slide-file">15-gogoping-hideseek-scenario.html</span></div><div class="script">"숨바꼭질은 6단계. 놀이구역 이동 → 아이 등록 → 30초 카운트다운 → 정해진 지점 순찰 → 카메라로 아이 탐색 → 복귀."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[35]</span><span class="slide-title">숨바꼭질 영상</span><span class="slide-file">15-gogoping-hideseek.html</span></div><div class="script">"순찰·탐색 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[36]</span><span class="slide-title">숨바꼭질 기술</span><span class="slide-file">15b-gogoping-hideseek-content.html</span></div><div class="script">"매판 다른 동선 — <b>그룹 셔플 + 최근접 이웃 알고리즘</b> 으로 순찰 순서 정함. 장애물 시 <b>BehaviorTree 제어 하 Nav2 실시간 재계획</b>. 정지 후 <b>카메라만 좌우 26초 스윕</b> 으로 얼굴 탐색. <b>InsightFace ArcFace 512차원 임베딩</b> 으로 등록된 아이만 정답 인정."</div></div>
+</div>
+
+<div class="part noriarm">
+  <div class="part-header"><span class="label">PART 04</span><h2>NoriArm · 매니퓰레이터</h2><span class="count">37-46</span></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[37]</span><span class="slide-title">NoriArm 인트로</span><span class="slide-file">18-noriarm-section.html</span></div><div class="script">"이제 NoriArm 을 소개합니다. 교실 3대 작은 매니퓰레이터로 <b>블럭쌓기, OX 퀴즈, 가게놀이</b> 진행."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[38]</span><span class="slide-title">블럭쌓기 시나리오</span><span class="slide-file">19-noriarm-blocks-scenario.html</span></div><div class="script">"블럭쌓기는 3단계 파이프라인. ① 리드암으로 611 에피소드 직접 녹화 → ② ACT 모방학습 → ③ 실시간 폐쇄 루프에서 자율 픽업·적재."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[39]</span><span class="slide-title">블럭쌓기 영상</span><span class="slide-file">19-noriarm-blocks.html</span></div><div class="script">"사람·로봇 번갈아 쌓는 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[40]</span><span class="slide-title">블럭쌓기 기술</span><span class="slide-file">19b-noriarm-blocks-content.html</span></div><div class="script">"<b>611 에피소드</b>, 사람·로봇 4턴 반복. <b>LeRobot ACT 누적 197만 스텝 학습</b>. OMX-F 5축 팔 부족분 보완. 좁은 박스 → 전체 작업 영역 확대. 회귀 시 <b>재학습 없이 HSV 색상 마스킹 ROI 보완</b>."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[41]</span><span class="slide-title">OX 퀴즈 시나리오</span><span class="slide-file">20-noriarm-oxquiz-scenario.html</span></div><div class="script">"OX 퀴즈는 4단계. NoriArm 문제 제시 → 아이 손 표시 → 위치 판정 → 정답·오답 표시."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[42]</span><span class="slide-title">OX 퀴즈 영상</span><span class="slide-file">20-noriarm-oxquiz.html</span></div><div class="script">"문제 제시·손 추적 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[43]</span><span class="slide-title">OX 퀴즈 기술</span><span class="slide-file">20b-noriarm-oxquiz-content.html</span></div><div class="script">"<b>상단 카메라 + YOLO-World</b> 로 OX 보드 검출, 색깔로 영역 분할. <b>MediaPipe Hands</b> 로 손끝 추적, <b>한 영역 위 1.5초 머물면 확정 판정</b>. <b>ROS2 JointTrajectory</b> 로 5축 팔·그리퍼 독립 제어, 정답 방향만 가리키는 rule-based 정책 재생."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[44]</span><span class="slide-title">가게놀이 시나리오</span><span class="slide-file">21-noriarm-shop-scenario.html</span></div><div class="script">"가게놀이는 4단계 파이프라인. 625 에피소드 ACT 학습 → 음성 의도 분류 → YOLO ROI 마스킹 → 실시간 추론 픽업."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[45]</span><span class="slide-title">가게놀이 영상</span><span class="slide-file">21-noriarm-shop.html</span></div><div class="script">"과일 요청·픽업 영상입니다." <em>(영상 재생)</em></div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[46]</span><span class="slide-title">가게놀이 기술</span><span class="slide-file">21b-noriarm-shop-content.html</span></div><div class="script">"SmolVLA 는 prompt 무반응 60% 정확도. 비전 ablation MSE 0.08% → <b>로봇이 시각을 거의 안 보고 음성·상태로 외운다</b> 는 뜻. 그래서 <b>YOLO ROI 마스킹</b> 으로 대상 과일만 남기고 나머지 검정 처리 → <b>정확도 0.999 (TP 840 / FP 1)</b>. <b>LeRobot ACT 채택</b>, MAE 0.69 (baseline 1.91), <b>208Hz 실시간 성능</b>."</div></div>
+</div>
+
+<div class="part closing">
+  <div class="part-header"><span class="label">CLOSING</span><h2>마무리</h2><span class="count">47-55</span></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[47]</span><span class="slide-title">일과 보고서</span><span class="slide-file">22b-portal-report.html</span></div><div class="script">"Portal Web 에서 학부모가 <b>자녀 일과를 자연어 보고서</b> 로 받아봅니다. 시간대별 활동 사진 + 교사 편집 내용을 한 화면에서 확인. 하원 시점에 <b>qwen2.5:7b LLM</b> 이 사진 메타·모드 이력·점심 메뉴를 통합해 자동 요약."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[48]</span><span class="slide-title">PART 05 Process 인트로</span><span class="slide-file">22c-process-section.html</span></div><div class="script">"이제 저희 프로젝트 진행 과정을 소개합니다. <b>7주 동안 7개 스프린트</b> 로 완성했습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[49]</span><span class="slide-title">스프린트 타임라인</span><span class="slide-file">22-sprint-jira.html</span></div><div class="script">"S1 주제 정하기 2일 → S2 상세 설계·Vic Pinky 셋업 6일 → S3 scaffold·놀이 설계 6일 → S4 등하원·율동·OX·블럭 7일 → S5 무궁화꽃·LLM·OpenArm·가이드 7일 → S6 테스트·데모 7일 → S7 발표 준비 5일. <b>6주 6일 모든 스프린트 완주</b>."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[50]</span><span class="slide-title">Jira 진행</span><span class="slide-file">22a-jira-gantt.html</span></div><div class="script">"Jira FN-5 <b>구현 Epic 35개 이슈 모두 완료</b>. 의존성을 가진 작업들이 일정에 맞게 완성됐습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[51]</span><span class="slide-title">PART 06 Team 인트로</span><span class="slide-file">22d-team-section.html</span></div><div class="script">"이제 저희 <b>'사랑의 에듀핑'</b> 팀 6명을 소개합니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[52]</span><span class="slide-title">EduPing 팀</span><span class="slide-file">23a-team-eduping.html</span></div><div class="script">"EduPing 팀입니다. <b>박우림 리더</b> 가 EduPing 의 <b>율동, 원격진찰, 호출어 (STT·TTS)</b> 를 담당했습니다. <b>이정우</b> 는 <b>등하원/하이파이브, 무궁화꽃이 피었습니다, 일과 보고서</b> 를 구현했습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[53]</span><span class="slide-title">GogoPing 팀</span><span class="slide-file">23b-team-gogoping.html</span></div><div class="script">"GogoPing 팀입니다. <b>노영주</b> 는 <b>추종 기능, 사람 인식 (YOLO·ReID), WebRTC 영상 송출</b> 을 담당했습니다. <b>이강택</b> 은 <b>Nav2 자율주행 가이드, 숨바꼭질, 사람 인식 경로 재설정</b> 을 구현했습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[54]</span><span class="slide-title">NoriArm 팀</span><span class="slide-file">23c-team-noriarm.html</span></div><div class="script">"NoriArm 팀입니다. <b>이지수</b> 는 <b>ACT 블럭쌓기, HSV 추론, OX 퀴즈</b> 를 담당했습니다. <b>최민성</b> 은 <b>ACT 가게놀이, YOLO ROI 마스킹, 그리고 오늘 발표</b> 를 맡았습니다."</div></div>
+
+  <div class="slide"><div class="slide-head"><span class="slide-num">[55]</span><span class="slide-title">Q&A</span><span class="slide-file">24-ending.html</span></div><div class="script">"이상으로 <b>pingdergarten 프로젝트 발표</b> 를 마칩니다. 더 알고 싶으신 점이 있으시면 Q&A 버튼을 클릭하시면 각 기능별 상세 설명을 보실 수 있습니다. <b>감사합니다</b>."</div></div>
+</div>
+
+<footer>
+  pingdergarten · 사랑의 에듀핑 — 발표 대본 · ADDINEDU VLA 최종 프로젝트<br>
+  키보드 단축키: Ctrl/⌘ + P → 인쇄 또는 PDF 저장
+</footer>
+
+</div>
+</body>
+</html>

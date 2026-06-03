@@ -1,50 +1,61 @@
 <section>
   <div class="bg-deco">
-    <div class="blob" style="width:300px;height:300px;background:var(--babypinkSoft);top:-90px;left:-60px;opacity:0.35"></div>
-    <div class="blob float" style="width:220px;height:220px;background:var(--lavenderSoft);bottom:-50px;right:-30px;opacity:0.3"></div>
+    <div class="blob" style="width:340px;height:340px;background:var(--babypinkSoft);top:-90px;left:-70px;opacity:0.4"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);bottom:-60px;right:-40px;opacity:0.3"></div>
   </div>
-  <div class="layer" style="padding:24px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+  <div class="layer" style="padding:24px 48px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px">
       <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--babypink),var(--lavInk));color:#fff;border:0">EDUPING · 모드 02</span>
-      <h2 class="font-display" style="font-size:1.55em;color:var(--ink);margin:0">율동 — 녹화 → 키프레임 → 재생</h2>
+      <h2 class="font-display" style="font-size:1.55em;color:var(--ink);margin:0">율동 기능 설명</h2>
     </div>
 
-    <div style="flex:1;display:grid;grid-template-columns:1.1fr 1fr;gap:20px;min-height:0">
-      <!-- LEFT: video -->
-      <div style="background:#000;border:2px solid var(--babypink);border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 8px 24px rgba(236,143,166,0.3)">
-        <img src="slides/assets/media/eduping/dance-teach.gif" alt="Leader 팔 녹화"
-             style="width:100%;height:100%;object-fit:cover"/>
-        <span style="position:absolute;left:14px;bottom:14px;background:rgba(15,18,28,0.85);color:#fff;font-family:'Jua';font-size:13px;padding:6px 14px;border-radius:7px;letter-spacing:0.05em">Leader 팔로 직접 녹화</span>
+    <!-- 2-column body: 2 GIFs stacked (left) + 3 step cards (right) -->
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:18px;min-height:0">
+
+      <!-- Left: 2 GIFs stacked vertically (녹화 위, 재생 아래) — gif src 만 swap -->
+      <div style="display:grid;grid-template-rows:1fr 1fr;gap:12px;min-height:0">
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0">
+          <img src="slides/assets/media/eduping/dance-play.gif" alt="Leader 팔 녹화"
+               style="max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:12px;border:1.5px solid var(--lavenderSoft)"/>
+          <span style="position:absolute;top:8px;left:10px;background:rgba(15,18,28,0.85);color:#fff;font-family:'Jua';font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--lavInk)">녹화 (Leader 팔)</span>
+        </div>
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0">
+          <img src="slides/assets/media/eduping/dance-record.gif" alt="율동 재생"
+               style="max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:12px;border:1.5px solid var(--babypinkSoft)"/>
+          <span style="position:absolute;top:8px;left:10px;background:rgba(15,18,28,0.85);color:#fff;font-family:'Jua';font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--babypink)">재생 (EduPing)</span>
+        </div>
       </div>
 
-      <!-- RIGHT: 3 steps stacked -->
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="flex:1;background:var(--surface);border-left:4px solid var(--babypink);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
-          <div style="font-family:'Jua';font-size:2.2em;color:var(--babypink);line-height:1;flex:0 0 auto">1</div>
+      <!-- Right: 3 step cards -->
+      <div style="display:grid;grid-template-columns:1fr;grid-template-rows:repeat(3,1fr);gap:10px;min-height:0">
+
+        <div style="background:var(--surface);border-left:4px solid var(--babypink);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
+          <div style="font-family:'Jua';font-size:2em;color:var(--babypink);line-height:1;flex:0 0 auto;width:32px;text-align:center">1</div>
           <div>
-            <div style="font-family:'Jua';font-size:0.95em;color:var(--ink);margin-bottom:4px">녹화</div>
-            <p style="color:var(--inkSoft);font-size:0.6em;margin:0;line-height:1.5">모터 <b style="color:var(--babypink)">16개</b> 각도 · <b style="color:var(--babypink)">50Hz</b> 샘플링<br>→ <code style="background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:3px">motion.yaml</code></p>
+            <div style="font-family:'Jua';font-size:0.9em;color:var(--ink);margin-bottom:5px">녹화</div>
+            <p style="color:var(--inkSoft);font-size:0.66em;margin:0;line-height:1.5">Leader 팔 직접 시연 · 모터 <b style="color:var(--ink)">16개</b> 각도 <b style="color:var(--ink)">50Hz</b> 샘플링 → <code style="background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:4px;font-size:0.95em">motion.yaml</code></p>
           </div>
         </div>
-        <div style="flex:1;background:var(--surface);border-left:4px solid var(--lavInk);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
-          <div style="font-family:'Jua';font-size:2.2em;color:var(--lavInk);line-height:1;flex:0 0 auto">2</div>
+
+        <div style="background:var(--surface);border-left:4px solid var(--lavInk);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
+          <div style="font-family:'Jua';font-size:2em;color:var(--lavInk);line-height:1;flex:0 0 auto;width:32px;text-align:center">2</div>
           <div>
-            <div style="font-family:'Jua';font-size:0.95em;color:var(--ink);margin-bottom:4px">키프레임</div>
-            <p style="color:var(--inkSoft);font-size:0.6em;margin:0;line-height:1.5">시간 + 관절 라디안 → 사이는 <b style="color:var(--lavInk)">선형 보간</b></p>
+            <div style="font-family:'Jua';font-size:0.9em;color:var(--ink);margin-bottom:5px">키프레임</div>
+            <p style="color:var(--inkSoft);font-size:0.66em;margin:0;line-height:1.5">시간 + 관절 라디안 키프레임 · 사이는 <b style="color:var(--ink)">선형 보간</b></p>
           </div>
         </div>
-        <div style="flex:1;background:var(--surface);border-left:4px solid var(--skyInk);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
-          <div style="font-family:'Jua';font-size:2.2em;color:var(--skyInk);line-height:1;flex:0 0 auto">3</div>
+
+        <div style="background:var(--surface);border-left:4px solid var(--skyInk);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">
+          <div style="font-family:'Jua';font-size:2em;color:var(--skyInk);line-height:1;flex:0 0 auto;width:32px;text-align:center">3</div>
           <div>
-            <div style="font-family:'Jua';font-size:0.95em;color:var(--ink);margin-bottom:4px">재생</div>
-            <p style="color:var(--inkSoft);font-size:0.6em;margin:0;line-height:1.5">WS 한 채널 · 같은 <b style="color:var(--skyInk)">t_ms</b> 시각에 <b style="color:var(--skyInk)">동작 + 음악</b> 송출</p>
+            <div style="font-family:'Jua';font-size:0.9em;color:var(--ink);margin-bottom:5px">재생</div>
+            <p style="color:var(--inkSoft);font-size:0.66em;margin:0;line-height:1.5">WS 한 채널 · 같은 <b style="color:var(--ink)">t_ms</b> 시각에 <b style="color:var(--ink)">동작 + 음악</b> 동기</p>
           </div>
         </div>
+
       </div>
     </div>
   </div>
-  <aside class="notes">
-    율동 — 핵심 3단계. 좌측: Confluence dance-teach.gif. 우측: 1) Leader 녹화, 2) 키프레임 + 선형 보간, 3) WS 동기 재생.
-    상세 (폴더 구조, 16 모터 detail, motion.yaml 포맷, 보간 알고리즘 등) 은 Q&A 슬라이드로.
-  </aside>
+  <aside class="notes">율동 기능 — 좌측 녹화/재생 GIF 2개, 우측 3 step 카드.</aside>
 </section>

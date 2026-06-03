@@ -1,0 +1,54 @@
+<section>
+  <style>
+    .gmap{position:relative;width:1280px;height:720px;padding:32px 56px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+    .gmap .head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .gmap h2{font-family:'Jua';font-size:1.5em;color:var(--ink);margin:0}
+    .gmap .row{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:22px;min-height:0}
+    .gmap .pane{display:flex;flex-direction:column;gap:10px;min-height:0}
+    .gmap .pane .tag{font-family:'Jua';font-size:0.62em;color:var(--mintInk);letter-spacing:0.08em;display:flex;align-items:center;gap:8px;line-height:1}
+    .gmap .pane .tag .badge{background:rgba(74,222,128,0.15);border:1px solid var(--mintInk);color:var(--mintInk);padding:3px 9px;border-radius:999px;font-size:11px;letter-spacing:0.06em}
+    .gmap .pane.r .tag,.gmap .pane.r .tag .badge{color:var(--lavInk);border-color:var(--lavInk);background:rgba(168,85,247,0.15)}
+    .gmap .pane .pic{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:14px;overflow:hidden;border:1.5px solid var(--mintInk);box-shadow:0 6px 20px rgba(74,222,128,0.18)}
+    .gmap .pane.r .pic{border-color:var(--lavInk);box-shadow:0 6px 20px rgba(168,85,247,0.18)}
+    .gmap .pane .pic img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+    .gmap .pane .cap{color:var(--inkSoft);font-size:0.6em;line-height:1.4;text-align:center;margin:0;font-family:'Pretendard Variable',sans-serif}
+    .gmap .pane .cap b{color:var(--ink)}
+  </style>
+
+  <div class="bg-deco">
+    <div class="blob" style="width:300px;height:300px;background:var(--mintSoft);top:-90px;left:-60px;opacity:0.32"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);bottom:-50px;right:-40px;opacity:0.3"></div>
+  </div>
+
+  <div class="gmap">
+    <div class="head">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 2</span>
+      <h2>가이드 — 시뮬 ↔ 운영 동일 지도</h2>
+    </div>
+
+    <div class="row">
+      <!-- LEFT: Gazebo sim -->
+      <div class="pane">
+        <div class="tag"><span class="badge">SIM</span>Gazebo 3D 시뮬레이션</div>
+        <div class="pic">
+          <img src="slides/assets/media/gogoping/gazebo-sim.png" alt="Gazebo 시뮬 맵"/>
+        </div>
+      </div>
+
+      <!-- RIGHT: Admin app nav graph -->
+      <div class="pane r">
+        <div class="tag"><span class="badge">ADMIN</span>Admin App · 영역 + Vertex 그래프</div>
+        <div class="pic">
+          <img src="slides/assets/media/gogoping/nav-graph.png" alt="Admin App Nav Graph"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="notes">
+    가이드 — 시뮬과 운영이 같은 지도 위에서 동작.
+    좌: Gazebo 3D 시뮬 (유치원 평면도를 3D 로 복원, Nav2+AMCL 검증 환경)
+    우: Admin App 의 영역+vertex 그래프 뷰 (놀이방·수면실·통로·출입구·충전소, vertex 노드로 의미 명령)
+    "놀이방으로 가" 같은 자연어 명령이 곧 vertex 그래프 위의 의미 노드.
+  </aside>
+</section>

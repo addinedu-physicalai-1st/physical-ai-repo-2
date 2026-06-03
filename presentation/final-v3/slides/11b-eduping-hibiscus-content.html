@@ -2,18 +2,51 @@
   <div class="bg-deco">
     <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-80px;right:-80px;opacity:0.35"></div>
     <div class="blob float" style="width:220px;height:220px;background:var(--butterSoft);bottom:-50px;left:-30px;opacity:0.3"></div>
-    <div class="blob" style="width:160px;height:160px;background:var(--babypinkSoft);top:280px;left:200px;opacity:0.22"></div>
   </div>
-  <div class="layer" style="padding:32px 60px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+  <div class="layer" style="padding:24px 48px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
       <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--mintInk),var(--babypink));color:#fff;border:0">EDUPING · 모드 03</span>
-      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">무궁화 꽃이 피었습니다 — 키 포인트</h2>
+      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">무궁화 꽃이 피었습니다 기능 설명</h2>
     </div>
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
-      <span class="material-icons-round" style="font-size:90px;color:var(--mintSoft)">local_florist</span>
-      <div style="font-family:'Jua';color:var(--inkSoft);font-size:0.75em;letter-spacing:0.05em">내용 채울 자리</div>
-      <div style="color:var(--inkSoft);opacity:0.55;font-size:0.5em">Confluence 「무궁화 꽃이 피었습니다 - 이정우」 작성 후 키워드 정리 예정</div>
+
+    <!-- 2-column body: hero image (left) + bullet cards (right) -->
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px;min-height:0">
+
+      <!-- Left: hero GIF (real demo) — width:100% 로 column 폭 채움 -->
+      <div style="display:flex;align-items:center;justify-content:center;min-height:0;min-width:0;height:100%">
+        <img src="https://images.prismic.io/joey/ah546geQX7-eWhsq_mugunghwa_real.gif" alt="mugunghwa real demo"
+             style="width:100%;height:auto;max-height:100%;object-fit:contain;display:block;border-radius:14px;border:1.5px solid var(--mintSoft)"/>
+      </div>
+
+      <!-- Right: bullet cards (상태머신 카드 제거 — 시나리오 슬라이드에 6단계 노출) -->
+      <div style="display:grid;grid-template-columns:1fr;grid-template-rows:repeat(4,1fr);gap:10px;min-height:0">
+
+        <div style="background:var(--surface);border:1.5px solid var(--skySoft);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:'Jua';font-size:0.55em;color:var(--skyInk);letter-spacing:0.14em;flex:0 0 100px;line-height:1.3;white-space:nowrap">단일 시계</div>
+          <p style="color:var(--ink);font-size:0.66em;margin:0;line-height:1.4"><b>audio.currentTime</b> 하나로 박자 변주에도 팔이 노래에 정확히 동기</p>
+        </div>
+
+        <div style="background:var(--surface);border:1.5px solid var(--lavenderSoft);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:'Jua';font-size:0.55em;color:var(--lavInk);letter-spacing:0.14em;flex:0 0 100px;line-height:1.3;white-space:nowrap">정·역 재생</div>
+          <p style="color:var(--ink);font-size:0.66em;margin:0;line-height:1.4">가리기 모션 <b>한 벌</b>로 가렸다 떼기 양방향 연출</p>
+        </div>
+
+        <div style="background:var(--surface);border:1.5px solid var(--babypinkSoft);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:'Jua';font-size:0.55em;color:var(--babypink);letter-spacing:0.14em;flex:0 0 100px;line-height:1.3;white-space:nowrap">다중 인식</div>
+          <p style="color:var(--ink);font-size:0.66em;margin:0;line-height:1.4">MediaPipe + IoU 트래커 + <b>InsightFace 코사인 거리</b></p>
+        </div>
+
+        <div style="background:var(--surface);border:1.5px solid var(--butterSoft);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+          <div style="font-family:'Jua';font-size:0.55em;color:var(--butterInk);letter-spacing:0.14em;flex:0 0 100px;line-height:1.3;white-space:nowrap">움직임 판정</div>
+          <p style="color:var(--ink);font-size:0.66em;margin:0;line-height:1.4"><b>SAD + 2단 임계 + self-filter</b> · 연속 3회 → 오탐 최소화</p>
+        </div>
+
+      </div>
     </div>
   </div>
-  <aside class="notes">무궁화 키워드 정리 자리 — Confluence (id 70385701) 가 비어있어 placeholder.</aside>
+  <aside class="notes">
+    무궁화 꽃이 피었습니다 — 6단계 상태머신, audio.currentTime 단일 시계로 노래·팔·관찰 동기. 좌측 mugunghwa_real.gif 실물 시연.
+  </aside>
 </section>

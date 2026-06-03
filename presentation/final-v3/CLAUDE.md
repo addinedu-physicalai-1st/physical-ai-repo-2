@@ -46,27 +46,7 @@ Reveal.js 정적 덱. 구조·실행·키바인딩은 [README.md](README.md) 참
    <img src="https://images.prismic.io/.../foo.png" alt="..." />
    ```
 
-3. **상단 섹션 인덱스 뱃지 필수.** 모든 보고서는 상단 고정 바에서 **`← Q&A` 뒤로가기
-   버튼과 같은 라인에** 그 보고서의 **섹션 목차를 뱃지 형태로** 반드시 둔다.
-   각 뱃지는 번호 + 제목으로 표기하고 해당 섹션 앵커로 점프한다.
-   예) 율동 기능 → `01 안전 거리 근접 정지`.
-   - 뒤로가기 버튼과 뱃지를 `.topbar` (position:fixed) 안에 함께 넣어 한 줄에 보이게 한다.
-   - 섹션에는 `id="sec-01"` 식 앵커를 주고, 가려짐 방지로 `scroll-margin-top` 을 둔다.
-   - 섹션을 추가하면 상단 뱃지 줄에도 한 줄을 함께 추가한다.
-   - 레퍼런스 구현: [`reports/03-eduping-dance/index.html`](reports/03-eduping-dance/index.html) (`.topbar` / `.sec-nav`).
-
-   ```html
-   <div class="topbar">
-     <button class="back jua" onclick="backToQna()">← Q&amp;A</button>
-     <nav class="sec-nav">
-       <a href="#sec-01"><span class="n">01</span> 안전 거리 근접 정지</a>
-       <a href="#sec-02"><span class="n">02</span> ...</a>
-     </nav>
-   </div>
-   <section id="sec-01" class="section"> ... </section>
-   ```
-
-4. (권장) 스타터의 디자인 토큰 (`--accent`, `--surface`, `--ink`, `--bg`) 을 그대로 쓰면
+3. (권장) 스타터의 디자인 토큰 (`--accent`, `--surface`, `--ink`, `--bg`) 을 그대로 쓰면
    덱과 톤이 맞는다. 폰트는 Jua(제목) + Pretendard(본문).
 
 ## 슬라이드에서 항목 추가/수정

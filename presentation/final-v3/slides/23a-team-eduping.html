@@ -11,34 +11,69 @@
       <h2 class="font-display" style="font-size:1.7em;color:var(--ink);margin:0">EduPing · 양팔 로봇 팀</h2>
     </div>
 
-    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:32px;min-height:0">
+    <div style="flex:1;display:flex;justify-content:space-around;align-items:center;gap:32px;min-height:0">
 
       <!-- 박우림 -->
-      <div style="display:flex;background:var(--surface);border:2px solid var(--babypink);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
-        <div style="width:50%;background:#0a0d14;overflow:hidden;display:flex;align-items:center;justify-content:center">
-          <img src="slides/assets/team/wurim_face.png" alt="박우림" style="width:100%;height:100%;object-fit:cover;object-position:center top"
+      <div style="display:flex;align-items:stretch;background:var(--surface);height:580px;border:2px solid var(--babypink);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
+        <div class="team-photo-box" style="width:273px;height:100%;background:#0a0d14;overflow:hidden;position:relative">
+          <img src="slides/assets/team/wurim_face.png?v=18" alt="박우림" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top"
                onerror="this.outerHTML='&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:120px;color:var(--babypinkSoft)&quot;&gt;person&lt;/span&gt;'"/>
         </div>
-        <div style="flex:1;padding:22px 22px;display:flex;flex-direction:column;justify-content:center;gap:10px">
-          <h3 class="font-display" style="font-size:1.6em;color:var(--babypink);margin:0;line-height:1">박우림</h3>
-          <p style="font-size:0.62em;color:var(--inkSoft);margin:0;line-height:1.55">원격 진찰<br>Doctor Telehealth<br>D435 PointCloud<br>임피던스 제어</p>
+        <div style="width:273px;height:100%;padding:32px 24px;display:flex;flex-direction:column;justify-content:center;gap:24px;box-sizing:border-box">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin:0 0 8px">
+              <h3 class="font-display" style="font-size:1.7em;color:var(--babypink);margin:0;line-height:1">박우림</h3>
+              <span style="font-family:'Jua';font-size:0.5em;background:var(--babypink);color:var(--canvas);padding:4px 9px;border-radius:6px;letter-spacing:0.12em;line-height:1">LEADER</span>
+            </div>
+            <div style="height:2px;background:linear-gradient(90deg,var(--babypink),transparent);border-radius:1px"></div>
+          </div>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:18px">
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--babypink);flex-shrink:0">music_note</span>
+              <span>율동</span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--babypink);flex-shrink:0">medical_services</span>
+              <span>원격 진찰</span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.25">
+              <span class="material-icons-round" style="font-size:22px;color:var(--babypink);flex-shrink:0">mic</span>
+              <span>호출어<br><span style="font-size:0.78em;color:var(--inkSoft);letter-spacing:0.04em">STT · TTS</span></span>
+            </li>
+          </ul>
         </div>
       </div>
 
       <!-- 이정우 -->
-      <div style="display:flex;background:var(--surface);border:2px solid var(--babypink);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
-        <div style="width:50%;background:#0a0d14;overflow:hidden;display:flex;align-items:center;justify-content:center">
-          <img src="slides/assets/team/jungwoo_face.png" alt="이정우" style="width:100%;height:100%;object-fit:cover;object-position:center top"
+      <div style="display:flex;align-items:stretch;background:var(--surface);height:580px;border:2px solid var(--babypink);border-radius:18px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.3)">
+        <div class="team-photo-box" style="width:273px;height:100%;background:#0a0d14;overflow:hidden;position:relative">
+          <img src="slides/assets/team/jungwoo_face.png?v=18" alt="이정우" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top"
                onerror="this.outerHTML='&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:120px;color:var(--babypinkSoft)&quot;&gt;person&lt;/span&gt;'"/>
         </div>
-        <div style="flex:1;padding:22px 22px;display:flex;flex-direction:column;justify-content:center;gap:10px">
-          <h3 class="font-display" style="font-size:1.6em;color:var(--babypink);margin:0;line-height:1">이정우</h3>
-          <p style="font-size:0.62em;color:var(--inkSoft);margin:0;line-height:1.55">무궁화꽃 게임<br>등하원 출석<br>OpenArm 제어<br>Admin UI</p>
+        <div style="width:273px;height:100%;padding:32px 24px;display:flex;flex-direction:column;justify-content:center;gap:24px;box-sizing:border-box">
+          <div>
+            <h3 class="font-display" style="font-size:1.7em;color:var(--babypink);margin:0 0 8px;line-height:1">이정우</h3>
+            <div style="height:2px;background:linear-gradient(90deg,var(--babypink),transparent);border-radius:1px"></div>
+          </div>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:18px">
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.25">
+              <span class="material-icons-round" style="font-size:22px;color:var(--babypink);flex-shrink:0">emoji_people</span>
+              <span>등하원<br><span style="font-size:0.78em;color:var(--inkSoft);letter-spacing:0.04em">하이파이브</span></span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--babypink);flex-shrink:0">local_florist</span>
+              <span>무궁화꽃이 피었습니다</span>
+            </li>
+            <li style="min-height:54px;display:flex;align-items:center;gap:12px;font-size:0.78em;color:var(--ink);line-height:1.2">
+              <span class="material-icons-round" style="font-size:22px;color:var(--babypink);flex-shrink:0">summarize</span>
+              <span>일과 보고서</span>
+            </li>
+          </ul>
         </div>
       </div>
 
     </div>
   </div>
 
-  <aside class="notes">EduPing(양팔 로봇) 팀 — 박우림, 이정우.</aside>
+  <aside class="notes">EduPing(양팔 로봇) 팀 — 박우림(율동·원격진찰·호출어), 이정우(등하원/하이파이브·무궁화꽃·일과보고서).</aside>
 </section>

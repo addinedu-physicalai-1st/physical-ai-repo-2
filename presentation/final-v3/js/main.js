@@ -18,31 +18,51 @@ var SLIDES = [
   '07b-hardware.html',
   '06-system.html',
   '07-tech-stack.html',
+  '07c-daily-scenario.html',
   // ── EDUPING ──
   '08-eduping-section.html',
+  '09-eduping-arrival-scenario.html',
   '09-eduping-arrival.html',
   '09b-eduping-arrival-content.html',
+  '10-eduping-dance-scenario.html',
   '10-eduping-dance.html',
+  '10b-eduping-dance-content.html',
+  '11-eduping-hibiscus-scenario.html',
   '11-eduping-hibiscus.html',
   '11b-eduping-hibiscus-content.html',
+  '12-eduping-doctor-preview.html',
   '12-eduping-doctor.html',
   '12b-eduping-doctor-content.html',
   // ── GOGOPING ──
   '13-gogoping-section.html',
+  '14-gogoping-follow-scenario.html',
   '14-gogoping-follow.html',
   '14b-gogoping-follow-content.html',
+  '14c-gogoping-guide-intro.html',
+  '14c-gogoping-guide-map.html',
+  '14c-gogoping-guide-scenario.html',
+  '14c-gogoping-guide.html',
+  '14d-gogoping-guide-content.html',
+  '15-gogoping-hideseek-scenario.html',
+  '15-gogoping-hideseek.html',
+  '15b-gogoping-hideseek-content.html',
   // ── NORIARM ──
   '18-noriarm-section.html',
+  '19-noriarm-blocks-scenario.html',
   '19-noriarm-blocks.html',
   '19b-noriarm-blocks-content.html',
+  '20-noriarm-oxquiz-scenario.html',
   '20-noriarm-oxquiz.html',
   '20b-noriarm-oxquiz-content.html',
+  '21-noriarm-shop-scenario.html',
   '21-noriarm-shop.html',
   '21b-noriarm-shop-content.html',
   // ── CLOSING ──
   '22b-portal-report.html',
+  '22c-process-section.html',
   '22-sprint-jira.html',
   '22a-jira-gantt.html',
+  '22d-team-section.html',
   '23a-team-eduping.html',
   '23b-team-gogoping.html',
   '23c-team-noriarm.html',
@@ -62,6 +82,7 @@ var SLIDE_TITLES = [
   '로봇 하드웨어',
   '시스템 구성',
   '기술 스택',
+  '하루 일과 시나리오',
   '— EduPing —',
   '에듀핑 · 등하원 + 하이파이브',
   '에듀핑 · 율동',
@@ -69,14 +90,24 @@ var SLIDE_TITLES = [
   '에듀핑 · 원격 진단',
   '— GogoPing —',
   '고고핑 · 교사 추종',
+  '고고핑 · 가이드 (인트로)',
+  '고고핑 · 가이드 (지도)',
+  '고고핑 · 가이드',
+  '고고핑 · 가이드 (내용)',
+  '고고핑 · 숨바꼭질',
+  '고고핑 · 숨바꼭질 (내용)',
   '— NoriArm —',
   '노리암 · 블럭쌓기',
   '노리암 · OX 퀴즈',
   '노리암 · 가게놀이',
+  'Portal · 일과 보고서',
+  'PART 05 · Process',
   '스프린트 타임라인',
   'Jira Epic 진행',
-  'Portal · 일과 보고서',
-  '팀',
+  'PART 06 · Team',
+  'Team · EduPing',
+  'Team · GogoPing',
+  'Team · NoriArm',
   'Q&A',
 ];
 
@@ -146,10 +177,11 @@ async function initPresentation() {
     },
   });
 
-  // 현재 슬라이드에 아직 안 재생된 [data-press-to-play] 영상이 있으면 재생, 없으면 다음 슬라이드.
+  // 1) 영상 먼저 재생, 2) 시나리오 fragment 진행, 3) 다음 슬라이드.
   function advanceOrPlay() {
     var slide = Reveal.getCurrentSlide();
     if (!slide) { Reveal.right(); return; }
+    // 1) 안 재생된 영상 먼저 재생
     var pending = slide.querySelectorAll('video[data-press-to-play]:not([data-played="1"])');
     if (pending.length > 0) {
       pending.forEach(function (v) {
@@ -299,38 +331,13 @@ function openReport(path) {
   setTimeout(function () { window.location.href = url; }, 300);
 }
 
-/* ── Video speed controls (overlay on every video) ── */
+/* ── Video speed controls — UI 숨김, default rate 만 적용 ── */
 function attachVideoSpeedControls() {
   document.querySelectorAll('.reveal video').forEach(function (v) {
     if (v.dataset.speedBound) return;
     v.dataset.speedBound = '1';
-    var rates = ['1', '1.5', '2', '3'];
-    var ctl = document.createElement('div');
-    ctl.className = 'video-speed show';
-    ctl.innerHTML = rates.map(function (s) {
-      return '<button data-rate="' + s + '">' + s + 'x</button>';
-    }).join('');
-    ctl.querySelectorAll('button').forEach(function (b) {
-      b.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var rate = parseFloat(b.dataset.rate);
-        v.playbackRate = rate;
-        ctl.querySelectorAll('button').forEach(function (x) {
-          x.classList.toggle('active', x === b);
-        });
-      });
-    });
     var defaultRate = v.dataset.defaultRate || '2';
     v.playbackRate = parseFloat(defaultRate);
-    var defBtn = ctl.querySelector('button[data-rate="' + defaultRate + '"]');
-    if (defBtn) defBtn.classList.add('active');
-    var parent = v.parentElement;
-    if (parent) {
-      if (getComputedStyle(parent).position === 'static') {
-        parent.style.position = 'relative';
-      }
-      parent.appendChild(ctl);
-    }
   });
 }
 

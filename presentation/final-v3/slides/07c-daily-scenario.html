@@ -1,0 +1,110 @@
+<section>
+  <style>
+    .dly{position:relative;width:1280px;height:720px;padding:32px 56px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:36px}
+    .dly .head .eye{color:var(--lavInk);font-family:'Jua';letter-spacing:0.3em;font-size:0.6em;margin:0 0 2px}
+    .dly h2{font-family:'Jua';font-size:1.55em;color:var(--ink);margin:0}
+
+    .dly .row{display:flex;align-items:center;justify-content:center;gap:14px}
+    .dly .blk{position:relative;width:200px;height:200px;background:var(--surface);border:2.5px solid;border-radius:18px;padding:14px 14px 14px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,0.25)}
+    .dly .blk .num{position:absolute;left:12px;top:8px;font-family:'Jua';font-size:14px;letter-spacing:0.1em;opacity:0.85;line-height:1}
+    .dly .blk .icons{display:flex;justify-content:center;align-items:center;gap:6px;height:54px;margin-top:6px}
+    .dly .blk .icons img{height:50px;width:auto;background:#fff;border-radius:8px;padding:3px;border:1px solid rgba(255,255,255,0.15)}
+    .dly .blk .l{font-family:'Jua';font-size:24px;color:var(--ink);line-height:1.1;margin-top:4px}
+    .dly .blk .meta{color:var(--inkSoft);font-size:12.5px;line-height:1.4;margin:0;font-family:'Pretendard Variable',sans-serif}
+
+    .dly .arr{font-size:32px;font-weight:700;color:var(--inkSoft);opacity:0.55;flex:0 0 auto}
+
+    .dly .blk.edu{border-color:var(--mintInk);background:linear-gradient(180deg,rgba(74,222,128,0.14),var(--surface) 70%)}
+    .dly .blk.edu .num{color:var(--mintInk)}
+    .dly .blk.gog{border-color:var(--babypink);background:linear-gradient(180deg,rgba(244,114,182,0.14),var(--surface) 70%)}
+    .dly .blk.gog .num{color:var(--babypink)}
+    .dly .blk.mix{border-color:var(--lavInk);background:linear-gradient(180deg,rgba(168,85,247,0.14),var(--surface) 70%)}
+    .dly .blk.mix .num{color:var(--lavInk)}
+    .dly .blk.sky{border-color:var(--skyInk);background:linear-gradient(180deg,rgba(96,165,250,0.14),var(--surface) 70%)}
+    .dly .blk.sky .num{color:var(--skyInk)}
+
+    .dly .extra{display:flex;justify-content:center}
+    .dly .extra .blk{width:420px;height:auto;min-height:0;padding:14px 22px;flex-direction:row;align-items:center;justify-content:center;gap:14px;text-align:center;border-style:dashed}
+    .dly .extra .blk .icons{height:auto;margin:0}
+    .dly .extra .blk .info{display:flex;flex-direction:column;align-items:center;gap:4px}
+    .dly .extra .blk .tag{font-family:'Jua';font-size:11px;letter-spacing:0.2em;line-height:1;text-transform:uppercase}
+    .dly .extra .blk .l{font-size:20px;margin:0}
+    .dly .extra .blk.sky .tag{color:var(--skyInk)}
+  </style>
+
+  <div class="bg-deco">
+    <div class="blob" style="width:300px;height:300px;background:var(--mintSoft);top:-90px;left:-60px;opacity:0.32"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);top:120px;right:-40px;opacity:0.28"></div>
+    <div class="blob" style="width:200px;height:200px;background:var(--babypinkSoft);bottom:-40px;left:50%;opacity:0.22"></div>
+  </div>
+
+  <div class="dly">
+    <div class="head">
+      <p class="eye">DAILY SCENARIO</p>
+      <h2>등원부터 하원까지 — 하루 일과</h2>
+    </div>
+
+    <div class="row">
+      <div class="blk edu">
+        <span class="num">01</span>
+        <div class="icons">
+          <img src="slides/assets/media/panel/icon-eduping.png" alt="EduPing">
+        </div>
+        <div class="l">등원</div>
+      </div>
+      <span class="arr">→</span>
+      <div class="blk mix">
+        <span class="num">02</span>
+        <div class="icons">
+          <img src="slides/assets/media/panel/icon-eduping.png" alt="EduPing">
+          <img src="slides/assets/media/panel/icon-gogoping.png" alt="GogoPing">
+          <img src="slides/assets/media/panel/icon-noriarm.png" alt="NoriArm">
+        </div>
+        <div class="l">놀이</div>
+      </div>
+      <span class="arr">→</span>
+      <div class="blk gog">
+        <span class="num">03</span>
+        <div class="icons">
+          <img src="slides/assets/media/panel/icon-gogoping.png" alt="GogoPing">
+        </div>
+        <div class="l">낮잠</div>
+      </div>
+      <span class="arr">→</span>
+      <div class="blk mix">
+        <span class="num">04</span>
+        <div class="icons">
+          <img src="slides/assets/media/panel/icon-gogoping.png" alt="GogoPing">
+          <img src="slides/assets/media/panel/icon-eduping.png" alt="EduPing">
+        </div>
+        <div class="l">보조</div>
+      </div>
+      <span class="arr">→</span>
+      <div class="blk edu">
+        <span class="num">05</span>
+        <div class="icons">
+          <img src="slides/assets/media/panel/icon-eduping.png" alt="EduPing">
+        </div>
+        <div class="l">하원</div>
+      </div>
+    </div>
+
+    <div class="extra">
+      <div class="blk sky">
+        <div class="icons">
+          <img src="slides/assets/media/panel/icon-eduping.png" alt="EduPing">
+        </div>
+        <div class="info">
+          <span class="tag">+ 상시 가능</span>
+          <div class="l">원격진찰</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="notes">
+    하루 일과 — 5단계 메인 + 1 보조 블록. 색상=주 담당 로봇, 아이콘=참여 로봇.
+    01 등원 (EduPing 민트) → 02 놀이 (EduPing/GogoPing/NoriArm 전부, 라벤더) → 03 낮잠 (GogoPing 핑크) → 04 보조 (GogoPing+EduPing, 라벤더) → 05 하원 (EduPing 민트)
+    별도: 원격진찰 (EduPing 청진기 텔레오퍼 — 상시 가능, 스카이 dashed)
+  </aside>
+</section>

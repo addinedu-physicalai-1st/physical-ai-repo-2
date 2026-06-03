@@ -1,0 +1,38 @@
+<section>
+  <style>
+    .scn-hide{position:relative;width:1280px;height:720px;padding:60px 60px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}
+    .scn-hide h2{font-family:'Jua';font-size:1.65em;color:var(--ink);margin:0 0 50px}
+    .scn-hide .row{display:flex;align-items:center;justify-content:center;gap:8px}
+    .scn-hide .blk{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(74,222,128,0.16);border:2px solid var(--mintInk);border-radius:14px;width:148px;height:96px;box-sizing:border-box}
+    .scn-hide .blk .n{font-family:'Jua';font-size:24px;color:var(--mintInk);line-height:1}
+    .scn-hide .blk .l{font-family:'Jua';font-size:16px;color:var(--ink);line-height:1.15;text-align:center;white-space:nowrap}
+    .scn-hide .blk .sub{font-family:'Jua';font-size:10px;color:var(--inkSoft);letter-spacing:0.06em}
+    .scn-hide .arr{font-size:24px;color:var(--mintInk);font-weight:700}
+  </style>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-90px;right:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);bottom:-60px;left:-30px;opacity:0.3"></div>
+  </div>
+  <div class="layer scn-hide">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:30px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 3</span>
+      <h2>숨바꼭질 — 시나리오</h2>
+    </div>
+    <div class="row">
+      <div class="blk"><span class="n">1</span><span class="l">놀이구역 이동</span><span class="sub">move_to_play</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">2</span><span class="l">참가 등록</span><span class="sub">recruit</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">3</span><span class="l">카운트 30초</span><span class="sub">countdown</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">4</span><span class="l">순찰</span><span class="sub">patrol</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">5</span><span class="l">복귀</span><span class="sub">return</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">6</span><span class="l">종료</span><span class="sub">end</span></div>
+    </div>
+  </div>
+  <aside class="notes">
+    숨바꼭질 6단계 BT Sequence — 놀이구역 이동 → 아동 얼굴 등록 → 30초 카운트 → 순찰 지점마다 pan/tilt sweep 으로 얼굴 찾기 → 복귀 → 종료. 도중 발견도 인정.
+  </aside>
+</section>

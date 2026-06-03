@@ -1,0 +1,47 @@
+<section>
+  <style>
+    .scn-il-blk{position:relative;width:1280px;height:720px;padding:60px 80px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}
+    .scn-il-blk h2{font-family:'Jua';font-size:1.65em;color:var(--ink);margin:0}
+    .scn-il-blk .head{display:flex;align-items:center;gap:14px;margin-bottom:80px}
+    .scn-il-blk .row{display:flex;align-items:center;justify-content:center;gap:18px}
+    .scn-il-blk .blk{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(168,85,247,0.16);border:2px solid var(--lavInk);border-radius:18px;width:280px;height:170px;box-sizing:border-box;padding:14px 18px}
+    .scn-il-blk .blk .eye{font-family:'Jua';font-size:11px;color:var(--lavInk);letter-spacing:0.22em;line-height:1}
+    .scn-il-blk .blk .l{font-family:'Jua';font-size:22px;color:var(--ink);line-height:1.1;text-align:center}
+    .scn-il-blk .blk .meta{color:var(--inkSoft);font-size:13px;line-height:1.4;text-align:center}
+    .scn-il-blk .blk .meta b{color:var(--lavInk)}
+    .scn-il-blk .arr{font-size:34px;color:var(--lavInk);font-weight:700}
+  </style>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--lavenderSoft);top:-90px;left:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--mintSoft);bottom:-60px;right:-40px;opacity:0.3"></div>
+  </div>
+  <div class="layer scn-il-blk">
+    <div class="head">
+      <span class="chip" style="font-size:0.55em;background:var(--lavInk);color:#fff;border:0">NORIARM · 1</span>
+      <h2>블럭쌓기 — 모방학습 파이프라인</h2>
+    </div>
+
+    <div class="row">
+      <div class="blk">
+        <span class="eye">DATA</span>
+        <span class="l">데이터 수집</span>
+        <p class="meta"><b>611 episode</b> 리드암 직접 녹화</p>
+      </div>
+      <span class="arr">→</span>
+      <div class="blk">
+        <span class="eye">TRAIN</span>
+        <span class="l">ACT 모방학습</span>
+        <p class="meta">front + wrist multi-view</p>
+      </div>
+      <span class="arr">→</span>
+      <div class="blk">
+        <span class="eye">INFER</span>
+        <span class="l">closed-loop</span>
+        <p class="meta">ACT 자율 픽업·적재</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    블럭쌓기 — DATA (611 epi 리드암 녹화) → TRAIN (ACT 모방학습, front + wrist multi-view) → INFER (closed-loop 자율 픽업·적재).
+  </aside>
+</section>

@@ -1,66 +1,39 @@
-<section>
-  <div class="bg-deco">
-    <div class="blob" style="width:300px;height:300px;background:var(--babypinkSoft);top:-90px;left:-60px;opacity:0.35"></div>
-    <div class="blob float" style="width:220px;height:220px;background:var(--lavenderSoft);bottom:-50px;right:-30px;opacity:0.3"></div>
-  </div>
-  <div class="layer" style="padding:22px 44px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+<section data-arch-flow>
+  <style>
+    .ovr-flow-pink-10{position:absolute;top:14px;left:14px;right:14px;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none}
+    .ovr-flow-pink-10 .n{display:flex;align-items:center;gap:8px;background:rgba(15,18,28,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1.5px solid rgba(244,114,182,0.4);border-radius:10px;padding:7px 14px;opacity:0.55;filter:saturate(0.65);transform:scale(0.97);transition:all .35s cubic-bezier(0.2,0.8,0.2,1)}
+    .ovr-flow-pink-10 .n.on{opacity:1;filter:none;transform:scale(1.04);background:rgba(244,114,182,0.92);border-color:var(--babypink);box-shadow:0 0 24px rgba(244,114,182,0.55)}
+    .ovr-flow-pink-10 .n .num{font-family:'Jua';font-size:14px;color:var(--babypink);width:18px;text-align:center;flex:0 0 auto}
+    .ovr-flow-pink-10 .n.on .num{color:#fff}
+    .ovr-flow-pink-10 .n .lab{font-family:'Jua';font-size:13px;color:#fff;letter-spacing:0.02em}
+    .ovr-flow-pink-10 .arrow{font-size:18px;color:rgba(244,114,182,0.45);font-weight:700;flex:0 0 auto;transition:color .35s}
+    .ovr-flow-pink-10 .arrow.on{color:var(--babypink)}
+    .arr-drv{position:absolute;left:-9999px;top:-9999px}
+  </style>
+  <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:10px">
       <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--babypink),var(--lavInk));color:#fff;border:0">EDUPING · 모드 02</span>
-      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">율동 — 녹화 → 키프레임 → 재생</h2>
+      <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">율동</h2>
     </div>
-
-    <div style="flex:1;display:grid;grid-template-columns:1.5fr 1fr;gap:18px;min-height:0">
-
-      <!-- LEFT: BIG dance demo -->
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;position:relative">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0">
+      <div style="position:relative;aspect-ratio:1920/1072;max-width:100%;max-height:100%;height:100%;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+        <div class="ovr-flow-pink-10">
+          <div class="n" data-step="1,2,3"><span class="num">1</span><span class="lab">녹화</span></div>
+          <span class="arrow" data-flow="2,3">→</span>
+          <div class="n" data-step="2,3"><span class="num">2</span><span class="lab">키프레임</span></div>
+          <span class="arrow" data-flow="3">→</span>
+          <div class="n" data-step="3"><span class="num">3</span><span class="lab">재생</span></div>
+        </div>
         <video src="slides/assets/media/eduping/dance.mp4" loop playsinline data-press-to-play
-               style="max-width:100%;max-height:100%;object-fit:contain;border:2px solid var(--babypink);border-radius:16px;box-shadow:0 8px 28px rgba(236,143,166,0.35);display:block"
-               onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft)&quot;&gt;dance.mp4&lt;/div&gt;'"></video>
-        <span style="position:absolute;top:18px;left:24px;background:rgba(15,18,28,0.88);color:#fff;font-family:'Jua';font-size:14px;padding:6px 16px;border-radius:8px;border:1.5px solid var(--babypink)">실제 율동 동작 (재생)</span>
+               style="width:100%;height:100%;object-fit:cover;display:block"
+               onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;eduping/dance.mp4&lt;/p&gt;&lt;/div&gt;'"></video>
       </div>
-
-      <!-- RIGHT: small teach + 3 steps -->
-      <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
-
-        <!-- 녹화 영상 -->
-        <div style="display:flex;align-items:center;justify-content:center;min-height:0;position:relative;height:200px">
-          <img src="slides/assets/media/eduping/dance-teach.gif" alt="Leader 팔 녹화"
-               style="max-width:100%;max-height:100%;object-fit:contain;border:1.5px solid var(--lavInk);border-radius:12px;box-shadow:0 4px 16px rgba(168,85,247,0.3);display:block"/>
-          <span style="position:absolute;top:10px;left:12px;background:rgba(15,18,28,0.88);color:#fff;font-family:'Jua';font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--lavInk)">녹화 (Leader 팔)</span>
-        </div>
-
-        <!-- 3 step cards -->
-        <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-height:0">
-
-          <div style="background:var(--surface);border-left:4px solid var(--babypink);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;flex:1">
-            <div style="font-family:'Jua';font-size:1.7em;color:var(--babypink);line-height:1;flex:0 0 auto;width:26px;text-align:center">1</div>
-            <div>
-              <div style="font-family:'Jua';font-size:0.72em;color:var(--ink);margin-bottom:3px">녹화</div>
-              <p style="color:var(--inkSoft);font-size:0.55em;margin:0;line-height:1.45">모터 <b style="color:var(--babypink)">16개</b> 각도 · <b style="color:var(--babypink)">50Hz</b> → <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:0.95em">motion.yaml</code></p>
-            </div>
-          </div>
-
-          <div style="background:var(--surface);border-left:4px solid var(--lavInk);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;flex:1">
-            <div style="font-family:'Jua';font-size:1.7em;color:var(--lavInk);line-height:1;flex:0 0 auto;width:26px;text-align:center">2</div>
-            <div>
-              <div style="font-family:'Jua';font-size:0.72em;color:var(--ink);margin-bottom:3px">키프레임</div>
-              <p style="color:var(--inkSoft);font-size:0.55em;margin:0;line-height:1.45">시간 + 관절 라디안 · 사이는 <b style="color:var(--lavInk)">선형 보간</b></p>
-            </div>
-          </div>
-
-          <div style="background:var(--surface);border-left:4px solid var(--skyInk);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:12px;flex:1">
-            <div style="font-family:'Jua';font-size:1.7em;color:var(--skyInk);line-height:1;flex:0 0 auto;width:26px;text-align:center">3</div>
-            <div>
-              <div style="font-family:'Jua';font-size:0.72em;color:var(--ink);margin-bottom:3px">재생</div>
-              <p style="color:var(--inkSoft);font-size:0.55em;margin:0;line-height:1.45">WS 한 채널 · 같은 <b style="color:var(--skyInk)">t_ms</b> 에 <b style="color:var(--skyInk)">동작 + 음악</b></p>
-            </div>
-          </div>
-
-        </div>
-      </div>
+    </div>
+    <div class="arr-drv" aria-hidden="true">
+      <span class="fragment" data-archstep="1"></span>
+      <span class="fragment" data-archstep="2"></span>
+      <span class="fragment" data-archstep="3"></span>
     </div>
   </div>
-  <aside class="notes">
-    율동 — 좌측 큰 데모 영상 (dance.mp4) · 우측 상단 녹화 GIF (dance-teach.gif) + 3 step 설명.
-  </aside>
+  <aside class="notes">율동 — 데모 영상 only. 영상 상단 3단계 블록 overlay.</aside>
 </section>

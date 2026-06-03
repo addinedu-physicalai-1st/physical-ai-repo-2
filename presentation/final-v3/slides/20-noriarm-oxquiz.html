@@ -1,17 +1,40 @@
-<section>
+<section data-arch-flow>
+  <style>
+    .ovr-flow-lav{position:absolute;top:14px;left:14px;right:14px;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none}
+    .ovr-flow-lav .n{display:flex;align-items:center;gap:8px;background:rgba(15,18,28,0.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1.5px solid rgba(168,85,247,0.4);border-radius:10px;padding:7px 14px;opacity:0.55;filter:saturate(0.65);transform:scale(0.97);transition:all .35s cubic-bezier(0.2,0.8,0.2,1)}
+    .ovr-flow-lav .n.on{opacity:1;filter:none;transform:scale(1.04);background:rgba(168,85,247,0.92);border-color:var(--lavInk);box-shadow:0 0 24px rgba(168,85,247,0.55)}
+    .ovr-flow-lav .n .num{font-family:'Jua';font-size:14px;color:var(--lavInk);width:18px;text-align:center;flex:0 0 auto}
+    .ovr-flow-lav .n.on .num{color:#fff}
+    .ovr-flow-lav .n .lab{font-family:'Jua';font-size:13px;color:#fff;letter-spacing:0.02em}
+    .ovr-flow-lav .arrow{font-size:18px;color:rgba(168,85,247,0.45);font-weight:700;flex:0 0 auto;transition:color .35s}
+    .ovr-flow-lav .arrow.on{color:var(--lavInk)}
+    .arr-drv{position:absolute;left:-9999px;top:-9999px}
+  </style>
   <div style="padding:24px 60px 36px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;align-items:center;gap:10px">
       <span class="chip chip-lavender" style="font-size:0.55em">NORIARM · 2</span>
       <h2 class="font-display" style="font-size:1.6em;color:var(--ink);margin:0">OX 퀴즈 — overhead + MediaPipe Hands</h2>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+    <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <div class="ovr-flow-lav">
+        <div class="n" data-step="1,2,3,4"><span class="num">1</span><span class="lab">문제 출제</span></div>
+        <span class="arrow" data-flow="2,3,4">→</span>
+        <div class="n" data-step="2,3,4"><span class="num">2</span><span class="lab">손 검출</span></div>
+        <span class="arrow" data-flow="3,4">→</span>
+        <div class="n" data-step="3,4"><span class="num">3</span><span class="lab">위치 판정</span></div>
+        <span class="arrow" data-flow="4">→</span>
+        <div class="n" data-step="4"><span class="num">4</span><span class="lab">정답 표시</span></div>
+      </div>
       <video src="slides/assets/media/noriarm/oxquiz.mp4" loop playsinline data-press-to-play
              style="max-width:100%;max-height:100%;object-fit:contain"
-             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;assets/media/noriarm/oxquiz.mp4&lt;br&gt;&lt;span style=&quot;font-size:0.7em&quot;&gt;pull-assets.sh 실행 후 표시됨&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;'"></video>
+             onerror="this.outerHTML='&lt;div style=&quot;color:var(--inkSoft);text-align:center;padding:40px&quot;&gt;&lt;span class=&quot;material-icons-round&quot; style=&quot;font-size:60px&quot;&gt;videocam_off&lt;/span&gt;&lt;p style=&quot;margin-top:12px;font-size:0.85em&quot;&gt;noriarm/oxquiz.mp4&lt;/p&gt;&lt;/div&gt;'"></video>
+    </div>
+    <div class="arr-drv" aria-hidden="true">
+      <span class="fragment" data-archstep="1"></span>
+      <span class="fragment" data-archstep="2"></span>
+      <span class="fragment" data-archstep="3"></span>
+      <span class="fragment" data-archstep="4"></span>
     </div>
   </div>
-  <aside class="notes">
-    OX 퀴즈. shared/ox_quiz.json 에서 3문제 무작위 추출, 5초 카운트다운 후 정답 공개. 노트북 overhead 카메라 + MediaPipe Hands 로 O/X 영역 위 손가락 위치를 검출해 점수 누적.
-    sim/real 모두 같은 vision 파이프라인 — sim/real 차이는 OMX 팔 레이어 (joint_state_only ↔ Dynamixel) 에만 국한.
-  </aside>
+  <aside class="notes">OX 퀴즈 — 영상 상단 4단계 블록 overlay.</aside>
 </section>

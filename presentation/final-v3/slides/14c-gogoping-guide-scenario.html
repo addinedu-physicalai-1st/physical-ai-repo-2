@@ -1,0 +1,35 @@
+<section>
+  <style>
+    .scn-guide{position:relative;width:1280px;height:720px;padding:60px 60px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}
+    .scn-guide h2{font-family:'Jua';font-size:1.65em;color:var(--ink);margin:0 0 50px}
+    .scn-guide .row{display:flex;align-items:center;justify-content:center;gap:8px}
+    .scn-guide .blk{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(74,222,128,0.16);border:2px solid var(--mintInk);border-radius:14px;width:148px;height:90px;box-sizing:border-box}
+    .scn-guide .blk .n{font-family:'Jua';font-size:24px;color:var(--mintInk);line-height:1}
+    .scn-guide .blk .l{font-family:'Jua';font-size:16px;color:var(--ink);line-height:1.1;text-align:center;white-space:nowrap}
+    .scn-guide .arr{font-size:24px;color:var(--mintInk);font-weight:700}
+  </style>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-90px;left:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);bottom:-60px;right:-40px;opacity:0.28"></div>
+  </div>
+  <div class="layer scn-guide">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:30px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 2</span>
+      <h2>가이드 — 시나리오</h2>
+    </div>
+    <div class="row">
+      <div class="blk"><span class="n">1</span><span class="l">명령</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">2</span><span class="l">출발 확인</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">3</span><span class="l">경로 생성</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">4</span><span class="l">이동</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">5</span><span class="l">도착</span></div>
+      <span class="arr">→</span>
+      <div class="blk"><span class="n">6</span><span class="l">대기</span></div>
+    </div>
+  </div>
+  <aside class="notes">가이드 6단계 — 음성/UI 명령 → 현재 위치에서 출발 vertex 확정 → Dijkstra 경로 (위험 회전 제외) → vertex 순차 주행 → 도착 안내 → IDLE.</aside>
+</section>

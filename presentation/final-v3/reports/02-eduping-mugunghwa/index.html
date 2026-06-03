@@ -25,29 +25,27 @@
 
   .topbar{
     position:fixed; top:0; left:0; right:0; z-index:60;
-    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
-    padding:14px 28px; background:rgba(20,17,28,.82); backdrop-filter:blur(8px);
+    display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+    padding:11px 22px; background:rgba(20,17,28,.78); backdrop-filter:blur(8px);
     border-bottom:1px solid var(--border);
   }
   .back{
-    flex:0 0 auto; display:inline-flex; align-items:center; gap:8px;
-    height:46px; padding:0 24px;
-    background:var(--surface); border:1px solid var(--border); color:var(--ink);
-    font-family:'Jua',sans-serif; font-size:18px; border-radius:999px;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border); color:var(--inkSoft);
+    font-family:'Jua',sans-serif; font-size:14px; padding:7px 15px; border-radius:999px;
     cursor:pointer; transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .sec-nav{display:flex; flex-wrap:wrap; gap:9px; margin:0}
+  .sec-nav{display:flex; flex-wrap:wrap; gap:7px; margin:0}
   .sec-nav a{
-    display:inline-flex; align-items:center; gap:8px; cursor:pointer;
-    height:46px; padding:0 19px;
-    background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft);
-    font-family:'Jua',sans-serif; font-size:16px; border-radius:999px;
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+    background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--inkSoft);
+    font-family:'Jua',sans-serif; font-size:13px; padding:6px 13px; border-radius:999px;
     transition:color .15s, background .15s, border-color .15s; white-space:nowrap;
   }
-  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.09)}
+  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.08)}
   .sec-nav a.on{color:#2A0F16; background:var(--accent); border-color:var(--accent)}
-  .sec-nav a .n{font-size:14px; opacity:.75; font-weight:700}
+  .sec-nav a .n{font-size:12px; opacity:.8}
 
   .deck{
     position:fixed; inset:0; display:flex; overflow-x:auto; overflow-y:hidden;
@@ -96,12 +94,6 @@
   .narrow{max-width:880px; margin:0 auto}
   .lead{font-size:18px; line-height:1.85; margin:0 0 14px}
   .lead b{color:var(--accent)}
-  /* 불릿: 핵심 개념 + 짧은 설명 */
-  .points{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px}
-  .points li{position:relative; padding-left:30px; font-size:17px; line-height:1.72; color:var(--inkSoft)}
-  .points li::before{content:"›"; position:absolute; left:8px; top:-2px; color:var(--accent); font-family:'Jua',sans-serif; font-size:20px}
-  .points .c{color:var(--accent); font-weight:700; margin-right:3px}
-  .points b{color:var(--accent)}
 
   .flow{background:rgba(0,0,0,.32); border:1px solid var(--border); border-radius:12px; padding:14px 18px; margin:8px 0 0; font-family:ui-monospace,monospace; font-size:15px; line-height:2.1; color:var(--inkSoft); overflow-x:auto}
   .flow b{color:var(--ink)} .flow .a{color:var(--accent)}
@@ -158,7 +150,7 @@
   <div id="page-fade"></div>
 
   <div class="topbar">
-    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:20px">arrow_back</span> Q&amp;A</button>
+    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:17px">arrow_back</span> Q&amp;A</button>
     <nav class="sec-nav" id="secnav"></nav>
   </div>
 
@@ -210,11 +202,7 @@
       <div class="dslide-in">
         <div class="s-head"><div class="s-num">01</div><h2 class="jua">게임 상태머신 &amp; 오디오 동기 박자</h2><div class="tags"><span>Vue 3</span><span>currentTime</span><span>playbackRate</span></div></div>
         <div class="narrow">
-          <ul class="points">
-            <li><span class="c">6단계 상태 머신</span> — 진입(등록)부터 종료(순위)까지 한 화면에서 진행</li>
-            <li><span class="c">오디오 동기</span> — 팔 동작을 노래 시각(<code>audio.currentTime</code>)에 묶어 박자가 변해도 정확히 추종</li>
-            <li><span class="c">박자 변주</span> — 재생 속도 0.6~2.0배로 술래의 약 올리는 페이스 연출</li>
-          </ul>
+          <p class="lead"><b>여섯 단계 상태 머신</b>으로 진입(등록)부터 종료(순위)까지 한 화면에서 돌게 했습니다. 팔 동작 시각을 <b>노래 재생 시각(<code>audio.currentTime</code>)에 묶어</b> 박자를 바꿔도 팔이 정확히 따라오고, 술래의 약 올리는 맛을 살리려 <b>재생 속도를 0.6~2.0배로 변주</b>합니다.</p>
           <div class="flow"><b>진입</b>(등록) <span class="a">→</span> <b>준비</b>(30초) <span class="a">→</span> <b>노래</b>(팔·박자) <span class="a">→</span> <b>관찰</b>(정지·판정) <span class="a">→</span> <b>탈락 대기</b>(퇴장) <span class="a">→</span> 반복 <span class="a">→</span> <b>종료</b></div>
           <table>
             <tr><th>패턴</th><th>설명</th></tr>
@@ -236,11 +224,7 @@
             <img src="https://images.prismic.io/joey/ah548weQX7-eWhs0_web_eduping_ui.jpg?auto=format,compress" alt="EduPing 메뉴" />
             <div class="cap">메뉴의 "무궁화 꽃이 피었습니다" · 율동 등록.</div>
           </div>
-          <ul class="points">
-            <li><span class="c">녹화 UI</span> — <code>MugunghwaArmManager.vue</code>로 눈 가리기 동작을 직접 녹화</li>
-            <li><span class="c">정·역재생</span> — 관찰 구간엔 같은 동작을 거꾸로 재생해 눈을 스르르 뗌</li>
-            <li><span class="c">효율</span> — 동작 한 벌로 가리기·떼기 모두, 적은 데이터로 자연스러운 연출</li>
-          </ul>
+          <p class="lead">눈 가리기 동작은 <b>녹화 UI</b>(<code>MugunghwaArmManager.vue</code>)로 직접 녹화하고, 관찰 구간에는 같은 동작을 <b>거꾸로 재생</b>해 가렸던 눈을 스르르 뗍니다. 동작을 두 벌 만들 필요 없이 적은 데이터로 자연스러운 연출이 됩니다.</p>
         </div>
       </div>
     </section>
@@ -255,11 +239,8 @@
             <div class="cap">한 화면에 여러 명이 동시에 등장하는 술래잡기.</div>
           </div>
           <div>
-            <ul class="points">
-              <li><span class="c">다중 얼굴 등록</span> — MediaPipe FaceDetection 검출 → IoU 트래커로 같은 사람 유지 → <code>recognize-multi</code>(InsightFace·코사인)로 신원 식별</li>
-              <li><span class="c">움직임 감지</span> — 160×90 축소 화면의 밝기 차이 합(SAD) + 얼굴 박스 변위로 탈락 판정(자기 팔 self-filter 제외)</li>
-              <li><span class="c">per-kid 추적</span> — D435에서 YOLO + ByteTrack perception 노드가 아이별 추적</li>
-            </ul>
+            <p class="lead" style="font-size:17px"><span class="term">MediaPipe FaceDetection</span>으로 여러 얼굴을 검출 → <b>IoU 트래커</b>로 같은 사람을 유지 → 서버 <code>recognize-multi</code>(<b>InsightFace</b>, 코사인 거리)로 각각 누구인지 식별해 "○○ 등록!"을 띄웁니다.</p>
+            <p class="lead" style="font-size:17px;margin:0">관찰 구간엔 화면을 작게(160×90) 줄여 밝기 차이 합(<span class="term">SAD</span>)으로 움직임을 재고 얼굴 박스 변위로 탈락 판정(자기 팔은 self-filter 제외). D435에선 <span class="term">YOLO + ByteTrack</span> perception 노드가 per-kid를 추적합니다.</p>
           </div>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>SAD</b> = 직전 화면과 지금 화면의 픽셀 차이를 더해 "누가 움직였나" 보기. <b>IoU</b> = "직전 얼굴 상자와 지금 상자가 얼마나 겹치나"로 같은 사람을 이어 추적. <b>InsightFace</b> = 얼굴을 숫자 지문으로 바꿔 누구인지 식별. <b>YOLO+ByteTrack</b> = 사람을 찾아 번호를 붙여 화면이 바뀌어도 계속 따라가는 추적기. <b>self-filter</b> = 로봇 자기 팔 영역은 판정에서 제외.</p></div>
@@ -355,7 +336,7 @@
       function fit(s){
         var inner=s.querySelector('.dslide-in'); if(!inner) return;
         inner.style.transform='none';
-        var MX=44, TOP=94, BOT=58;
+        var MX=44, TOP=78, BOT=62;
         var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
         inner.style.width=Math.min(1140,aW)+'px';
         var nW=inner.offsetWidth, nH=inner.offsetHeight;

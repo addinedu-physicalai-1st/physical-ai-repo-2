@@ -1,0 +1,67 @@
+<section>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--babypinkSoft);top:-90px;left:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--skySoft);bottom:-60px;right:-40px;opacity:0.3"></div>
+  </div>
+  <div class="layer" style="padding:36px 50px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:28px">
+      <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--babypink),var(--skyInk));color:#fff;border:0">EDUPING · 모드 04</span>
+      <h2 class="font-display" style="font-size:1.55em;color:var(--ink);margin:0">원격 진찰</h2>
+    </div>
+
+    <!-- 3-column body: 좌측 텍스트 + 중앙 영상 (확대) + 우측 텍스트 -->
+    <div style="flex:1;display:grid;grid-template-columns:0.7fr 2.6fr 0.7fr;gap:14px;min-height:0;align-items:center">
+
+      <!-- LEFT: TL + BL cards — 화살표 시작 y에 맞춰 중앙 정렬 -->
+      <div style="display:grid;grid-template-rows:1fr 1fr;height:100%;gap:10px">
+        <div style="display:flex;align-items:center"><div style="background:var(--surface);border-left:3px solid var(--babypink);border-radius:8px;padding:9px 11px;width:100%"><p style="color:var(--ink);font-size:0.55em;margin:0;line-height:1.35"><b>Doctor UI</b><br><span style="color:var(--inkSoft);font-size:0.85em">3D 모델+환자 카메라</span></p></div></div>
+        <div style="display:flex;align-items:center"><div style="background:var(--surface);border-left:3px solid var(--mintInk);border-radius:8px;padding:9px 11px;width:100%"><p style="color:var(--ink);font-size:0.55em;margin:0;line-height:1.35"><b>Doctor 실사</b><br><span style="color:var(--inkSoft);font-size:0.85em">Leader 팔 조작 의사</span></p></div></div>
+      </div>
+
+      <!-- CENTER: captured frame -->
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;min-height:0;height:100%">
+        <img src="slides/assets/media/doctor/telehealth-frame.jpg" alt="telehealth quad"
+             style="max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:14px;border:1.5px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,0.4)"/>
+      </div>
+
+      <!-- RIGHT: TR + BR cards — 화살표 시작 y에 맞춰 중앙 정렬 -->
+      <div style="display:grid;grid-template-rows:1fr 1fr;height:100%;gap:10px">
+        <div style="display:flex;align-items:center"><div style="background:var(--surface);border-right:3px solid var(--skyInk);border-radius:8px;padding:9px 11px;width:100%;text-align:right"><p style="color:var(--ink);font-size:0.55em;margin:0;line-height:1.35"><b>환자 UI</b><br><span style="color:var(--inkSoft);font-size:0.85em">의사 영상+진찰 안내</span></p></div></div>
+        <div style="display:flex;align-items:center"><div style="background:var(--surface);border-right:3px solid var(--lavInk);border-radius:8px;padding:9px 11px;width:100%;text-align:right"><p style="color:var(--ink);font-size:0.55em;margin:0;line-height:1.35"><b>환자 실사</b><br><span style="color:var(--inkSoft);font-size:0.85em">EduPing 옆 환자, 청진</span></p></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 화살표 SVG — 좌우 카드에서 영상 사분면으로 짧은 곡선 -->
+  <svg style="position:absolute;top:0;left:0;width:1280px;height:720px;pointer-events:none;z-index:6" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ar-pink" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#FF6F86"/></marker>
+      <marker id="ar-sky"  viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5BB6FF"/></marker>
+      <marker id="ar-mint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3FD9A6"/></marker>
+      <marker id="ar-lav"  viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#B98CFF"/></marker>
+    </defs>
+
+    <!-- Layout (approx px in 1280×720):
+         Left card 1 right edge ~ x=300, y=200 (Doctor UI)
+         Left card 2 right edge ~ x=300, y=540 (Doctor 실사)
+         Right card 1 left edge ~ x=970, y=200 (환자 UI)
+         Right card 2 left edge ~ x=970, y=540 (환자 실사)
+         Image area approx: x=350-920, y=130-620
+         Quadrants: TL center (490, 250), TR (785, 250), BL (490, 500), BR (785, 500) -->
+
+    <!-- Card1 (좌상, y≈245) → TL : 우측으로 살짝 곡선 -->
+    <path d="M 252 245 C 320 245, 380 265, 445 285" stroke="#FF6F86" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#ar-pink)" opacity="0.95"/>
+    <!-- Card2 (좌하, y≈535) → BL : 우측으로 살짝 곡선 -->
+    <path d="M 252 535 C 320 535, 380 515, 445 495" stroke="#3FD9A6" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#ar-mint)" opacity="0.95"/>
+    <!-- Card3 (우상, y≈245) → TR : 좌측으로 살짝 곡선 -->
+    <path d="M 1028 245 C 960 245, 900 265, 835 285" stroke="#5BB6FF" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#ar-sky)" opacity="0.95"/>
+    <!-- Card4 (우하, y≈535) → BR : 좌측으로 살짝 곡선 -->
+    <path d="M 1028 535 C 960 535, 900 515, 835 495" stroke="#B98CFF" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#ar-lav)" opacity="0.95"/>
+  </svg>
+
+  <aside class="notes">
+    원격진찰 데모 전 설명 슬라이드. 좌측 (Doctor UI / Doctor 실사) + 우측 (환자 UI / 환자 실사) 카드, 중앙 영상 4분할. 각 카드 → 해당 사분면 짧은 곡선 화살표.
+  </aside>
+</section>

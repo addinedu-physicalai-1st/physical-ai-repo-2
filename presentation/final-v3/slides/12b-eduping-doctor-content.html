@@ -1,111 +1,90 @@
 <section>
+  <style>
+    .doctor-slide{position:relative;width:1280px;height:720px;padding:24px 44px 26px;box-sizing:border-box;display:flex;flex-direction:column}
+    .doctor-slide h2{font-family:'Jua';font-size:1.55em;color:var(--ink);margin:0}
+    .doctor-slide .body{flex:1;display:grid;grid-template-columns:0.85fr 1.3fr;gap:18px;min-height:0;margin-top:16px}
+    .doctor-slide .small-stack{display:grid;grid-template-rows:1fr 1fr 1fr;gap:12px;min-height:0}
+    .doctor-slide .scard{position:relative;background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;justify-content:center;gap:8px;overflow:hidden;min-height:0}
+    .doctor-slide .scard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px}
+    .doctor-slide .scard.c1{background-color:rgba(244,114,182,0.07);border:1px solid rgba(244,114,182,0.34)}
+    .doctor-slide .scard.c1::before{background:var(--babypink)}
+    .doctor-slide .scard.c2{background-color:rgba(96,165,250,0.07);border:1px solid rgba(96,165,250,0.34)}
+    .doctor-slide .scard.c2::before{background:var(--skyInk)}
+    .doctor-slide .scard.c4{background-color:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.34)}
+    .doctor-slide .scard.c4::before{background:var(--butterInk)}
+    .doctor-slide .scard .num{font-family:'Jua';font-size:0.58em;letter-spacing:0.22em}
+    .doctor-slide .scard.c1 .num{color:var(--babypink)}
+    .doctor-slide .scard.c2 .num{color:var(--skyInk)}
+    .doctor-slide .scard.c4 .num{color:var(--butterInk)}
+    .doctor-slide .scard h3{font-family:'Jua';font-size:1.25em;color:var(--ink);margin:0;line-height:1.1}
+    .doctor-slide .scard p{color:var(--inkSoft);font-size:0.68em;margin:0;line-height:1.5}
+    .doctor-slide .scard p b{color:var(--ink)}
+    .doctor-slide .scard .dir{position:absolute;top:12px;right:16px;font-family:'Jua';font-size:0.55em;color:var(--inkSoft);letter-spacing:0.16em;opacity:0.7}
+
+    /* Hero (FSR) card — video larger */
+    .doctor-slide .hero{position:relative;background:linear-gradient(155deg,rgba(74,222,128,0.12),rgba(34,197,94,0.03));border:2px solid var(--mintInk);border-radius:18px;padding:16px 18px 18px;display:flex;flex-direction:column;gap:10px;min-height:0;box-shadow:0 10px 32px rgba(74,222,128,0.22)}
+    .doctor-slide .hero .htop{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+    .doctor-slide .hero .num{font-family:'Jua';font-size:0.62em;color:var(--mintInk);letter-spacing:0.22em}
+    .doctor-slide .hero h3{font-family:'Jua';font-size:1.55em;color:var(--ink);margin:0}
+    .doctor-slide .hero .dir{font-family:'Jua';font-size:0.62em;color:var(--mintInk);letter-spacing:0.16em;opacity:0.85}
+    .doctor-slide .hero .video-box{flex:1;border-radius:12px;overflow:hidden;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
+    .doctor-slide .hero .video-box video{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block;border-radius:10px}
+  </style>
+
   <div class="bg-deco">
-    <div class="blob" style="width:280px;height:280px;background:var(--babypinkSoft);top:-80px;left:-60px;opacity:0.35"></div>
-    <div class="blob float" style="width:220px;height:220px;background:var(--skySoft);bottom:-60px;right:-30px;opacity:0.3"></div>
-    <div class="blob" style="width:160px;height:160px;background:var(--lavenderSoft);top:340px;left:540px;opacity:0.18"></div>
+    <div class="blob" style="width:340px;height:340px;background:var(--babypinkSoft);top:-110px;left:-90px;opacity:0.32"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--skySoft);bottom:-70px;right:-50px;opacity:0.28"></div>
   </div>
-  <div class="layer" style="padding:22px 48px 20px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+
+  <div class="layer doctor-slide">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:14px">
       <span class="chip" style="font-size:0.55em;background:linear-gradient(90deg,var(--babypink),var(--skyInk));color:#fff;border:0">EDUPING · 모드 04</span>
-      <h2 class="font-display" style="font-size:1.5em;color:var(--ink);margin:0">원격 진찰 — 4 채널 × 양방향 중계</h2>
+      <h2>원격 진찰 기능 설명</h2>
     </div>
 
-    <!-- TOP diagram — bigger -->
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px;padding:24px 22px;background:linear-gradient(90deg,rgba(168,85,247,0.10),rgba(96,165,250,0.10));border:1.5px solid var(--lavenderSoft);border-radius:16px">
-      <!-- Doctor box -->
-      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;min-width:150px">
-        <span class="material-icons-round" style="font-size:44px;color:var(--lavInk)">medical_services</span>
-        <div style="font-family:'Jua';font-size:0.95em;color:var(--ink)">의사 머신</div>
-        <div style="font-size:0.55em;color:var(--inkSoft)">Leader 팔 · 의사 UI</div>
-      </div>
-      <!-- Channels left side -->
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-          <span style="background:rgba(244,114,182,0.22);color:var(--babypink);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--babypink)">Teleop</span>
-          <span style="background:rgba(96,165,250,0.22);color:var(--skyInk);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--skyInk)">Depth</span>
-          <span style="background:rgba(74,222,128,0.22);color:var(--mintInk);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--mintInk)">FSR</span>
-          <span style="background:rgba(245,158,11,0.22);color:var(--butterInk);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--butterInk)">WebRTC</span>
-        </div>
-        <div style="position:relative;width:100%;height:3px;background:linear-gradient(90deg,var(--lavInk),var(--mintInk),var(--lavInk));border-radius:2px">
-          <span style="position:absolute;left:50%;top:-11px;transform:translateX(-50%);font-size:18px;color:var(--mintInk)">◆</span>
-        </div>
-      </div>
-      <!-- Control center -->
-      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;min-width:150px;background:rgba(74,222,128,0.14);padding:12px 14px;border-radius:12px;border:2px solid var(--mintInk)">
-        <span class="material-icons-round" style="font-size:44px;color:var(--mintInk)">hub</span>
-        <div style="font-family:'Jua';font-size:0.95em;color:var(--mintInk)">Control 서버</div>
-        <div style="font-size:0.55em;color:var(--inkSoft);text-align:center">2개 ROS 도메인 중계</div>
-      </div>
-      <!-- Channels right side -->
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-          <span style="background:rgba(244,114,182,0.22);color:var(--babypink);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--babypink)">Joint</span>
-          <span style="background:rgba(96,165,250,0.22);color:var(--skyInk);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--skyInk)">PointCloud</span>
-          <span style="background:rgba(74,222,128,0.22);color:var(--mintInk);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--mintInk)">Pressure</span>
-          <span style="background:rgba(245,158,11,0.22);color:var(--butterInk);font-size:0.6em;font-weight:700;padding:4px 12px;border-radius:6px;border:1.5px solid var(--butterInk)">P2P</span>
-        </div>
-        <div style="position:relative;width:100%;height:3px;background:linear-gradient(90deg,var(--mintInk),var(--babypink),var(--mintInk));border-radius:2px">
-          <span style="position:absolute;left:50%;top:-11px;transform:translateX(-50%);font-size:18px;color:var(--babypink)">◆</span>
-        </div>
-      </div>
-      <!-- EduPing -->
-      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;min-width:150px">
-        <span class="material-icons-round" style="font-size:44px;color:var(--babypink)">child_care</span>
-        <div style="font-family:'Jua';font-size:0.95em;color:var(--ink)">EduPing</div>
-        <div style="font-size:0.55em;color:var(--inkSoft)">로봇 + 아이 곁</div>
-      </div>
-    </div>
+    <!-- Body: 3 small text cards (left) + hero FSR (right, video bigger) -->
+    <div class="body">
 
-    <!-- 4 channel cards (short text) -->
-    <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;min-height:0">
+      <div class="small-stack">
 
-      <div style="background:var(--surface);border:1.5px solid var(--babypink);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(244,114,182,0.18)">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="material-icons-round" style="color:var(--babypink);font-size:24px">back_hand</span>
-          <span style="font-family:'Jua';font-size:0.55em;color:var(--babypink);letter-spacing:0.1em">CHANNEL 1</span>
+        <div class="scard c1">
+          <span class="dir">의사 → 로봇</span>
+          <h3>Leader Teleop</h3>
+          <p>의사 팔 관절각 → 로봇 팔에 직결<br>+ <b>3D 모델 피드백</b></p>
         </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:0">Leader Teleop</h3>
-        <p style="color:var(--inkSoft);font-size:0.58em;margin:0;line-height:1.55">
-          의사 팔 → 로봇 팔<br>+ <b style="color:var(--ink)">3D 모델 피드백</b>
-        </p>
+
+        <div class="scard c2">
+          <span class="dir">로봇 → 의사</span>
+          <h3>PointCloud</h3>
+          <p>D435 깊이 영상 · <b>1m 필터</b><br>의사 화면 입체 점구름</p>
+        </div>
+
+        <div class="scard c4">
+          <span class="dir">의사 ⇄ 환자</span>
+          <h3>WebRTC P2P</h3>
+          <p>화상·음성 <b>브라우저 직통</b><br>Control 은 시그널링만 중계</p>
+        </div>
+
       </div>
 
-      <div style="background:var(--surface);border:1.5px solid var(--skyInk);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(96,165,250,0.18)">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="material-icons-round" style="color:var(--skyInk);font-size:24px">view_in_ar</span>
-          <span style="font-family:'Jua';font-size:0.55em;color:var(--skyInk);letter-spacing:0.1em">CHANNEL 2</span>
+      <!-- Right: HERO — FSR + bigger video -->
+      <div class="hero">
+        <div class="htop">
+          <h3>FSR 청진기</h3>
+          <span class="dir">로봇 → 의사</span>
         </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:0">PointCloud</h3>
-        <p style="color:var(--inkSoft);font-size:0.58em;margin:0;line-height:1.55">
-          D435 깊이 · <b style="color:var(--ink)">1m 필터</b><br>의사 화면 입체 점구름
-        </p>
-      </div>
-
-      <div style="background:var(--surface);border:1.5px solid var(--mintInk);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(74,222,128,0.18)">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="material-icons-round" style="color:var(--mintInk);font-size:24px">monitor_heart</span>
-          <span style="font-family:'Jua';font-size:0.55em;color:var(--mintInk);letter-spacing:0.1em">CHANNEL 3</span>
+        <div class="video-box">
+          <video src="slides/assets/media/doctor/fsr-test.webm" loop muted playsinline data-press-to-play data-default-rate="1" data-no-speed
+                 onerror="this.outerHTML='&lt;div style=&quot;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff&quot;&gt;videocam_off&lt;/div&gt;'"></video>
         </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:0">FSR 청진기</h3>
-        <p style="color:var(--inkSoft);font-size:0.58em;margin:0;line-height:1.55">
-          <b style="color:var(--ink)">FSR402</b> → Arduino<br>누르는 세기 실시간
-        </p>
-      </div>
-
-      <div style="background:var(--surface);border:1.5px solid var(--butterInk);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px rgba(245,158,11,0.18)">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="material-icons-round" style="color:var(--butterInk);font-size:24px">videocam</span>
-          <span style="font-family:'Jua';font-size:0.55em;color:var(--butterInk);letter-spacing:0.1em">CHANNEL 4</span>
-        </div>
-        <h3 class="font-display" style="font-size:0.95em;color:var(--ink);margin:0">WebRTC P2P</h3>
-        <p style="color:var(--inkSoft);font-size:0.58em;margin:0;line-height:1.55">
-          화상·음성 <b style="color:var(--ink)">브라우저 직통</b><br>서버 시그널링만
-        </p>
       </div>
 
     </div>
   </div>
+
   <aside class="notes">
-    원격 진찰 — 위 다이어그램 크게 (큰 아이콘 + 큰 라벨), 아래 4 카드 텍스트 간결화.
+    원격 진찰 — 좌측 3 채널 텍스트 카드 (아이콘 제거, 글자만), 우측 FSR hero 카드에 큰 영상. 흐름 헤더 / LIVE 배지 / 게이지 라벨 모두 제거.
   </aside>
 </section>

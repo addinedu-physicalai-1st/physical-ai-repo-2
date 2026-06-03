@@ -1,0 +1,48 @@
+<section>
+  <style>
+    .hs2-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden}
+    .hs2-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mintInk)}
+    .hs2-card .num{position:absolute;right:14px;top:8px;font-family:'Jua';font-size:32px;color:rgba(74,222,128,0.22);line-height:1}
+    .hs2-card h3{font-family:'Jua';font-size:0.85em;color:var(--ink);margin:0;line-height:1.15}
+    .hs2-card .desc{color:var(--inkSoft);font-size:0.6em;line-height:1.4;margin:0}
+    .hs2-card .desc b{color:var(--mintInk)}
+  </style>
+  <div class="bg-deco">
+    <div class="blob" style="width:340px;height:340px;background:var(--mintSoft);top:-90px;right:-70px;opacity:0.35"></div>
+    <div class="blob float" style="width:240px;height:240px;background:var(--lavenderSoft);bottom:-60px;left:-30px;opacity:0.3"></div>
+  </div>
+  <div class="layer" style="padding:28px 56px;height:720px;width:1280px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;z-index:1">
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+      <span class="chip chip-mint" style="font-size:0.55em">GOGOPING · 3</span>
+      <h2 class="font-display" style="font-size:1.55em;color:var(--ink);margin:0">숨바꼭질 기능 설명</h2>
+    </div>
+
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1.1fr;gap:18px;min-height:0">
+
+      <!-- LEFT: 4 cards stacked -->
+      <div style="display:grid;grid-template-columns:1fr;grid-template-rows:repeat(4,1fr);gap:10px;min-height:0">
+        <div class="hs2-card"><span class="num">1</span><h3>매판 다른 동선</h3><p class="desc"><b>그룹 shuffle</b> + 그룹 내 <b>NN</b> 순찰 순서</p></div>
+        <div class="hs2-card"><span class="num">2</span><h3>Nav2 동적 re-plan</h3><p class="desc"><b>BehaviorTree</b> 순찰 중 장애물 출현 시 <b>Nav2</b> 가 경로 실시간 재계획</p></div>
+        <div class="hs2-card"><span class="num">3</span><h3>몸 정지, 카메라만</h3><p class="desc"><b>pan/tilt sweep</b> — 좌우 26초 훑기</p></div>
+        <div class="hs2-card"><span class="num">4</span><h3>등록 아동만 정답</h3><p class="desc"><b>InsightFace ArcFace 512-d</b> + <b>pgvector cosine 0.7</b></p></div>
+      </div>
+
+      <!-- RIGHT: video (경로 재생성) -->
+      <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-family:'Jua';font-size:0.62em;color:var(--mintInk);letter-spacing:0.08em">경로 재생성 — 장애물 우회</span>
+        </div>
+        <div style="flex:1;min-height:0;border-radius:12px;overflow:hidden;border:1.5px solid rgba(74,222,128,0.4)">
+          <video src="slides/assets/media/gogoping/hideseek-replan.mp4" loop muted playsinline data-press-to-play data-default-rate="2"
+                 style="width:100%;height:100%;object-fit:cover;object-position:75% center;display:block"
+                 onerror="this.outerHTML='&lt;div style=&quot;color:#fff&quot;&gt;hideseek-replan.mp4&lt;/div&gt;'"></video>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <aside class="notes">
+    숨바꼭질 — 좌측 경로 재생성 영상 (장애물 우회 동적 re-plan), 우측 5 핵심 카드.
+  </aside>
+</section>
