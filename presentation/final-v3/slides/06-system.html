@@ -35,31 +35,16 @@
     .archx .n.db { background:linear-gradient(165deg,rgba(245,158,11,0.18),rgba(245,158,11,0.04)); border:1.5px solid rgba(245,158,11,0.4); }
     .archx .n.db.on { box-shadow:0 0 0 1px rgba(245,158,11,0.7),0 0 22px rgba(245,158,11,0.5); border-color:#f59e0b; }
     .archx .n.db .icon, .archx .n.db .tag { color:#f59e0b; }
-    .archx .n.db { flex-direction:row; gap:7px; }
-    .archx .n.db .label { font-size:14px; line-height:1.15; text-align:left; }
-    .archx .n.db .icon { font-size:22px; margin-bottom:0; }
-
-    /* svc · hub · ai: 아이콘 왼쪽 · 글씨 오른쪽 (가로 배치) + 전체 확대 */
-    .archx .n.svc, .archx .n.hub, .archx .n.ai { flex-direction:row; gap:12px; }
-    .archx .n.svc .icon, .archx .n.hub .icon, .archx .n.ai .icon { margin-bottom:0; font-size:30px; }
-    .archx .n.svc .label, .archx .n.ai .label { font-size:20px; }
-    .archx .n.hub .label { font-size:25px; }
-    .archx .n.hub .icon { font-size:34px; }
-
-    /* app: 아이콘 왼쪽 · 글씨(라벨+서브라벨) 묶어서 오른쪽 */
-    .archx .n.app { flex-direction:row; gap:12px; text-align:left; }
-    .archx .n.app .icon { margin-bottom:0; font-size:30px; }
-    .archx .n.app .rtext { display:flex; flex-direction:column; align-items:flex-start; }
-    .archx .n.app .rtext .label { font-size:18px; }
-    .archx .n.app .rtext .sublabel { margin-top:2px; font-size:12px; }
+    .archx .n.db .label { font-size:10px; }
+    .archx .n.db .icon { font-size:18px; margin-bottom:1px; }
 
     .archx .n.robot { background:linear-gradient(170deg,rgba(244,114,182,0.14),rgba(244,114,182,0.03)); border:1.5px solid rgba(244,114,182,0.36); padding:10px 16px; align-items:flex-start; justify-content:flex-start; text-align:left; }
-    .archx .n.robot .rhead { height:52px; flex:0 0 auto; overflow:hidden; }
+    .archx .n.robot .rhead { min-height:62px; }
     .archx .n.robot.on { box-shadow:0 0 0 1px rgba(244,114,182,0.75),0 0 28px rgba(244,114,182,0.5); border-color:#f472b6; }
     .archx .n.robot .icon, .archx .n.robot .tag { color:#f472b6; }
     .archx .n.robot .tag { font-size:11px; letter-spacing:0.22em; }
     .archx .n.robot .rhead { display:flex; align-items:center; gap:12px; width:100%; margin-bottom:10px; }
-    .archx .n.robot .rhead img { width:46px; height:46px; object-fit:contain; background:rgba(255,255,255,0.06); border-radius:9px; padding:4px; flex:0 0 auto; }
+    .archx .n.robot .rhead img { width:62px; height:62px; object-fit:contain; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px; flex:0 0 auto; }
     .archx .n.robot .rhead .label { font-size:24px; }
     .archx .n.robot .board { margin-top:12px; width:100%; min-height:70px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; }
     .archx .n.robot .board:first-of-type { margin-top:0; }
@@ -79,7 +64,7 @@
 
     .archx svg.lines { position:absolute; left:0; top:0; width:1280px; height:720px; pointer-events:none; }
     .archx svg.lines path { fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:0.38; transition:opacity 0.4s ease, stroke-width 0.3s; }
-    .archx svg.lines path.on { opacity:1; stroke-width:2.6; }
+    .archx svg.lines path.on { opacity:1; stroke-width:2.6; filter:drop-shadow(0 0 6px currentColor); animation:edge-pulse 1.6s ease-in-out infinite; }
     @keyframes edge-pulse { 0%,100% { stroke-width:2.4; } 50% { stroke-width:3; } }
 
     .archx svg.lines text { font-family:system-ui,sans-serif; font-size:13px; font-weight:700; opacity:0.32; transition:opacity 0.4s; paint-order:stroke; stroke:rgba(10,13,20,0.95); stroke-width:5; stroke-linecap:round; stroke-linejoin:round; }
@@ -105,71 +90,62 @@
     <div class="ribbon ribbon-rob">ROBOTS</div>
 
     <svg class="lines">
-      <!-- 양방향 화살표: marker 가 일부 환경(CSS-sized SVG)에서 렌더 안 돼 직접 삼각형 path 로 그림 -->
+      <defs>
+        <marker id="m-blue" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#60a5fa"/></marker>
+        <marker id="m-blue-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#60a5fa"/></marker>
+        <marker id="m-green" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#4ade80"/></marker>
+        <marker id="m-green-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#4ade80"/></marker>
+        <marker id="m-orange" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#f59e0b"/></marker>
+        <marker id="m-orange-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#f59e0b"/></marker>
+        <marker id="m-purple" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a855f7"/></marker>
+        <marker id="m-purple-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#a855f7"/></marker>
+        <marker id="m-pink" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#f472b6"/></marker>
+        <marker id="m-pink-rev" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M8,0 L0,4 L8,8 z" fill="#f472b6"/></marker>
+      </defs>
 
       <!-- Browser → Web (APP↔SERVICE): vertical at x=220 -->
-      <path data-flow="2,4,6" d="M 220,162 L 220,200" stroke="#60a5fa"/>
-      <path data-flow="2,4,6" style="fill:#60a5fa" d="M 214,172 L 226,172 L 220,160 Z"/>
-      <path data-flow="2,4,6" style="fill:#60a5fa" d="M 214,190 L 226,190 L 220,202 Z"/>
+      <path data-flow="2,4,6" d="M 220,162 L 220,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
       <text data-flow="2,4,6" x="228" y="186" fill="#60a5fa">HTTP·WS</text>
 
       <!-- Admin → Control (APP↔SERVICE): vertical at x=640 -->
-      <path data-flow="2,5" d="M 640,162 L 640,200" stroke="#60a5fa"/>
-      <path data-flow="2,5" style="fill:#60a5fa" d="M 634,172 L 646,172 L 640,160 Z"/>
-      <path data-flow="2,5" style="fill:#60a5fa" d="M 634,190 L 646,190 L 640,202 Z"/>
+      <path data-flow="2,5" d="M 640,162 L 640,200" stroke="#60a5fa" marker-start="url(#m-blue-rev)" marker-end="url(#m-blue)"/>
       <text data-flow="2,5" x="648" y="186" fill="#60a5fa">HTTP·WS</text>
 
       <!-- Web → Control (SERVICE internal): horizontal at y=230 -->
-      <path data-flow="2,4,6" d="M 320,230 L 460,230" stroke="#4ade80"/>
-      <path data-flow="2,4,6" style="fill:#4ade80" d="M 330,224 L 330,236 L 318,230 Z"/>
-      <path data-flow="2,4,6" style="fill:#4ade80" d="M 450,224 L 450,236 L 462,230 Z"/>
-      <text data-flow="2,4,6" x="338" y="216" fill="#4ade80">HTTP·WS</text>
+      <path data-flow="2,4,6" d="M 320,230 L 440,230" stroke="#4ade80" marker-start="url(#m-green-rev)" marker-end="url(#m-green)"/>
+      <text data-flow="2,4,6" x="338" y="223" fill="#4ade80">HTTP·WS</text>
 
       <!-- Control → DB (SERVICE internal): horizontal at y=230 -->
-      <path data-flow="2,4,5,6" d="M 820,230 L 868,230" stroke="#f59e0b"/>
-      <path data-flow="2,4,5,6" style="fill:#f59e0b" d="M 830,224 L 830,236 L 818,230 Z"/>
-      <path data-flow="2,4,5,6" style="fill:#f59e0b" d="M 858,224 L 858,236 L 870,230 Z"/>
-      <text data-flow="2,4,5,6" x="844" y="216" fill="#f59e0b" text-anchor="middle">TCP</text>
+      <path data-flow="2,4,5,6" d="M 840,230 L 890,230" stroke="#f59e0b" marker-start="url(#m-orange-rev)" marker-end="url(#m-orange)"/>
+      <text data-flow="2,4,5,6" x="865" y="222" fill="#f59e0b" text-anchor="middle">TCP</text>
 
       <!-- Control → AI (SERVICE internal): route ABOVE at y=182 -->
-      <path data-flow="2,4,5,6" d="M 800,200 L 800,182 L 1120,182 L 1120,200" stroke="#a855f7"/>
-      <path data-flow="2,4,5,6" style="fill:#a855f7" d="M 794,190 L 806,190 L 800,202 Z"/>
-      <path data-flow="2,4,5,6" style="fill:#a855f7" d="M 1114,190 L 1126,190 L 1120,202 Z"/>
-      <text data-flow="2,4,5,6" x="960" y="176" fill="#a855f7" text-anchor="middle">HTTP·WS</text>
+      <path data-flow="2,4,5,6" d="M 815,200 L 815,182 L 1070,182 L 1070,200" stroke="#a855f7" marker-start="url(#m-purple-rev)" marker-end="url(#m-purple)"/>
+      <text data-flow="2,4,5,6" x="942" y="176" fill="#a855f7" text-anchor="middle">HTTP·WS</text>
 
       <!-- Control → EduPing: L-shape (scenarios ①·②) -->
-      <path data-flow="4" d="M 480,270 L 480,330 L 220,330 L 220,360" stroke="#f472b6"/>
-      <path data-flow="4" style="fill:#f472b6" d="M 474,280 L 486,280 L 480,268 Z"/>
-      <path data-flow="4" style="fill:#f472b6" d="M 214,350 L 226,350 L 220,362 Z"/>
+      <path data-flow="4" d="M 480,270 L 480,330 L 220,330 L 220,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
       <text data-flow="4" x="240" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
 
       <!-- Control → GogoPing: straight vertical at x=640 (scenario ③ GogoPing) -->
-      <path data-flow="5" d="M 640,270 L 640,360" stroke="#f472b6"/>
-      <path data-flow="5" style="fill:#f472b6" d="M 634,280 L 646,280 L 640,268 Z"/>
-      <path data-flow="5" style="fill:#f472b6" d="M 634,350 L 646,350 L 640,362 Z"/>
+      <path data-flow="5" d="M 640,270 L 640,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
       <text data-flow="5" x="640" y="320" fill="#f472b6" text-anchor="middle">WS · ROS2 · WebRTC · HTTP</text>
 
       <!-- Control → NoriArm: L-shape (scenario ③ NoriArm) -->
-      <path data-flow="6" d="M 800,270 L 800,330 L 1040,330 L 1040,360" stroke="#f472b6"/>
-      <path data-flow="6" style="fill:#f472b6" d="M 794,280 L 806,280 L 800,268 Z"/>
-      <path data-flow="6" style="fill:#f472b6" d="M 1034,350 L 1046,350 L 1040,362 Z"/>
+      <path data-flow="6" d="M 800,270 L 800,330 L 1000,330 L 1000,360" stroke="#f472b6" marker-start="url(#m-pink-rev)" marker-end="url(#m-pink)"/>
       <text data-flow="6" x="822" y="323" fill="#f472b6">WS · ROS2 · WebRTC · HTTP</text>
     </svg>
 
     <!-- APP layer -->
     <div class="n app" data-step="1,4,6" style="left:120px;top:92px;width:200px;height:70px">
       <span class="material-icons-round icon">person</span>
-      <div class="rtext">
-        <div class="label">Portal Browser</div>
-        <div class="sublabel">학부모 · 교사 · 의사</div>
-      </div>
+      <div class="label">Portal Browser</div>
+      <div class="sublabel">학부모 · 교사 · 의사</div>
     </div>
     <div class="n app" data-step="1,5" style="left:540px;top:92px;width:200px;height:70px">
       <span class="material-icons-round icon">admin_panel_settings</span>
-      <div class="rtext">
-        <div class="label">Admin App</div>
-        <div class="sublabel">운영 관제</div>
-      </div>
+      <div class="label">Admin App</div>
+      <div class="sublabel">운영 관제</div>
     </div>
 
     <!-- SERVICE layer -->
@@ -177,15 +153,15 @@
       <span class="material-icons-round icon">dns</span>
       <div class="label">Portal Web</div>
     </div>
-    <div class="n hub" data-step="2,4,5,6" style="left:460px;top:200px;width:360px;height:70px">
+    <div class="n hub" data-step="2,4,5,6" style="left:440px;top:200px;width:400px;height:70px">
       <span class="material-icons-round icon">hub</span>
       <div class="label">Control Service</div>
     </div>
-    <div class="n db" data-step="2,4,5,6" style="left:868px;top:206px;width:104px;height:58px;padding:6px 8px">
+    <div class="n db" data-step="2,4,5,6" style="left:890px;top:210px;width:60px;height:50px;padding:4px">
       <span class="material-icons-round icon">storage</span>
-      <div class="label">Control<br>DB</div>
+      <div class="label">Control DB</div>
     </div>
-    <div class="n ai" data-step="2,4,5,6" style="left:1020px;top:200px;width:200px;height:70px">
+    <div class="n ai" data-step="2,4,5,6" style="left:980px;top:200px;width:180px;height:70px">
       <span class="material-icons-round icon">memory</span>
       <div class="label">AI Service</div>
     </div>
