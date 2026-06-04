@@ -25,27 +25,29 @@
 
   .topbar{
     position:fixed; top:0; left:0; right:0; z-index:60;
-    display:flex; align-items:center; flex-wrap:wrap; gap:10px;
-    padding:11px 22px; background:rgba(20,17,28,.78); backdrop-filter:blur(8px);
+    display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+    padding:14px 28px; background:rgba(20,17,28,.82); backdrop-filter:blur(8px);
     border-bottom:1px solid var(--border);
   }
   .back{
-    flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
-    background:var(--surface); border:1px solid var(--border); color:var(--inkSoft);
-    font-family:'Jua',sans-serif; font-size:14px; padding:7px 15px; border-radius:999px;
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:8px;
+    height:46px; padding:0 24px;
+    background:var(--surface); border:1px solid var(--border); color:var(--ink);
+    font-family:'Jua',sans-serif; font-size:18px; border-radius:999px;
     cursor:pointer; transition:color .15s, border-color .15s, transform .15s;
   }
   .back:hover{color:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
-  .sec-nav{display:flex; flex-wrap:wrap; gap:7px; margin:0}
+  .sec-nav{display:flex; flex-wrap:wrap; gap:9px; margin:0}
   .sec-nav a{
-    display:inline-flex; align-items:center; gap:7px; cursor:pointer;
-    background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--inkSoft);
-    font-family:'Jua',sans-serif; font-size:13px; padding:6px 13px; border-radius:999px;
+    display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+    height:46px; padding:0 19px;
+    background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--inkSoft);
+    font-family:'Jua',sans-serif; font-size:16px; border-radius:999px;
     transition:color .15s, background .15s, border-color .15s; white-space:nowrap;
   }
-  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.08)}
+  .sec-nav a:hover{color:var(--ink); background:rgba(255,255,255,.09)}
   .sec-nav a.on{color:#2A0F16; background:var(--accent); border-color:var(--accent)}
-  .sec-nav a .n{font-size:12px; opacity:.8}
+  .sec-nav a .n{font-size:14px; opacity:.75; font-weight:700}
 
   .deck{
     position:fixed; inset:0; display:flex; overflow-x:auto; overflow-y:hidden;
@@ -94,6 +96,12 @@
 
   .lead{font-size:18px; line-height:1.85; margin:0 0 14px}
   .lead b{color:var(--accent)}
+  /* 불릿: 핵심 개념 + 짧은 설명 */
+  .points{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px}
+  .points li{position:relative; padding-left:30px; font-size:17px; line-height:1.72; color:var(--inkSoft)}
+  .points li::before{content:"›"; position:absolute; left:8px; top:-2px; color:var(--accent); font-family:'Jua',sans-serif; font-size:20px}
+  .points .c{color:var(--accent); font-weight:700; margin-right:3px}
+  .points b{color:var(--accent)}
 
   .callout{display:flex; gap:12px; align-items:flex-start; background:rgba(255,255,255,.04); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:12px; padding:16px 18px; margin-top:18px}
   .callout .material-icons-round{color:var(--accent); font-size:24px; margin-top:1px}
@@ -143,7 +151,7 @@
   <div id="page-fade"></div>
 
   <div class="topbar">
-    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:17px">arrow_back</span> Q&amp;A</button>
+    <button class="back jua" onclick="backToQna()"><span class="material-icons-round" style="font-size:20px">arrow_back</span> Q&amp;A</button>
     <nav class="sec-nav" id="secnav"></nav>
   </div>
 
@@ -198,7 +206,11 @@
             <img src="https://images.prismic.io/joey/ah546weQX7-eWhsr_report_ui2.jpg?auto=format,compress" alt="아이별 타임라인" />
             <div class="cap">실제 화면 — 아이를 고르면 그 아이의 시간순 타임라인이 뜸.</div>
           </div>
-          <p class="lead">학부모 보고서(<code>parent/Report.vue</code>)는 <b>시간 | 점 | 카드</b>의 세로 타임라인 + 요약 카드로, 표정 라벨·출결·놀이 사진을 함께 묶습니다. 교사 화면(<code>teacher/Reports.vue</code>)에서는 같은 데이터를 <b>인라인으로 편집</b>하고, 각 항목을 고치면 <b>그 항목만 PATCH</b>로 저장합니다 — 원본이 하나라 교사 편집이 학부모 화면에 어긋날 일이 없습니다.</p>
+          <ul class="points">
+            <li><span class="c">학부모 타임라인</span> — <code>parent/Report.vue</code>: 시간|점|카드 세로 타임라인 + 요약, 표정·출결·사진 묶음</li>
+            <li><span class="c">교사 인라인 편집</span> — <code>teacher/Reports.vue</code>: 같은 데이터를 그 자리에서 수정, 항목별 PATCH 저장</li>
+            <li><span class="c">단일 원본</span> — 데이터 한 벌이라 교사 편집이 학부모 화면에 그대로 반영, 어긋남 없음</li>
+          </ul>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>PATCH</b> = 전체를 다시 보내지 말고 "<b>바뀐 한 줄만</b>" 고쳐 저장하는 방식. 한 줄 고쳤는데 보고서 전체를 통째로 덮어쓰면 충돌·낭비라서, 항목 하나만 가볍게 저장합니다. <b>Pinia</b> = 화면들이 함께 보는 "공용 데이터 보관함"이라 교사가 고친 게 학부모 화면에도 자연히 반영됩니다.</p></div>
       </div>
@@ -214,8 +226,11 @@
             <div class="cap">놀이 중 자동 촬영된 emotion capture — 세션별 묶음 → 라이트박스 갤러리.</div>
           </div>
           <div>
-            <p class="lead" style="font-size:17px">무궁화·율동 중 자동 촬영된 표정 사진을 <b>세션(놀이)별로 묶어</b> 타임라인에 띄우고, 누르면 <code>Teleport</code>로 <b>body 직속 라이트박스 갤러리</b>가 열립니다(키보드 ←/→/Esc, lazy load).</p>
-            <p class="lead" style="font-size:17px;margin:0">학부모 일정(<code>parent/Schedule.vue</code>)은 하루 일과 그리드에서 <b>현재 시각의 칸을 강조</b>합니다 — <code>setInterval</code> 60초 틱 + <code>HH:MM</code> 범위 비교, 등/하원 행은 항상 보이게 보장.</p>
+            <ul class="points">
+              <li><span class="c">사진 갤러리</span> — 세션(놀이)별 사진 묶음 → <code>Teleport</code> 라이트박스(←/→/Esc, lazy load)</li>
+              <li><span class="c">현재 시각 일정</span> — <code>parent/Schedule.vue</code>: 일과 그리드에서 현재 칸 강조(60초 틱 + <code>HH:MM</code> 비교)</li>
+              <li><span class="c">등/하원 보장</span> — 등·하원 행은 항상 표시</li>
+            </ul>
           </div>
         </div>
         <div class="eli5"><span class="lbl">쉽게 말하면</span><p><b>Teleport</b> = 사진 확대창을 화면 맨 위로 띄워 다른 요소에 안 가리게 하는 Vue 기능. <b>60초 틱</b> = 화면이 1분마다 "지금 시각"을 확인해 타임라인에서 현재 시간대를 밝게 강조 — "지금 우리 아이가 뭐 하는 중"인지 한눈에 보입니다.</p></div>
@@ -310,7 +325,7 @@
       function fit(s){
         var inner=s.querySelector('.dslide-in'); if(!inner) return;
         inner.style.transform='none';
-        var MX=44, TOP=78, BOT=62;
+        var MX=44, TOP=94, BOT=58;
         var aW=Math.max(160,window.innerWidth-2*MX), aH=Math.max(160,window.innerHeight-TOP-BOT);
         inner.style.width=Math.min(1140,aW)+'px';
         var nW=inner.offsetWidth, nH=inner.offsetHeight;
