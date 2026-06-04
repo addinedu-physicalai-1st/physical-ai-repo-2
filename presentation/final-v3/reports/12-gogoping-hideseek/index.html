@@ -291,7 +291,7 @@
           <ul>
             <li><b>검출(SCRFD)</b> — InsightFace <code>buffalo_l</code>, <code>det_size 640²</code>로 얼굴 검출</li>
             <li><b>임베딩(ArcFace)</b> — 얼굴 한 장 → <b>512-d 벡터</b>. angular margin 사전학습이라 <b>아이마다 추가 학습 0</b>, 등록 사진 임베딩만 DB에</li>
-            <li><b>비교(pgvector)</b> — DB와 <b>cosine 거리</b>(<code>&lt;=&gt;</code>)로 최근접 한 명</li>
+            <li><b>비교(pgvector)</b> — DB와 <b>cosine 거리</b>로 최근접 한 명</li>
           </ul>
           <p style="font-size:16.5px;margin-top:14px"><b style="color:var(--accent)">임계 거리(cutoff) 0.7</b> — 가장 가까운 한 명을 뽑되, 그 거리가 <b>0.7보다 멀면 "등록 아동 아님"으로 거부</b>합니다. 닮은 아이가 있어도 거리가 임계 밖이면 잡지 않아 오인을 막습니다.</p>
         </div>
