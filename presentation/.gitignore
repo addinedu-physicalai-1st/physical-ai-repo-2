@@ -5,3 +5,6 @@ final-*/slides/assets/media/
 *.dn.mp4
 *.dn.webm
 final-*/reports/*/assets-local/
+# 단, 09-noriarm-shop 의 Q&A 영상은 git 에 포함 (Prismic 자격증명 없어 임시)
+!final-v3/reports/09-noriarm-shop/assets-local/
+!final-v3/reports/09-noriarm-shop/assets-local/*.mp4
