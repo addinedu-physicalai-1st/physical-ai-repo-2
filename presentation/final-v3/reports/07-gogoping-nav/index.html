@@ -224,8 +224,8 @@
         <div>
           <p class="lead">좌표가 아니라 <b>의미있는 장소에 이름을 붙인 vertex 그래프</b> 위에 길을 짭니다. (Nav2 표준 Route Server를 자체 <code>graph_router</code>로 구현)</p>
           <ul class="reasons">
-            <li><span class="rn">①</span><span class="rt"><b>의미 명령</b> — "놀이방으로 가". 공간이 바뀌면 <code>waypoints.yaml</code> 점만 옮김 → <b>코드 수정 0</b></span></li>
-            <li><span class="rn">②</span><span class="rt"><b>좁은 길 정확 통과</b> — 문(0.885m) 한가운데 vertex를 박아 <b>그 좌표를 정확히 조준</b></span></li>
+            <li><span class="rn">①</span><span class="rt"><b>의미</b> — 좌표 숫자 대신 "놀이방" 같은 이름으로 명령. 공간이 바뀌면 점 위치만 옮기면 된다.</span></li>
+            <li><span class="rn">②</span><span class="rt"><b>좁은 길</b> — 좁은 문 한가운데에 점을 두어 그 지점으로 정확히 통과한다.</span></li>
             <li><span class="rn">③</span><span class="rt"><b>안전 정거장</b> — 멈춤·회전·복구를 <b>검증된 안전 지점에서만</b></span></li>
           </ul>
         </div>
@@ -261,13 +261,12 @@
           <p style="font-size:17px"><code>can_rotate</code> 지점에 도착했을 때만 다음 차선 방향으로 <b>정렬 회전 후 직진</b>합니다 (허용 ~5.7°, ~30°/s). 좁은 통로엔 비스듬히 들어가 벽을 긁지 않고, <b>미리 몸을 정렬해 직선으로</b> 진입합니다.</p>
         </div>
         <div>
-          <h3>회전 안전 지점 (can_rotate) — 5개</h3>
-          <p><span class="chip">복도</span><span class="chip">충전소</span><span class="chip">놀-상-회</span><span class="chip">놀-하-회</span><span class="chip">수-회</span></p>
-          <p style="font-size:16px;color:var(--inkSoft)">넓어서 회전해도 안전한 곳만 화이트리스트로 지정. 이름의 <b style="color:var(--accent)">"-회"가 곧 회전(回) 전용 지점</b> — 좁은 차선이 만나는 길목의 방향 전환을 여기서만 합니다.</p>
-          <div class="callout">
-            <span class="material-icons-round">alt_route</span>
-            <p><b>실제 사례.</b> 반대편 충전소로 복귀할 때 좁은 통로에서 U턴하지 않고, <span class="k">복-4 → 복-4-1(옆 차선) → 복-5 → 충전소입구</span> 처럼 <b>안전 지점을 경유하는 우회 경로</b>를 자동으로 찾습니다.</p>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;height:30vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center"><video src="https://asd0821.cdn.prismic.io/asd0821/aiAgEQeQX7-eWp_6_can_rotate2.mp4" autoplay loop muted playsinline style="max-width:100%;max-height:100%;display:block;object-fit:contain"></video></div>
+            <div style="flex:1;height:30vh;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center"><video src="https://asd0821.cdn.prismic.io/asd0821/aiAgDweQX7-eWp_4_can_rotate1.mp4" autoplay loop muted playsinline style="max-width:100%;max-height:100%;display:block;object-fit:contain"></video></div>
           </div>
+          <h3 style="font-size:19px;margin:16px 0 5px">회전 안전 지점 (can_rotate) — 5개</h3>
+          <p style="margin:4px 0 0"><span class="chip">복도</span><span class="chip">충전소</span><span class="chip">놀-상-회</span><span class="chip">놀-하-회</span><span class="chip">수-회</span></p>
         </div>
       </div>
     </div>
