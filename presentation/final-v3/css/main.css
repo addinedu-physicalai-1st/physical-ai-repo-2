@@ -362,3 +362,90 @@ html, body {
   max-height: none !important;
   box-shadow: none !important;
 }
+
+/* ==========================================
+   PDF 내보내기 — html2canvas + jsPDF (브라우저 인쇄 미사용)
+   export 중 <html>.pdf-exporting 클래스가 붙으면 모든 슬라이드를
+   1280×720 블록으로 펼쳐(reveal 의 transform/숨김 무력화) 정상 흐름에 둔다.
+   main.js 의 exportPDF() 가 각 <section> 을 캔버스로 캡처 → jsPDF 페이지로 추가.
+   ========================================== */
+html.pdf-exporting,
+html.pdf-exporting body {
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--canvas) !important;
+}
+
+/* 화면 전용 크롬·오버레이는 캡처에서 제외 */
+html.pdf-exporting #loading-screen,
+html.pdf-exporting #draw-canvas,
+html.pdf-exporting #webcam-overlay,
+html.pdf-exporting #slide-panel,
+html.pdf-exporting #slide-panel-overlay,
+html.pdf-exporting #image-zoom-overlay,
+html.pdf-exporting #fullscreen-hint,
+html.pdf-exporting #pdf-export-btn,
+html.pdf-exporting .reveal .progress,
+html.pdf-exporting .reveal .controls,
+html.pdf-exporting .reveal .slide-number,
+html.pdf-exporting .reveal .backgrounds { display: none !important; }
+
+/* reveal 컨테이너의 scale/위치 변환 제거 → 정상 흐름으로 */
+html.pdf-exporting .reveal-viewport,
+html.pdf-exporting .reveal,
+html.pdf-exporting .reveal .slides {
+  position: static !important;
+  width: 1280px !important;
+  height: auto !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  zoom: 1 !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+
+/* 모든 슬라이드를 1280×720 블록으로 펼친다 */
+html.pdf-exporting .reveal .slides > section,
+html.pdf-exporting .reveal .slides > section > section {
+  display: block !important;
+  position: relative !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 1280px !important;
+  height: 720px !important;
+  min-height: 720px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* export 시 모든 fragment 를 최종(표시) 상태로 */
+html.pdf-exporting .reveal .fragment {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+/* 발표자 노트는 캡처 제외 */
+html.pdf-exporting .reveal aside.notes,
+html.pdf-exporting .reveal .speaker-notes { display: none !important; }
+
+/* 진행률 토스트 (export 중 표시) */
+#pdf-export-toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+  z-index: 99999; display: none;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px 20px; font-family: 'Jua', sans-serif; font-size: 15px;
+  box-shadow: var(--sh-2);
+}
+#pdf-export-toast.show { display: block; }

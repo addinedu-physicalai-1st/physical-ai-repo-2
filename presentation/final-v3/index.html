@@ -107,6 +107,11 @@
       <span class="font-display text-em-md text-ink">슬라이드</span>
       <button onclick="closeSlidePanel()" class="text-inkSoft hover:text-babypink text-xl leading-none">×</button>
     </header>
+    <button id="pdf-export-btn" onclick="exportPDF()" title="모든 슬라이드를 PDF 한 파일로 (단축키 E)"
+            class="mx-3 mt-3 px-3 py-2 rounded-xl bg-babypinkSoft text-babypink font-display text-em-sm flex items-center justify-center gap-2 hover:bg-babypink hover:text-cream transition-colors">
+      <span class="mi material-icons-round" style="font-size:1.15em">picture_as_pdf</span>
+      전체 슬라이드 PDF로 내보내기
+    </button>
     <div id="slide-panel-list" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
   </aside>
 
@@ -118,6 +123,9 @@
     <img id="image-zoom-img" src="" alt="" style="max-width:92vw;max-height:92vh;object-fit:contain;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5)" />
   </div>
 
+  <!-- PDF export progress toast -->
+  <div id="pdf-export-toast"></div>
+
   <!-- Fullscreen hint -->
   <div id="fullscreen-hint" class="fixed bottom-3 left-3 z-[50] text-em-3xs text-inkSoft" style="font-size:11px">
     Press <kbd style="background:#241F33;border:1px solid rgba(255,255,255,0.14);border-radius:4px;padding:1px 5px;font-size:0.9em;color:#F4EFE8">F</kbd> for fullscreen
@@ -126,6 +134,9 @@
   <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <!-- PDF 내보내기 (인쇄 대화상자 미사용): 슬라이드 → 캔버스 → jsPDF -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

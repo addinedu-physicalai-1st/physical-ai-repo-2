@@ -171,6 +171,7 @@ async function initPresentation() {
       87: function () { toggleWebcam(); },     // W
       67: function () { toggleDraw(); },       // C
       88: function () { clearDraw(); },        // X
+      69: function () { exportPDF(); },         // E (Export PDF)
       39: function () { advanceOrPlay(); },    // →
       32: function () { advanceOrPlay(); },    // Space
       34: function () { advanceOrPlay(); },    // PageDown
@@ -442,6 +443,71 @@ function _stopWebcam() {
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen();
   else document.exitFullscreen();
+}
+
+/* ── PDF 내보내기 ── 브라우저 인쇄 미사용. 각 슬라이드를 html2canvas 로 캡처해
+   jsPDF 페이지로 쌓아 .pdf 파일을 바로 다운로드한다. (css/main.css 의 .pdf-exporting 참고) */
+var _pdfExporting = false;
+
+function _pdfToast(msg, show) {
+  var t = document.getElementById('pdf-export-toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.toggle('show', show !== false);
+}
+function _raf2() {
+  return new Promise(function (r) {
+    requestAnimationFrame(function () { requestAnimationFrame(function () { r(); }); });
+  });
+}
+
+async function exportPDF() {
+  if (_pdfExporting) return;
+  if (typeof html2canvas === 'undefined' || !window.jspdf) {
+    _pdfToast('PDF 라이브러리를 불러오지 못했습니다 (네트워크 확인)', true);
+    setTimeout(function () { _pdfToast('', false); }, 3000);
+    return;
+  }
+  _pdfExporting = true;
+  closeSlidePanel();
+  closeImageZoom();
+  if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
+
+  var W = 1280, H = 720;
+  var sections = Array.prototype.slice.call(
+    document.querySelectorAll('.reveal .slides > section')
+  );
+  var jsPDF = window.jspdf.jsPDF;
+  var pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [W, H], compress: true });
+
+  // export 레이아웃 적용 + 폰트/리렌더 안정화 대기
+  document.documentElement.classList.add('pdf-exporting');
+  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+  await _raf2();
+
+  try {
+    for (var i = 0; i < sections.length; i++) {
+      _pdfToast('PDF 생성 중… ' + (i + 1) + ' / ' + sections.length, true);
+      await _raf2();
+      var canvas = await html2canvas(sections[i], {
+        width: W, height: H, windowWidth: W, windowHeight: H,
+        scale: 2, useCORS: true, backgroundColor: '#16131F', logging: false,
+        imageTimeout: 4000, removeContainer: true
+      });
+      var img = canvas.toDataURL('image/jpeg', 0.92);
+      if (i > 0) pdf.addPage([W, H], 'landscape');
+      pdf.addImage(img, 'JPEG', 0, 0, W, H);
+    }
+    pdf.save('pingdergarten.pdf');
+    _pdfToast('PDF 저장 완료 (' + sections.length + '장)', true);
+  } catch (err) {
+    console.error('[exportPDF]', err);
+    _pdfToast('PDF 생성 실패: ' + (err && err.message ? err.message : err), true);
+  } finally {
+    document.documentElement.classList.remove('pdf-exporting');
+    _pdfExporting = false;
+    setTimeout(function () { _pdfToast('', false); }, 2500);
+  }
 }
 function updateFullscreenHint() {
   var hint = document.getElementById('fullscreen-hint');
