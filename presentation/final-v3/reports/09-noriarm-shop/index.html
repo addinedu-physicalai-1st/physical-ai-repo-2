@@ -380,8 +380,12 @@
       <h2 class="jua">최종 시연 — 가게놀이</h2>
       <p class="sub">Phase 6 SmolVLA + R13 v2 YOLO. <b>ACT phase5 (50k → 200k step) ~64 시간 학습</b> · SmolVLA 는 학습머신 (RTX 5090) 별도 학습.</p>
       <div style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center">
-        <div class="vc" style="max-width:1080px; width:100%">
-          <video src="https://minsung.cdn.prismic.io/minsung/aiDhAAeQX7-eWtV6_%EA%B0%80%EA%B2%8C%EB%86%80%EC%9D%B4-%EC%B5%9C%EC%A2%85-.mp4" controls preload="metadata" muted playsinline></video>
+        <div class="vc" style="max-width:90%; max-height:100%; display:flex; flex-direction:column; min-height:0">
+          <div style="position:relative; width:100%; aspect-ratio:16/9; flex:0 1 auto; min-height:0">
+            <video src="https://minsung.cdn.prismic.io/minsung/aiDhAAeQX7-eWtV6_%EA%B0%80%EA%B2%8C%EB%86%80%EC%9D%B4-%EC%B5%9C%EC%A2%85-.mp4"
+                   controls preload="metadata" muted playsinline
+                   style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000"></video>
+          </div>
           <div class="meta"><p class="t">가게놀이 — 5종 객체 grasp + 종 누르기 (최종)</p><p class="d">노리암 로봇 가게놀이 데모</p></div>
         </div>
       </div>
