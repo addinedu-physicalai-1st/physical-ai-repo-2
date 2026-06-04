@@ -114,7 +114,7 @@ var SLIDE_TITLES = [
 async function loadSlides() {
   var container = document.querySelector('.reveal .slides');
   var responses = await Promise.all(
-    SLIDES.map(function (name) { return fetch('slides/' + name + '?t=' + Date.now()); })
+    SLIDES.map(function (name) { return fetch('slides/' + name + '?t=' + Date.now(), { cache: 'no-store' }); })
   );
   var htmls = await Promise.all(responses.map(function (r) { return r.text(); }));
   htmls.forEach(function (html) {
